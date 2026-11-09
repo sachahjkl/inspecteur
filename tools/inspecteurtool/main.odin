@@ -3,7 +3,7 @@
 //   odin run tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/inspecteurtool -- <command>
 //   (build.sh and build.bat are its shortcuts for `build`)
 //
-// What it needs is on the path: git, odin, cargo (the toolkit's text library).
+// What it needs is on the path: git, odin, cargo (the toolkit's text library); sway for live, shots and bench.
 // GT=<folder>: another checkout of gui_toolkit (its root, not its src).
 package inspecteurtool
 
@@ -24,6 +24,9 @@ COMMANDS :: [?]Command{
 	{name = "build", about = "[release]: the toolkit's text library when its sources changed, then build/inspecteur", run = run_build},
 	{name = "test", about = "the unit tests of the program", run = run_test},
 	{name = "check", about = "odin check of the program and of this tool (-vet), the tests, then a release build", run = run_check},
+	{name = "live", about = "[--keep]: the real program in a sway nobody sees: rows, filter, sort, menu, End task and Kill on its own child", run = run_live},
+	{name = "shots", about = "[--out folder]: the pictures of the README, the program's own frames in a sway nobody sees", run = run_shots},
+	{name = "bench", about = "[seconds]: a release build in a sway nobody sees: the time to its first frame, its CPU use at rest", run = run_bench},
 }
 
 main :: proc() {
