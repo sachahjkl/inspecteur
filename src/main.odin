@@ -13,7 +13,8 @@ APP_VERSION :: "0.1.0"
 USAGE :: `inspecteur: the processes of the system
 
   inspecteur                  the window
-  inspecteur --first-frame    the window; prints when its first frame was drawn (unix time, nanoseconds)
+  inspecteur --first-frame    the window; prints when its first frame was drawn (unix time, ns) and where the
+                              time went, then at the end what a sample and a frame cost (for inspecteurtool bench)
   inspecteur prefs            every preference, its value and what it does
   inspecteur version
   --pref name=value           a preference for this run only

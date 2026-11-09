@@ -48,6 +48,9 @@ App :: struct {
 	menu:        Row_Menu,          // the row's menu, the confirmation of a kill (menu.odin)
 	status:      string,            // a message for the status bar (owned), until status_until (ui clock, ms)
 	status_until: f64,
+	// what the samples and the frames cost (--first-frame prints it at the end: the tools measure the program)
+	refresh_time, frame_time: time.Duration,
+	refreshes, frames: int,
 }
 
 app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
@@ -58,6 +61,7 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	app.settings = prefs_read(&app.prefs)
 
 	// the processes before the window: its first frame shows them
+	t_main := time.tick_now()
 	if !sampler_init(&app.sampler) {
 		fmt.eprintln("inspecteur: /proc cannot be read")
 		return 1
@@ -66,6 +70,7 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	app.table.sort = .Name
 	refresh(app)
 
+	t_read := time.tick_now()
 	platform.set_app_id(APP_NAME)
 	if !host.host_open(&app.main, &app.shared, {title = "Inspecteur", size = app.settings.size, integrated_title = true}, view_build, app) {
 		fmt.eprintln("inspecteur: no window")
@@ -82,15 +87,27 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	app.devtools = devtools.start_from_env(win, "inspecteur")
 	h.before_input = proc(h: ^host.Host) { app := (^App)(h.user); devtools.service(app.devtools, &h.state, &app.shared.r) }
 
+	t_window := time.tick_now()
 	platform.show_window(win)
 	host.host_frame(h)
-	if first_frame { fmt.printfln("first-frame %d", time.now()._nsec) }
+	if first_frame {
+		// (a tool reads it: the end of the first frame, then where the time went since main)
+		ms :: proc(a, b: time.Tick) -> f64 { return time.duration_milliseconds(time.tick_diff(a, b)) }
+		fmt.printfln("first-frame %d read %.1f window %.1f frame %.1f (draw %.1f, present %.1f)", time.now()._nsec, ms(t_main, t_read), ms(t_read, t_window), ms(t_window, time.tick_now()), time.duration_milliseconds(h.times.draw), time.duration_milliseconds(h.times.present))
+	}
 	for !platform.is_closed(win) {
 		host.hosts_wait({h})
 		if time.tick_diff(app.next_sample, time.tick_now()) >= 0 { refresh(app) }
+		t_frame := time.tick_now()
 		host.host_frame(h)
+		app.frame_time += time.tick_since(t_frame)
+		app.frames += 1
 	}
 
+	if first_frame {
+		mean :: proc(d: time.Duration, n: int) -> f64 { return n > 0 ? time.duration_milliseconds(d) / f64(n) : 0 }
+		fmt.printfln("costs: %d samples, %.2f ms each; %d frames, %.2f ms each", app.refreshes, mean(app.refresh_time, app.refreshes), app.frames, mean(app.frame_time, app.frames))
+	}
 	devtools.stop(app.devtools)
 	icons_destroy(&app.app_icons, &app.shared.r)
 	host.host_close(h)
@@ -113,6 +130,8 @@ refresh :: proc(app: ^App) {
 	table_group(&app.table, app.sampler.procs[:])
 	rows_again(app)
 	app.next_sample = time.tick_add(now, time.Duration(app.settings.refresh_ms) * time.Millisecond)
+	app.refresh_time += time.tick_since(now)
+	app.refreshes += 1
 	app.main.settle = max(app.main.settle, 1)
 }
 
@@ -163,6 +182,8 @@ app_params :: proc(h: ^host.Host, bp: ^ui.Build_Params) {
 	// (applied only when it changes, or the system goes light or dark: a palette applied starts a cross-fade)
 	choice := ui.Theme_Choice{name = app.settings.theme, mode = app.settings.mode, finish = app.settings.finish}
 	if ui.theme_show(&app.shared.theme, ui.THEMES[:], choice, &app.theme_shown, render.blend_space(&app.shared.r)) { platform.set_dark_title(h.win, !app.theme_shown.light) }
+	// (in a window the user is not in, the search's caret neither shows nor blinks: at rest, one frame per sample)
+	bp.inactive = !h.win.active
 	bp.base = ui.Style{pref = {.X = ui.text_size(), .Y = ui.px(26)}, font = app.shared.font, font_size = app.settings.font_size, text_pad = 6, cursor = .Arrow}
 }
 
