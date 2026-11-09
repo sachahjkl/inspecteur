@@ -101,16 +101,23 @@ row_menu_items :: proc(app: ^App, em: f32) {
 		if ui.menu_item("End task", "Delete").clicked { send_signal(app, &m.menu, .SIGTERM) }
 		if ui.menu_item("Kill…", "Shift+Del").clicked { kill_ask(app, m.menu) }
 		ui.menu_separator()
-		if ui.menu_item("Open file location", enabled = p.exe != "").clicked {
-			if !platform.reveal_in_folder(p.exe) { say(app, "No file manager opens %s", p.exe) }
-		}
-		if ui.menu_item("Copy command line", enabled = p.cmdline != "").clicked {
-			platform.set_clipboard(app.main.win, p.cmdline)
-			say(app, "Copied the command line of %s", p.name)
-		}
+		if ui.menu_item("Open file location", enabled = p.exe != "").clicked { open_location(app, p) }
+		if ui.menu_item("Copy command line", enabled = p.cmdline != "").clicked { copy_command(app, p) }
 		ui.menu_separator()
 		_ = ui.menu_item("Properties", enabled = false)
 	}
+}
+
+// The executable's folder in the file manager.
+open_location :: proc(app: ^App, p: ^Proc) {
+	if p.exe == "" { return }
+	if !platform.reveal_in_folder(p.exe) { say(app, "No file manager opens %s", p.exe) }
+}
+
+copy_command :: proc(app: ^App, p: ^Proc) {
+	if p.cmdline == "" { return }
+	platform.set_clipboard(app.main.win, p.cmdline)
+	say(app, "Copied the command line of %s", p.name)
 }
 
 // Asks the selected row's processes to end (SIGTERM).

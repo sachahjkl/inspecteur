@@ -43,6 +43,7 @@ App :: struct {
 	tab:         Tab,
 	search:      ui.Text_Field,
 	search_key:  ui.Key,
+	typed:       bool,              // a character was typed this frame: the filter takes the keyboard (app_input)
 	vl:          ui.Virtual_List,   // the rows (vl.sel: the selected row)
 	sel_rect:    ui.Rect,           // the selected row, as last built (where the Menu key opens the menu)
 	menu:        Row_Menu,          // the row's menu, the confirmation of a kill (menu.odin)
@@ -84,6 +85,7 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	h.partial_redraw = true   // (a sample changes some cells: only they are drawn again)
 	ui.set_rounding(&h.state, ROUNDING)
 	h.params = app_params
+	h.input = app_input
 	app.devtools = devtools.start_from_env(win, "inspecteur")
 	h.before_input = proc(h: ^host.Host) { app := (^App)(h.user); devtools.service(app.devtools, &h.state, &app.shared.r) }
 
@@ -196,3 +198,11 @@ say :: proc(app: ^App, format: string, args: ..any) {
 }
 
 STATUS_SHOWN_MS :: 4000
+
+// The input before the interface sees it: a character typed, wherever the keyboard is, is for the filter.
+@(private = "file")
+app_input :: proc(h: ^host.Host, events: []platform.Event) -> []platform.Event {
+	app := (^App)(h.user)
+	for e in events { if e.kind == .Text && e.text >= ' ' { app.typed = true } }
+	return events
+}
