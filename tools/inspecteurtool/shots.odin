@@ -13,6 +13,8 @@ import cdp "gt:cdp"
 SHOTS_DIR  :: "build/shots"
 SHOTS_PORT :: 9373
 SHOTS_OUT  :: "docs/screenshots"
+// The Performance section's graphs, a few samples old before their pictures.
+PERF_SETTLE :: 6 * time.Second
 
 run_shots :: proc(args: []string) -> int {
 	out := SHOTS_OUT
@@ -43,5 +45,23 @@ run_shots :: proc(args: []string) -> int {
 	cdp.wait_for(&c, "Copy command line", SESSION_WAIT)
 	shot(&c, out, "menu", &failed)
 	cdp.key(&c, "Escape")
+
+	// the Performance section: the graphs need some history (a few samples)
+	cdp.click_text(&c, "Performance")
+	cdp.wait_name(&c, "cpu_graph", SESSION_WAIT)
+	time.sleep(PERF_SETTLE)
+	shot(&c, out, "performance_cpu", &failed)
+	cdp.click_text(&c, "Logical processors")
+	cdp.wait_name(&c, "core_0", SESSION_WAIT)
+	shot(&c, out, "performance_cpu_grid", &failed)
+	cdp.click_name(&c, "dev_1_0")
+	cdp.wait_name(&c, "memory_graph", SESSION_WAIT)
+	shot(&c, out, "performance_memory", &failed)
+	pictures := [3]string{"performance_disk", "performance_network", "performance_gpu"}
+	for name, kind in ([]string{"dev_2_0", "dev_3_0", "dev_4_0"}) {
+		if !cdp.click_name(&c, name) { continue }
+		cdp.wait_idle(&c, SESSION_WAIT)
+		shot(&c, out, pictures[kind], &failed)
+	}
 	return failed ? 1 : 0
 }

@@ -60,7 +60,11 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 			if ui.column(id = "###main") {
 				ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
 				if ui.column(id = "###section") {
-					if app.tab == .Processes { build_processes(app, em) } else { build_placeholder(app, em) }
+					#partial switch app.tab {
+					case .Processes:   build_processes(app, em)
+					case .Performance: build_performance(app, em)
+					case:              build_placeholder(app, em)
+					}
 				}
 				build_footer(app, em)
 			}
@@ -225,12 +229,11 @@ build_filter :: proc(app: ^App, em: f32) {
 // The machine's CPU and memory: a line each, its value, a bar of how full.
 @(private = "file")
 build_meters :: proc(app: ^App, em: f32) {
-	s := &app.sampler
 	ui.hline(ui.fill())
 	ui.spacer(ui.px(em * 0.5))
-	meter(app, "cpu", lucide.CPU, "CPU", fmt.tprintf("%.0f%% of %d cores", s.cpu, s.cores), s.cpu / 100, em)
-	mem := s.mem_total > 0 ? f32(f64(s.mem_used) / f64(s.mem_total)) : 0
-	meter(app, "memory", lucide.LAYERS_2, "Memory", fmt.tprintf("%s of %s", size_text(s.mem_used), size_text(s.mem_total)), mem, em)
+	meter(app, "cpu", lucide.CPU, "CPU", fmt.tprintf("%.0f%% of %d cores", app.machine.cpu, len(app.machine.core_total)), app.machine.cpu / 100, em)
+	mem := app.machine.mem.total > 0 ? f32(f64(mem_used(&app.machine)) / f64(app.machine.mem.total)) : 0
+	meter(app, "memory", lucide.LAYERS_2, "Memory", fmt.tprintf("%s of %s", size_text(mem_used(&app.machine)), size_text(app.machine.mem.total)), mem, em)
 	ui.spacer(ui.px(em * 0.7))
 }
 
@@ -299,7 +302,6 @@ build_placeholder :: proc(app: ^App, em: f32) {
 // A message (what a command did, else the selection) at the left; the machine's counters at the right.
 @(private = "file")
 build_footer :: proc(app: ^App, em: f32) {
-	s := &app.sampler
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * FOOTER_EM)), bg = surface("bar")})
 	if ui.row(.Center, {.Draw_Background, .Draw_Side_Top}, "###footer") {
 		ui.spacer(ui.px(em * 0.8))
@@ -315,9 +317,9 @@ build_footer :: proc(app: ^App, em: f32) {
 				ui.next({width = ui.fill(), height = ui.pct(1)})
 				ui.label(fmt.tprintf("%s###msg", msg))
 			}
-			counter(app, "f_cpu", lucide.CPU, fmt.tprintf("%.0f%%", s.cpu), em)
-			counter(app, "f_mem", lucide.LAYERS_2, fmt.tprintf("%.0f%%", s.mem_total > 0 ? 100 * f64(s.mem_used) / f64(s.mem_total) : 0), em)
-			counter(app, "f_procs", lucide.LAYOUT_LIST, fmt.tprintf("%d", len(s.procs)), em)
+			counter(app, "f_cpu", lucide.CPU, fmt.tprintf("%.0f%%", app.machine.cpu), em)
+			counter(app, "f_mem", lucide.LAYERS_2, fmt.tprintf("%.0f%%", app.machine.mem.total > 0 ? 100 * f64(mem_used(&app.machine)) / f64(app.machine.mem.total) : 0), em)
+			counter(app, "f_procs", lucide.LAYOUT_LIST, fmt.tprintf("%d", len(app.sampler.procs)), em)
 		}
 		ui.spacer(ui.px(em * 0.6))
 	}

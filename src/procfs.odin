@@ -37,6 +37,8 @@ Proc :: struct {
 	cpu:        f32,      // percent of the machine since the last sample
 	rss:        u64,      // resident memory, bytes
 	threads:    i32,
+	state:      u8,       // R running, S sleeping, D disk wait, T stopped, Z zombie...
+	nice:       i8,       // -20 (first served) to 19 (last)
 	io_read, io_write: u64,   // bytes read from and written to the disk, since the start
 	read_rate, write_rate: f64,   // bytes per second since the last sample
 	io_denied:  bool,     // /proc/<pid>/io is not ours to read: never asked again
@@ -47,10 +49,6 @@ Sampler :: struct {
 	proc_dir:   linux.Fd,
 	buf:        []u8,            // PROC_READ_MAX bytes: what each read fills
 	users:      map[u32]string,  // uid -> login name (/etc/passwd), owned
-	cores:      int,
-	total, idle: u64,            // the machine's CPU ticks at the last sample
-	cpu:        f32,             // the machine's CPU %, since the last sample
-	mem_total, mem_used: u64,    // bytes; used = total - available
 	last_ns:    i64,             // when the last sample was taken (monotonic)
 	samples:    int,
 }
@@ -86,26 +84,13 @@ user_name :: proc(s: ^Sampler, uid: u32) -> string {
 	return "?"
 }
 
-// Reads the machine and every process again. `now_ns`: a monotonic clock. `catalog`: matches each new process to an
+// Reads every process again. `now_ns`: a monotonic clock. `d_total`: the machine's CPU ticks since the last sample
+// (machine.odin): a process's CPU % is its share. `catalog`: matches each new process to an
 // app (nil: none).
-sample :: proc(s: ^Sampler, now_ns: i64, catalog: ^Catalog) {
+sample :: proc(s: ^Sampler, now_ns: i64, d_total: u64, catalog: ^Catalog) {
 	dt := s.last_ns > 0 ? f64(now_ns - s.last_ns) / 1e9 : 0
 	s.last_ns = now_ns
 	s.samples += 1
-
-	// the machine
-	d_total: u64
-	if text, ok := read_at(s, "stat"); ok {
-		t := parse_cpu_times(string(text))
-		d_total = t.total - s.total
-		d_idle := t.idle - s.idle
-		if s.total > 0 && d_total > 0 { s.cpu = 100 * (1 - f32(d_idle) / f32(d_total)) }
-		s.total, s.idle, s.cores = t.total, t.idle, t.cores
-	}
-	if text, ok := read_at(s, "meminfo"); ok {
-		m := parse_meminfo(string(text))
-		s.mem_total, s.mem_used = m.total, m.total - min(m.available, m.total)
-	}
 
 	// the pids, in order
 	pids := make([dynamic]i32, 0, len(s.procs) + 64, context.temp_allocator)
@@ -137,6 +122,7 @@ sample :: proc(s: ^Sampler, now_ns: i64, catalog: ^Catalog) {
 		}
 		p.ppid = st.ppid
 		p.threads = st.threads
+		p.state, p.nice = st.state, st.nice
 		p.rss = st.rss_pages * PAGE_BYTES
 		p.cpu = known && d_total > 0 ? 100 * f32(st.ticks - min(p.ticks, st.ticks)) / f32(d_total) : 0
 		p.ticks = st.ticks
@@ -243,20 +229,34 @@ read_at :: proc(s: ^Sampler, path: string) -> (data: []u8, ok: bool) {
 
 @(private = "file")
 read_errno :: proc(s: ^Sampler, path: string) -> (data: []u8, err: linux.Errno, ok: bool) {
-	name: [64]u8
+	return read_file(s.buf, s.proc_dir, path)
+}
+
+// A file whole, up to the buffer's size, in `buf` (valid until its next read). `dir`: the folder a relative `path` is in
+// (linux.AT_FDCWD: an absolute one). One open, reads, one close: no allocation.
+read_file :: proc(buf: []u8, dir: linux.Fd, path: string) -> (data: []u8, err: linux.Errno, ok: bool) {
+	name: [256]u8
 	if len(path) >= len(name) { return nil, .ENAMETOOLONG, false }
 	copy(name[:], path)
-	fd, e := linux.openat(s.proc_dir, cstring(&name[0]), {.CLOEXEC})
+	fd, e := linux.openat(dir, cstring(&name[0]), {.CLOEXEC})
 	if e != .NONE { return nil, e, false }
 	defer linux.close(fd)
 	n := 0
-	for n < len(s.buf) {
-		k, re := linux.read(fd, s.buf[n:])
+	for n < len(buf) {
+		k, re := linux.read(fd, buf[n:])
 		if re != .NONE { return nil, re, false }
 		if k <= 0 { break }
 		n += k
 	}
-	return s.buf[:n], .NONE, true
+	return buf[:n], .NONE, true
+}
+
+// A small file of /sys or /proc as text, trimmed ("" when it cannot be read), in the temporary allocator.
+read_text :: proc(path: string) -> string {
+	buf: [512]u8
+	data, _, ok := read_file(buf[:], linux.AT_FDCWD, path)
+	if !ok { return "" }
+	return strings.clone(strings.trim_space(string(data)), context.temp_allocator)
 }
 
 @(private = "file")
@@ -311,6 +311,8 @@ Stat_Fields :: struct {
 	flags:     u32,
 	ticks:     u64,   // utime + stime
 	threads:   i32,
+	state:     u8,
+	nice:      i8,
 	start:     u64,
 	rss_pages: u64,
 }
@@ -325,9 +327,11 @@ parse_stat :: proc(text: string) -> (f: Stat_Fields, ok: bool) {
 	field := 3   // (the state, after the name)
 	for word in strings.fields_iterator(&rest) {
 		switch field {
+		case 3:  f.state = word[0]
 		case 4:  f.ppid = i32(strconv.parse_int(word, 10) or_else 0)
 		case 9:  f.flags = u32(strconv.parse_uint(word, 10) or_else 0)
 		case 14, 15: f.ticks += u64(strconv.parse_uint(word, 10) or_else 0)
+		case 19: f.nice = i8(strconv.parse_int(word, 10) or_else 0)
 		case 20: f.threads = i32(strconv.parse_int(word, 10) or_else 0)
 		case 22: f.start = u64(strconv.parse_uint(word, 10) or_else 0)
 		case 24:
@@ -335,48 +339,6 @@ parse_stat :: proc(text: string) -> (f: Stat_Fields, ok: bool) {
 			return f, true
 		}
 		field += 1
-	}
-	return
-}
-
-Cpu_Times :: struct { total, idle: u64, cores: int }
-
-// /proc/stat: the first line's ticks (user, nice, system, idle, iowait, irq, softirq, steal; the guest time is in the
-// user time already), idle + iowait as idle, and the count of the cpuN lines.
-parse_cpu_times :: proc(text: string) -> (t: Cpu_Times) {
-	rest := text
-	for line in strings.split_lines_iterator(&rest) {
-		if !strings.has_prefix(line, "cpu") { break }
-		if strings.has_prefix(line, "cpu ") {
-			fields := line[4:]
-			i := 0
-			for word in strings.fields_iterator(&fields) {
-				if i >= 8 { break }
-				v := u64(strconv.parse_uint(word, 10) or_else 0)
-				t.total += v
-				if i == 3 || i == 4 { t.idle += v }
-				i += 1
-			}
-		} else {
-			t.cores += 1
-		}
-	}
-	return
-}
-
-Mem_Fields :: struct { total, available: u64 }
-
-// /proc/meminfo, in bytes.
-parse_meminfo :: proc(text: string) -> (m: Mem_Fields) {
-	rest := text
-	for line in strings.split_lines_iterator(&rest) {
-		kib := proc(line: string) -> u64 {
-			v := strings.trim_space(line[strings.index_byte(line, ':') + 1:])
-			v = strings.trim_suffix(v, " kB")
-			return u64(strconv.parse_uint(v, 10) or_else 0) * 1024
-		}
-		if strings.has_prefix(line, "MemTotal:") { m.total = kib(line) }
-		if strings.has_prefix(line, "MemAvailable:") { m.available = kib(line) }
 	}
 	return
 }

@@ -35,12 +35,15 @@ App :: struct {
 	theme_shown: ui.Theme_Shown,
 
 	sampler:     Sampler,
+	machine:     Machine,           // the CPU, the memory, the disks, the network, the GPUs (machine.odin, gpu.odin)
 	catalog:     Catalog,
 	app_icons:   map[string]Icon,   // the apps' icons by name (apps.odin)
 	table:       Table,
 	next_sample: time.Tick,
 
 	tab:         Tab,
+	device:      Device,            // the Performance section's device shown (perf_view.odin)
+	cpu_grid:    bool,              // the CPU's page shows a graph per logical processor
 	search:      ui.Text_Field,
 	search_key:  ui.Key,
 	typed:       bool,              // a character was typed this frame: the filter takes the keyboard (app_input)
@@ -68,6 +71,7 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 		return 1
 	}
 	catalog_load(&app.catalog)
+	machine_init(&app.machine)
 	app.table.sort = .Name
 	refresh(app)
 
@@ -118,6 +122,7 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	table_destroy(&app.table)
 	catalog_destroy(&app.catalog)
 	sampler_destroy(&app.sampler)
+	machine_destroy(&app.machine)
 	delete(app.status)
 	row_menu_destroy(&app.menu)
 	settings_free(&app.settings)
@@ -128,7 +133,8 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 // A new sample, its groups and its rows; the next one is due a period later.
 refresh :: proc(app: ^App) {
 	now := time.tick_now()
-	sample(&app.sampler, now._nsec, &app.catalog)
+	machine_sample(&app.machine, now._nsec, app.tab == .Performance && app.device.kind == .Cpu)
+	sample(&app.sampler, now._nsec, app.machine.d_total, &app.catalog)
 	table_group(&app.table, app.sampler.procs[:])
 	rows_again(app)
 	app.next_sample = time.tick_add(now, time.Duration(app.settings.refresh_ms) * time.Millisecond)

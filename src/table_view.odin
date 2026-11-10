@@ -222,7 +222,7 @@ build_cells :: proc(app: ^App, r: Row, em: f32, hot: ui.Color) {
 	cell(.PID, fmt.tprintf("%d", p.pid), em, weak = true)
 	cell(.User, user_name(s, p.uid), em, weak = true)
 	cell(.CPU, fmt.tprintf("%.1f%%", cpu), em, heat = cpu / HEAT_CPU_FULL, hot = hot)
-	cell(.Memory, size_text(rss), em, heat = s.mem_total > 0 ? f32(f64(rss) / f64(s.mem_total) / HEAT_MEM_FULL) : 0, hot = hot)
+	cell(.Memory, size_text(rss), em, heat = app.machine.mem.total > 0 ? f32(f64(rss) / f64(app.machine.mem.total) / HEAT_MEM_FULL) : 0, hot = hot)
 	cell(.Read, (r.kind == .Process && p.io_denied) ? "–" : rate_text(read), em, weak = p.io_denied)
 	cell(.Write, (r.kind == .Process && p.io_denied) ? "–" : rate_text(write), em, weak = p.io_denied)
 	cell(.Threads, fmt.tprintf("%d", threads), em, weak = weak)
