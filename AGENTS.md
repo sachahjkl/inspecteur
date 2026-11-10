@@ -11,9 +11,11 @@ Every step is a command of `tools/inspecteurtool` (`help` lists them):
     odin run tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/inspecteurtool -keep-executable -- <command>
 
 - `build [release]` builds `build/inspecteur` (`build.sh` / `build.bat` are shortcuts).
-- `check`: `odin check -vet`, the unit tests, a release build. `live`: the real program in a headless sway (245 checks).
+- `check`: `odin check -vet`, the unit tests, THIRD-PARTY-NOTICES up to date, a release build. `live`: the real program
+  in a headless sway (310 checks).
 - `shots` makes the pictures of the documentation from `inspecteur --demo` (no data of the machine in them); `bench`
   measures the cold start and the CPU use at rest. `desktop_files <prefix>`: the Nix package's entry and icons.
+  `notices`: THIRD-PARTY-NOTICES.
 - `nix develop` first (`flake.nix`). `nix build` builds the package.
 
 ## Rules

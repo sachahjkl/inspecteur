@@ -24,23 +24,30 @@ odin run tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/insp
 |---|---|
 | `build [release]` | the toolkit's text library (when its sources changed), then `build/inspecteur` |
 | `test` | the unit tests of `src` |
-| `check` | `odin check -vet` of the program and the tool, the tests, a release build |
-| `live [--keep]` | the real program in a headless sway, driven over the DevTools protocol (245 checks); its pictures stay in `build/live` |
+| `check` | `odin check -vet` of the program and the tool, the tests, THIRD-PARTY-NOTICES up to date, a release build |
+| `live [--keep]` | the real program in a headless sway, driven over the DevTools protocol (310 checks); its pictures stay in `build/live` |
 | `shots [--out folder]` | the pictures of the documentation, the program's own frames, of the demo's made-up machine |
 | `bench [seconds]` | a release build in a headless sway that draws on the GPU: the time to the first frame, the CPU use at rest, then with Services and with Connections shown |
 | `logo` | `assets/logo*.png` and `.project/image.png`, drawn by the toolkit's paint package |
 | `desktop_files <prefix>` | the desktop entry and the icons under `<prefix>/share`: what the Nix package installs |
+| `notices [--check]` | THIRD-PARTY-NOTICES: the licences of what the program embeds and links (gui_toolkit and its attributions, Roboto, Inconsolata, Lucide, wgpu-native, the text library's crates from `cargo metadata`, procedural macros left out); `--check` fails when it is not up to date |
+| `package [version]`, `notes <version>`, `ship <version>` | the release's archive (the program, LICENSE, THIRD-PARTY-NOTICES, README, CHANGELOG) and its SHA-256; the changelog's section; the release itself |
 
 `GT=<folder>` builds against another checkout of gui_toolkit.
 
 The headless sway of `live` and `shots` draws on the CPU (pixman): inspecteur then draws with Mesa's software Vulkan.
 `bench` uses sway's Vulkan renderer, so that inspecteur draws on the GPU as on a desktop.
 
-The session has a runtime folder, a configuration folder and a data folder of its own; the welcome page is off unless a
-test asks for it. `live` gives inspecteur the person's session bus, so that the Services and Startup sections reach the
-user's service manager. It acts only on what it made itself, and checks it before it presses a key that acts:
+The session has a runtime folder, a configuration folder and a data folder of its own (`live`: a cache too, for a dump
+file; the others keep the person's, as fontconfig's cache costs most of a second to build again), and no
+`XDG_CURRENT_DESKTOP` (the welcome page then offers nothing that writes the person's desktop settings); the welcome page
+is off unless a test asks for it. `live` gives inspecteur the person's session bus (`DBUS_SESSION_BUS_ADDRESS`, else the
+user manager's `$XDG_RUNTIME_DIR/bus`), so that the Services and Startup sections reach the user's service manager. It
+acts only on what it made itself, and checks it before it presses a key that acts:
 
-- processes it started (`sleep` with a mark of its own in its command line, found by the mark and checked by its pid);
+- processes it started (`sleep` with a mark of its own in its command line, found by the mark and checked by its pid; a
+  shell and two sleeps for End process tree): the rows marked, a tree's processes, the affinity and the dump act only
+  once the confirmation, or the row selected, names those processes and no other;
 - a transient service (`systemd-run --user --unit=inspecteur-live-<pid>`), stopped and reset at the end;
 - an app of its own: a desktop entry in the session's data folder, and two sleeps in a scope named for it
   (`systemd-run --user --scope --unit=app-inspecteurlive<pid>-1.scope`); the group is killed only once the scope holds
@@ -48,7 +55,9 @@ user's service manager. It acts only on what it made itself, and checks it befor
 - an autostart entry, the desktop entry and icons of the welcome page and of `inspecteur setup`, all in the session's
   folders.
 
-Without a user manager, `live` says so and skips those checks.
+Without a session bus (neither address), `live` says so and skips the checks of the user's service and of the app's
+group. It never opens a web page, a file manager or a text editor: Search online, Open file location and Open unit file
+would act on the person's desktop.
 
 ## The pictures, without the machine's data
 
@@ -67,12 +76,12 @@ cores, NVIDIA 595, about 200 processes):
 
 | | |
 |---|---|
-| cold start (process start to the end of the first frame) | 265 to 280 ms: `/proc` 14 ms, the window 220 ms, the first frame 30 ms |
+| cold start (process start to the end of the first frame) | about 280 ms (268 to 297, median 276): `/proc` 14 ms, the window 220 to 250 ms, the first frame 30 ms |
 | at rest, the table read each second | 1.0 % of one core, 187 MB resident (most of it the GPU driver) |
-| Services shown (read every 3 s) | 1.4 % of one core |
-| Connections shown (read each second) | 3.0 % of one core, 1.6 % of it the scan of the descriptors |
+| Services shown (read every 3 s, the selected one's details and journal with them) | 1.6 % of one core |
+| Connections shown (read each second) | 1.9 % of one core |
 | a sample | 7 ms (`stat`, `statm` and `io` of about 200 processes) |
-| a frame | 7 ms on the mean of a bench's frames (most of them with Services or Connections shown); at rest, a frame a second |
+| a frame | 7.8 ms on the mean of a bench's frames (most of them with Services or Connections shown); at rest, a frame a second |
 
 ## Drive the window
 

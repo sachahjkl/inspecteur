@@ -10,7 +10,8 @@ inspecteur ─ the window's thread (app.odin)
                sleeps in the toolkit's wait until input, the next sample, or a reader's result
                a sample: the machine (machine.odin) -> the processes (sampler.odin) -> groups (processes.odin) -> rows
            ─ the GPUs' thread (gpu.odin): every 2 s
-           ─ a thread per section that reads something slow (ui.Worker): Services, Startup, Connections, Information
+           ─ a thread per section that reads something slow (ui.Worker): Services, Startup, Connections, Information,
+             a service's details and journal, a dump file
 ```
 
 A sample reads about 200 processes in 7 to 8 ms. It runs on the window's thread: a second thread would cost more in
@@ -38,7 +39,9 @@ of `/proc` or `/sys`, no system call: they read the structs and call those procs
 | Startup | `startup.odin` | `startup_linux.odin` | `startup_view.odin` |
 | Connections | `connections.odin` | `connections_linux.odin` | `connections_view.odin` |
 | Information | `information.odin` | `information_linux.odin` | `information_view.odin` |
-| the session | `menu.odin` (the guards) | `session_linux.odin` | |
+| the session | `menu.odin` (the guards) | `session_linux.odin`, `desktop_linux.odin` | `setup_view.odin` |
+| a dump file | `dump.odin` | `dump_linux.odin` | |
+| the system's words | `props.odin` (`Priority`) | `system_linux.odin` | |
 
 A reader gives counters, not rates: a process's CPU time since it started, a disk's bytes since boot. The neutral side
 makes the rates (`rate_of`, `busy_percent`), the CPU % and the graphs' points, and keeps what it learnt of each process
@@ -58,17 +61,21 @@ view, model or command changes. What each file gives:
 | `apps_windows.odin` | `catalog_load` | the `Catalog`'s entries (`catalog_add_entry`): the Start menu's apps, their names and icons |
 | `machine_windows.odin` | `Machine_Reader`, `machine_reader_init`, `machine_reader_destroy`, `machine_read`, `cpu_info_read`, `cpu_mhz_now`, `disks_list`, `nets_list` | `Machine_Counters` (each processor's total and idle time in ns, boot time, uptime, handles, `Mem_Fields`, each disk's bytes and busy ms, each interface's bytes), `Cpu_Info`, `Disk_Info`, `Net_Info` |
 | `gpu_windows.odin` | `Gpu_Reader`, `gpu_reader_close`, `gpu_read` | `Gpu_Snapshot`: each GPU's `Gpu_Read`, and each process's video memory (`gpu_proc_add`) |
-| `props_windows.odin` | `proc_cwd`, `proc_threads`, `proc_files`, `proc_modules`, `proc_environment` | `Thread_Row`, `File_Row`, `Module_Row`, the environment's lines; `Read_State` says what was refused |
-| `services_windows.odin` | `Service_Bus`, `service_bus_close`, `services_read`, `service_act` | `Service` (the Service Control Manager's services; `Manager.User` lists none) |
+| `props_windows.odin` | `proc_cwd`, `proc_threads`, `proc_files`, `proc_modules`, `proc_environment` (each by pid and start time) | `Thread_Row`, `File_Row`, `Module_Row`, the environment's lines; `Read_State` says what was refused |
+| `services_windows.odin` | `Service_Bus`, `service_bus_close`, `services_read`, `service_act`, `unit_details_read` | `Service` (the Service Control Manager's services; `Manager.User` lists none), `Unit_Details` (its file, since when, the event log's last lines) |
 | `startup_windows.odin` | `Startup_Bus`, `startup_bus_close`, `startup_read`, `startup_set_enabled` | `Startup_Item` (the Run keys and the Startup folder) |
 | `connections_windows.odin` | `Socket_Reader`, `socket_reader_destroy`, `sockets_read` | `Socket` (GetExtendedTcpTable, GetExtendedUdpTable: each with its pid) |
 | `information_windows.odin` | `info_read` | `Info_Static` |
-| `session_windows.odin` | `display_server_pid` | the pid of the process Inspecteur must not suspend besides itself (dwm.exe), or 0 |
+| `session_windows.odin` | `display_server_pid`, `own_units` | the pid of the process Inspecteur must not suspend besides itself (dwm.exe), or 0; the services Inspecteur runs in (none) |
+| `desktop_windows.odin` | `current_desktop`, `task_manager_hint`, `task_manager_bind` | how Windows opens Inspecteur as its task manager (the Task Manager's replacement key) |
+| `dump_windows.odin` | `process_dump`, `DUMP_HOW` | a minidump of the process (MiniDumpWriteDump) |
+| `system_windows.odin` | `PRIORITIES`, `PRIORITY_COLUMN`, `PRIORITY_DENIED`, `ADMIN`, `priority_text` | the priority classes offered, as nice values (Idle 19 ... High -10), "an administrator" |
 
-What the toolkit does is already portable: signals and priorities (`process.signal_process`, `process.set_priority`: a
-Windows port of the toolkit maps End task to WM_CLOSE, Kill to TerminateProcess), the desktop entry (`gt:desktop`: the
-Start menu's shortcut), the clipboard, the file manager. Linux words a port may meet: a nice value is a priority (-20
-the highest, 19 the lowest; `PRIORITIES` lists those offered), a state is `Proc_State`.
+What the toolkit does is already portable: signals, priorities and affinities (`process.signal_process`,
+`process.set_priority`, `process.set_affinity`: a Windows port of the toolkit maps End task to WM_CLOSE, Kill to
+TerminateProcess), the desktop entry (`gt:desktop`: the Start menu's shortcut), the clipboard, the file manager, a web
+page. In the neutral files a priority is a nice value (-20 the highest, 19 the lowest): `system_<os>.odin` gives the
+priorities offered and their words; a state is `Proc_State`.
 
 ## Services and Startup: systemd over D-Bus
 
@@ -84,11 +91,19 @@ user's manager which services the session's targets want (their `Wants` property
 turned off by the user's copy of it with `Hidden=true`, as the specification says; turned on again, the copy goes when
 nothing else changed in it.
 
+A service's details (the pane under the table) come from its unit's properties over the same bus (`LoadUnit`, then
+`FragmentPath`, `StateChangeTimestamp`, `TasksCurrent`, `CPUUsageNSec`, `NRestarts`) and its journal's last lines from
+`journalctl -u <unit> -n 50` (the journal's own program reads journald's files), on a thread of their own: when another
+service is selected, and after each reading of the list. Stop and Restart are asked first: the question says when the
+service runs the desktop or Inspecteur (its main process is the display server or one Inspecteur runs under, or
+Inspecteur's own cgroup is under that unit).
+
 ## Connections
 
 `/proc/net/tcp`, `tcp6`, `udp` and `udp6` list the sockets; a socket's process is the one whose `/proc/<pid>/fd/<n>`
-links to `socket:[<inode>]`. Only the processes the user may read can be told. That scan of every descriptor is what
-costs (a few milliseconds): a reading whose sockets all have a known owner skips it, ten readings in a row at most.
+links to `socket:[<inode>]`, its start time read before and after its descriptors. Only the processes the user may read
+can be told. That scan of every descriptor is what costs (a few milliseconds): a reading whose sockets are all known (an
+owner, or none at the last scan: another user's, one in TIME_WAIT) skips it, ten readings in a row at most.
 
 ## Information
 
@@ -117,13 +132,20 @@ On Linux everything comes from `/proc`, read with system calls (`openat`, `read`
 - **Kernel threads** (`PF_KTHREAD`) are not shown.
 - **Names**: the kernel cuts a command name to 15 bytes; the first argument or the executable gives it whole. A Nix
   wrapper's `.firefox-wrapped` is shown as `firefox`.
+- **Memory pages**: the page size is the kernel's (`AT_PAGESZ` of `/proc/self/auxv`), not a constant: arm64 may have 16
+  or 64 KB pages.
+- **The tree** (`processes.view = tree`): each process under its parent, the siblings sorted by the sort's column; a
+  filter shows the processes it finds and their lines of parents.
 
 ## Apps (apps.odin, processes.odin)
 
 Wayland does not let a program see the other programs' windows. So an app is what the desktop's menu knows: a desktop
 entry under `applications/` of each XDG data folder (not hidden, not run in a terminal). A process matches an entry by
-its name or its executable's name (the entry's program, its id, its window class), else by the systemd unit its launcher
-made (`app-<launcher>-<desktop id>-<random>.scope`; a `-` of the id is escaped `\x2d`).
+its name or its executable's name (the entry's program, its id, its window class), an interpreter's process by its
+script, else by the systemd unit its launcher made (`app-<launcher>-<desktop id>-<random>.scope`; a `-` of the id is
+escaped `\x2d`). An entry's program is found past its launchers (`env`, `sudo`, `flatpak run`, `systemd-run`, `uwsm app`
+and the like: `program_of`), and an interpreter's (Python, Perl, Ruby, Node, Java, Electron, Wine, a shell) is the
+script it runs: `python3`, `bash` or `sh` would make every Python program or shell that app.
 
 A group is one entry: every process of that app and the processes under it, unless one of them is another app (a browser
 started from a terminal is the browser's). Two windows of one app are one group. End task on a group asks each of the
@@ -135,20 +157,31 @@ then `pixmaps`; PNG or SVG), made into a texture the first time it is shown.
 
 ## Actions on processes (menu.odin)
 
-End task sends SIGTERM, Kill sends SIGKILL after a confirmation, Suspend and Resume SIGSTOP and SIGCONT. The toolkit's
+End task sends SIGTERM, Kill sends SIGKILL after a confirmation, End process tree SIGTERM to a process and every
+process under it (the last sample's parents) after a confirmation, Suspend and Resume SIGSTOP and SIGCONT. With rows
+marked (Ctrl and Shift clicks, Ctrl+A: the toolkit's list marks rows by their identity), End task and Kill act on all
+of them; the confirmation lists each process by its name and PID. The toolkit's
 `process.signal_process` pins the pid with a pidfd, reads the process's start time again, and signals through the pidfd
 only when it is the same: a pid freed and given to another process is not signalled, even between the check and the
-signal. A priority is set the same way, on every thread of the process (`process.set_priority`).
+signal. A priority and an affinity are set through a descriptor of the process's own `/proc/<pid>` folder, whose start
+time is checked, on every thread of the process; the pidfd says afterwards whether the process still ran
+(`process.set_priority`, `process.set_affinity`).
 
 Inspecteur does not suspend itself, the processes it runs under (its line of parents), or the display server (on
 Wayland the compositor, the peer of `$WAYLAND_DISPLAY`'s socket: `SO_PEERCRED`): nothing could resume them from its
-window. Ending the display server ends the session: it is asked first. Suspend or resume reads the process's state at
-that moment, not the last sample's.
+window. Ending the display server, Inspecteur or what it runs under is asked first, and Enter cancels the question of a
+kill. Suspend or resume reads the process's state at that moment, not the last sample's.
+
+A dump file (`dump_linux.odin`) is gdb's `gcore` of the process, written on a thread of its own into
+`$XDG_CACHE_HOME/inspecteur/dumps`, asked first: it holds whatever the process had in memory. Without gcore, or when the
+kernel does not let a user read another process's memory (`kernel.yama.ptrace_scope`), the footer says so.
 
 ## Properties (props.odin)
 
 The dialog reads only the tab shown: when it opens, when another tab is shown, and every 3 seconds while the process
-lives. Once the process is gone it reads nothing and says so.
+lives. A reading opens the process's `/proc/<pid>` folder once, checks the start time through it, and reads every file
+relative to it: a pid given to another process meanwhile reads nothing. Once the process is gone it reads nothing and
+says so.
 
 ## The GPUs (gpu.odin, gpu_linux.odin)
 
@@ -173,15 +206,17 @@ key does two things in one place.
 ## The desktop (integration.odin, setup_view.odin, src/identity)
 
 `src/identity` holds what Inspecteur is to the desktop: its names, the actions of its desktop entry (one per section:
-`--section <name>`), its icons (`assets/logo_<n>.png`). `inspecteur setup` and the welcome page write the entry and the
+`--section <name>`, and `StartupWMClass`, the window's class), its icons (`assets/logo_<n>.png`).
+`desktop_linux.odin` reads `$XDG_CURRENT_DESKTOP` and says how that desktop opens Inspecteur as its task manager; on
+GNOME, the welcome page's button adds the custom shortcut with `gsettings`. `inspecteur setup` and the welcome page write the entry and the
 icons for the running executable through the toolkit's `gt:desktop`; `inspecteurtool desktop_files` writes the same for
 the Nix package.
 
 ## Tests
 
-- Unit tests (`src`): the formats of `/proc`, `/proc/net`, unit files, desktop entries, `os-release`, `pci.ids`, EDID and
+- Unit tests (`src`; those of the Linux readers' formats in `*_linux_test.odin`): the formats of `/proc`, `/proc/net`, unit files, desktop entries, `os-release`, `pci.ids`, EDID and
   `mountinfo`; the rates, a pid used again, the devices that come and go, the rows' filter and sort, the columns kept,
-  the priorities' steps, the apps of a scope; names, sizes, durations; no key doing two things; the preferences'
+  the priorities' steps, the apps of a scope, launchers and interpreters; names, sizes, durations; no key doing two things; the preferences'
   documentation.
 - `inspecteurtool live`: the real program in a sway with no screen, driven over the DevTools protocol (see
   [development.md](development.md)). A key that changes something is pressed only once the selected row, as the
