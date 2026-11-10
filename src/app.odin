@@ -46,6 +46,7 @@ App :: struct {
 	tab:         Tab,
 	query:       string,            // the filter, in lower case (owned): each section with a table applies it
 	connections: Connections,       // the sockets (connections.odin), read only while their section is shown
+	services:    Services,          // systemd's services (services.odin), read every few seconds while shown
 	information: Information,       // what the system is (information.odin), read when first shown and on F5
 	device:      Device,            // the Performance section's device shown (perf_view.odin)
 	cpu_grid:    bool,              // the CPU's page shows a graph per logical processor
@@ -105,6 +106,7 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	h.before_input = proc(h: ^host.Host) { app := (^App)(h.user); devtools.service(app.devtools, &h.state, &app.shared.r) }
 	connections_init(&app.connections, app)
 	information_init(&app.information, app)
+	services_init(&app.services, app)
 
 	t_window := time.tick_now()
 	platform.show_window(win)
@@ -117,6 +119,7 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	for !platform.is_closed(win) {
 		host.hosts_wait({h})
 		if time.tick_diff(app.next_sample, time.tick_now()) >= 0 { refresh(app) }
+		services_tick(app)
 		sections_take(app)
 		t_frame := time.tick_now()
 		host.host_frame(h)
@@ -131,6 +134,7 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	devtools.stop(app.devtools)
 	connections_destroy(&app.connections)
 	information_destroy(&app.information)
+	services_destroy(&app.services)
 	delete(app.query)
 	icons_destroy(&app.app_icons, &app.shared.r)
 	host.host_close(h)
@@ -189,6 +193,7 @@ tab_show :: proc(app: ^App, tab: Tab) {
 	#partial switch tab {
 	case .Connections: worker_ask(&app.connections.worker)
 	case .Information: if !app.information.asked { information_ask(&app.information) }
+	case .Services:    services_ask(app)
 	}
 }
 
@@ -197,6 +202,7 @@ refresh_now :: proc(app: ^App) {
 	refresh(app)
 	#partial switch app.tab {
 	case .Information: information_ask(&app.information)
+	case .Services:    services_ask(app)
 	}
 	say(app, "Read again")
 }
@@ -205,6 +211,7 @@ refresh_now :: proc(app: ^App) {
 sections_take :: proc(app: ^App) {
 	connections_take(app)
 	information_take(&app.information)
+	services_take(app)
 }
 
 selected_id :: proc(app: ^App) -> u64 {

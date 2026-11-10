@@ -10,6 +10,7 @@ import "core:os"
 import "core:strings"
 import "core:time"
 import cdp "gt:cdp"
+import toolbox "gt:toolbox"
 
 // The sidebar's rows (view.odin: ###side_<tab>), in the order of the Tab enum.
 SIDE_PROCESSES   :: "side_0"
@@ -17,6 +18,8 @@ SIDE_SERVICES    :: "side_2"
 SIDE_STARTUP     :: "side_3"
 SIDE_CONNECTIONS :: "side_4"
 SIDE_INFORMATION :: "side_5"
+// More than the toolkit's DOUBLE_CLICK_MS (450 ms) between two clicks on a row.
+DOUBLE_CLICK_GAP :: 600 * time.Millisecond
 
 // A TCP listener of this test on 127.0.0.1: its row says this tool's name and pid.
 live_connections :: proc(l: ^Live) {
@@ -37,6 +40,132 @@ live_connections :: proc(l: ^Live) {
 	check(l, cdp.key(c, "Escape"), "Escape clears the filter")
 	cdp.wait_idle(c, SESSION_WAIT)
 	check(l, cdp.shot(c, fmt.tprintf("%s/connections.png", l.dir)), "a picture of the section")
+}
+
+// The system's services are listed (and only read). Then a transient service of the user's manager that this test makes
+// (inspecteur-live-<pid>): it fails first (a file it waits for is not there) and stays listed; the test makes the file,
+// then Start, Restart and Stop from the window, each pressed only once the row selected is that service. It is stopped
+// and its failure forgotten at the end, whatever happened.
+live_services :: proc(l: ^Live) {
+	c := &l.c
+	check(l, cdp.click_name(c, SIDE_SERVICES), "the Services section")
+	check(l, cdp.wait_for(c, "running", SESSION_WAIT), "the system's services are listed")
+	check(l, len(cdp.find_name(c, "c0")) > 5, "with rows (%d in view)", len(cdp.find_name(c, "c0")))
+	cdp.wait_idle(c, SESSION_WAIT)
+	check(l, cdp.shot(c, fmt.tprintf("%s/services.png", l.dir)), "a picture of the section")
+
+	state, code := toolbox.capture({"systemctl", "--user", "is-system-running"})
+	state = strings.trim_space(state)
+	if state != "running" && state != "degraded" {
+		check(l, true, "no user service manager here (%s, %d): its checks are skipped", state, code)
+		return
+	}
+	unit := fmt.tprintf("inspecteur-live-%d", os.get_pid())
+	service := fmt.tprintf("%s.service", unit)
+	flag := fmt.tprintf("%s/start-allowed", l.dir)
+	_ = os.remove(flag)
+	script := fmt.tprintf("test -e '%s' && exec sleep 300; exit 1", flag)
+	if !check(l, toolbox.run({"systemd-run", "--user", "--quiet", fmt.tprintf("--unit=%s", unit), "--", "sh", "-c", script}), "a transient user service of this test: %s", service) { return }
+	defer {
+		_ = toolbox.run({"systemctl", "--user", "stop", service})
+		_ = toolbox.run({"systemctl", "--user", "reset-failed", service})
+		_ = os.remove(flag)
+	}
+	check(l, wait_unit(service, "failed"), "it fails first (no %s)", flag)
+
+	check(l, cdp.key(c, "ctrl+u"), "Ctrl+U: the user's services")
+	check(l, cdp.type_text(c, unit), "filter by its name")
+	if !check(l, wait_named_text(c, "c0", service), "its row is there") { return }
+	check(l, wait_row_cell(c, service, "c2", "failed"), "it says failed")
+	if !select_unit(l, service) { return }
+
+	_ = os.write_entire_file(flag, "")
+	if !check(l, cdp.key(c, "ctrl+s"), "Ctrl+S: Start") { return }
+	check(l, wait_unit(service, "active"), "the manager says it is active")
+	check(l, wait_row_cell(c, service, "c2", "active (running)"), "its row says active (running)")
+	check(l, cdp.wait_for(c, fmt.tprintf("Started %s", service), SESSION_WAIT), "the footer says it started")
+	pid := cell_of(c, service, "c5")
+	check(l, pid != "", "its main process is shown (PID %s)", pid)
+
+	if !select_unit(l, service) { return }
+	if !check(l, cdp.key(c, "ctrl+r"), "Ctrl+R: Restart") { return }
+	check(l, cdp.wait_for(c, fmt.tprintf("Restarted %s", service), SESSION_WAIT), "the footer says it restarted")
+	check(l, wait_row_cell_not(c, service, "c5", pid) && wait_unit(service, "active"), "a new main process (was %s, now %s)", pid, cell_of(c, service, "c5"))
+	check(l, wait_row_cell(c, service, "c2", "active (running)"), "its row says active (running) again")
+
+	if !select_unit(l, service) { return }
+	if !check(l, cdp.key(c, "Delete"), "Delete: Stop") { return }
+	check(l, cdp.wait_for(c, fmt.tprintf("Stopped %s", service), SESSION_WAIT), "the footer says it stopped (%q)", footer(c))
+	check(l, !wait_unit(service, "active", 2 * time.Second), "the manager says it is not active")
+	check(l, cdp.key(c, "Escape"), "Escape clears the filter")
+	check(l, cdp.key(c, "ctrl+u"), "Ctrl+U: the system's services again")
+}
+
+// Selects the row of `service` (its name's cell, clicked: the list gets the keyboard) and checks that the row selected,
+// as the accessibility tree says, is that service. (It waits first: two clicks on a row closer than the toolkit's
+// DOUBLE_CLICK_MS are a double click, which opens the service's process in Processes.)
+@(private = "file")
+select_unit :: proc(l: ^Live, service: string) -> bool {
+	c := &l.c
+	time.sleep(DOUBLE_CLICK_GAP)
+	at := -1
+	for b, i in cdp.find_name(c, "c0") { if b.text == service { at = i } }
+	if !check(l, at >= 0, "the row of %s is in view", service) { return false }
+	_, ok := cdp.call(c, "Toolkit.click", fmt.tprintf(`{{"name":"c0","index":%d}}`, at))
+	cdp.wait_idle(c, SESSION_WAIT)
+	got := selected_row_name(c)
+	if check(l, ok && strings.has_prefix(got, fmt.tprintf("%s, ", service)), "the row selected is %s (%q)", service, got) { return true }
+	cdp.shot(c, fmt.tprintf("%s/select_failed.png", l.dir))   // (what the window showed instead)
+	return false
+}
+
+// The footer's message.
+footer :: proc(c: ^cdp.Client) -> string {
+	boxes := cdp.find_name(c, "msg")
+	return len(boxes) > 0 ? boxes[0].text : ""
+}
+
+// `systemctl --user is-active` says `want` within the time.
+@(private = "file")
+wait_unit :: proc(service, want: string, within := SESSION_WAIT) -> bool {
+	deadline := time.tick_add(time.tick_now(), within)
+	for time.tick_diff(time.tick_now(), deadline) > 0 {
+		out, _ := toolbox.capture({"systemctl", "--user", "is-active", service})
+		if strings.trim_space(out) == want { return true }
+		time.sleep(SESSION_POLL)
+	}
+	return false
+}
+
+// The cell `name` of the row whose first cell says `first` ("" when it is not in view).
+@(private = "file")
+cell_of :: proc(c: ^cdp.Client, first, name: string) -> string {
+	for b in cdp.find_name(c, "c0") {
+		if b.text != first { continue }
+		mid := b.y + b.h / 2
+		for x in cdp.find_name(c, name) { if x.y <= mid && mid <= x.y + x.h { return x.text } }
+	}
+	return ""
+}
+
+@(private = "file")
+wait_row_cell :: proc(c: ^cdp.Client, first, name, want: string) -> bool {
+	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
+	for time.tick_diff(time.tick_now(), deadline) > 0 {
+		if cell_of(c, first, name) == want { return true }
+		time.sleep(SESSION_POLL)
+	}
+	return false
+}
+
+@(private = "file")
+wait_row_cell_not :: proc(c: ^cdp.Client, first, name, was: string) -> bool {
+	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
+	for time.tick_diff(time.tick_now(), deadline) > 0 {
+		if v := cell_of(c, first, name); v != "" && v != was { return true }
+		time.sleep(SESSION_POLL)
+	}
+	return false
 }
 
 // The system's details: the kernel's version, as this test reads it; Copy all says what it copied.

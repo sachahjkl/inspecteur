@@ -1,8 +1,8 @@
 package inspecteurtool
 
 // A session nobody sees, for `live`, `shots` and `bench`: a sway with no screen (headless, pixman) in a runtime
-// directory of its own, and inspecteur started in it with its own configuration, no session bus and the DevTools server
-// on a port. The person's desktop is not touched. (/proc is the machine's: inspecteur lists every process, and only
+// directory of its own, and inspecteur started in it with its own configuration, no session bus (but for live's
+// services, see session_start) and the DevTools server on a port. The person's desktop is not touched. (/proc is the machine's: inspecteur lists every process, and only
 // reads them; the tests signal only the processes they start.)
 
 import "core:fmt"
@@ -29,8 +29,10 @@ Session :: struct {
 }
 
 // Starts sway and inspecteur in `dir` (made anew) with `args`. `renderer`: sway's (pixman: the CPU, anywhere; vulkan: the
-// GPU, as on a desktop: inspecteur then draws on the GPU too). `why` says what failed.
-session_start :: proc(s: ^Session, dir: string, port: int, args: []string = nil, renderer := "pixman") -> (why: string) {
+// GPU, as on a desktop: inspecteur then draws on the GPU too). `user_bus`: inspecteur gets the person's session bus,
+// for its Services and Startup sections to reach the user's service manager (live: it acts only on a transient unit it
+// made itself). `why` says what failed.
+session_start :: proc(s: ^Session, dir: string, port: int, args: []string = nil, renderer := "pixman", user_bus := false) -> (why: string) {
 	cwd, _ := os.get_working_directory(context.temp_allocator)
 	s.dir = strings.clone(fmt.tprintf("%s/%s", cwd, dir))
 	s.port = port
@@ -66,8 +68,10 @@ session_start :: proc(s: ^Session, dir: string, port: int, args: []string = nil,
 		fmt.tprintf("XDG_RUNTIME_DIR=%s", run), fmt.tprintf("WAYLAND_DISPLAY=%s", socket),
 		fmt.tprintf("XDG_CONFIG_HOME=%s/config", s.dir), fmt.tprintf("XDG_STATE_HOME=%s/state", s.dir),
 		fmt.tprintf("TOOLKIT_DEVTOOLS=%d", port))
-	s.env = make([]string, len(env))
+	bus := os.get_env("DBUS_SESSION_BUS_ADDRESS", context.temp_allocator)
+	s.env = make([]string, len(env) + (user_bus && bus != "" ? 1 : 0))
 	for e, i in env { s.env[i] = strings.clone(e) }
+	if user_bus && bus != "" { s.env[len(env)] = strings.clone(fmt.tprintf("DBUS_SESSION_BUS_ADDRESS=%s", bus)) }
 	s.output = strings.clone(fmt.tprintf("%s/inspecteur.log", s.dir))
 	out, oerr := os.open(s.output, {.Write, .Create, .Trunc})
 	if oerr != nil { return "the log cannot be written" }

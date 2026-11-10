@@ -229,6 +229,17 @@ find_proc :: proc(s: ^Sampler, pid: i32, start: u64) -> ^Proc {
 	return nil
 }
 
+// The process `pid` of the last sample, whatever its start; nil when it is not there.
+find_pid :: proc(s: ^Sampler, pid: i32) -> ^Proc {
+	lo, hi := 0, len(s.procs)
+	for lo < hi {
+		mid := (lo + hi) / 2
+		if s.procs[mid].pid < pid { lo = mid + 1 } else { hi = mid }
+	}
+	if lo < len(s.procs) && s.procs[lo].pid == pid { return &s.procs[lo] }
+	return nil
+}
+
 // Opens the Properties of the selected row's process (an app's: its first process).
 props_selected :: proc(app: ^App) {
 	r, ok := selected_row(app)

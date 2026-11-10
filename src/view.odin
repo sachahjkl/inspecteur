@@ -67,6 +67,7 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 					case .Performance: build_performance(app, em)
 					case .Connections: build_connections(app, em)
 					case .Information: build_information(app, em)
+					case .Services:    build_services(app, em)
 					case:              build_placeholder(app, em)
 					}
 				}
@@ -76,7 +77,7 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	}
 	props_build(app, em)
 	row_menu_build(app, em)   // (after the Properties: the kill's confirmation goes over them)
-	ui.wake_within(&app.main.state, until_sample(app))
+	ui.wake_within(&app.main.state, min(until_sample(app), services_due_ms(app)))
 }
 
 @(private = "file")
@@ -93,6 +94,7 @@ view_keys :: proc(app: ^App) {
 	#partial switch app.tab {
 	case .Connections: connections_keys(app, field_keeps)
 	case .Information: information_keys(app)
+	case .Services:    services_keys(app, field_keeps)
 	}
 	if app.tab != .Processes { return }
 	if ui.key_press(.Down) { select_step(app, app.vl.sel, 1, 1) }

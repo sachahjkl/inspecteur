@@ -37,7 +37,7 @@ run_live :: proc(args: []string) -> int {
 	keep := len(args) > 0 && args[0] == "--keep"
 	if run_build(nil) != 0 { return 1 }
 	l: Live
-	if why := session_start(&l.session, LIVE_DIR, LIVE_PORT); why != "" {
+	if why := session_start(&l.session, LIVE_DIR, LIVE_PORT, user_bus = true); why != "" {
 		fmt.eprintfln("inspecteurtool live: %s", why)
 		session_stop(&l.session)
 		return 1
@@ -78,9 +78,9 @@ live_window :: proc(l: ^Live) {
 	down := column_numbers(c, "c1")
 	check(l, turns(down, ascending = false) <= 1, "the rows go by PID, highest first (%d turns)", turns(down, false))
 
-	// a section to come, then the Performance section, the columns, the theme (live_more.odin)
-	check(l, cdp.click_text(c, "Services"), "click the Services section")
-	check(l, cdp.wait_for(c, "comes in a later version", SESSION_WAIT), "it says what it will be")
+	// the Services, Connections and Information sections (live_sections.odin), the Performance section, the columns,
+	// the theme (live_more.odin)
+	live_services(l)
 	live_connections(l)
 	live_information(l)
 	live_performance(l)

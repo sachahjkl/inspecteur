@@ -18,6 +18,8 @@ PREF_DEFS := [?]config.Def{
 	{name = "processes.sort", category = "processes", description = "The column the processes are sorted by (one of processes.columns, or name).", kind = .String, default = {s = "name"}},
 	{name = "processes.descending", category = "processes", description = "Sort from the largest (or from Z) down.", kind = .Bool, default = {b = false}},
 	{name = "processes.refresh_ms", category = "processes", description = "How often the processes are read again, in milliseconds.", kind = .Int, default = {i = 1000}, min = 250, max = 10_000, bounded = true, unit = "ms"},
+	{name = "services.manager", category = "services", description = "The services the Services section lists: the system's (system) or the user's (user). Its System and User buttons change it.", kind = .String, default = {s = "system"}, choices = {"system", "user"}},
+	{name = "services.refresh_ms", category = "services", description = "How often the services are read again while their section is shown, in milliseconds.", kind = .Int, default = {i = 3000}, min = 1000, max = 60_000, bounded = true, unit = "ms"},
 	{name = "view.theme", category = "appearance", description = "The window's colours: a theme of the toolkit by its name (Graphite, Midnight, Nord, Gruvbox, Tokyo Night, Catppuccin...).", kind = .String, default = {s = "Graphite"}},
 	{name = "view.mode", category = "appearance", description = "The theme's version: the system's (light or dark, followed as it changes), dark, or light.", kind = .String, default = {s = "system"}, choices = {"system", "dark", "light"}},
 	{name = "view.finish", category = "appearance", description = "How surfaces are drawn. Flat: plain surfaces and thin lines. Machined: bevelled buttons, sunken fields.", kind = .String, default = {s = "flat"}, choices = {"flat", "machined", "gradient", "glass"}},
@@ -29,6 +31,8 @@ PREF_DEFS := [?]config.Def{
 // The values the program reads, copied out of the registry (prefs_read).
 Settings :: struct {
 	refresh_ms: int,
+	manager:    Manager,    // services.manager
+	services_ms: int,       // services.refresh_ms
 	columns:    string,   // owned: processes.columns, .widths, .sort as written
 	widths:     string,
 	sort:       string,
@@ -56,6 +60,8 @@ prefs_open :: proc(p: ^config.Prefs, args: []string) -> (rest: [dynamic]string, 
 
 prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Settings) {
 	s.refresh_ms = int(config.int_of(p, "processes.refresh_ms"))
+	s.manager = config.string_of(p, "services.manager") == "user" ? .User : .System
+	s.services_ms = int(config.int_of(p, "services.refresh_ms"))
 	s.columns = strings.clone(config.string_of(p, "processes.columns"), allocator)
 	s.widths = strings.clone(config.string_of(p, "processes.widths"), allocator)
 	s.sort = strings.clone(config.string_of(p, "processes.sort"), allocator)

@@ -14,6 +14,8 @@ inspecteur --pref view.mode=light --pref processes.refresh_ms=2000
 | `processes.sort` | name | The column the processes are sorted by (one of `processes.columns`, or `name`). |
 | `processes.descending` | false | Sort from the largest (or from Z) down. |
 | `processes.refresh_ms` | 1000 | How often the processes are read again, in milliseconds (250 to 10000). |
+| `services.manager` | system | The services the Services section lists: the system's (`system`) or the user's (`user`). Its System and User buttons change it. |
+| `services.refresh_ms` | 3000 | How often the services are read again while their section is shown, in milliseconds (1000 to 60000). |
 | `view.theme` | Graphite | The window's colours: a theme of gui_toolkit by its name (Graphite, Midnight, Nord, Gruvbox, Tokyo Night, Catppuccin...). |
 | `view.mode` | system | The theme's version: `system` (light or dark, as the system), `dark` or `light`. |
 | `view.finish` | flat | How surfaces are drawn: `flat`, `machined`, `gradient` or `glass`. |
