@@ -69,9 +69,7 @@ live_access_denied :: proc(l: ^Live) {
 // for the test's app.
 live_group_kill :: proc(l: ^Live) {
 	c := &l.c
-	state, _ := toolbox.capture({"systemctl", "--user", "is-system-running"})
-	state = strings.trim_space(state)
-	if state != "running" && state != "degraded" { check(l, true, "no user service manager here: the group's kill is skipped"); return }
+	if user_bus_address() == "" { check(l, true, "no session bus here: the group's kill is skipped"); return }
 	unit := fmt.tprintf("app-%s-1.scope", live_app_id())
 	mark_a, mark_b := fmt.tprintf("300.%d41", os.get_pid()), fmt.tprintf("300.%d42", os.get_pid())
 	child, err := os.process_start({command = {"systemd-run", "--user", "--scope", "--quiet", fmt.tprintf("--unit=%s", unit), "--", "sh", "-c", fmt.tprintf("sleep %s & exec sleep %s", mark_a, mark_b)}})

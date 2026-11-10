@@ -19,6 +19,8 @@ GRAPH_DRAWN_SHARE :: 0.01
 GRAPH_COLOR_SLACK :: 12
 // The Performance section's graphs get some points first.
 PERF_POINTS_WAIT :: 8 * time.Second
+// How often a graph's pixels are read again while they are waited for (a picture of the window each time).
+GRAPH_POLL :: 250 * time.Millisecond
 // The busy children end by themselves after this many seconds, whatever becomes of this tool.
 BUSY_SECONDS :: "30"
 
@@ -94,7 +96,7 @@ wait_drawn :: proc(c: ^cdp.Client, name: string) -> f64 {
 	for time.tick_diff(time.tick_now(), deadline) > 0 {
 		share = drawn_share(c, name)
 		if share > GRAPH_DRAWN_SHARE { break }
-		time.sleep(250 * time.Millisecond)
+		time.sleep(GRAPH_POLL)
 	}
 	return share
 }
@@ -183,7 +185,7 @@ live_theme :: proc(l: ^Live) {
 	check(l, cdp.click_name(c, "theme") && cdp.wait_for(c, "As the system", SESSION_WAIT), "the theme's menu opens")
 	check(l, cdp.click_text(c, "Light"), "choose Light")
 	check(l, file_has(prefs, "view.mode\tlight"), "it is in the preferences")
-	time.sleep(400 * time.Millisecond)   // (the colours fade to the light version)
+	// (the colours fade to the light version: the window is idle once the fade is over)
 	cdp.wait_idle(c, SESSION_WAIT)
 	check(l, cdp.shot(c, fmt.tprintf("%s/light.png", l.dir)), "a picture of the light version")
 	check(l, cdp.click_name(c, "theme") && cdp.wait_for(c, "As the system", SESSION_WAIT), "the menu again")

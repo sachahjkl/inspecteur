@@ -54,10 +54,8 @@ live_services :: proc(l: ^Live) {
 	cdp.wait_idle(c, SESSION_WAIT)
 	check(l, cdp.shot(c, fmt.tprintf("%s/services.png", l.dir)), "a picture of the section")
 
-	state, code := toolbox.capture({"systemctl", "--user", "is-system-running"})
-	state = strings.trim_space(state)
-	if state != "running" && state != "degraded" {
-		check(l, true, "no user service manager here (%s, %d): its checks are skipped", state, code)
+	if user_bus_address() == "" {
+		check(l, true, "no session bus here (no DBUS_SESSION_BUS_ADDRESS, no $XDG_RUNTIME_DIR/bus): the user service's checks are skipped")
 		return
 	}
 	unit := fmt.tprintf("inspecteur-live-%d", os.get_pid())

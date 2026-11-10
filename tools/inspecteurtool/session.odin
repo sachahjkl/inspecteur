@@ -71,7 +71,7 @@ session_start :: proc(s: ^Session, dir: string, port: int, args: []string = nil,
 		fmt.tprintf("XDG_RUNTIME_DIR=%s", run), fmt.tprintf("WAYLAND_DISPLAY=%s", socket),
 		fmt.tprintf("XDG_CONFIG_HOME=%s/config", s.dir), fmt.tprintf("XDG_STATE_HOME=%s/state", s.dir),
 		fmt.tprintf("XDG_DATA_HOME=%s/data", s.dir), fmt.tprintf("TOOLKIT_DEVTOOLS=%d", port))
-	bus := os.get_env("DBUS_SESSION_BUS_ADDRESS", context.temp_allocator)
+	bus := user_bus_address()
 	s.env = make([]string, len(env) + (user_bus && bus != "" ? 1 : 0))
 	for e, i in env { s.env[i] = strings.clone(e) }
 	if user_bus && bus != "" { s.env[len(env)] = strings.clone(fmt.tprintf("DBUS_SESSION_BUS_ADDRESS=%s", bus)) }
@@ -87,6 +87,15 @@ session_start :: proc(s: ^Session, dir: string, port: int, args: []string = nil,
 	os.close(out)
 	if err != nil { return fmt.tprintf("%s does not start", PROGRAM) }
 	s.program = p
+	return ""
+}
+
+// The person's session bus: DBUS_SESSION_BUS_ADDRESS, else the socket of the user's service manager,
+// $XDG_RUNTIME_DIR/bus (a CI runner has the manager and not the variable); "" when there is neither.
+user_bus_address :: proc() -> string {
+	if bus := os.get_env("DBUS_SESSION_BUS_ADDRESS", context.temp_allocator); bus != "" { return bus }
+	runtime := os.get_env("XDG_RUNTIME_DIR", context.temp_allocator)
+	if runtime != "" && os.exists(fmt.tprintf("%s/bus", runtime)) { return fmt.tprintf("unix:path=%s/bus", runtime) }
 	return ""
 }
 
