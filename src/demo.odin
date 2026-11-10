@@ -407,6 +407,7 @@ demo_props_read :: proc(d: ^Demo, p: ^Props, a: mem.Allocator) {
 	if !ok { p.cwd_read, p.list_read = .Gone, .Gone; return }
 	if q.user != DEMO_USER { p.cwd_read, p.list_read = .Denied, .Denied; return }
 	p.cwd, p.cwd_read, p.list_read = "/home/alex", .Read, .Read
+	p.cpus = fmt.aprintf("0-%d", DEMO_LOGICAL - 1, allocator = a)
 	switch p.tab {
 	case .General:
 	case .Threads:

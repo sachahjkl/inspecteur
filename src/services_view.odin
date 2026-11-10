@@ -51,7 +51,12 @@ service_details_build :: proc(app: ^App, em: f32) {
 	d := s.details
 	ui.next({width = ui.fill(), height = ui.px(em * DETAILS_EM), axis = .Y, bg = surface("well")})
 	pane := ui.build_box({.Clip, .Draw_Background, .Draw_Side_Top}, "###svc_pane")
-	if !ui.parent(pane) { return }
+	if ui.parent(pane) { service_details_body(app, u, selected, d, em) }
+}
+
+@(private = "file")
+service_details_body :: proc(app: ^App, u: Service, selected: bool, d: ^Unit_Details, em: f32) {
+	s := &app.services
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.2))})
 	if ui.row(.Center, {}, "###svc_details_head") {
 		ui.spacer(ui.px(em * 0.8))
@@ -98,10 +103,10 @@ service_details_build :: proc(app: ^App, em: f32) {
 	for &v, i in ids { v = name_id(lines[i]) ~ u64(i) }
 	if s.journal_for != name_id(u.name) || s.journal_lines != len(lines) {
 		s.journal_for, s.journal_lines = name_id(u.name), len(lines)
-		ui.list_select(&s.journal_vl, len(lines) - 1)
+		s.journal_vl.sel = -1
+		ui.vlist_scroll_to(&s.journal_vl, max(f32))   // (the view clamps it to the end)
 	}
-	// (an exact height: the pane's is fixed, and the table above takes the rest)
-	ui.next({width = ui.fill(), height = ui.px(em * DETAILS_EM - ui.dense(em * 2.2))})
+	ui.next({width = ui.fill(), height = ui.fill()})
 	rows, ok := ui.vlist("###svc_journal", &s.journal_vl, ids)
 	if !ok { return }
 	for i in rows.first ..< rows.last {
