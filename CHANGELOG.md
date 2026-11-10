@@ -5,6 +5,10 @@ and the versions follow [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- **Busy cells go from green through yellow to red** as the load grows, with dark or light text, whichever reads on
+  the colour (it was one orange tint).
+
 ## [0.1.0] - 2026-11-10
 
 ### Added

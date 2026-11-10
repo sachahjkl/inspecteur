@@ -17,12 +17,39 @@ import "gt:ui"
 INDENT_EM  :: 1.6
 CHEVRON_EM :: 1.4
 ICON_EM    :: 1.5
-// The tint of a busy cell (the theme's warning hue): the CPU % (of the machine) and the share of the memory at which it is
-// strongest, the least it shows for (a quiet cell stays plain), and its strongest opacity.
-HEAT_CPU_FULL :: 25.0
-HEAT_MEM_FULL :: 0.15
-HEAT_MIN      :: 0.04
-HEAT_ALPHA    :: 0.3
+// The colour of a busy cell, from green through yellow to red as the load grows: the CPU % (of the machine) and the share
+// of the memory at which it is red, the least it shows for (a quiet cell stays plain), and its weakest and strongest
+// opacity over the page.
+HEAT_CPU_FULL  :: 25.0
+HEAT_MEM_FULL  :: 0.15
+HEAT_MIN       :: 0.04
+HEAT_ALPHA_MIN :: 0.35
+HEAT_ALPHA_MAX :: 0.9
+HEAT_GREEN     :: ui.Color{0.18, 0.62, 0.30, 1}
+HEAT_YELLOW    :: ui.Color{0.93, 0.74, 0.13, 1}
+HEAT_RED       :: ui.Color{0.86, 0.20, 0.17, 1}
+// A background lighter than this (relative luminance) takes dark text, a darker one light text.
+HEAT_TEXT_LUMINANCE :: 0.45
+HEAT_TEXT_DARK      :: ui.Color{0.07, 0.07, 0.07, 1}
+HEAT_TEXT_LIGHT     :: ui.Color{1, 1, 1, 1}
+
+// A busy cell's background and the text that reads on it, for a load `heat` (1: red) over the page `page`.
+heat_colors :: proc(heat: f32, page: ui.Color) -> (bg, fg: ui.Color) {
+	h := clamp(heat, 0, 1)
+	hue := h < 0.5 ? lerp_color(HEAT_GREEN, HEAT_YELLOW, h * 2) : lerp_color(HEAT_YELLOW, HEAT_RED, (h - 0.5) * 2)
+	alpha := HEAT_ALPHA_MIN + (HEAT_ALPHA_MAX - HEAT_ALPHA_MIN) * h
+	bg = {hue.r, hue.g, hue.b, alpha}
+	// (what the eye sees: the tint over the page)
+	shown := lerp_color(page, hue, alpha)
+	luminance := 0.2126 * shown.r + 0.7152 * shown.g + 0.0722 * shown.b
+	fg = luminance > HEAT_TEXT_LUMINANCE ? HEAT_TEXT_DARK : HEAT_TEXT_LIGHT
+	return
+}
+
+@(private = "file")
+lerp_color :: proc(a, b: ui.Color, t: f32) -> ui.Color {
+	return {a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t, a.a + (b.a - a.a) * t}
+}
 
 build_processes :: proc(app: ^App, em: f32) {
 	if app.table.query != app.query {
@@ -149,9 +176,7 @@ build_rows :: proc(app: ^App, em: f32) {
 	if !ok { return }
 	// (the search has the keyboard, yet the selection is the window's: it shows as strong as a focused list's)
 	app.vl.focused = true
-	ui.push_tags("warn")
-	hot := ui.color("text")   // (the theme's warning hue: the busy cells' tint)
-	ui.pop_tags()
+	page := ui.color("background")   // (the busy cells' tint is seen over it: their text is chosen for the mix)
 	for i in rows.first ..< rows.last {
 		r := t.rows[i]
 		ui.next({height = ui.px(row_h)})
@@ -162,7 +187,7 @@ build_rows :: proc(app: ^App, em: f32) {
 		}
 		row := ui.list_row(&app.vl, i, row_label(app, r))
 		tip := ""
-		if ui.parent(row.box) { tip = build_cells(app, r, em, hot) }
+		if ui.parent(row.box) { tip = build_cells(app, r, em, page) }
 		ui.table_cell_tip(row, tip)
 		if i == app.vl.sel { app.sel_rect = row.box.rect }
 		if row.double_clicked { default_action(app) }
@@ -206,7 +231,7 @@ build_section :: proc(app: ^App, r: Row, em: f32) {
 
 // The cells of a row. Returns the whole text of the cell under the pointer when it is cut.
 @(private = "file")
-build_cells :: proc(app: ^App, r: Row, em: f32, hot: ui.Color) -> (tip: string) {
+build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string) {
 	s := &app.sampler
 	t := &app.table
 	p: Proc
@@ -233,16 +258,12 @@ build_cells :: proc(app: ^App, r: Row, em: f32, hot: ui.Color) -> (tip: string) 
 	case .Section:
 		return
 	}
-	cell :: proc(t: ^Table, c: Column, text: string, tip: ^string, weak := false, heat: f32 = 0, hot: ui.Color = {}) {
-		bg: Maybe(ui.Color)
-		if heat >= HEAT_MIN {
-			tint := hot
-			tint.a = HEAT_ALPHA * min(heat, 1)
-			bg = tint
-		}
-		if weak { ui.push_tags("weak") }
-		if ui.table_cell(&t.layout, int(c), text, bg) { tip^ = text }
-		if weak { ui.pop_tags() }
+	cell :: proc(t: ^Table, c: Column, text: string, tip: ^string, weak := false, heat: f32 = 0, page: ui.Color = {}) {
+		bg, fg: Maybe(ui.Color)
+		if heat >= HEAT_MIN { bg, fg = heat_colors(heat, page) }
+		if weak && fg == nil { ui.push_tags("weak") }
+		defer if weak && fg == nil { ui.pop_tags() }
+		if ui.table_cell(&t.layout, int(c), text, bg, fg) { tip^ = text }
 	}
 
 	// Name: the indent, the chevron of a group, the icon, the name
@@ -290,8 +311,8 @@ build_cells :: proc(app: ^App, r: Row, em: f32, hot: ui.Color) -> (tip: string) 
 		case .User:       cell(t, c, p.user, &tip, weak = true)
 		case .State:      cell(t, c, state_text(p.state), &tip, weak = p.state != .Stopped && p.state != .Zombie)
 		case .Nice:       cell(t, c, fmt.tprintf("%d", p.nice), &tip, weak = p.nice == 0)
-		case .CPU:        cell(t, c, fmt.tprintf("%.1f%%", cpu), &tip, heat = cpu / HEAT_CPU_FULL, hot = hot)
-		case .Memory:     cell(t, c, size_text(private), &tip, heat = app.machine.mem.total > 0 ? f32(f64(private) / f64(app.machine.mem.total) / HEAT_MEM_FULL) : 0, hot = hot)
+		case .CPU:        cell(t, c, fmt.tprintf("%.1f%%", cpu), &tip, heat = cpu / HEAT_CPU_FULL, page = page)
+		case .Memory:     cell(t, c, size_text(private), &tip, heat = app.machine.mem.total > 0 ? f32(f64(private) / f64(app.machine.mem.total) / HEAT_MEM_FULL) : 0, page = page)
 		case .Resident:   cell(t, c, size_text(resident), &tip, weak = true)
 		case .GPU_Memory: cell(t, c, gpu_mem > 0 ? size_text(gpu_mem) : "", &tip)
 		case .Read:       cell(t, c, io_dash ? "–" : rate_text(read), &tip, weak = io_dash)
