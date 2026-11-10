@@ -5,6 +5,8 @@ and the versions follow [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-10
+
 ### Added
 - **Processes**: name with the app's icon, PID, user, CPU % (of the whole machine), private memory, disk read and write
   rates, threads, read from `/proc` each second; more columns from the header's right click (Ctrl+Shift+C): parent,
@@ -51,3 +53,4 @@ and the versions follow [semantic versioning](https://semver.org/).
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.1.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.1.0
