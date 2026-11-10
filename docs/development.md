@@ -25,14 +25,20 @@ odin run tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/insp
 | `build [release]` | the toolkit's text library (when its sources changed), then `build/inspecteur` |
 | `test` | the unit tests of `src` |
 | `check` | `odin check -vet` of the program and the tool, the tests, a release build |
-| `live [--keep]` | the real program in a headless sway, driven over the DevTools protocol; writes `docs/screenshots/processes.png` |
+| `live [--keep]` | the real program in a headless sway, driven over the DevTools protocol (167 checks); writes `docs/screenshots/processes.png` and `properties.png` |
 | `shots [--out folder]` | the pictures of the README, the program's own frames |
-| `bench [seconds]` | a release build in a headless sway that draws on the GPU: the time to the first frame, the CPU use at rest |
+| `bench [seconds]` | a release build in a headless sway that draws on the GPU: the time to the first frame, the CPU use at rest, then with Services and with Connections shown |
 
 `GT=<folder>` builds against another checkout of gui_toolkit.
 
 The headless sway of `live` and `shots` draws on the CPU (pixman): inspecteur then draws with Mesa's software Vulkan.
 `bench` uses sway's Vulkan renderer, so that inspecteur draws on the GPU as on a desktop.
+
+The session has a runtime folder and a configuration of its own. `live` and `shots` give inspecteur the person's session
+bus, so that the Services and Startup sections reach the user's service manager: `shots` only reads it, and `live` acts
+only on a transient service it makes (`systemd-run --user --unit=inspecteur-live-<pid>`), which it stops and resets at
+the end. Without a user manager, `live` says so and skips those checks. Its autostart entry is in the session's own
+configuration folder.
 
 ## Measures
 
@@ -42,8 +48,10 @@ cores, NVIDIA 595, about 200 processes):
 
 | | |
 |---|---|
-| cold start (process start to the end of the first frame) | 265 to 280 ms: `/proc` 12 ms, the window 230 ms, the first frame 20 ms |
-| at rest, the table read each second | 1.0 % of one core, 160 MB resident (most of it the GPU driver) |
+| cold start (process start to the end of the first frame) | 250 to 265 ms: `/proc` 13 ms, the window 215 ms, the first frame 20 ms |
+| at rest, the table read each second | 1.0 % of one core, 190 MB resident (most of it the GPU driver) |
+| Services shown (read every 3 s) | 1.2 % of one core |
+| Connections shown (read each second) | 2.9 % of one core, 1.7 % of it the scan of the descriptors |
 | a sample | 6 to 7 ms (`stat` about 5 ms, `io` about 1.5 ms) |
 | a frame | 1.3 ms |
 

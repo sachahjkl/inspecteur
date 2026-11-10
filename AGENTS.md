@@ -11,7 +11,7 @@ Every step is a command of `tools/inspecteurtool` (`help` lists them):
     odin run tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/inspecteurtool -keep-executable -- <command>
 
 - `build [release]` builds `build/inspecteur` (`build.sh` / `build.bat` are shortcuts).
-- `check`: `odin check -vet`, the unit tests, a release build. `live`: the real program in a headless sway (36 checks).
+- `check`: `odin check -vet`, the unit tests, a release build. `live`: the real program in a headless sway (167 checks).
 - `shots` makes the pictures of the README; `bench` measures the cold start and the CPU use at rest.
 - `nix develop` first (`flake.nix`). `nix build` builds the package.
 
@@ -22,7 +22,10 @@ Every step is a command of `tools/inspecteurtool` (`help` lists them):
 - A preference is a `config.Def` in `src/settings.odin` with its line in `docs/configuration.md` (a test checks it).
 - What changed goes under `## [Unreleased]` in `CHANGELOG.md`.
 - Tests never touch the person's desktop: `live`, `shots` and `bench` run in a sway of their own. A test sends a signal
-  only to a process it started itself, found by a mark in its command line and checked by its pid.
+  only to a process it started itself, found by a mark in its command line and checked by its pid; it acts on a service
+  or an autostart entry only when it made it itself. A key that changes something is pressed only after a check that the
+  selected row is the test's own (`select_child`, `select_unit`), and the test stops when that check fails.
+- A section's reader of the system is in a `*_linux.odin` file behind plain structs; its view has no Linux in it.
 - Automation is a command of `tools/inspecteurtool`, never a shell, batch, PowerShell, Python or Node script.
 - Comments and commit messages are in English. Comments say why.
 - Commits: author and committer `sachahjkl <sacha@sacha.house>`, no attribution trailer, no session link.
