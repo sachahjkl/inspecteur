@@ -111,6 +111,13 @@ run_shots :: proc(args: []string) -> int {
 		cdp.key(&c, "Escape")
 		cdp.wait_for(&c, "Keyboard shortcuts", SESSION_WAIT, gone = true)
 	}
+	// Why is it slow?
+	cdp.key(&c, "F2")
+	if need(cdp.wait_for(&c, "Why is it slow?", SESSION_WAIT), "no diagnosis", &failed) {
+		shot(&c, out, "diagnosis", &failed)
+		cdp.key(&c, "Escape")
+		cdp.wait_for(&c, "Why is it slow?", SESSION_WAIT, gone = true)
+	}
 
 	// the Performance section: the graphs need some history (a few samples)
 	cdp.key(&c, "ctrl+2")

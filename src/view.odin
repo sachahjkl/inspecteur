@@ -36,7 +36,7 @@ METER_FULL :: 0.9
 view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	app := (^App)(h.user)
 	em := ui.font_size()
-	free_keys := !app.menu.confirm.open && !app.props.open && !app.affinity.open && !app.shortcuts_open && !app.setup.open && !ui.ctx_menu_any_open()
+	free_keys := !app.menu.confirm.open && !app.props.open && !app.affinity.open && !app.shortcuts_open && !app.setup.open && !app.diagnosis_open && !ui.ctx_menu_any_open()
 	// typing anywhere filters: a character typed gives the filter the keyboard (an open menu searches its own items)
 	if free_keys { ui.type_to_field(app.search_key) }
 	if free_keys { view_keys(app) }
@@ -70,6 +70,7 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	palette_build(app)
 	shortcuts_build(app)
 	setup_build(app, em)
+	diagnosis_build(app, em)
 	ui.wake_within(&app.main.state, min(until_sample(app), services_due_ms(app)))
 }
 

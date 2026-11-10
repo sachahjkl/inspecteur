@@ -25,6 +25,8 @@ and the versions follow [semantic versioning](https://semver.org/).
   sort, kept by name across starts.
 - **What changes shows**: a process that comes flashes green and fades; one that ends stays a moment in red, fading
   out, and nothing acts on it any more. With the animations off they keep their colour, still.
+- **Why is it slow?** (F2): what the last sample says, in sentences, the worst first: the processors and who keeps
+  them busy, the time tasks waited, the memory and the swap, the disks, the GPU, the heat.
 - **History in Properties**: graphs of the process's CPU, private memory and disk since Inspecteur saw it start (5
   minutes at most at the default period).
 

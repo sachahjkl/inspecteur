@@ -184,3 +184,11 @@ live_pin :: proc(l: ^Live) {
 	check(l, cdp.key(c, "alt+p") && cdp.wait_for(c, "Pinned (1)", SESSION_WAIT, gone = true), "Alt+P again unpins it")
 	check(l, cdp.key(c, "Escape"), "Escape clears the filter")
 }
+
+// F2: "Why is it slow?", at least one finding; Escape closes it.
+live_diagnosis :: proc(l: ^Live) {
+	c := &l.c
+	check(l, cdp.key(c, "F2") && cdp.wait_for(c, "Why is it slow?", SESSION_WAIT), "F2: Why is it slow?")
+	check(l, cdp.wait_name(c, "diag_text0", SESSION_WAIT), "it says at least one thing")
+	check(l, cdp.key(c, "Escape") && cdp.wait_for(c, "Why is it slow?", SESSION_WAIT, gone = true), "Escape closes it")
+}

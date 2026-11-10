@@ -64,6 +64,7 @@ App :: struct {
 	theme_menu:  ui.Key,            // the menu of the theme (view.odin)
 	palette:     ui.Key,            // the command palette (commands.odin)
 	shortcuts_open: bool,           // the sheet of the keys
+	diagnosis_open: bool,   // "Why is it slow?" (F2, diagnosis.odin)
 	setup:       Setup_Page,        // the welcome page, and the desktop integration (setup_view.odin)
 	tz:          ^datetime.TZ_Region,   // local time, for the processes' start (loaded when first needed)
 	tz_tried:    bool,

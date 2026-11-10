@@ -133,6 +133,7 @@ live_window :: proc(l: ^Live) {
 	live_properties(l)
 	live_guards(l)
 	live_pin(l)
+	live_diagnosis(l)
 	live_access_denied(l)
 	live_group_kill(l)
 	live_commands(l)

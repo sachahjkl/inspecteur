@@ -15,7 +15,7 @@ import "gt:ui"
 Cmd :: enum u8 {
 	// Window
 	Palette, Shortcuts, Filter, Clear_Filter, Read_Again, Pause_Refresh, Refresh_Speed, Zoom_In, Zoom_Out, Zoom_Reset,
-	Light_Dark, Setup,
+	Light_Dark, Setup, Diagnose,
 	// Sections
 	Show_Processes, Show_Performance, Show_Services, Show_Startup, Show_Connections, Show_Information, Next_Section, Previous_Section,
 	// Processes
@@ -50,6 +50,7 @@ COMMANDS := [Cmd]ui.Command{
 	.Zoom_Reset       = {label = "Text size as the default", group = "Window", keys = {{.N0, {.Ctrl}}, {}}},
 	.Light_Dark       = {label = "Light or dark", group = "Window", keys = {{.L, {.Ctrl, .Shift}}, {}}},
 	.Setup            = {label = "Desktop integration…", group = "Window", keys = {{.I, {.Ctrl, .Shift}}, {}}},
+	.Diagnose         = {label = "Why is it slow?", group = "Window", keys = {{.F2, {}}, {}}},
 
 	.Show_Processes   = {label = "Processes", group = "Sections", keys = {{.N1, {.Ctrl}}, {}}},
 	.Show_Performance = {label = "Performance", group = "Sections", keys = {{.N2, {.Ctrl}}, {}}},
@@ -210,7 +211,7 @@ shortcuts_build :: proc(app: ^App) {
 cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 	p := selected_proc(app)
 	switch c {
-	case .Palette, .Shortcuts, .Filter, .Read_Again, .Light_Dark, .Setup, .Pause_Refresh, .Refresh_Speed: return true
+	case .Palette, .Shortcuts, .Filter, .Read_Again, .Light_Dark, .Setup, .Pause_Refresh, .Refresh_Speed, .Diagnose: return true
 	case .Zoom_In:    return app.settings.font_size < FONT_SIZE_MAX
 	case .Zoom_Out:   return app.settings.font_size > FONT_SIZE_MIN
 	case .Zoom_Reset: return app.settings.font_size != FONT_SIZE_DEFAULT
@@ -265,6 +266,7 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Zoom_Reset:       zoom(app, FONT_SIZE_DEFAULT)
 	case .Light_Dark:       light_dark_switch(app)
 	case .Setup:            setup_show(app)
+	case .Diagnose:         app.diagnosis_open = true
 	case .Show_Processes:   tab_show(app, .Processes)
 	case .Show_Performance: tab_show(app, .Performance)
 	case .Show_Services:    tab_show(app, .Services)
