@@ -68,9 +68,17 @@
     inspecteur = pkgs.stdenv.mkDerivation {
       pname = "inspecteur";
       inherit version;
+      # (the sources without what builds, tests and the site leave in the tree: a change there builds nothing again)
       src = lib.fileset.toSource {
         root = ./.;
-        fileset = lib.fileset.difference ./. (lib.fileset.maybeMissing ./build);
+        fileset = lib.fileset.difference ./. (lib.fileset.unions (map lib.fileset.maybeMissing [
+          ./build
+          ./_site
+          ./result
+          ./.direnv
+          ./.odin-cache
+          ./ext/gui_toolkit/build
+        ]));
       };
       # the crates of the toolkit's text library, vendored: cargo makes no request
       cargoDeps = pkgs.rustPlatform.importCargoLock {lockFile = ./ext/gui_toolkit/native/text/Cargo.lock;};
@@ -109,8 +117,7 @@
         # the desktop entry (Categories=System;Monitor;, an action per section) and the logo in the hicolor theme, as
         # `inspecteur setup` writes them for a user
         odin run tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/inspecteurtool -- desktop_files $out
-        install -Dm644 -t $out/share/doc/inspecteur LICENSE README.md CHANGELOG.md
-        install -Dm644 ext/gui_toolkit/src/lucide/LICENSE.txt $out/share/doc/inspecteur/LUCIDE-LICENSE.txt
+        install -Dm644 -t $out/share/doc/inspecteur LICENSE THIRD-PARTY-NOTICES README.md CHANGELOG.md
         runHook postInstall
       '';
 

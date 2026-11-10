@@ -2,9 +2,10 @@ package inspecteurtool
 
 // What a release is made of, the same steps on a laptop and in the release workflow:
 //
-//   package [version]       build/dist: inspecteur-<version>-linux-x64.tar.gz (the program, its icons and desktop
-//                           entry, its licences, the README and the changelog), and the archive's
-//                           SHA-256 beside it (<archive>.sha256); the version is APP_VERSION's when none is given
+//   package [version]       build/dist: inspecteur-<version>-linux-x64.tar.gz (the program, its licence and the
+//                           third-party notices, the README and the changelog; the program writes its own desktop
+//                           entry and icons: `inspecteur setup`), and the archive's SHA-256 beside it
+//                           (<archive>.sha256); the version is APP_VERSION's when none is given
 //   notes <version>         the changelog's section of that version (the notes of its GitHub release)
 //   ship <version> [--dry-run]
 //                           from a clean main: the changelog's [Unreleased] becomes [<version>] with today's date,
@@ -23,8 +24,9 @@ VERSION_FILE :: "src/main.odin"
 VERSION_LINE :: "APP_VERSION :: "
 REPOSITORY   :: "https://github.com/sachahjkl/inspecteur"
 DIST_DIR     :: "build/dist"
-// What goes beside the program in the archive: the file, and its name there (the icons' licence is the toolkit's).
-DIST_FILES   :: [?][2]string{{"README.md", "README.md"}, {"LICENSE", "LICENSE"}, {"CHANGELOG.md", "CHANGELOG.md"}, {"ext/gui_toolkit/src/lucide/LICENSE.txt", "LUCIDE-LICENSE.txt"}}
+// What goes beside the program in the archive: the file, and its name there (THIRD-PARTY-NOTICES holds the licences of
+// what the program embeds and links: inspecteurtool notices).
+DIST_FILES   :: [?][2]string{{"README.md", "README.md"}, {"LICENSE", "LICENSE"}, {"THIRD-PARTY-NOTICES", "THIRD-PARTY-NOTICES"}, {"CHANGELOG.md", "CHANGELOG.md"}}
 
 // The version of the sources: APP_VERSION's value ("" when the line is not there).
 version_of :: proc(source: string) -> string {
