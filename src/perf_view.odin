@@ -369,7 +369,8 @@ cpu_page :: proc(app: ^App, em: f32) {
 	append(&details, Stat{"Sockets", fmt.tprintf("%d", m.info.sockets)}, Stat{"Cores", fmt.tprintf("%d", m.info.cores)}, Stat{"Logical processors", fmt.tprintf("%d", len(m.core_total))})
 	append(&details, ..caches[:])
 	append(&details, Stat{"Load average", fmt.tprintf("%.2f  %.2f  %.2f", m.load[0], m.load[1], m.load[2])})
-	for &t in m.temps[1:m.temp_count] { append(&details, Stat{temp_label(&t), fmt.tprintf("%.0f °C", t.celsius)}) }
+	// (the first sensor is the big Temperature; a machine with none, a CI runner's, has no others)
+	if m.temp_count > 1 { for &t in m.temps[1:m.temp_count] { append(&details, Stat{temp_label(&t), fmt.tprintf("%.0f °C", t.celsius)}) } }
 	if m.throttled > m.throttled_before { append(&details, Stat{"Slowed for its heat", fmt.tprintf("%d times since Inspecteur started", m.throttled - m.throttled_before)}) }
 	big := make([dynamic]Stat, context.temp_allocator)
 	append(&big, Stat{"Utilization", fmt.tprintf("%.0f%%", m.cpu)}, Stat{"Speed", mhz_text(m.mhz)})
