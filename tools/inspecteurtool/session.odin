@@ -2,7 +2,7 @@ package inspecteurtool
 
 // A session nobody sees, for `live`, `shots` and `bench`: a sway with no screen (headless, pixman) in a runtime
 // directory of its own, and inspecteur started in it with its own configuration and data folders (its preferences, its
-// desktop entry when a test installs it, its cache: a dump file), no session bus (but for live's services, see session_start) and the DevTools
+// desktop entry when a test installs it), no session bus (but for live's services, see session_start) and the DevTools
 // server on a port. The person's desktop is not touched. (/proc is the machine's: inspecteur lists every process, and
 // only reads them; the tests signal only the processes they start.) The welcome page is off unless a test asks for it.
 
@@ -32,9 +32,10 @@ Session :: struct {
 // Starts sway and inspecteur in `dir` (made anew) with `args`. `renderer`: sway's (pixman: the CPU, anywhere; vulkan: the
 // GPU, as on a desktop: inspecteur then draws on the GPU too). `user_bus`: inspecteur gets the person's session bus,
 // for its Services and Startup sections to reach the user's service manager (live: it acts only on a transient unit it
-// made itself). `welcome`: the welcome page shows at the start. `before`: writes what inspecteur reads at its start in
-// the session's folders (live: a desktop entry of its own). `why` says what failed.
-session_start :: proc(s: ^Session, dir: string, port: int, args: []string = nil, renderer := "pixman", user_bus := false, welcome := false, before: proc(dir: string) = nil) -> (why: string) {
+// made itself). `welcome`: the welcome page shows at the start. `own_cache`: its XDG_CACHE_HOME is the session's.
+// `before`: writes what inspecteur reads at its start in the session's folders (live: a desktop entry of its own).
+// `why` says what failed.
+session_start :: proc(s: ^Session, dir: string, port: int, args: []string = nil, renderer := "pixman", user_bus := false, welcome := false, own_cache := false, before: proc(dir: string) = nil) -> (why: string) {
 	cwd, _ := os.get_working_directory(context.temp_allocator)
 	s.dir = strings.clone(fmt.tprintf("%s/%s", cwd, dir))
 	s.port = port
@@ -67,15 +68,21 @@ session_start :: proc(s: ^Session, dir: string, port: int, args: []string = nil,
 	}
 	if socket == "" { return fmt.tprintf("sway made no Wayland socket (%s/sway.log)", s.dir) }
 
-	// (no XDG_CURRENT_DESKTOP: the welcome page then offers nothing that writes the person's desktop settings)
-	env := toolbox.env_with({"WAYLAND_DISPLAY", "DISPLAY", "DBUS_SESSION_BUS_ADDRESS", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_CURRENT_DESKTOP"},
+	// (no XDG_CURRENT_DESKTOP: the welcome page then offers nothing that writes the person's desktop settings. A cache of
+	// its own only when asked: an empty one makes fontconfig build its cache again at each start, which bench would
+	// count as inspecteur's)
+	env := toolbox.env_with({"WAYLAND_DISPLAY", "DISPLAY", "DBUS_SESSION_BUS_ADDRESS", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "XDG_CURRENT_DESKTOP"},
 		fmt.tprintf("XDG_RUNTIME_DIR=%s", run), fmt.tprintf("WAYLAND_DISPLAY=%s", socket),
-		fmt.tprintf("XDG_CONFIG_HOME=%s/config", s.dir), fmt.tprintf("XDG_STATE_HOME=%s/state", s.dir), fmt.tprintf("XDG_CACHE_HOME=%s/cache", s.dir),
+		fmt.tprintf("XDG_CONFIG_HOME=%s/config", s.dir), fmt.tprintf("XDG_STATE_HOME=%s/state", s.dir),
 		fmt.tprintf("XDG_DATA_HOME=%s/data", s.dir), fmt.tprintf("TOOLKIT_DEVTOOLS=%d", port))
 	bus := user_bus_address()
-	s.env = make([]string, len(env) + (user_bus && bus != "" ? 1 : 0))
+	extra := make([dynamic]string, context.temp_allocator)
+	if user_bus && bus != "" { append(&extra, fmt.tprintf("DBUS_SESSION_BUS_ADDRESS=%s", bus)) }
+	// (what the program writes in the cache stays in the session: a dump file)
+	if own_cache { append(&extra, fmt.tprintf("XDG_CACHE_HOME=%s/cache", s.dir)) }
+	s.env = make([]string, len(env) + len(extra))
 	for e, i in env { s.env[i] = strings.clone(e) }
-	if user_bus && bus != "" { s.env[len(env)] = strings.clone(fmt.tprintf("DBUS_SESSION_BUS_ADDRESS=%s", bus)) }
+	for e, i in extra { s.env[len(env) + i] = strings.clone(e) }
 	s.output = strings.clone(fmt.tprintf("%s/inspecteur.log", s.dir))
 	out, oerr := os.open(s.output, {.Write, .Create, .Trunc})
 	if oerr != nil { return "the log cannot be written" }

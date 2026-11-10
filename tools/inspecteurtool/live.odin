@@ -36,7 +36,7 @@ run_live :: proc(args: []string) -> int {
 	keep := len(args) > 0 && args[0] == "--keep"
 	if run_build(nil) != 0 { return 1 }
 	l: Live
-	if why := session_start(&l.session, LIVE_DIR, LIVE_PORT, user_bus = true, welcome = true, before = live_app_entry); why != "" {
+	if why := session_start(&l.session, LIVE_DIR, LIVE_PORT, user_bus = true, welcome = true, own_cache = true, before = live_app_entry); why != "" {
 		fmt.eprintfln("inspecteurtool live: %s", why)
 		session_stop(&l.session)
 		return 1
