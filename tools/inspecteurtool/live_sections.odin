@@ -122,7 +122,11 @@ select_unit :: proc(l: ^Live, service: string) -> bool {
 	c := &l.c
 	time.sleep(DOUBLE_CLICK_GAP)
 	at := -1
-	for b, i in cdp.find_name(c, "c0") { if b.text == service { at = i } }
+	deadline := time.tick_add(time.tick_now(), READER_WAIT)
+	for at < 0 && time.tick_diff(time.tick_now(), deadline) > 0 {
+		for b, i in cdp.find_name(c, "c0") { if b.text == service { at = i } }
+		if at < 0 { time.sleep(SESSION_POLL) }
+	}
 	if !check(l, at >= 0, "the row of %s is in view", service) {
 		cdp.shot(c, fmt.tprintf("%s/select_failed.png", l.dir))   // (what the window showed instead)
 		return false
@@ -284,7 +288,7 @@ row_with :: proc(c: ^cdp.Client, name, text: string) -> (r: Row_Cells) {
 
 // A box named `name` comes to say `text`.
 wait_named_text :: proc(c: ^cdp.Client, name, text: string) -> bool {
-	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
+	deadline := time.tick_add(time.tick_now(), READER_WAIT)
 	for time.tick_diff(time.tick_now(), deadline) > 0 {
 		for b in cdp.find_name(c, name) { if b.text == text { return true } }
 		time.sleep(SESSION_POLL)

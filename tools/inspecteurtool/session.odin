@@ -17,6 +17,9 @@ SESSION_WAIT :: 8 * time.Second
 // The first connection to the window: on a CI runner a debug build drawn by lavapipe, with fontconfig making its cache,
 // takes longer than any later step, so it gets its own limit.
 WINDOW_START_WAIT :: 60 * time.Second
+// A row that a section's reader thread brings (a service over D-Bus, a socket found by a scan of every process): on a
+// slow runner a reading can take longer than SESSION_WAIT.
+READER_WAIT :: 30 * time.Second
 SESSION_POLL :: 50 * time.Millisecond
 // (inspecteur floats at a size of its own, as on a desktop: the pictures have its real proportions)
 SWAY_CONFIG :: "output HEADLESS-1 resolution 1600x1000\nxwayland disable\nfor_window [app_id=\"inspecteur\"] floating enable, resize set 1180 740, move position center\n"
