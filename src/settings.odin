@@ -21,6 +21,7 @@ PREF_DEFS := [?]config.Def{
 	{name = "processes.descending", category = "processes", description = "Sort from the largest (or from Z) down.", kind = .Bool, default = {b = false}},
 	{name = "processes.refresh_ms", category = "processes", description = "How often the processes and the machine are read again, in milliseconds: a point of the Performance section's graphs each time. The title bar's refresh menu (Ctrl+Shift+R) changes it.", kind = .Int, default = {i = 1000}, min = 250, max = 10_000, bounded = true, unit = "ms"},
 	{name = "processes.view", category = "processes", description = "How the processes are listed: apps, the apps' groups and the background processes; tree, every process under its parent. Ctrl+T switches them.", kind = .String, default = {s = "apps"}, choices = {"apps", "tree"}},
+	{name = "processes.pinned", category = "processes", description = "The apps and processes pinned over the others, by name, apart by commas. Alt+P pins or unpins the selected row.", kind = .String, default = {s = ""}},
 	{name = "processes.summary", category = "processes", description = "Show the summary of the machine over the Processes table: CPU, memory, disks, network, GPU, temperature and pressure, each with its last minute. Ctrl+B shows or hides it.", kind = .Bool, default = {b = true}},
 	{name = "services.manager", category = "services", description = "The services the Services section lists: the system's (system) or the user's (user). Its System and User buttons change it.", kind = .String, default = {s = "system"}, choices = {"system", "user"}},
 	{name = "services.widths", category = "services", description = "The widths of the Services table's columns that were resized, in ems (description=30). Dragging the line before a column's title changes them.", kind = .String, default = {s = ""}},
@@ -57,6 +58,7 @@ Settings :: struct {
 	refresh_ms: int,
 	tree:       bool,       // processes.view = tree
 	summary:    bool,       // processes.summary
+	pinned:     string,     // owned: processes.pinned as written
 	manager:    Manager,    // services.manager
 	details:    bool,       // services.details
 	services_ms: int,       // services.refresh_ms
@@ -92,6 +94,7 @@ prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Sett
 	s.refresh_ms = int(config.int_of(p, "processes.refresh_ms"))
 	s.tree = config.string_of(p, "processes.view") == "tree"
 	s.summary = config.bool_of(p, "processes.summary")
+	s.pinned = strings.clone(config.string_of(p, "processes.pinned"), allocator)
 	s.details = config.bool_of(p, "services.details")
 	s.manager = config.string_of(p, "services.manager") == "user" ? .User : .System
 	s.services_ms = int(config.int_of(p, "services.refresh_ms"))
@@ -115,6 +118,7 @@ settings_free :: proc(s: ^Settings) {
 	delete(s.columns)
 	delete(s.widths)
 	delete(s.sort)
+	delete(s.pinned)
 	s^ = {}
 }
 

@@ -116,6 +116,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	if app.demo != nil { demo_preroll(app.demo, &app.machine, &app.sampler, &app.catalog, time.tick_now()._nsec) }
 	table_layout_load(&app.table, app.settings)
 	app.table.tree = app.settings.tree
+	pins_load(&app.table, app.settings.pinned)
 	app.vl.multi = true   // (Ctrl and Shift clicks, Ctrl+A: End task and Kill act on every row marked)
 	app.tab = opts.tab
 	refresh(app)

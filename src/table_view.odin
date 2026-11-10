@@ -271,7 +271,12 @@ row_label :: proc(app: ^App, r: Row) -> string {
 build_section :: proc(app: ^App, r: Row, em: f32) {
 	t := &app.table
 	ui.spacer(ui.px(em * 0.8))
-	text := r.index == 0 ? fmt.tprintf("Apps (%d)###sec", t.shown_apps) : fmt.tprintf("Background processes (%d)###sec", t.shown_background)
+	text: string
+	switch r.index {
+	case SECTION_APPS:   text = fmt.tprintf("Apps (%d)###sec", t.shown_apps)
+	case SECTION_PINNED: text = fmt.tprintf("Pinned (%d)###sec_pin", t.shown_pinned)
+	case:                text = fmt.tprintf("Background processes (%d)###sec", t.shown_background)
+	}
 	ui.next({width = ui.fill(), height = ui.pct(1), font_size = em * 0.92, fg = ui.color("accent")})
 	ui.label(text)
 }

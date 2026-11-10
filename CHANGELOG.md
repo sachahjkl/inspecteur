@@ -21,6 +21,8 @@ and the versions follow [semantic versioning](https://semver.org/).
   Ctrl+B (`processes.summary`) hides it.
 - **GPU use per process** (the `gpu` column): the share of a GPU's time a process keeps busy, as NVIDIA's driver tells
   it; read only while a GPU column or Performance is shown, so a sleeping GPU is not woken.
+- **Pinned apps and processes** (Alt+P, `processes.pinned`): a section of their own above the others, whatever the
+  sort, kept by name across starts.
 - **History in Properties**: graphs of the process's CPU, private memory and disk since Inspecteur saw it start (5
   minutes at most at the default period).
 

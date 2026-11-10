@@ -157,3 +157,30 @@ wait_allowed :: proc(pid: int, want: string) -> bool {
 	}
 	return false
 }
+
+// Alt+P pins the test's own child: a Pinned section above the others shows it, the preference keeps its name; Alt+P
+// again unpins it. Nothing is signalled.
+live_pin :: proc(l: ^Live) {
+	c := &l.c
+	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
+	child, mark, started := start_child("8")
+	if !check(l, started, "a child to pin (%s)", mark) { return }
+	defer {
+		_ = os.process_kill(child)
+		_, _ = os.process_wait(child, SESSION_WAIT)
+	}
+	pid := fmt.tprintf("%d", child.pid)
+	check(l, cdp.key(c, "Escape") && cdp.type_text(c, mark), "filter by its mark")
+	listed := false
+	deadline := time.tick_add(time.tick_now(), READER_WAIT)
+	for !listed && time.tick_diff(time.tick_now(), deadline) > 0 {
+		listed = pid_cell(c, pid) >= 0
+		if !listed { time.sleep(SESSION_POLL) }
+	}
+	if !check(l, listed, "it is listed") { _ = cdp.key(c, "Escape"); return }
+	if !select_child(l, pid) { _ = cdp.key(c, "Escape"); return }
+	check(l, cdp.key(c, "alt+p") && cdp.wait_for(c, "Pinned (1)", SESSION_WAIT), "Alt+P pins it: a Pinned section")
+	check(l, file_has(prefs, "processes.pinned\tsleep"), "the preference keeps its name")
+	check(l, cdp.key(c, "alt+p") && cdp.wait_for(c, "Pinned (1)", SESSION_WAIT, gone = true), "Alt+P again unpins it")
+	check(l, cdp.key(c, "Escape"), "Escape clears the filter")
+}

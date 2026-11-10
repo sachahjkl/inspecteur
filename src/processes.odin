@@ -7,6 +7,9 @@ package inspecteur
 //       firefox, Web Content...
 //   Background processes (n)          a section: every other process, one row each
 //
+// Pinned apps and processes (Alt+P, processes.pinned, by name) are in a section of their own above the others, sorted
+// among themselves, whatever the sort.
+//
 // A group's processes are the app's process (the highest one of that app in its line of parents) and every process
 // under it, unless one of them is another app (a browser started from a terminal is the browser's group). Sorting
 // orders the groups among themselves, the processes of a group, and the background processes.
@@ -76,7 +79,8 @@ Table :: struct {
 	rows:       [dynamic]Row,
 	ids:        [dynamic]u64,    // each row's identity, stable across samples (the list's row keys, the selection)
 	selectable: [dynamic]bool,
-	shown_apps, shown_background: int,   // the rows each section counts (the filter's matches)
+	shown_apps, shown_background, shown_pinned: int,   // the rows each section counts (the filter's matches)
+	pinned:     map[string]bool, // the names pinned (an app's or a process's), from processes.pinned (owned keys)
 	expanded:   map[u64]bool,    // the groups open, by key
 	tree:       bool,            // every process under its parent (processes.view = tree), not apps and background
 	collapsed:  map[u64]bool,    // in the tree, the processes whose children are closed away, by key
@@ -111,7 +115,9 @@ columns_of :: proc(keys: string) -> (out: bit_set[Column]) {
 // The sort's column.
 table_sort :: proc(t: ^Table) -> Column { return Column(t.layout.sort) }
 
-SECTION_IDS :: [2]u64{0x5ec7_0000_0000_0001, 0x5ec7_0000_0000_0002}
+SECTION_IDS :: [3]u64{0x5ec7_0000_0000_0001, 0x5ec7_0000_0000_0002, 0x5ec7_0000_0000_0003}
+// Section rows' index: Apps, Background processes, Pinned.
+SECTION_APPS, SECTION_BACKGROUND, SECTION_PINNED :: 0, 1, 2
 APP_ID_MARK :: u64(1) << 63
 
 proc_key :: proc(p: Proc) -> u64 { return u64(u32(p.pid)) << 32 | (p.start & 0xffff_ffff) }
@@ -125,6 +131,8 @@ table_destroy :: proc(t: ^Table) {
 	delete(t.ids)
 	delete(t.selectable)
 	delete(t.expanded)
+	pins_clear(t)
+	delete(t.pinned)
 	delete(t.collapsed)
 	delete(t.query)
 	ui.table_layout_destroy(&t.layout)
@@ -292,10 +300,39 @@ table_rows :: proc(t: ^Table, s: ^Sampler, c: ^Catalog) {
 	q := t.query
 	add :: add_row
 
-	// the groups that pass, and which of their processes
+	// pinned first, then the apps and the background processes that are not
+	pinned_groups := groups_passing(t, s, c, true)
+	pinned_procs := background_passing(t, s, true)
+	t.shown_pinned = len(pinned_groups) + len(pinned_procs)
+	if t.shown_pinned > 0 {
+		add(t, {kind = .Section, index = SECTION_PINNED}, SECTION_IDS[SECTION_PINNED], false)
+		add_groups(t, s, pinned_groups)
+		for it in pinned_procs { add(t, {kind = .Process, index = i32(it.index)}, proc_key(procs[it.index]), true) }
+	}
+	groups := groups_passing(t, s, c, false)
+	t.shown_apps = len(groups)
+	if len(groups) > 0 {
+		add(t, {kind = .Section, index = SECTION_APPS}, SECTION_IDS[SECTION_APPS], false)
+		add_groups(t, s, groups)
+	}
+	background := background_passing(t, s, false)
+	t.shown_background = len(background)
+	if len(background) > 0 {
+		add(t, {kind = .Section, index = SECTION_BACKGROUND}, SECTION_IDS[SECTION_BACKGROUND], false)
+		for it in background { add(t, {kind = .Process, index = i32(it.index)}, proc_key(procs[it.index]), true) }
+	}
+	_ = q
+}
+
+// The groups the filter passes whose app is pinned (or not), sorted.
+@(private = "file")
+groups_passing :: proc(t: ^Table, s: ^Sampler, c: ^Catalog, pinned: bool) -> []Sort_Item {
+	procs := s.procs[:]
+	q := t.query
 	order := make([dynamic]Sort_Item, context.temp_allocator)
 	for g, k in t.groups {
 		name := c.entries[g.entry].name
+		if t.pinned[name] != pinned { continue }
 		name_hit := q == "" || strings.contains(strings.to_lower(name, context.temp_allocator), q)
 		member_hit := false
 		if !name_hit { for m in t.members[g.first:][:g.count] { if proc_matches(procs[m], q) { member_hit = true; break } } }
@@ -303,34 +340,38 @@ table_rows :: proc(t: ^Table, s: ^Sampler, c: ^Catalog) {
 		append(&order, sort_item_group(t, s, g, k, name))
 	}
 	sort_items(order[:], t.layout.descending)
-	t.shown_apps = len(order)
-	if len(order) > 0 {
-		add(t, {kind = .Section, index = 0}, SECTION_IDS[0], false)
-		members := make([dynamic]Sort_Item, context.temp_allocator)
-		for it in order {
-			g := t.groups[it.index]
-			add(t, {kind = .App, index = i32(it.index)}, g.key, true)
-			// open: asked, or the filter found some of its processes
-			open := t.expanded[g.key] || q != ""
-			if !open { continue }
-			clear(&members)
-			for m in t.members[g.first:][:g.count] {
-				if q == "" || proc_matches(procs[m], q) { append(&members, sort_item_proc(t, s, m)) }
-			}
-			sort_items(members[:], t.layout.descending)
-			for m in members { add(t, {kind = .Process, depth = 1, index = i32(m.index)}, proc_key(procs[m.index]), true) }
-		}
-	}
+	return order[:]
+}
 
-	clear(&order)
+// The background processes the filter passes whose name is pinned (or not), sorted.
+@(private = "file")
+background_passing :: proc(t: ^Table, s: ^Sampler, pinned: bool) -> []Sort_Item {
+	order := make([dynamic]Sort_Item, context.temp_allocator)
 	for i in t.background {
-		if proc_matches(procs[i], q) { append(&order, sort_item_proc(t, s, i)) }
+		p := s.procs[i]
+		if t.pinned[p.name] != pinned || !proc_matches(p, t.query) { continue }
+		append(&order, sort_item_proc(t, s, i))
 	}
 	sort_items(order[:], t.layout.descending)
-	t.shown_background = len(order)
-	if len(order) > 0 {
-		add(t, {kind = .Section, index = 1}, SECTION_IDS[1], false)
-		for it in order { add(t, {kind = .Process, index = i32(it.index)}, proc_key(procs[it.index]), true) }
+	return order[:]
+}
+
+// The rows of groups: each group, and its processes when it is open (asked, or the filter found some of them).
+@(private = "file")
+add_groups :: proc(t: ^Table, s: ^Sampler, groups: []Sort_Item) {
+	procs := s.procs[:]
+	q := t.query
+	members := make([dynamic]Sort_Item, context.temp_allocator)
+	for it in groups {
+		g := t.groups[it.index]
+		add_row(t, {kind = .App, index = i32(it.index)}, g.key, true)
+		if !(t.expanded[g.key] || q != "") { continue }
+		clear(&members)
+		for m in t.members[g.first:][:g.count] {
+			if q == "" || proc_matches(procs[m], q) { append(&members, sort_item_proc(t, s, m)) }
+		}
+		sort_items(members[:], t.layout.descending)
+		for m in members { add_row(t, {kind = .Process, depth = 1, index = i32(m.index)}, proc_key(procs[m.index]), true) }
 	}
 }
 

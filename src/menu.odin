@@ -253,6 +253,7 @@ row_menu_items :: proc(app: ^App) {
 		cmd_item(app, .Search_Online)
 		cmd_item(app, .Dump)
 		ui.menu_separator()
+		cmd_item(app, .Pin, pin_name(app) != "" && app.table.pinned[pin_name(app)] ? "Unpin" : "Pin")
 		cmd_item(app, .Select_All)
 		cmd_item(app, .Properties)
 	}

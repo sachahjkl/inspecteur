@@ -15,6 +15,7 @@ inspecteur --pref view.mode=light --pref processes.refresh_ms=2000
 | `processes.descending` | false | Sort from the largest (or from Z) down. |
 | `processes.refresh_ms` | 1000 | How often the processes and the machine are read again, in milliseconds (250 to 10000): a point of the Performance section's graphs each time, so that their span is 60 times this period. The title bar's refresh menu (Ctrl+Shift+R) changes it; Ctrl+Space pauses the refresh and resumes it (a pause is not kept). |
 | `processes.view` | apps | How the processes are listed: `apps` (the apps' groups, then the background processes) or `tree` (every process under its parent). Ctrl+T switches them. |
+| `processes.pinned` | (empty) | The apps and processes pinned over the others, by name, apart by commas. Alt+P pins or unpins the selected row. |
 | `processes.summary` | true | Show the summary of the machine over the Processes table: CPU, memory, disks, network, the first GPU, the processor's temperature and the pressure (the share of the time tasks waited), each with its last minute; a click shows the device in Performance. Ctrl+B shows or hides it. |
 | `services.manager` | system | The services the Services section lists: the system's (`system`) or the user's (`user`). Its System and User buttons change it. |
 | `services.widths` | (empty) | The widths of the Services table's columns that were resized, in ems (`description=30`). Dragging the line before a column's title changes them. |

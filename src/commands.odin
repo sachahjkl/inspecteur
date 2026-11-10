@@ -20,7 +20,7 @@ Cmd :: enum u8 {
 	Show_Processes, Show_Performance, Show_Services, Show_Startup, Show_Connections, Show_Information, Next_Section, Previous_Section,
 	// Processes
 	End_Task, Kill, End_Tree, Select_All, Suspend, Properties, Open_Location, Copy_Command, Default_Action, Open_Group,
-	Close_Group, Raise_Priority, Lower_Priority, Affinity, Go_To_Service, Dump, Search_Online, Tree_View, Columns, Summary,
+	Close_Group, Raise_Priority, Lower_Priority, Affinity, Go_To_Service, Dump, Search_Online, Tree_View, Columns, Summary, Pin,
 	// Performance
 	Cpu_Grid, Next_Device, Previous_Device,
 	// Services
@@ -80,6 +80,7 @@ COMMANDS := [Cmd]ui.Command{
 	.Tree_View        = {label = "Process tree or apps", group = "Processes", keys = {{.T, {.Ctrl}}, {}}},
 	.Columns          = {label = "Columns…", group = "Processes", keys = {{.C, {.Ctrl, .Shift}}, {}}},
 	.Summary          = {label = "Show or hide the summary of the machine", group = "Processes", keys = {{.B, {.Ctrl}}, {}}},
+	.Pin              = {label = "Pin or unpin", group = "Processes", keys = {{.P, {.Alt}}, {}}},
 
 	.Cpu_Grid         = {label = "One graph per logical processor", group = "Performance", keys = {{.G, {.Ctrl}}, {}}},
 	.Next_Device      = {label = "Next device", group = "Performance", keys = {{.Down, {}}, {}}},
@@ -125,7 +126,7 @@ COMMANDS := [Cmd]ui.Command{
 cmd_tab :: proc(c: Cmd) -> Maybe(Tab) {
 	switch {
 	case c <= .Previous_Section:                   return nil
-	case c <= .Summary:                            return .Processes
+	case c <= .Pin:                                return .Processes   // (the last command of Processes)
 	case c <= .Previous_Device:                    return .Performance
 	case c <= .Service_Manager:                    return .Services
 	case c <= .Startup_Copy:                       return .Startup
@@ -222,6 +223,7 @@ cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 	case .Go_To_Service: return p != nil && selected_is_process(app) && p.unit != ""
 	case .Dump: return p != nil && selected_is_process(app)
 	case .Tree_View: return true
+	case .Pin: return pin_name(app) != "" && !app.table.tree
 	case .Suspend: return p != nil && selected_is_process(app)
 	case .Open_Location: return p != nil && p.exe != ""
 	case .Copy_Command: return p != nil && p.cmdline != ""
@@ -291,6 +293,7 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Tree_View:        tree_view_switch(app)
 	case .Columns:          columns_menu_open(app)
 	case .Summary:          summary_switch(app)
+	case .Pin:              pin_switch(app)
 	case .Cpu_Grid:         cpu_grid_switch(app)
 	case .Next_Device:      device_step(app, 1)
 	case .Previous_Device:  device_step(app, -1)
