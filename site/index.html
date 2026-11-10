@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>inspecteur: a fast native task manager for Linux</title>
-<meta name="description" content="inspecteur shows what runs on a Linux machine and lets you act on it: processes grouped by app, live performance graphs, systemd services, startup programs, network connections and the system's details. One small native program that opens in about a quarter of a second.">
+<meta name="description" content="inspecteur shows what runs on a Linux machine and lets you act on it: processes grouped by app, live performance graphs, systemd services, startup programs, network connections and the system's details. One small native program, on screen in about 280 ms.">
 <link rel="icon" href="img/logo.png">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -27,13 +27,13 @@
     <h1>inspecteur</h1>
     <p class="lead">A task manager for Linux that keeps up with you. Every process, grouped under the app it belongs to;
       the machine's load as it happens; the services, what starts with the session, who talks to the network. Type to
-      find, a key to act. One small native program that is on screen in about a quarter of a second and costs about
-      1 % of one core while it watches.</p>
+      find, a key to act. One small native program that is on screen in about 280 ms and costs about 1 % of one core
+      while it watches.</p>
     <div class="actions">
       <a class="btn accent get" href="https://github.com/sachahjkl/inspecteur/releases/download/v{{version}}/inspecteur-{{version}}-linux-x64.tar.gz"><span class="get-text"><span class="get-main">Download for Linux</span> <span class="get-sub">v{{version}} · x64 · .tar.gz · Wayland</span></span></a>
       <a class="btn" href="https://github.com/sachahjkl/inspecteur">Source on GitHub</a>
     </div>
-    <p class="small">Or with Nix: <code>nix run github:sachahjkl/inspecteur</code> &nbsp;·&nbsp; MIT</p>
+    <p class="small">Or with Nix: <code>nix run git+https://github.com/sachahjkl/inspecteur</code> &nbsp;·&nbsp; MIT</p>
   </section>
 
   <figure class="shot wide">
@@ -44,13 +44,15 @@
   <section id="features" class="grid">
     <article class="card">
       <h3>Processes, by app</h3>
-      <p>Each app is one row with its icon and every process it started under it; the rest is background. CPU, memory,
-        disk reads and writes, threads, and the columns you add: parent, state, priority, start time, command line.</p>
+      <p>Each app is one row with its icon and every process it started under it; the rest is background. Or every
+        process under its parent. CPU, memory, disk reads and writes, threads, and the columns you add: parent, state,
+        priority, start time, command line.</p>
     </article>
     <article class="card">
       <h3>Act in a key</h3>
-      <p>Delete ends a task, Shift+Delete kills it after a confirmation, a right click has the rest. Before any signal the
-        process is pinned by a pidfd and its start time read again, so a reused PID is never hit.</p>
+      <p>Delete ends a task, Shift+Delete kills it, Ctrl+Delete ends a whole tree; select many rows with Ctrl and Shift.
+        A kill lists each process before it acts. Before any signal the process is pinned by a pidfd and its start time
+        read again, so a reused PID is never hit.</p>
     </article>
     <article class="card">
       <h3>Performance, live</h3>
@@ -59,13 +61,13 @@
     </article>
     <article class="card">
       <h3>Properties of a process</h3>
-      <p>Its executable, command line, folder and parent; its threads, open files, loaded libraries and environment. Lower
-        its priority, suspend it, resume it.</p>
+      <p>Its executable, command line, folder and parent; its threads, open files, loaded libraries and environment, each
+        with a filter. Its priority and the processors it may run on; suspend it, resume it, write a dump.</p>
     </article>
     <article class="card">
       <h3>Services</h3>
       <p>systemd's system and user services, read over D-Bus: their state, whether they start at boot, their main
-        process and memory. Start, stop, restart, enable, disable; polkit asks when it must.</p>
+        process and memory, the journal's last lines. Start, stop, restart, enable, disable; polkit asks when it must.</p>
     </article>
     <article class="card">
       <h3>Startup</h3>
@@ -84,8 +86,8 @@
     </article>
     <article class="card">
       <h3>Light on the machine</h3>
-      <p>Drawn on the GPU by its own toolkit, no web view. On screen in about 250 ms; about 1 % of one core at rest. A
-        section you do not show reads nothing.</p>
+      <p>Drawn on the GPU by its own toolkit, no web view. On screen in about 280 ms; about 1 % of one core at rest.
+        A section you do not show reads nothing, and Ctrl+Space pauses it all.</p>
     </article>
   </section>
 
@@ -115,7 +117,9 @@
   <section class="gallery">
     <figure class="shot"><a class="frame" href="img/performance.png"><img src="img/performance.png" alt="The Performance section: one graph per logical processor" loading="lazy"></a><figcaption>Performance, per processor</figcaption></figure>
     <figure class="shot"><a class="frame" href="img/properties.png"><img src="img/properties.png" alt="The Properties of a process" loading="lazy"></a><figcaption>Properties of a process</figcaption></figure>
-    <figure class="shot"><a class="frame" href="img/services.png"><img src="img/services.png" alt="The Services section: systemd's services and their state" loading="lazy"></a><figcaption>Services</figcaption></figure>
+    <figure class="shot"><a class="frame" href="img/services.png"><img src="img/services.png" alt="The Services section: systemd's services, their state, and the selected one's journal" loading="lazy"></a><figcaption>Services and a service's journal</figcaption></figure>
+    <figure class="shot"><a class="frame" href="img/tree.png"><img src="img/tree.png" alt="Every process under its parent" loading="lazy"></a><figcaption>Every process under its parent</figcaption></figure>
+    <figure class="shot"><a class="frame" href="img/kill.png"><img src="img/kill.png" alt="Three processes selected, their kill asked first with each one listed" loading="lazy"></a><figcaption>A kill of three, asked first</figcaption></figure>
   </section>
 
   <section id="download" class="download">
@@ -129,15 +133,15 @@
       </div>
       <div class="well">
         <h3>Nix</h3>
-        <p>The flake builds inspecteur from source with everything it needs, its desktop entry and icons included:
-          <code>nix run github:sachahjkl/inspecteur</code>, or add <code>packages.x86_64-linux.default</code> to your
-          configuration.</p>
-        <code>nix profile add github:sachahjkl/inspecteur</code>
+        <p>The flake builds inspecteur from source with everything it needs, its desktop entry and icons included
+          (Nix 2.27 or later: it brings its submodule). Add <code>packages.x86_64-linux.default</code> to your
+          configuration, or install it. Not on NixOS: start it through nixGL for Vulkan.</p>
+        <code>nix profile add git+https://github.com/sachahjkl/inspecteur</code>
       </div>
       <div class="well">
         <h3>As your task manager</h3>
-        <p>Bind it to <code>Ctrl+Shift+Escape</code> in your desktop, or name it where your desktop asks for a task
-          manager. The <a href="https://github.com/sachahjkl/inspecteur#readme">README</a> says how.</p>
+        <p>The welcome page says what your desktop wants: on GNOME it adds <code>Ctrl+Shift+Escape</code> in a click; on KDE
+          Plasma and others, the steps. The <a href="https://github.com/sachahjkl/inspecteur#readme">README</a> says more.</p>
       </div>
     </div>
   </section>
@@ -145,7 +149,7 @@
 
 <footer>
   <p>Built in <a href="https://odin-lang.org">Odin</a> on <a href="https://gt.sacha.house/">gui_toolkit</a>.
-    MIT licence. Icons: <a href="https://lucide.dev">Lucide</a> (ISC).</p>
+    MIT licence; the works it embeds keep theirs (<a href="https://github.com/sachahjkl/inspecteur/blob/main/THIRD-PARTY-NOTICES">THIRD-PARTY-NOTICES</a>). Icons: <a href="https://lucide.dev">Lucide</a> (ISC).</p>
 </footer>
 <script>
   // the bar's menu on narrow screens: the button opens it, a link or a click elsewhere closes it
