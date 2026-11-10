@@ -32,8 +32,26 @@ live_guards :: proc(l: ^Live) {
 	c := &l.c
 	pid := fmt.tprintf("%d", l.program.pid)
 	check(l, cdp.key(c, "Escape") && cdp.type_text(c, pid), "filter by Inspecteur's own PID, %s", pid)
-	if !check(l, cdp.wait_for(c, fmt.tprintf("Selected: inspecteur, PID %s", pid), SESSION_WAIT), "Inspecteur's row is selected") { return }
-	if !select_named(l, pid, fmt.tprintf("inspecteur, PID %s", pid)) { return }
+	// Its row is a background process's, or, on a machine whose menu has Inspecteur's own entry (installed by its
+	// package), its app's group: Suspend is refused either way.
+	time.sleep(DOUBLE_CLICK_GAP)
+	at := pid_cell(c, pid)
+	if !check(l, at >= 0, "its PID cell is in view") { return }
+	_, clicked := cdp.call(c, "Toolkit.click", fmt.tprintf(`{{"name":"c1","index":%d}}`, at))
+	cdp.wait_idle(c, SESSION_WAIT)
+	got := selected_row_name(c)
+	if clicked && got == "Inspecteur, 1 process" {
+		// its app's group: opened, the process's own row under it (the same PID, the last such cell)
+		check(l, cdp.key(c, "Right"), "Right opens Inspecteur's group")
+		cdp.wait_idle(c, SESSION_WAIT)
+		at = -1
+		for b, i in cdp.find_name(c, "c1") { if b.text == pid { at = i } }
+		if !check(l, at >= 0, "its process's PID cell is in view") { return }
+		_, clicked = cdp.call(c, "Toolkit.click", fmt.tprintf(`{{"name":"c1","index":%d}}`, at))
+		cdp.wait_idle(c, SESSION_WAIT)
+		got = selected_row_name(c)
+	}
+	if !check(l, clicked && got == fmt.tprintf("inspecteur, PID %s", pid), "the row selected is Inspecteur's own process (%q)", got) { return }
 	check(l, cdp.key(c, "ctrl+p"), "Ctrl+P: Suspend")
 	check(l, cdp.wait_for(c, "Inspecteur does not suspend itself", SESSION_WAIT), "it is refused (%q)", footer(c))
 	stopped := wait_state(l.program.pid, 'T', 500 * time.Millisecond)
