@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>inspecteur: a fast native task manager for Linux</title>
+<meta name="description" content="inspecteur shows what runs on a Linux machine and lets you act on it: processes grouped by app, live performance graphs, systemd services, startup programs, network connections and the system's details. One small native program that opens in about a quarter of a second.">
+<link rel="icon" href="img/logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="bar">
+  <a class="brand" href="#"><img src="img/logo.png" alt="" width="28" height="28"><span>inspecteur</span></a>
+  <button class="burger" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav"><span></span></button>
+  <nav id="nav">
+    <a href="#features">Features</a>
+    <a href="#keys">Keys</a>
+    <a href="#download">Download</a>
+    <a href="changelog.html">Changelog</a>
+    <a href="https://github.com/sachahjkl/inspecteur">GitHub</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <img class="mark" src="img/logo.png" alt="inspecteur logo" width="112" height="112">
+    <h1>inspecteur</h1>
+    <p class="lead">A task manager for Linux that keeps up with you. Every process, grouped under the app it belongs to;
+      the machine's load as it happens; the services, what starts with the session, who talks to the network. Type to
+      find, a key to act. One small native program that is on screen in about a quarter of a second and costs about
+      1 % of one core while it watches.</p>
+    <div class="actions">
+      <a class="btn accent get" href="https://github.com/sachahjkl/inspecteur/releases/download/v{{version}}/inspecteur-{{version}}-linux-x64.tar.gz"><span class="get-text"><span class="get-main">Download for Linux</span> <span class="get-sub">v{{version}} · x64 · .tar.gz · Wayland</span></span></a>
+      <a class="btn" href="https://github.com/sachahjkl/inspecteur">Source on GitHub</a>
+    </div>
+    <p class="small">Or with Nix: <code>nix run github:sachahjkl/inspecteur</code> &nbsp;·&nbsp; MIT</p>
+  </section>
+
+  <figure class="shot wide">
+    <a class="frame" href="img/main.png"><img src="img/main.png" alt="inspecteur's Processes section: apps with their icons and their processes, background processes, CPU and memory cells shaded by load" loading="lazy"></a>
+    <figcaption>Processes: apps first, each with its processes under it, then the background; the busiest cells shaded.</figcaption>
+  </figure>
+
+  <section id="features" class="grid">
+    <article class="card">
+      <h3>Processes, by app</h3>
+      <p>Each app is one row with its icon and every process it started under it; the rest is background. CPU, memory,
+        disk reads and writes, threads, and the columns you add: parent, state, priority, start time, command line.</p>
+    </article>
+    <article class="card">
+      <h3>Act in a key</h3>
+      <p>Delete ends a task, Shift+Delete kills it after a confirmation, a right click has the rest. Before any signal the
+        process is pinned by a pidfd and its start time read again, so a reused PID is never hit.</p>
+    </article>
+    <article class="card">
+      <h3>Performance, live</h3>
+      <p>CPU as one graph or one per logical processor, memory and what it is made of, every disk, every network
+        interface and the GPU. A minute of history is kept while you look elsewhere.</p>
+    </article>
+    <article class="card">
+      <h3>Properties of a process</h3>
+      <p>Its executable, command line, folder and parent; its threads, open files, loaded libraries and environment. Lower
+        its priority, suspend it, resume it.</p>
+    </article>
+    <article class="card">
+      <h3>Services</h3>
+      <p>systemd's system and user services, read over D-Bus: their state, whether they start at boot, their main
+        process and memory. Start, stop, restart, enable, disable; polkit asks when it must.</p>
+    </article>
+    <article class="card">
+      <h3>Startup</h3>
+      <p>What starts with your session: the autostart entries and the user services the session wants. Turn one off
+        the way the specification says, and on again.</p>
+    </article>
+    <article class="card">
+      <h3>Connections</h3>
+      <p>Every TCP and UDP socket, IPv4 and IPv6, with the process that holds it. End that process, copy an address, jump
+        to its row in Processes.</p>
+    </article>
+    <article class="card">
+      <h3>Information</h3>
+      <p>The system, processor, memory, GPUs, disks and file systems, network, screens and batteries on one page, and
+        all of it copied as plain text in one key.</p>
+    </article>
+    <article class="card">
+      <h3>Light on the machine</h3>
+      <p>Drawn on the GPU by its own toolkit, no web view. On screen in about 250 ms; about 1 % of one core at rest. A
+        section you do not show reads nothing.</p>
+    </article>
+  </section>
+
+  <section id="keys" class="download">
+    <h2>Made for the keyboard</h2>
+    <div class="cols">
+      <div class="well">
+        <h3>Find</h3>
+        <p>Start typing anywhere to filter the section shown, by name, command line or PID. <code>Ctrl+F</code> goes to the
+          filter, <code>Escape</code> clears it.</p>
+      </div>
+      <div class="well">
+        <h3>Move</h3>
+        <p><code>Ctrl+1</code> to <code>Ctrl+6</code> switch sections; arrows, <code>Home</code>, <code>End</code> and the
+          page keys move in a table; <code>Enter</code> does the row's main action, <code>Shift+F10</code> opens its menu.</p>
+      </div>
+      <div class="well">
+        <h3>Act</h3>
+        <p><code>Delete</code> ends, <code>Shift+Delete</code> kills, <code>Alt+Enter</code> opens the Properties,
+          <code>F5</code> reads everything again. Every action shows its key in its menu and its tooltip.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- whats-new -->
+
+  <section class="gallery">
+    <figure class="shot"><a class="frame" href="img/performance.png"><img src="img/performance.png" alt="The Performance section: one graph per logical processor" loading="lazy"></a><figcaption>Performance, per processor</figcaption></figure>
+    <figure class="shot"><a class="frame" href="img/properties.png"><img src="img/properties.png" alt="The Properties of a process" loading="lazy"></a><figcaption>Properties of a process</figcaption></figure>
+    <figure class="shot"><a class="frame" href="img/services.png"><img src="img/services.png" alt="The Services section: systemd's services and their state" loading="lazy"></a><figcaption>Services</figcaption></figure>
+  </section>
+
+  <section id="download" class="download">
+    <h2>Download</h2>
+    <div class="cols">
+      <div class="well">
+        <h3>The archive</h3>
+        <p>One program for Linux x64. Unpack it and run <code>./inspecteur setup</code>: a launcher in the applications
+          menu with its icon. Needs a Wayland desktop, Vulkan and fontconfig.</p>
+        <code><a href="https://github.com/sachahjkl/inspecteur/releases/download/v{{version}}/inspecteur-{{version}}-linux-x64.tar.gz">inspecteur-{{version}}-linux-x64.tar.gz</a></code>
+      </div>
+      <div class="well">
+        <h3>Nix</h3>
+        <p>The flake builds inspecteur from source with everything it needs, its desktop entry and icons included:
+          <code>nix run github:sachahjkl/inspecteur</code>, or add <code>packages.x86_64-linux.default</code> to your
+          configuration.</p>
+        <code>nix profile add github:sachahjkl/inspecteur</code>
+      </div>
+      <div class="well">
+        <h3>As your task manager</h3>
+        <p>Bind it to <code>Ctrl+Shift+Escape</code> in your desktop, or name it where your desktop asks for a task
+          manager. The <a href="https://github.com/sachahjkl/inspecteur#readme">README</a> says how.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>Built in <a href="https://odin-lang.org">Odin</a> on <a href="https://gt.sacha.house/">gui_toolkit</a>.
+    MIT licence. Icons: <a href="https://lucide.dev">Lucide</a> (ISC).</p>
+</footer>
+<script>
+  // the bar's menu on narrow screens: the button opens it, a link or a click elsewhere closes it
+  const bar = document.querySelector('.bar'), burger = bar.querySelector('.burger');
+  const shut = () => { bar.classList.remove('open'); burger.setAttribute('aria-expanded', 'false'); };
+  burger.addEventListener('click', e => { e.stopPropagation(); burger.setAttribute('aria-expanded', String(bar.classList.toggle('open'))); });
+  bar.querySelectorAll('nav a').forEach(a => a.addEventListener('click', shut));
+  document.addEventListener('click', e => { if (!bar.contains(e.target)) shut(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') shut(); });
+</script>
+<script src="gallery.js" defer></script>
+</body>
+</html>

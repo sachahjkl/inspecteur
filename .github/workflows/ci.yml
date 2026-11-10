@@ -1,0 +1,59 @@
+name: CI
+
+# Every push to main and every pull request: inspecteurtool check (odin check -vet of the program and the tool, the unit tests,
+# a release build), then inspecteurtool live (the real program in a headless sway: the window
+# over the DevTools protocol, rendered by Mesa's lavapipe). The program is kept as an artifact.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux x64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: ./.github/actions/setup-odin-linux
+
+      # (the toolkit's text library: cargo's target directory, keyed by its sources)
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ext/gui_toolkit/build/text
+            ~/.cargo/registry
+          key: text-linux-${{ hashFiles('ext/gui_toolkit/native/text/**') }}
+
+      - name: inspecteurtool check
+        run: |
+          odin build tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/inspecteurtool -vet
+          build/inspecteurtool check
+
+      - name: sway, lavapipe
+        run: sudo apt-get install -y -qq sway mesa-vulkan-drivers libvulkan1 libxkbcommon0
+
+      - name: inspecteurtool live
+        run: build/inspecteurtool live --keep
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: inspecteur-linux-x64-${{ github.sha }}
+          path: |
+            build/inspecteur
+            build/live/*.log
+            build/live/*.png
+          if-no-files-found: warn
+
