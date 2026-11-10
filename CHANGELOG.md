@@ -31,6 +31,8 @@ and the versions follow [semantic versioning](https://semver.org/).
   minutes at most at the default period).
 
 ### Changed
+- **Machined by default** (`view.finish`): raised buttons and dialogs, sunken fields, graphs and meters. `flat` gives
+  back the plain look.
 - **Ctrl+F selects the filter's text**: what is typed then replaces it.
 - **The Properties' actions in colour**: Suspend in the accent, End task in amber, Kill in red.
 - **A narrow window keeps the names readable**: the name column keeps its width and cuts what does not fit; the last

@@ -28,7 +28,7 @@ inspecteur --pref view.mode=light --pref processes.refresh_ms=2000
 | `services.refresh_ms` | 3000 | How often the services are read again while their section is shown, in milliseconds (1000 to 60000). |
 | `view.theme` | Graphite | The window's colours: a theme of gui_toolkit by its name (Graphite, Midnight, Nord, Gruvbox, Tokyo Night, Catppuccin...). |
 | `view.mode` | system | The theme's version: `system` (light or dark, as the system), `dark` or `light`. Ctrl+Shift+L switches light and dark. A theme of one version (Graphite is dark only) gives way to Silver when the other version is chosen. |
-| `view.finish` | flat | How surfaces are drawn: `flat` (plain surfaces, thin lines), `machined` (bevelled buttons, sunken fields), `gradient` (surfaces shaded top to bottom) or `glass` (surfaces that let the page show through). |
+| `view.finish` | machined | How surfaces are drawn: `machined` (raised buttons and panels; sunken fields, graphs and meters; a light theme is drawn flat), `flat` (plain surfaces, thin lines), `gradient` (surfaces shaded top to bottom) or `glass` (surfaces that let the page show through). |
 | `view.zebra` | true | Shade every second row of the tables (Processes, Services, Startup, Connections, the Properties' lists): a line of numbers reads across. |
 | `view.rules` | true | Draw a thin line under each row of the tables. |
 | `view.font_size` | 13 | The text size, in logical pixels (8 to 40). Ctrl+= and Ctrl+- change it, Ctrl+0 sets it back to 13. |
