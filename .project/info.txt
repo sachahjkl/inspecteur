@@ -1,0 +1,2 @@
+name=inspecteur
+description=A fast native task manager for Linux: processes by app, live performance, services, startup, connections. Odin, on gui_toolkit.
