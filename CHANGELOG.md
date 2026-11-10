@@ -11,6 +11,14 @@ and the versions follow [semantic versioning](https://semver.org/).
 - **A CPU graph in each row** (the `cpu_graph` column, shown by default): the last 30 samples of a process's or an
   app's CPU, a bar each in the colours of the load; its tooltip says the mean and the highest; sorted, it orders by the
   mean.
+- **Temperatures and frequencies**: the processor's package and dies or cores (k10temp, zenpower, coretemp), with a
+  graph on the CPU's page; each logical processor's frequency over its graph; the GPU's temperature graph; the times
+  an Intel processor slowed for its heat.
+- **Pressure** in Performance: the share of the time tasks waited for the CPU, the memory and the disks
+  (`/proc/pressure`), over 10 and 60 seconds, with a graph.
+- **A summary of the machine over the Processes table**: CPU, memory, disks, network, GPU, temperature and pressure,
+  each its value, its last minute and a stripe in the colour of its load; a click shows the device in Performance.
+  Ctrl+B (`processes.summary`) hides it.
 - **History in Properties**: graphs of the process's CPU, private memory and disk since Inspecteur saw it start (5
   minutes at most at the default period).
 

@@ -106,6 +106,7 @@ build_processes :: proc(app: ^App, em: f32) {
 		}
 		rows_again(app)
 	}
+	if app.settings.summary { summary_build(app, em) }
 	build_bar(app, em)
 	build_header(app, em)
 	build_rows(app, em)

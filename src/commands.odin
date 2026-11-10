@@ -20,7 +20,7 @@ Cmd :: enum u8 {
 	Show_Processes, Show_Performance, Show_Services, Show_Startup, Show_Connections, Show_Information, Next_Section, Previous_Section,
 	// Processes
 	End_Task, Kill, End_Tree, Select_All, Suspend, Properties, Open_Location, Copy_Command, Default_Action, Open_Group,
-	Close_Group, Raise_Priority, Lower_Priority, Affinity, Go_To_Service, Dump, Search_Online, Tree_View, Columns,
+	Close_Group, Raise_Priority, Lower_Priority, Affinity, Go_To_Service, Dump, Search_Online, Tree_View, Columns, Summary,
 	// Performance
 	Cpu_Grid, Next_Device, Previous_Device,
 	// Services
@@ -79,6 +79,7 @@ COMMANDS := [Cmd]ui.Command{
 	.Search_Online    = {label = "Search online", group = "Processes", keys = {{.F, {.Ctrl, .Shift}}, {}}},
 	.Tree_View        = {label = "Process tree or apps", group = "Processes", keys = {{.T, {.Ctrl}}, {}}},
 	.Columns          = {label = "Columns…", group = "Processes", keys = {{.C, {.Ctrl, .Shift}}, {}}},
+	.Summary          = {label = "Show or hide the summary of the machine", group = "Processes", keys = {{.B, {.Ctrl}}, {}}},
 
 	.Cpu_Grid         = {label = "One graph per logical processor", group = "Performance", keys = {{.G, {.Ctrl}}, {}}},
 	.Next_Device      = {label = "Next device", group = "Performance", keys = {{.Down, {}}, {}}},
@@ -124,7 +125,7 @@ COMMANDS := [Cmd]ui.Command{
 cmd_tab :: proc(c: Cmd) -> Maybe(Tab) {
 	switch {
 	case c <= .Previous_Section:                   return nil
-	case c <= .Columns:                            return .Processes
+	case c <= .Summary:                            return .Processes
 	case c <= .Previous_Device:                    return .Performance
 	case c <= .Service_Manager:                    return .Services
 	case c <= .Startup_Copy:                       return .Startup
@@ -227,7 +228,7 @@ cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 	case .Default_Action: return p != nil
 	case .Open_Group, .Close_Group: return group_can_toggle(app, c == .Open_Group)
 	case .Raise_Priority, .Lower_Priority: return p != nil && selected_is_process(app)
-	case .Columns: return true
+	case .Columns, .Summary: return true
 	case .Cpu_Grid, .Next_Device, .Previous_Device: return true
 	case .Service_Start, .Service_Stop, .Service_Restart, .Service_Enable, .Service_Disable, .Service_Open, .Service_Copy, .Service_Open_File: return service_can(app, c)
 	case .Service_Details: return true
@@ -289,6 +290,7 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Search_Online:    search_online(app)
 	case .Tree_View:        tree_view_switch(app)
 	case .Columns:          columns_menu_open(app)
+	case .Summary:          summary_switch(app)
 	case .Cpu_Grid:         cpu_grid_switch(app)
 	case .Next_Device:      device_step(app, 1)
 	case .Previous_Device:  device_step(app, -1)
