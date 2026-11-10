@@ -46,6 +46,7 @@ App :: struct {
 	tab:         Tab,
 	query:       string,            // the filter, in lower case (owned): each section with a table applies it
 	connections: Connections,       // the sockets (connections.odin), read only while their section is shown
+	information: Information,       // what the system is (information.odin), read when first shown and on F5
 	device:      Device,            // the Performance section's device shown (perf_view.odin)
 	cpu_grid:    bool,              // the CPU's page shows a graph per logical processor
 	columns_menu: ui.Key,           // the menu of the table's columns (table_view.odin)
@@ -103,6 +104,7 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	app.devtools = devtools.start_from_env(win, "inspecteur")
 	h.before_input = proc(h: ^host.Host) { app := (^App)(h.user); devtools.service(app.devtools, &h.state, &app.shared.r) }
 	connections_init(&app.connections, app)
+	information_init(&app.information, app)
 
 	t_window := time.tick_now()
 	platform.show_window(win)
@@ -128,6 +130,7 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	}
 	devtools.stop(app.devtools)
 	connections_destroy(&app.connections)
+	information_destroy(&app.information)
 	delete(app.query)
 	icons_destroy(&app.app_icons, &app.shared.r)
 	host.host_close(h)
@@ -185,17 +188,23 @@ tab_show :: proc(app: ^App, tab: Tab) {
 	app.tab = tab
 	#partial switch tab {
 	case .Connections: worker_ask(&app.connections.worker)
+	case .Information: if !app.information.asked { information_ask(&app.information) }
 	}
 }
 
 // F5: the processes and the section shown, read again now.
 refresh_now :: proc(app: ^App) {
 	refresh(app)
+	#partial switch app.tab {
+	case .Information: information_ask(&app.information)
+	}
+	say(app, "Read again")
 }
 
 // What the sections' threads have published since the last frame becomes their rows.
 sections_take :: proc(app: ^App) {
 	connections_take(app)
+	information_take(&app.information)
 }
 
 selected_id :: proc(app: ^App) -> u64 {

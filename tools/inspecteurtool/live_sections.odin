@@ -7,6 +7,7 @@ package inspecteurtool
 import "core:fmt"
 import "core:net"
 import "core:os"
+import "core:strings"
 import "core:time"
 import cdp "gt:cdp"
 
@@ -36,6 +37,19 @@ live_connections :: proc(l: ^Live) {
 	check(l, cdp.key(c, "Escape"), "Escape clears the filter")
 	cdp.wait_idle(c, SESSION_WAIT)
 	check(l, cdp.shot(c, fmt.tprintf("%s/connections.png", l.dir)), "a picture of the section")
+}
+
+// The system's details: the kernel's version, as this test reads it; Copy all says what it copied.
+live_information :: proc(l: ^Live) {
+	c := &l.c
+	release, _ := os.read_entire_file("/proc/sys/kernel/osrelease", context.temp_allocator)
+	kernel := strings.trim_space(string(release))
+	check(l, cdp.click_name(c, SIDE_INFORMATION), "the Information section")
+	check(l, cdp.wait_for(c, fmt.tprintf("Linux %s", kernel), SESSION_WAIT), "it shows the kernel, Linux %s", kernel)
+	check(l, cdp.wait_for(c, "Operating system", SESSION_WAIT) && cdp.wait_for(c, "Installed", SESSION_WAIT), "the system and its memory")
+	check(l, cdp.key(c, "ctrl+c") && cdp.wait_for(c, "Copied the system's information", SESSION_WAIT), "Ctrl+C copies it all")
+	cdp.wait_idle(c, SESSION_WAIT)
+	check(l, cdp.shot(c, fmt.tprintf("%s/information.png", l.dir)), "a picture of the section")
 }
 
 // The cells of the row whose cell `name` says `text`: the process (c0), the PID (c1), the state (c5).

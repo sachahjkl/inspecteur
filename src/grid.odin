@@ -14,6 +14,9 @@ import "core:strings"
 import lucide "gt:lucide"
 import "gt:ui"
 
+// Seconds the pointer rests on a cut cell before its whole text shows.
+TIP_DELAY_S :: 0.5
+
 Grid_Column :: struct {
 	title:  string,
 	width:  f32,    // in ems; 0: the room the others leave (one column has it)
@@ -223,8 +226,13 @@ grid_build :: proc(app: ^App, g: ^Grid, d: ^Grid_Data, empty: string, em: f32) -
 	for i in rows.first ..< rows.last {
 		r := g.order[i]
 		ui.next({height = ui.px(row_h)})
-		row := ui.list_row(&g.vl, i, "")
-		if ui.parent(row.box) { grid_cells(app, g, d, r, em) }
+		row := ui.list_row(&g.vl, i, grid_label(d, r))
+		tip := ""
+		if ui.parent(row.box) { tip = grid_cells(app, g, d, r, em) }
+		// (a cell too narrow for its text: the whole text, once the pointer rests on it)
+		if tip != "" && ui.hovered_for(row, TIP_DELAY_S) {
+			if ui.tooltip_beside() { ui.tooltip_text(tip) }
+		}
 		if i == g.vl.sel { g.sel_rect = row.box.rect }
 		if row.double_clicked { ev.activated = true }
 		if row.right_clicked {
@@ -296,8 +304,15 @@ grid_rule :: proc(g: ^Grid, k: int, em: f32) {
 	if sig.dragging { g.width[k] = clamp(ui.drag_load()[0] - sig.drag_delta.x / em, COLUMN_MIN_EM, COLUMN_MAX_EM) }
 }
 
+// What a screen reader says of a row (and what live reads to know which row is selected): its first two cells.
+grid_label :: proc(d: ^Grid_Data, r: int) -> string {
+	if d.cols < 2 { return grid_text(d, r, 0) }
+	return fmt.tprintf("%s, %s", grid_text(d, r, 0), grid_text(d, r, 1))
+}
+
+// The cells of a row. Returns the whole text of the cell under the pointer when it is cut.
 @(private = "file")
-grid_cells :: proc(app: ^App, g: ^Grid, d: ^Grid_Data, r: int, em: f32) {
+grid_cells :: proc(app: ^App, g: ^Grid, d: ^Grid_Data, r: int, em: f32) -> (tip: string) {
 	tone := d.tones[r]
 	if tone == .Dim { ui.push_tags("weak") }
 	if tone == .Bad { ui.push_tags("bad") }
@@ -319,17 +334,28 @@ grid_cells :: proc(app: ^App, g: ^Grid, d: ^Grid_Data, r: int, em: f32) {
 				}
 				ui.spacer(ui.px(em * 0.4))
 				ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0})
-				ui.build_box({.Draw_Text, .Clip}, fmt.tprintf("%s###c0", text))
+				b := ui.build_box({.Draw_Text, .Clip}, fmt.tprintf("%s###c0", text))
+				if cut_under_mouse(app, b, text, 0, em) { tip = text }
 			}
 			continue
 		}
 		if c.weak && tone == .Normal { ui.push_tags("weak") }
 		pad := c.number ? em * 0.6 : em * RULE_GRIP_EM * 0.5 + max(1, ui.scale())
 		ui.next({width = width, height = ui.pct(1), text_align = c.number ? .Right : .Left, text_pad = pad})
-		ui.build_box({.Draw_Text, .Clip}, fmt.tprintf("%s###c%d", text, k))
+		b := ui.build_box({.Draw_Text, .Clip}, fmt.tprintf("%s###c%d", text, k))
+		if cut_under_mouse(app, b, text, pad, em) { tip = text }
 		if c.weak && tone == .Normal { ui.pop_tags() }
 	}
 	ui.spacer(ui.px(em * SCROLLBAR_EM))
+	return
+}
+
+// Whether the pointer is on the box and its text does not fit in it (the box as laid out at the last frame).
+cut_under_mouse :: proc(app: ^App, b: ^ui.Box, text: string, pad, em: f32) -> bool {
+	m := ui.mouse_pos()
+	r := b.rect
+	if m.x < r.min.x || m.x >= r.max.x || m.y < r.min.y || m.y >= r.max.y { return false }
+	return ui.text_width(app.shared.font, em, text) + 2 * pad > r.max.x - r.min.x
 }
 
 ////////////////////////////////

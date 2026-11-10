@@ -66,6 +66,7 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 					case .Processes:   build_processes(app, em)
 					case .Performance: build_performance(app, em)
 					case .Connections: build_connections(app, em)
+					case .Information: build_information(app, em)
 					case:              build_placeholder(app, em)
 					}
 				}
@@ -91,6 +92,7 @@ view_keys :: proc(app: ^App) {
 	field_keeps := ui.focus_key() == app.search_key && app.search_key != 0 && len(app.search.buf) > 0
 	#partial switch app.tab {
 	case .Connections: connections_keys(app, field_keeps)
+	case .Information: information_keys(app)
 	}
 	if app.tab != .Processes { return }
 	if ui.key_press(.Down) { select_step(app, app.vl.sel, 1, 1) }

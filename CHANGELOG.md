@@ -25,7 +25,11 @@ and the versions follow [semantic versioning](https://semver.org/).
 - **Connections**: every TCP and UDP socket, IPv4 and IPv6, with the process that holds it (its icon, name and PID),
   its local and remote addresses and its state; sort, filter, End task, Kill, Open in Processes, Copy address. Read on a
   thread of its own, only while the section is shown.
+- **Information**: the system (name, kernel, computer, motherboard, firmware, session, uptime), the processor, the memory,
+  the GPUs (with their PCI ids and driver), the disks and file systems with their free room, the network interfaces with
+  their MAC and addresses, the screens (their EDID's name and mode), the batteries. **Copy all** (Ctrl+C) copies it as text.
+- A table's cell too narrow for its text shows the whole text when the pointer rests on it.
 - **Keys**: Ctrl+F gives the filter the keyboard, Ctrl+1 to Ctrl+6 show a section, F5 reads again now; the filter
   filters the section shown, and Escape clears it in every section.
-- The sections Services, Startup and Information, to come.
+- The sections Services and Startup, to come.
 - Preferences: refresh period, theme, light or dark, finish, text size, window size (`docs/configuration.md`).

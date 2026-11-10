@@ -6,7 +6,7 @@ package inspecteur
 //   End task           Delete        SIGTERM to the process
 //   Kill…              Shift+Delete  SIGKILL, after a confirmation
 //   Open in Processes  Enter         the process, selected in the Processes section
-//   Copy address                     the remote address, else the local one
+//   Copy address       Ctrl+C        the remote address, else the local one
 
 import "core:fmt"
 import "core:strings"
@@ -18,7 +18,7 @@ build_connections :: proc(app: ^App, em: f32) {
 	c := &app.connections
 	if c.grid.query != app.query { grid_apply(&c.grid, &c.data, app.query) }
 	listening := 0
-	for s in c.sockets { if (s.proto == .TCP && s.state == 10) || (s.proto == .UDP && s.state != 1) { listening += 1 } }
+	for s in c.sockets { if socket_listens(s) { listening += 1 } }
 	note := c.read ? fmt.tprintf("%s, %d listening or open", count_text(len(c.sockets), "socket", "sockets"), listening) : "Reading…"
 	section_bar(app, "Connections", note, em, connections_actions)
 	ev := grid_build(app, &c.grid, &c.data, c.read ? "No socket." : "", em)
@@ -43,7 +43,7 @@ connections_actions :: proc(app: ^App, em: f32) {
 	if tool_button(app, "kill", lucide.ZAP, "Kill (Shift+Delete)", owned, em) { connection_signal(app, true) }
 	vrule(em)
 	if tool_button(app, "open_process", lucide.LAYOUT_LIST, "Open in Processes (Enter)", owned, em) { connection_reveal(app) }
-	if tool_button(app, "copy_address", lucide.COPY, "Copy address", ok, em) { connection_copy(app) }
+	if tool_button(app, "copy_address", lucide.COPY, "Copy address (Ctrl+C)", ok, em) { connection_copy(app) }
 }
 
 // The keys of the section (view_keys calls it when no menu or dialog is open). `field_keeps`: the filter keeps Delete.
@@ -53,6 +53,7 @@ connections_keys :: proc(app: ^App, field_keeps: bool) {
 	if !field_keeps {
 		if ui.key_press(.Delete) { connection_signal(app, false) }
 		if ui.key_press(.Delete, {.Shift}) { connection_signal(app, true) }
+		if ui.key_press(.C, {.Ctrl}) { connection_copy(app) }
 	}
 	if ui.key_press(.Return) { connection_reveal(app) }
 	if ui.key_press(.Menu) || ui.key_press(.F10, {.Shift}) { connections_menu_open(app, {c.grid.sel_rect.min.x + 40, c.grid.sel_rect.max.y}, true) }
@@ -78,7 +79,7 @@ connections_menu :: proc(app: ^App, em: f32) {
 		if ui.menu_item("Kill…", "Shift+Del", enabled = owned).clicked { connection_signal(app, true) }
 		ui.menu_separator()
 		if ui.menu_item("Open in Processes", "Enter", enabled = owned).clicked { connection_reveal(app) }
-		if ui.menu_item("Copy address").clicked { connection_copy(app) }
+		if ui.menu_item("Copy address", "Ctrl+C").clicked { connection_copy(app) }
 	}
 }
 

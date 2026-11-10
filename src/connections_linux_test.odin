@@ -12,14 +12,13 @@ a_tcp_line_gives_its_socket :: proc(t: ^testing.T) {
 	testing.expect_value(t, len(list), 2)
 	if len(list) < 2 { return }
 	testing.expect_value(t, endpoint_text(list[0].local, list[0].lport, false), "127.0.0.1:631")
-	testing.expect_value(t, list[0].state, u8(10))
-	testing.expect_value(t, socket_state_text(list[0]), "Listening")
+	testing.expect_value(t, list[0].state, Socket_State.Listening)
+	testing.expect_value(t, SOCKET_STATE_TEXT[list[0].state], "Listening")
 	testing.expect_value(t, remote_text(list[0]), "")
-	testing.expect_value(t, list[0].inode, u64(23456))
+	testing.expect_value(t, list[0].key, u64(23456))
 	testing.expect_value(t, endpoint_text(list[1].local, list[1].lport, false), "10.0.2.15:55010")
 	testing.expect_value(t, remote_text(list[1]), "93.184.216.34:443")
-	testing.expect_value(t, list[1].uid, u32(1000))
-	testing.expect_value(t, socket_state_text(list[1]), "Established")
+	testing.expect_value(t, list[1].state, Socket_State.Established)
 }
 
 @(test)
@@ -37,13 +36,22 @@ a_tcp6_line_gives_its_socket :: proc(t: ^testing.T) {
 
 @(test)
 a_udp_socket_is_open_or_connected :: proc(t: ^testing.T) {
-	testing.expect_value(t, socket_state_text(Socket{proto = .UDP, state = 7}), "Open")
-	testing.expect_value(t, socket_state_text(Socket{proto = .UDP, state = 1}), "Connected")
+	text := "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode ref pointer drops\n" +
+		"  1: 00000000:0044 00000000:0000 07 00000000:00000000 00:00000000 00000000     0        0 4321 2 0000000000000000 0\n" +
+		"  2: 0100007F:A000 0100007F:0035 01 00000000:00000000 00:00000000 00000000  1000        0 4322 2 0000000000000000 0\n"
+	list := make([dynamic]Socket, context.temp_allocator)
+	parse_net_sockets(text, .UDP, false, &list)
+	testing.expect_value(t, len(list), 2)
+	if len(list) < 2 { return }
+	testing.expect_value(t, list[0].state, Socket_State.Open)
+	testing.expect_value(t, endpoint_text(list[0].local, list[0].lport, false), "*:68")
+	testing.expect_value(t, list[1].state, Socket_State.Connected)
+	testing.expect_value(t, remote_text(list[1]), "127.0.0.1:53")
 }
 
 @(test)
 a_socket_keeps_its_identity :: proc(t: ^testing.T) {
-	a := Socket{inode = 42}
+	a := Socket{key = 42}
 	b := Socket{lport = 80, rport = 5000}
 	c := Socket{lport = 80, rport = 5001}
 	testing.expect(t, socket_id(a) != socket_id(b))
