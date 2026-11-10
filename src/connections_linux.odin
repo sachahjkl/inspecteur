@@ -3,8 +3,9 @@ package inspecteur
 // The sockets on Linux: /proc/net/tcp, tcp6, udp and udp6, and each socket's process by its inode: /proc/<pid>/fd/<n>
 // links to "socket:[<inode>]". Only the processes the user may read can be told: another user's sockets have none.
 //
-// The scan of every process's descriptors is what costs; a reading whose sockets all have a known owner skips it (at
-// most OWNER_SCAN_EVERY readings in a row); a new socket brings it back.
+// The scan of every process's descriptors is what costs; a reading whose sockets are all known skips it (at most
+// OWNER_SCAN_EVERY readings in a row): a socket with an owner, or one the last scan found no owner for (another user's,
+// one in TIME_WAIT). A new socket brings the scan back.
 
 import "core:strconv"
 import "core:strings"
@@ -19,12 +20,14 @@ Owner :: struct { pid: i32, start: u64 }
 
 Socket_Reader :: struct {
 	owners:  map[u64]Owner,   // inode -> process, from the last scan
+	unowned: map[u64]bool,    // the inodes the last scan found no owner for: known too
 	skipped: int,             // readings since the last scan
 	buf:     []u8,
 }
 
 socket_reader_destroy :: proc(r: ^Socket_Reader) {
 	delete(r.owners)
+	delete(r.unowned)
 	delete(r.buf)
 }
 
@@ -39,10 +42,12 @@ sockets_read :: proc(r: ^Socket_Reader, out: ^[dynamic]Socket) {
 		if ok { parse_net_sockets(string(data), f.proto, f.v6, out) }
 	}
 	unknown := false
-	for s in out { if s.key != 0 && s.key not_in r.owners { unknown = true; break } }
+	for s in out { if s.key != 0 && s.key not_in r.owners && s.key not_in r.unowned { unknown = true; break } }
 	if unknown || r.skipped >= OWNER_SCAN_EVERY {
 		owners_scan(&r.owners)
 		r.skipped = 0
+		clear(&r.unowned)
+		for s in out { if s.key != 0 && s.key not_in r.owners { r.unowned[s.key] = true } }
 	} else {
 		r.skipped += 1
 	}
@@ -61,13 +66,17 @@ owners_scan :: proc(owners: ^map[u64]Owner) {
 	link: [64]u8
 	stat_buf: [1024]u8
 	num: [16]u8
+	found := make([dynamic]u64, context.temp_allocator)   // one process's socket inodes
 	for pid in pids {
 		pid_s := strconv.write_int(num[:], i64(pid), 10)
 		dir := strings.clone_to_cstring(strings.concatenate({"/proc/", pid_s, "/fd"}, context.temp_allocator), context.temp_allocator)
+		// (its start time before its descriptors and after: a pid given to another process meanwhile is not kept)
+		stat_path := strings.concatenate({"/proc/", pid_s, "/stat"}, context.temp_allocator)
+		start, has_start := start_of(stat_buf[:], stat_path)
+		if !has_start { continue }
 		fd, err := linux.open(dir, {.DIRECTORY, .CLOEXEC})
 		if err != .NONE { continue }   // (another user's: EACCES)
-		start: u64
-		has_start := false
+		clear(&found)
 		for {
 			n, derr := linux.getdents(fd, dents[:])
 			if derr != .NONE || n <= 0 { break }
@@ -82,21 +91,24 @@ owners_scan :: proc(owners: ^map[u64]Owner) {
 				if lerr != .NONE { continue }
 				target := string(link[:k])
 				if !strings.has_prefix(target, "socket:[") || !strings.has_suffix(target, "]") { continue }
-				inode, ok := strconv.parse_u64(target[8:len(target) - 1], 10)
-				if !ok { continue }
-				if !has_start {
-					has_start = true
-					stat_path := strings.concatenate({"/proc/", pid_s, "/stat"}, context.temp_allocator)
-					if data, _, sok := read_file(stat_buf[:], linux.AT_FDCWD, stat_path); sok {
-						if st, pok := parse_stat(string(data)); pok { start = st.start }
-					}
-				}
-				// (a socket two processes share, after a fork: the first one met, the lower pid, keeps it)
-				if inode not_in owners^ { owners[inode] = Owner{pid, start} }
+				if inode, ok := strconv.parse_u64(target[8:len(target) - 1], 10); ok { append(&found, inode) }
 			}
 		}
 		linux.close(fd)
+		if len(found) == 0 { continue }
+		if again, ok := start_of(stat_buf[:], stat_path); !ok || again != start { continue }
+		// (a socket two processes share, after a fork: the first one met, the lower pid, keeps it)
+		for inode in found { if inode not_in owners^ { owners[inode] = Owner{pid, start} } }
 	}
+}
+
+// The start time of a process from its stat file.
+@(private = "file")
+start_of :: proc(buf: []u8, path: string) -> (start: u64, ok: bool) {
+	data, _, rok := read_file(buf, linux.AT_FDCWD, path)
+	if !rok { return }
+	st, pok := parse_stat(string(data))
+	return st.start, pok
 }
 
 // The lines of /proc/net/tcp (tcp6, udp, udp6), after its title line:
