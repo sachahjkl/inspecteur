@@ -59,6 +59,7 @@ Gpu :: struct {
 	read:      Gpu_Read,
 	util_hist: History,
 	mem_hist:  History,   // percent of its memory in use
+	temp_hist: History,   // degrees Celsius (when it tells them)
 }
 
 gpu_name :: proc(g: ^Gpu_Read) -> string { return string(g.name[:g.name_len]) }
@@ -105,6 +106,7 @@ gpus_sample :: proc(m: ^Machine, history: bool) {
 		if fresh && history {
 			ui.value_history_push(&g.util_hist, g.read.util)
 			ui.value_history_push(&g.mem_hist, g.read.mem_total > 0 ? 100 * f32(f64(g.read.mem_used) / f64(g.read.mem_total)) : 0)
+			if g.read.has_temp { ui.value_history_push(&g.temp_hist, g.read.temp_c) }
 		}
 	}
 }

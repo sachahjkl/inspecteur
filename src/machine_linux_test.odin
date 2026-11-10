@@ -40,3 +40,12 @@ cpu_topology_is_counted :: proc(t: ^testing.T) {
 	testing.expect_value(t, c.sockets, 2)
 	testing.expect_value(t, c.cores, 4)
 }
+
+@(test)
+pressure_is_read :: proc(t: ^testing.T) {
+	p := parse_pressure("some avg10=13.81 avg60=12.68 avg300=13.19 total=22814585738\nfull avg10=12.04 avg60=9.99 avg300=10.34 total=20216196013\n")
+	testing.expect_value(t, p, Pressure{some10 = 13.81, some60 = 12.68, full10 = 12.04, full60 = 9.99})
+	// (a kernel that tells no "full" line for the CPU)
+	q := parse_pressure("some avg10=0.23 avg60=1.59 avg300=1.89 total=2463812561\n")
+	testing.expect(t, q.some60 == 1.59 && q.full10 == 0, "some alone")
+}

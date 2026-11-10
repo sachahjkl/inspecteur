@@ -45,9 +45,31 @@ Machine_Counters :: struct {
 	mem:       Mem_Fields,
 	disks:     [dynamic]Disk_Counters,
 	nets:      [dynamic]Net_Counters,
+	temps:     [TEMPS_MAX]Temp,                  // the processor's sensors, the package's first
+	temp_count: int,
+	pressure:  [Pressure_Kind]Pressure,
+	has_pressure: bool,                          // the kernel tells it (PSI)
+	throttled: u64,                              // the times the processor slowed down for its heat, since boot (0: not told)
 }
 
 Disk_Counters :: struct { name: string, read_bytes, written_bytes, busy_ms: u64 }
+
+// A temperature of the processor's sensors: what it measures ("Tctl", "Package id 0", "Core 3") and its degrees Celsius.
+// The first one a reader gives is the whole package's.
+TEMPS_MAX :: 32
+Temp :: struct {
+	label:     [24]u8,
+	label_len: int,
+	celsius:   f32,
+}
+
+temp_label :: proc(t: ^Temp) -> string { return string(t.label[:t.label_len]) }
+
+// What waits on a resource (pressure stall information): the share of the time some task (`some`), or every task
+// (`full`), waited on it, over the last 10 and 60 seconds, in percent. The CPU's `full` is not told by every kernel.
+Pressure_Kind :: enum u8 { Cpu, Memory, Io }
+PRESSURE_NAMES := [Pressure_Kind]string{.Cpu = "CPU", .Memory = "Memory", .Io = "I/O"}
+Pressure :: struct { some10, some60, full10, full60: f32 }
 Net_Counters :: struct { name: string, rx, tx: u64 }
 
 // A disk as the system lists it (disks_list; texts in the temporary allocator).
@@ -105,6 +127,17 @@ Machine :: struct {
 	uptime:     f64,
 	handles:    u64,
 	mhz:        f32,               // the processors' mean frequency now (read while the CPU is shown)
+	core_mhz:   [dynamic]f32,      // each logical processor's (read while the CPU is shown; 0: not told)
+	temps:      [TEMPS_MAX]Temp,   // the processor's temperatures, the package's first
+	temp_count: int,
+	temp_hist:  History,           // the package's
+	pressure:   [Pressure_Kind]Pressure,
+	pressure_hist: [Pressure_Kind]History,   // `some` over 10 s
+	has_pressure: bool,
+	throttled:  u64,               // the times the processor slowed for its heat since boot
+	throttled_before: u64,         // at the first sample: what was before Inspecteur
+	disk_hist, net_hist: History,  // all the disks' bytes per second, all the interfaces' (the summary)
+	disk_rate, net_rate: f64,
 	info:       Cpu_Info,
 	info_read:  bool,
 	// the memory
@@ -134,6 +167,7 @@ machine_destroy :: proc(m: ^Machine) {
 	delete(m.core_idle)
 	delete(m.core_cpu)
 	delete(m.core_hist)
+	delete(m.core_mhz)
 	delete(m.info.model)
 	for &d in m.disks { disk_free(&d) }
 	delete(m.disks)
@@ -179,7 +213,8 @@ machine_sample :: proc(m: ^Machine, now_ns: i64, cpu_shown: bool, history := tru
 			m.info = m.demo != nil ? demo_cpu_info() : cpu_info_read()
 			if m.info.logical == 0 { m.info.logical = len(m.core_total) }
 		}
-		m.mhz = m.demo != nil ? demo_cpu_mhz(m.demo) : cpu_mhz_now(len(m.core_total))
+		resize(&m.core_mhz, len(m.core_total))
+		m.mhz = m.demo != nil ? demo_cpu_mhz(m.demo, m.core_mhz[:]) : cpu_mhz_now(m.core_mhz[:])
 	}
 }
 
@@ -204,6 +239,12 @@ machine_take :: proc(m: ^Machine, c: Machine_Counters, dt: f64, history: bool) {
 	if !first && history { ui.value_history_push(&m.cpu_hist, m.cpu) }
 	m.boot_time, m.load, m.uptime, m.handles, m.mem = c.boot_time, c.load, c.uptime, c.handles, c.mem
 	if history { ui.value_history_push(&m.mem_hist, m.mem.total > 0 ? 100 * f32(f64(mem_used(m)) / f64(m.mem.total)) : 0) }
+	m.temps, m.temp_count = c.temps, c.temp_count
+	if history && m.temp_count > 0 { ui.value_history_push(&m.temp_hist, m.temps[0].celsius) }
+	m.pressure, m.has_pressure = c.pressure, c.has_pressure
+	if history && m.has_pressure { for k in Pressure_Kind { ui.value_history_push(&m.pressure_hist[k], m.pressure[k].some10) } }
+	if first { m.throttled_before = c.throttled }
+	m.throttled = c.throttled
 
 	for s in c.disks {
 		for &d in m.disks {
@@ -219,6 +260,16 @@ machine_take :: proc(m: ^Machine, c: Machine_Counters, dt: f64, history: bool) {
 				}
 			}
 			d.read_bytes, d.written_bytes, d.busy_ms, d.seen = s.read_bytes, s.written_bytes, s.busy_ms, true
+		}
+	}
+	// (the summary's: every disk's and interface's bytes per second)
+	defer if !first {
+		m.disk_rate, m.net_rate = 0, 0
+		for d in m.disks { m.disk_rate += d.read_rate + d.write_rate }
+		for n in m.nets { m.net_rate += n.rx_rate + n.tx_rate }
+		if history {
+			ui.value_history_push(&m.disk_hist, f32(m.disk_rate))
+			ui.value_history_push(&m.net_hist, f32(m.net_rate))
 		}
 	}
 	for s in c.nets {

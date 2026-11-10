@@ -3,7 +3,8 @@ package inspecteur
 // The machine on Linux: /proc/stat (the processors' times, the boot time), /proc/meminfo, /proc/loadavg, /proc/uptime,
 // /proc/sys/fs/file-nr, /proc/diskstats and /proc/net/dev at each sample; the disks from /sys/block and their mounts
 // from /proc/self/mountinfo, the interfaces from /sys/class/net and their addresses (getifaddrs) when they are listed;
-// the CPU's details from /proc/cpuinfo and /sys/devices/system/cpu.
+// the CPU's details from /proc/cpuinfo and /sys/devices/system/cpu; the processor's temperatures from its hwmon driver
+// (k10temp, zenpower, coretemp), what waits on the CPU, the memory and the disks from /proc/pressure.
 
 import "core:fmt"
 import "core:net"
@@ -19,9 +20,21 @@ SECTOR_BYTES :: 512
 // The interfaces left out: the loopback (its type), and the virtual links of containers and bridges.
 NET_SKIPPED :: [?]string{"veth", "docker", "br-", "virbr"}
 
+// The hwmon drivers of a processor's sensors, and the labels of its package's temperature, the first shown.
+CPU_HWMON := [?]string{"k10temp", "zenpower", "coretemp", "cpu_thermal", "soc_thermal"}
+PACKAGE_LABELS := [?]string{"Tdie", "Tctl", "Package id 0"}
+
 Machine_Reader :: struct {
 	buf: []u8,
+	temps_listed: bool,
+	temp_files: [TEMPS_MAX]Temp_File,   // the package's first
+	temp_n: int,
+	no_throttle, no_pressure: bool,     // the files are not there: not looked for again
 }
+
+// A temperature's file (temp<n>_input, millidegrees) and its label.
+@(private = "file")
+Temp_File :: struct { path: [64]u8, path_len: int, label: [24]u8, label_len: int }
 
 machine_reader_init :: proc(r: ^Machine_Reader) { r.buf = make([]u8, PROC_READ_MAX) }
 machine_reader_destroy :: proc(r: ^Machine_Reader) { delete(r.buf) }
@@ -49,6 +62,67 @@ machine_read :: proc(r: ^Machine_Reader, c: ^Machine_Counters) {
 	}
 	if text, _, ok := read_file(r.buf, linux.AT_FDCWD, "/proc/net/dev"); ok {
 		for s in parse_net_dev(string(text)) { append(&c.nets, Net_Counters{s.name, s.rx, s.tx}) }
+	}
+	sensors_read(r, c)
+}
+
+// The processor's temperatures, the pressure, the times it slowed for its heat: a few small files each.
+@(private = "file")
+sensors_read :: proc(r: ^Machine_Reader, c: ^Machine_Counters) {
+	if !r.temps_listed { temps_list(r) }
+	for &f in r.temp_files[:r.temp_n] {
+		v, ok := strconv.parse_f64(read_text(string(f.path[:f.path_len])))
+		if !ok { continue }
+		t := &c.temps[c.temp_count]
+		t.label_len = copy(t.label[:], f.label[:f.label_len])
+		t.celsius = f32(v / 1000)
+		c.temp_count += 1
+	}
+	if !r.no_pressure {
+		names := [Pressure_Kind]string{.Cpu = "/proc/pressure/cpu", .Memory = "/proc/pressure/memory", .Io = "/proc/pressure/io"}
+		for path, k in names {
+			text, _, ok := read_file(r.buf, linux.AT_FDCWD, path)
+			if !ok { r.no_pressure = true; break }
+			c.pressure[k] = parse_pressure(string(text))
+		}
+		c.has_pressure = !r.no_pressure
+	}
+	// (Intel's count of the package's slowdowns; AMD's processors tell none)
+	if !r.no_throttle {
+		text := read_text("/sys/devices/system/cpu/cpu0/thermal_throttle/package_throttle_count")
+		if text == "" { r.no_throttle = true } else { c.throttled = u64(strconv.parse_uint(text, 10) or_else 0) }
+	}
+}
+
+// The temperatures of the processor's hwmon drivers, once: the package's first.
+@(private = "file")
+temps_list :: proc(r: ^Machine_Reader) {
+	r.temps_listed = true
+	for dir in list_dir("/sys/class/hwmon") {
+		base := fmt.tprintf("/sys/class/hwmon/%s", dir)
+		name := read_text(fmt.tprintf("%s/name", base))
+		cpu := false
+		for n in CPU_HWMON { if n == name { cpu = true } }
+		if !cpu { continue }
+		for i in 1 ..= TEMPS_MAX {
+			if r.temp_n >= TEMPS_MAX { break }
+			input := fmt.tprintf("%s/temp%d_input", base, i)
+			if !os.exists(input) { continue }
+			label := read_text(fmt.tprintf("%s/temp%d_label", base, i))
+			if label == "" { label = fmt.tprintf("%s %d", name, i) }
+			f := &r.temp_files[r.temp_n]
+			f.path_len = copy(f.path[:], input)
+			f.label_len = copy(f.label[:], label)
+			r.temp_n += 1
+		}
+	}
+	// the package's first: the first of PACKAGE_LABELS found
+	for want in PACKAGE_LABELS {
+		for i in 0 ..< r.temp_n {
+			if string(r.temp_files[i].label[:r.temp_files[i].label_len]) != want { continue }
+			r.temp_files[0], r.temp_files[i] = r.temp_files[i], r.temp_files[0]
+			return
+		}
 	}
 }
 
@@ -86,15 +160,31 @@ cpu_info_read :: proc() -> (info: Cpu_Info) {
 	return
 }
 
-// The processors' mean frequency now, in MHz (cpufreq's scaling_cur_freq; 0 without cpufreq).
-cpu_mhz_now :: proc(logical: int) -> f32 {
+// The processors' mean frequency now, in MHz, and each one's in `cores` (cpufreq's scaling_cur_freq; 0 without cpufreq).
+cpu_mhz_now :: proc(cores: []f32) -> f32 {
 	sum: f64
 	n := 0
-	for cpu in 0 ..< logical {
+	for &mhz, cpu in cores {
 		v, ok := strconv.parse_f64(read_text(fmt.tprintf("/sys/devices/system/cpu/cpu%d/cpufreq/scaling_cur_freq", cpu)))
+		mhz = ok ? f32(v / 1000) : 0
 		if ok { sum += v; n += 1 }
 	}
 	return n > 0 ? f32(sum / f64(n) / 1000) : 0
+}
+
+// A file of /proc/pressure: "some avg10=0.23 avg60=1.59 avg300=1.89 total=..." and the same for "full".
+parse_pressure :: proc(text: string) -> (p: Pressure) {
+	rest := text
+	for line in strings.split_lines_iterator(&rest) {
+		fields := strings.fields(line, context.temp_allocator)
+		if len(fields) < 3 { continue }
+		avg :: proc(field, key: string) -> f32 { return strings.has_prefix(field, key) ? f32(strconv.parse_f64(field[len(key):]) or_else 0) : 0 }
+		switch fields[0] {
+		case "some": p.some10, p.some60 = avg(fields[1], "avg10="), avg(fields[2], "avg60=")
+		case "full": p.full10, p.full60 = avg(fields[1], "avg10="), avg(fields[2], "avg60=")
+		}
+	}
+	return
 }
 
 ////////////////////////////////

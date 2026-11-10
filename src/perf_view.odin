@@ -11,7 +11,7 @@ import "core:time"
 import "gt:draw"
 import "gt:ui"
 
-Device_Kind :: enum u8 { Cpu, Memory, Disk, Network, Gpu }
+Device_Kind :: enum u8 { Cpu, Memory, Disk, Network, Gpu, Pressure }
 
 Device :: struct {
 	kind:  Device_Kind,
@@ -29,7 +29,11 @@ CPU_GRID_GAP_EM :: 0.4
 ADDRESSES_SHOWN :: 3    // an interface's addresses of each kind shown
 
 // The hues of the devices (hue).
-HUE_CPU, HUE_MEMORY, HUE_DISK, HUE_NETWORK, HUE_GPU, HUE_SECOND :: 1, 2, 3, 4, 6, 7
+HUE_CPU, HUE_MEMORY, HUE_DISK, HUE_NETWORK, HUE_GPU, HUE_SECOND, HUE_HEAT :: 1, 2, 3, 4, 6, 7, 5
+// A temperature graph's top (its graph is the same height whatever the reading), and the height of a second graph of a
+// page (the temperature under the utilization), in ems.
+TEMP_TOP      :: 100
+SMALL_GRAPH_EM :: 6
 // The least top of a rate's graph: a disk at rest, or an interface, does not fill its graph with its noise.
 DISK_FLOOR :: 1024 * 1024          // 1 MB/s
 NET_FLOOR  :: 1_000_000 / 8        // 1 Mbit/s, in bytes per second
@@ -63,7 +67,7 @@ build_performance :: proc(app: ^App, em: f32) {
 		if ui.parent(list) {
 			ui.next({width = ui.fill(), height = ui.fill()})
 			if ui.scroll_y("###devices_scroll") {
-				device_row(app, {.Cpu, 0}, "CPU", fmt.tprintf("%.0f%%  %s", m.cpu, mhz_text(m.mhz)), {{&m.cpu_hist, hue(app, HUE_CPU), ""}}, 100, 0, em)
+				device_row(app, {.Cpu, 0}, "CPU", fmt.tprintf("%.0f%%  %s%s", m.cpu, mhz_text(m.mhz), m.temp_count > 0 ? fmt.tprintf("  %.0f °C", m.temps[0].celsius) : ""), {{&m.cpu_hist, hue(app, HUE_CPU), ""}}, 100, 0, em)
 				device_row(app, {.Memory, 0}, "Memory", fmt.tprintf("%s / %s (%.0f%%)", size_text(mem_used(m)), size_text(m.mem.total), ui.value_history_last(&m.mem_hist)), {{&m.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, 0, em)
 				for &d, i in m.disks {
 					device_row(app, {.Disk, i}, fmt.tprintf("Disk %d (%s)", i, d.name), fmt.tprintf("%s  %.0f%%", d.kind, d.active), {{&d.active_hist, hue(app, HUE_DISK), ""}}, 100, 0, em)
@@ -78,6 +82,10 @@ build_performance :: proc(app: ^App, em: f32) {
 					case g.read.has_util: sub = fmt.tprintf("%s  %.0f%%", sub, g.read.util)
 					}
 					device_row(app, {.Gpu, i}, fmt.tprintf("GPU %d", i), sub, {{&g.util_hist, hue(app, HUE_GPU), ""}}, 100, 0, em)
+				}
+				if m.has_pressure {
+					worst := pressure_worst(m)
+					device_row(app, {.Pressure, 0}, "Pressure", fmt.tprintf("%s waits %.1f%%", PRESSURE_NAMES[worst], m.pressure[worst].some10), pressure_series(app), 0, PRESSURE_FLOOR, em)
 				}
 			}
 		}
@@ -95,6 +103,7 @@ build_performance :: proc(app: ^App, em: f32) {
 					case .Disk:    disk_page(app, &m.disks[app.device.index], em)
 					case .Network: net_page(app, &m.nets[app.device.index], em)
 					case .Gpu:     gpu_page(app, &m.gpus[app.device.index], em)
+					case .Pressure: pressure_page(app, em)
 					}
 				}
 				ui.spacer(ui.px(em * 1.2))
@@ -112,6 +121,7 @@ device_step :: proc(app: ^App, dir: int) {
 	for _, i in m.disks { append(&list, Device{.Disk, i}) }
 	for _, i in m.nets { append(&list, Device{.Network, i}) }
 	for _, i in m.gpus { append(&list, Device{.Gpu, i}) }
+	if m.has_pressure { append(&list, Device{.Pressure, 0}) }
 	at := 0
 	for d, i in list { if d == app.device { at = i } }
 	app.device = list[clamp(at + dir, 0, len(list) - 1)]
@@ -133,6 +143,7 @@ device_check :: proc(app: ^App) {
 	case .Disk:    if d.index >= len(m.disks) { app.device = {} }
 	case .Network: if d.index >= len(m.nets) { app.device = {} }
 	case .Gpu:     if d.index >= len(m.gpus) { app.device = {} }
+	case .Pressure: if !m.has_pressure { app.device = {} }
 	}
 }
 
@@ -144,7 +155,6 @@ Series :: struct {
 }
 
 // The series as the toolkit's graph takes them.
-@(private = "file")
 line_series :: proc(series: []Series) -> []ui.Line_Series {
 	out := make([]ui.Line_Series, len(series), context.temp_allocator)
 	for s, i in series { out[i] = {ui.value_history_values(s.hist), s.color} }
@@ -261,6 +271,7 @@ caption :: proc(left, right: string, em: f32) {
 }
 
 percent_top :: proc(v: f32) -> string { return fmt.tprintf("%.0f%%", v) }
+celsius_top :: proc(v: f32) -> string { return fmt.tprintf("%.0f °C", v) }
 rate_top :: proc(v: f32) -> string { return fmt.tprintf("%s/s", size_text(u64(v))) }
 
 // The numbers under the graphs: big ones on the left, a table of details on the right.
@@ -323,14 +334,28 @@ cpu_page :: proc(app: ^App, em: f32) {
 					for k in 0 ..< cols {
 						i := r * cols + k
 						if k > 0 { ui.spacer(ui.px(em * CPU_GRID_GAP_EM)) }
-						ui.next({width = ui.fill(), height = ui.fill()})
-						if i < n { ui.line_graph(fmt.tprintf("###core_%d", i), line_series({{&m.core_hist[i], c, ""}}), {top = 100, points = HISTORY_POINTS, grid = true}) } else { ui.spacer(ui.fill()) }
+						ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
+						if i >= n { ui.spacer(ui.fill()); continue }
+						if ui.column(id = fmt.tprintf("###core_box%d", i)) {
+							// (each processor's number and frequency over its graph)
+							if ui.tags("weak") {
+								mhz := i < len(m.core_mhz) ? m.core_mhz[i] : 0
+								ui.next({width = ui.fill(), height = ui.px(em * 1.3), font_size = em * 0.8, text_pad = 0})
+								ui.label(fmt.tprintf("CPU %d%s###core_label", i, mhz > 0 ? fmt.tprintf("  %s", mhz_text(mhz)) : ""))
+							}
+							ui.next({width = ui.fill(), height = ui.fill()})
+							ui.line_graph(fmt.tprintf("###core_%d", i), line_series({{&m.core_hist[i], c, ""}}), {top = 100, points = HISTORY_POINTS, grid = true})
+						}
 					}
 				}
 			}
 		}
 	} else {
 		captioned_graph(app, "cpu_graph", "% Utilization", {{&m.cpu_hist, c, ""}}, 100, percent_top, em, ui.fill())
+		if m.temp_count > 0 {
+			ui.spacer(ui.px(em * 0.4))
+			captioned_graph(app, "cpu_temp", fmt.tprintf("Temperature (%s)", temp_label(&m.temps[0])), {{&m.temp_hist, hue(app, HUE_HEAT), ""}}, TEMP_TOP, celsius_top, em, ui.px(em * SMALL_GRAPH_EM))
+		}
 	}
 	threads: i32
 	for p in app.sampler.procs { threads += p.threads }
@@ -344,10 +369,13 @@ cpu_page :: proc(app: ^App, em: f32) {
 	append(&details, Stat{"Sockets", fmt.tprintf("%d", m.info.sockets)}, Stat{"Cores", fmt.tprintf("%d", m.info.cores)}, Stat{"Logical processors", fmt.tprintf("%d", len(m.core_total))})
 	append(&details, ..caches[:])
 	append(&details, Stat{"Load average", fmt.tprintf("%.2f  %.2f  %.2f", m.load[0], m.load[1], m.load[2])})
-	stats_block({
-		{"Utilization", fmt.tprintf("%.0f%%", m.cpu)}, {"Speed", mhz_text(m.mhz)}, {"Up time", uptime_text(m.uptime)},
-		{"Processes", fmt.tprintf("%d", len(app.sampler.procs))}, {"Threads", fmt.tprintf("%d", threads)}, {"Open files", fmt.tprintf("%d", m.handles)},
-	}, details[:], em)
+	for &t in m.temps[1:m.temp_count] { append(&details, Stat{temp_label(&t), fmt.tprintf("%.0f °C", t.celsius)}) }
+	if m.throttled > m.throttled_before { append(&details, Stat{"Slowed for its heat", fmt.tprintf("%d times since Inspecteur started", m.throttled - m.throttled_before)}) }
+	big := make([dynamic]Stat, context.temp_allocator)
+	append(&big, Stat{"Utilization", fmt.tprintf("%.0f%%", m.cpu)}, Stat{"Speed", mhz_text(m.mhz)})
+	if m.temp_count > 0 { append(&big, Stat{"Temperature", fmt.tprintf("%.0f °C", m.temps[0].celsius)}) }
+	append(&big, Stat{"Up time", uptime_text(m.uptime)}, Stat{"Processes", fmt.tprintf("%d", len(app.sampler.procs))}, Stat{"Threads", fmt.tprintf("%d", threads)}, Stat{"Open files", fmt.tprintf("%d", m.handles)})
+	stats_block(big[:], details[:], em)
 }
 
 @(private = "file")
@@ -426,6 +454,10 @@ gpu_page :: proc(app: ^App, g: ^Gpu, em: f32) {
 		ui.spacer(ui.px(em * 0.4))
 		captioned_graph(app, "gpu_mem", "Dedicated memory usage", {{&g.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, proc(v: f32) -> string { return "100%" }, em, ui.fill(), period_ms = gpu_ms)
 	}
+	if r.has_temp && g.temp_hist.count > 0 {
+		ui.spacer(ui.px(em * 0.4))
+		captioned_graph(app, "gpu_temp", "Temperature", {{&g.temp_hist, hue(app, HUE_HEAT), ""}}, TEMP_TOP, celsius_top, em, ui.px(em * SMALL_GRAPH_EM), period_ms = gpu_ms)
+	}
 	if !r.has_util && !r.has_mem {
 		if ui.tags("weak") {
 			ui.next({width = ui.fill(), height = ui.px(em * 3)})
@@ -447,6 +479,39 @@ gpu_page :: proc(app: ^App, g: ^Gpu, em: f32) {
 	append(&details, Stat{"State", r.asleep ? "asleep" : "awake"})
 	if r.has_clock { append(&details, Stat{"Clock", mhz_text(r.clock_mhz)}) }
 	if r.driver_len > 0 { append(&details, Stat{"Driver version", gpu_driver(r)}) }
+	stats_block(big[:], details[:], em)
+}
+
+// The pressure's graph: the share of the time some task waited, for each resource, over 10 s.
+PRESSURE_FLOOR :: 10   // percent: a calm machine does not fill its graph with noise
+PRESSURE_HUES := [Pressure_Kind]int{.Cpu = HUE_CPU, .Memory = HUE_MEMORY, .Io = HUE_DISK}
+
+pressure_series :: proc(app: ^App) -> []Series {
+	out := make([]Series, len(Pressure_Kind), context.temp_allocator)
+	for k in Pressure_Kind { out[int(k)] = {&app.machine.pressure_hist[k], hue(app, PRESSURE_HUES[k]), PRESSURE_NAMES[k]} }
+	return out
+}
+
+// The resource the most waited on now.
+pressure_worst :: proc(m: ^Machine) -> Pressure_Kind {
+	worst := Pressure_Kind.Cpu
+	for k in Pressure_Kind { if m.pressure[k].some10 > m.pressure[worst].some10 { worst = k } }
+	return worst
+}
+
+@(private = "file")
+pressure_page :: proc(app: ^App, em: f32) {
+	m := &app.machine
+	page_title("Pressure", "the time tasks waited for a resource", em)
+	captioned_graph(app, "pressure_graph", "% of the time some task waited, over 10 s", pressure_series(app), 0, percent_top, em, ui.fill(), PRESSURE_FLOOR)
+	big := make([dynamic]Stat, context.temp_allocator)
+	details := make([dynamic]Stat, context.temp_allocator)
+	for k in Pressure_Kind {
+		p := m.pressure[k]
+		append(&big, Stat{fmt.tprintf("%s, some", PRESSURE_NAMES[k]), fmt.tprintf("%.1f%%", p.some10)})
+		append(&details, Stat{fmt.tprintf("%s, some task", PRESSURE_NAMES[k]), fmt.tprintf("%.1f%% over 10 s, %.1f%% over 60 s", p.some10, p.some60)})
+		append(&details, Stat{fmt.tprintf("%s, every task", PRESSURE_NAMES[k]), fmt.tprintf("%.1f%% over 10 s, %.1f%% over 60 s", p.full10, p.full60)})
+	}
 	stats_block(big[:], details[:], em)
 }
 

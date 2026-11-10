@@ -161,6 +161,7 @@ demo_preroll :: proc(d: ^Demo, m: ^Machine, s: ^Sampler, c: ^Catalog, now_ns: i6
 				g.read = snap.gpus[k]
 				ui.value_history_push(&g.util_hist, g.read.util)
 				ui.value_history_push(&g.mem_hist, 100 * f32(f64(g.read.mem_used) / f64(g.read.mem_total)))
+				ui.value_history_push(&g.temp_hist, g.read.temp_c)
 			}
 		}
 	}
@@ -246,6 +247,19 @@ demo_machine_read :: proc(d: ^Demo, now_ns: i64, c: ^Machine_Counters) {
 		d.disk[k][2] += u64(min(1000, rate / (k == 0 ? 120_000 : 40_000)) * dt)
 		append(&c.disks, Disk_Counters{k == 0 ? "nvme0n1" : "sda", d.disk[k][0], d.disk[k][1], d.disk[k][2]})
 	}
+	// the sensors: the package (k10temp's Tctl) and its two dies, warmer with the compilers; what waits on the CPU and
+	// on the disks
+	labels := [?]string{"Tctl", "Tccd1", "Tccd2"}
+	for l, k in labels {
+		tc := &c.temps[k]
+		tc.label_len = copy(tc.label[:], l)
+		tc.celsius = f32(61 + 7 * math.sin(t / 17) + 4 * math.sin(t / 5.3) - f64(k) * 4)
+	}
+	c.temp_count = len(labels)
+	c.has_pressure = true
+	c.pressure[.Cpu] = {some10 = f32(6 + 4 * swing(t, 23, 0.4, 0.8)), some60 = 6.8, full10 = 0, full60 = 0}
+	c.pressure[.Memory] = {some10 = f32(0.4 * swing(t, 31, 1.1)), some60 = 0.3, full10 = 0.1, full60 = 0.05}
+	c.pressure[.Io] = {some10 = f32(2.5 * swing(t, 19, 2.2, 0.9)), some60 = 2.1, full10 = f32(1.2 * swing(t, 19, 2.2, 0.9)), full60 = 0.9}
 	c.nets = make([dynamic]Net_Counters, context.temp_allocator)
 	for k in 0 ..< 2 {
 		if k == 1 { append(&c.nets, Net_Counters{"wlp4s0", 0, 0}); continue }
@@ -261,7 +275,17 @@ demo_cpu_info :: proc() -> Cpu_Info {
 		base_mhz = 4500, max_mhz = 5400, cache = {512 * 1024, 8 * 1024 * 1024, 32 * 1024 * 1024, 0}}
 }
 
-demo_cpu_mhz :: proc(d: ^Demo) -> f32 { return f32(4700 + 300 * math.sin(demo_seconds(d) / 4)) }
+// Each processor's frequency (the three busy ones faster), and their mean.
+demo_cpu_mhz :: proc(d: ^Demo, cores: []f32) -> f32 {
+	t := demo_seconds(d)
+	sum: f32
+	for &mhz, i in cores {
+		boost: f64 = i < 3 ? 900 : 200
+		mhz = f32(4400 + boost + 250 * math.sin(t / 4 + f64(i)))
+		sum += mhz
+	}
+	return len(cores) > 0 ? sum / f32(len(cores)) : 0
+}
 
 demo_devices :: proc(d: ^Demo, disks: ^[dynamic]Disk_Info, nets: ^[dynamic]Net_Info) {
 	@(static) root := [?]string{"/", "/boot", "/home"}
@@ -284,7 +308,7 @@ demo_gpus_read :: proc(d: ^Demo, snap: ^Gpu_Snapshot) {
 	g.util = f32(18 * swing(t, 10, 0.3, 0.8))
 	g.mem_total = 12 * 1024 * 1024 * 1024
 	g.mem_used = u64(f64(g.mem_total) * (0.21 + 0.02 * math.sin(t / 9)))
-	g.temp_c, g.power_w, g.clock_mhz = 47, f32(38 + 10 * math.sin(t / 7)), 2475
+	g.temp_c, g.power_w, g.clock_mhz = f32(47 + 4 * math.sin(t / 13)), f32(38 + 10 * math.sin(t / 7)), 2475
 	snap.count = 1
 	for p in DEMO_PROCS {
 		if p.gpu_mb > 0 { gpu_proc_add(snap, 0, p.pid, p.gpu_mb * 1024 * 1024) }

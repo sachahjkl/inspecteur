@@ -122,7 +122,7 @@ run_shots :: proc(args: []string) -> int {
 	shot(&c, out, "performance_cpu_grid", &failed)
 	cdp.key(&c, "ctrl+g")
 	pictures := [?]struct { device, picture: string }{
-		{"dev_1_0", "performance_memory"}, {"dev_2_0", "performance_disk"}, {"dev_3_0", "performance_network"}, {"dev_4_0", "performance_gpu"},
+		{"dev_1_0", "performance_memory"}, {"dev_2_0", "performance_disk"}, {"dev_3_0", "performance_network"}, {"dev_4_0", "performance_gpu"}, {"dev_5_0", "performance_pressure"},
 	}
 	for p in pictures {
 		if !need(cdp.click_name(&c, p.device), fmt.tprintf("no device %s", p.device), &failed) { continue }
