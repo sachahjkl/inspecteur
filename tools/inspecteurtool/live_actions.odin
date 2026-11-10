@@ -126,8 +126,14 @@ live_commands :: proc(l: ^Live) {
 	check(l, cdp.key(c, "ctrl+shift+Tab") && cdp.wait_name(c, "cpu_graph", SESSION_WAIT), "Ctrl+Shift+Tab: back to Performance")
 	check(l, cdp.key(c, "ctrl+1") && cdp.key(c, "ctrl+shift+c") && cdp.wait_for(c, "Default columns", SESSION_WAIT), "Ctrl+Shift+C in Processes: the columns' menu")
 	check(l, cdp.key(c, "Escape") && cdp.wait_for(c, "Default columns", SESSION_WAIT, gone = true), "Escape closes the menu")
-	check(l, cdp.key(c, "ctrl+shift+l") && file_has(prefs, "view.mode\tlight"), "Ctrl+Shift+L: the light version, kept")
-	check(l, cdp.key(c, "ctrl+shift+l") && file_has(prefs, "view.mode\tdark"), "again: the dark version")
+	// From the system's version, the key goes to the other one than the system shows: dark on a desktop in dark, light on
+	// a runner that has no dark setting. Either is right; the second press must give the other.
+	first := "light"
+	pressed := cdp.key(c, "ctrl+shift+l")
+	if pressed && !file_has(prefs, "view.mode\tlight") { first = "dark" }
+	other := first == "light" ? "dark" : "light"
+	check(l, pressed && file_has(prefs, fmt.tprintf("view.mode\t%s", first)), "Ctrl+Shift+L: the %s version, kept", first)
+	check(l, cdp.key(c, "ctrl+shift+l") && file_has(prefs, fmt.tprintf("view.mode\t%s", other)), "again: the %s version", other)
 	check(l, cdp.click_name(c, "theme") && cdp.wait_for(c, "As the system", SESSION_WAIT) && cdp.click_text(c, "As the system"), "back to the system's version")
 	check(l, file_has(prefs, "view.mode\tsystem"), "kept")
 }
