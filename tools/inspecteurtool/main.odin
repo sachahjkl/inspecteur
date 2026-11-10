@@ -28,6 +28,10 @@ COMMANDS :: [?]Command{
 	{name = "logo", about = "assets/logo*.png and .project/image.png, drawn by the toolkit's paint package", run = run_logo},
 	{name = "shots", about = "[--out folder]: the pictures of the README, the program's own frames in a sway nobody sees", run = run_shots},
 	{name = "bench", about = "[seconds]: a release build in a sway nobody sees: the time to its first frame, its CPU use at rest", run = run_bench},
+	{name = "package", about = "[version]: build/dist/inspecteur-<version>-linux-x64.tar.gz and its SHA-256", run = run_package},
+	{name = "notes", about = "<version>: the changelog's section of that version", run = run_notes},
+	{name = "ship", about = "<version> [--dry-run]: from a clean main, the changelog and APP_VERSION, the checks, a commit, the tag, the push", run = run_ship},
+	{name = "site", about = "build <site> <out> | check [--site folder] [--shot file.png] [--browser program]: the site's pages", run = run_site},
 }
 
 main :: proc() {
