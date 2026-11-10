@@ -74,6 +74,7 @@ Proc :: struct {
 	resident:   u64,
 	private:    u64,
 	gpu_mem:    u64,      // video memory, bytes (gpu.odin; 0: none, or no GPU tells it)
+	gpu:        f32,      // percent of a GPU's time it kept busy, summed over the GPUs (0: none, or no GPU tells it)
 	threads:    i32,
 	state:      Proc_State,
 	nice:       i8,

@@ -310,8 +310,11 @@ demo_gpus_read :: proc(d: ^Demo, snap: ^Gpu_Snapshot) {
 	g.mem_used = u64(f64(g.mem_total) * (0.21 + 0.02 * math.sin(t / 9)))
 	g.temp_c, g.power_w, g.clock_mhz = f32(47 + 4 * math.sin(t / 13)), f32(38 + 10 * math.sin(t / 7)), 2475
 	snap.count = 1
-	for p in DEMO_PROCS {
-		if p.gpu_mb > 0 { gpu_proc_add(snap, 0, p.pid, p.gpu_mb * 1024 * 1024) }
+	for p, i in DEMO_PROCS {
+		if p.gpu_mb == 0 { continue }
+		gpu_proc_add(snap, 0, p.pid, p.gpu_mb * 1024 * 1024)
+		// (its share of the GPU: the larger its video memory, the busier, each its own swing)
+		gpu_proc_util(snap, 0, p.pid, f32(f64(p.gpu_mb) / 40 * swing(t, 6 + f64(i % 4), f64(i))))
 	}
 }
 

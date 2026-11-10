@@ -138,6 +138,7 @@ props_general :: proc(app: ^App, p: ^Proc, em: f32) {
 		props_line("CPU", fmt.tprintf("%.1f%% of the machine", p.cpu), em)
 		props_line("Memory", fmt.tprintf("%s private, %s resident (with the pages it shares with other processes)", size_text(p.private), size_text(p.resident)), em)
 		if p.gpu_mem > 0 { props_line("GPU memory", size_text(p.gpu_mem), em) }
+		if p.gpu > 0 { props_line("GPU", fmt.tprintf("%.0f%% of a GPU's time", p.gpu), em) }
 		props_line("Threads", fmt.tprintf("%d", p.threads), em)
 		props_line("Disk", !p.io_known ? "Access denied (another user's process)" : fmt.tprintf("%s read, %s written since it started", size_text(p.io_read), size_text(p.io_write)), em)
 	}

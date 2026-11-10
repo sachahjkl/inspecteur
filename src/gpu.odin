@@ -34,12 +34,14 @@ Gpu_Read :: struct {
 	clock_mhz:   f32,
 }
 
-Gpu_Proc_Mem :: struct { pid: i32, bytes: u64 }
+// What a process uses of the GPUs: its video memory, and the share of a GPU's time it kept it busy (percent, the sum over
+// the GPUs; 0 when no GPU tells it).
+Gpu_Proc :: struct { pid: i32, bytes: u64, util: f32 }
 
 Gpu_Snapshot :: struct {
 	gpus:      [GPU_MAX]Gpu_Read,
 	count:     int,
-	procs:     [GPU_PROCS_MAX]Gpu_Proc_Mem,
+	procs:     [GPU_PROCS_MAX]Gpu_Proc,
 	proc_count: int,
 	readings:  int,   // how many readings have been made (0: none yet)
 }
@@ -90,8 +92,8 @@ gpu_want :: proc(w: ^Gpu_Watch, wanted: bool) {
 	sync.cond_signal(&w.cond)
 }
 
-// The GPUs' last reading into the machine; a point of each graph when it is a new reading. The processes' video
-// memory: gpu_proc_mem.
+// The GPUs' last reading into the machine; a point of each graph when it is a new reading. The processes' share:
+// gpu_procs.
 gpus_sample :: proc(m: ^Machine, history: bool) {
 	w := &m.gpu
 	sync.mutex_lock(&w.mutex)
@@ -111,12 +113,18 @@ gpus_sample :: proc(m: ^Machine, history: bool) {
 	}
 }
 
-// The video memory each process holds, by pid, over every GPU (temporary allocator; empty when no GPU tells it).
-gpu_proc_mem :: proc(m: ^Machine) -> map[i32]u64 {
-	out := make(map[i32]u64, 16, context.temp_allocator)
+// The video memory each process holds and its use of the GPUs, by pid, over every GPU (temporary allocator; empty when
+// no GPU tells it).
+gpu_procs :: proc(m: ^Machine) -> map[i32]Gpu_Proc {
+	out := make(map[i32]Gpu_Proc, 16, context.temp_allocator)
 	w := &m.gpu
 	sync.mutex_lock(&w.mutex)
-	for p in w.snap.procs[:w.snap.proc_count] { out[p.pid] += p.bytes }
+	for p in w.snap.procs[:w.snap.proc_count] {
+		q := out[p.pid]
+		q.bytes += p.bytes
+		q.util += p.util
+		out[p.pid] = q
+	}
 	sync.mutex_unlock(&w.mutex)
 	return out
 }
@@ -149,7 +157,17 @@ gpu_run :: proc(data: rawptr) {
 gpu_proc_add :: proc(snap: ^Gpu_Snapshot, first: int, pid: i32, bytes: u64) {
 	for q in snap.procs[first:snap.proc_count] { if q.pid == pid { return } }
 	if snap.proc_count < GPU_PROCS_MAX {
-		snap.procs[snap.proc_count] = {pid, bytes}
+		snap.procs[snap.proc_count] = {pid = pid, bytes = bytes}
+		snap.proc_count += 1
+	}
+}
+
+// Sets the share of one GPU's time process `pid` kept it busy (percent; `first`: where that GPU's processes start). A
+// process that holds no memory the GPU tells is added.
+gpu_proc_util :: proc(snap: ^Gpu_Snapshot, first: int, pid: i32, util: f32) {
+	for &q in snap.procs[first:snap.proc_count] { if q.pid == pid { q.util = max(q.util, util); return } }
+	if snap.proc_count < GPU_PROCS_MAX {
+		snap.procs[snap.proc_count] = {pid = pid, util = util}
 		snap.proc_count += 1
 	}
 }

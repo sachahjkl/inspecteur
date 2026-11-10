@@ -9,7 +9,7 @@ inspecteur --pref view.mode=light --pref processes.refresh_ms=2000
 
 | Name | Default | What it does |
 |---|---|---|
-| `processes.columns` | pid,user,cpu,cpu_graph,memory,read,write,threads | The columns of the Processes table besides the name, apart by commas: `pid`, `ppid`, `user`, `state`, `nice`, `cpu`, `cpu_graph` (the CPU of the last 30 seconds, a bar per sample in the colours of the load), `memory` (private memory), `resident`, `gpu_memory`, `read`, `write`, `threads`, `started`, `command`, `executable`. A right click on the table's header (or Ctrl+Shift+C) changes them. |
+| `processes.columns` | pid,user,cpu,cpu_graph,memory,read,write,threads | The columns of the Processes table besides the name, apart by commas: `pid`, `ppid`, `user`, `state`, `nice`, `cpu`, `cpu_graph` (the CPU of the last 30 seconds, a bar per sample in the colours of the load), `memory` (private memory), `resident`, `gpu` (the share of a GPU's time it keeps busy: NVIDIA's GPUs tell it), `gpu_memory`, `read`, `write`, `threads`, `started`, `command`, `executable`. A right click on the table's header (or Ctrl+Shift+C) changes them. |
 | `processes.widths` | (empty) | The widths of the columns that were resized, in ems, apart by commas (`pid=6,command=30`). Dragging the line before a column's title changes them. |
 | `processes.sort` | name | The column the processes are sorted by (one of `processes.columns`, or `name`). |
 | `processes.descending` | false | Sort from the largest (or from Z) down. |

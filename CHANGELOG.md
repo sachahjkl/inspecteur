@@ -19,6 +19,8 @@ and the versions follow [semantic versioning](https://semver.org/).
 - **A summary of the machine over the Processes table**: CPU, memory, disks, network, GPU, temperature and pressure,
   each its value, its last minute and a stripe in the colour of its load; a click shows the device in Performance.
   Ctrl+B (`processes.summary`) hides it.
+- **GPU use per process** (the `gpu` column): the share of a GPU's time a process keeps busy, as NVIDIA's driver tells
+  it; read only while a GPU column or Performance is shown, so a sleeping GPU is not woken.
 - **History in Properties**: graphs of the process's CPU, private memory and disk since Inspecteur saw it start (5
   minutes at most at the default period).
 

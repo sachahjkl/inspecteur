@@ -3,7 +3,8 @@ package inspecteur
 // The GPUs on Linux:
 //
 // - NVIDIA: NVML (libnvidia-ml.so.1, the library nvidia-smi is made on), opened with dlopen: the utilization, the video
-//   memory, the temperature, the power, the clock, and the video memory of each process. No process is started.
+//   memory, the temperature, the power, the clock, and each process's video memory and share of the GPU's time (its
+//   samples since the last reading: nvmlDeviceGetProcessUtilization). No process is started.
 // - AMD: amdgpu's files in /sys/class/drm/card*/device: gpu_busy_percent, mem_info_vram_used and _total.
 // - Intel: its name only (i915 and xe tell no utilization without root).
 //
@@ -25,6 +26,7 @@ PCI_VENDOR_NVIDIA :: "0x10de"
 
 Gpu_Reader :: struct {
 	nv:        Nvml,
+	seen_us:   [GPU_MAX]u64,      // each GPU's newest process sample read (NVML's clock, microseconds)
 	tried:     bool,              // NVML's library was looked for (once: it is there or not)
 	nvidia:    [GPU_MAX][16]u8,   // the PCI slots of the NVIDIA display controllers (0000:01:00.0)
 	nvidia_n:  int,
@@ -58,7 +60,7 @@ gpu_read :: proc(r: ^Gpu_Reader, snap: ^Gpu_Snapshot, wanted: bool) {
 		nvml_close(&r.nv)
 	}
 	if r.nv.ok {
-		nvml_read(&r.nv, snap)
+		nvml_read(&r.nv, snap, &r.seen_us)
 		for i in 0 ..< min(snap.count, GPU_MAX) { r.names[i] = snap.gpus[i]; r.names[i].has_util = false }
 	} else {
 		// (not read: each NVIDIA GPU as NVML last named it, asleep when it sleeps, else with no numbers)
@@ -120,6 +122,11 @@ Nvml_Device :: distinct rawptr
 Nvml_Utilization :: struct { gpu, memory: u32 }
 @(private = "file")
 Nvml_Memory :: struct { total, free, used: u64 }
+// nvmlProcessUtilizationSample_t: a process's share of the GPU's engines over one of the driver's sample periods.
+@(private = "file")
+Nvml_Process_Sample :: struct { pid: u32, time_us: u64, sm, mem, enc, dec: u32 }
+@(private = "file")
+NVML_PROCESS_SAMPLES :: 256
 // nvmlProcessInfo_t of the _v3 calls.
 @(private = "file")
 Nvml_Process :: struct { pid: u32, used_gpu_memory: u64, gpu_instance_id, compute_instance_id: u32 }
@@ -142,6 +149,7 @@ Nvml :: struct {
 	driver:      proc "c" (buf: [^]u8, len: u32) -> i32,
 	graphics:    proc "c" (dev: Nvml_Device, n: ^u32, infos: [^]Nvml_Process) -> i32,
 	compute:     proc "c" (dev: Nvml_Device, n: ^u32, infos: [^]Nvml_Process) -> i32,
+	samples:     proc "c" (dev: Nvml_Device, out: [^]Nvml_Process_Sample, n: ^u32, since_us: u64) -> i32,
 }
 
 @(private = "file")
@@ -164,6 +172,7 @@ nvml_load :: proc(nv: ^Nvml) {
 	nv.driver = auto_cast sym(lib, "nvmlSystemGetDriverVersion")
 	nv.graphics = auto_cast sym(lib, "nvmlDeviceGetGraphicsRunningProcesses_v3")
 	nv.compute = auto_cast sym(lib, "nvmlDeviceGetComputeRunningProcesses_v3")
+	nv.samples = auto_cast sym(lib, "nvmlDeviceGetProcessUtilization")
 }
 
 @(private = "file")
@@ -179,7 +188,7 @@ nvml_close :: proc(nv: ^Nvml) {
 }
 
 @(private = "file")
-nvml_read :: proc(nv: ^Nvml, snap: ^Gpu_Snapshot) {
+nvml_read :: proc(nv: ^Nvml, snap: ^Gpu_Snapshot, seen_us: ^[GPU_MAX]u64) {
 	n: u32
 	if nv.count(&n) != NVML_SUCCESS { return }
 	driver: [32]u8
@@ -210,6 +219,19 @@ nvml_read :: proc(nv: ^Nvml, snap: ^Gpu_Snapshot) {
 			if call(dev, &count, &infos[0]) != NVML_SUCCESS { continue }
 			for p in infos[:min(int(count), len(infos))] {
 				if p.used_gpu_memory != NVML_VALUE_NOT_AVAILABLE { gpu_proc_add(snap, first, i32(p.pid), p.used_gpu_memory) }
+			}
+		}
+		// each process's share of the GPU's time: the samples since the last reading, the newest of each process
+		if nv.samples != nil {
+			samples: [NVML_PROCESS_SAMPLES]Nvml_Process_Sample
+			count := u32(len(samples))
+			if nv.samples(dev, &samples[0], &count, seen_us[i]) == NVML_SUCCESS {
+				newest := seen_us[i]
+				for q in samples[:min(int(count), len(samples))] {
+					gpu_proc_util(snap, first, i32(q.pid), f32(q.sm))
+					newest = max(newest, q.time_us)
+				}
+				seen_us[i] = newest
 			}
 		}
 	}

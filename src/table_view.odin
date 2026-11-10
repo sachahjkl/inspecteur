@@ -22,6 +22,7 @@ ICON_EM    :: 1.5
 // and the share of the memory at which it is red, the least it shows for (a quiet cell stays plain).
 HEAT_CPU_FULL  :: 25.0
 HEAT_MEM_FULL  :: 0.15
+HEAT_GPU_FULL  :: 60.0   // percent of a GPU's time
 HEAT_MIN       :: 0.04
 // The hue (degrees: 0 red, 60 yellow, 120 green) at each step of the load, then the colour's saturation and value
 // (sRGB): a turn of the hue goes through clear colours, where a mix of green and red would go through olive.
@@ -283,6 +284,7 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 	p: Proc
 	cpu: f32
 	private, resident, gpu_mem: u64
+	gpu: f32
 	read, write: f64
 	threads: i32
 	name: string
@@ -292,6 +294,7 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 	case .Process:
 		p = s.procs[r.index]
 		cpu, private, resident, gpu_mem, read, write, threads, name = p.cpu, p.private, p.resident, p.gpu_mem, p.read_rate, p.write_rate, p.threads, p.name
+		gpu = p.gpu
 		// (in a group, the app's icon is the group's; in the tree, each app's process has its own)
 		if p.entry >= 0 && (r.depth == 0 || t.tree) { icon_name = app.catalog.entries[p.entry].icon }
 	case .App:
@@ -299,6 +302,7 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 		p = s.procs[g.root]
 		e := app.catalog.entries[g.entry]
 		cpu, private, resident, gpu_mem, read, write, threads, name = g.cpu, g.private, g.resident, g.gpu_mem, g.read_rate, g.write_rate, g.threads, e.name
+		gpu = g.gpu
 		icon_name = e.icon
 		count = g.count
 	case .Section:
@@ -362,6 +366,7 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 			if text := cpu_graph_cell(app, r, page, em); text != "" { tip = text }
 		case .Memory:     cell(t, c, size_text(private), &tip, heat = app.machine.mem.total > 0 ? f32(f64(private) / f64(app.machine.mem.total) / HEAT_MEM_FULL) : 0, page = page)
 		case .Resident:   cell(t, c, size_text(resident), &tip, weak = true)
+		case .GPU:        cell(t, c, gpu > 0 ? fmt.tprintf("%.0f%%", gpu) : "", &tip, heat = gpu / HEAT_GPU_FULL, page = page)
 		case .GPU_Memory: cell(t, c, gpu_mem > 0 ? size_text(gpu_mem) : "", &tip)
 		case .Read:       cell(t, c, io_dash ? "–" : rate_text(read), &tip, weak = io_dash)
 		case .Write:      cell(t, c, io_dash ? "–" : rate_text(write), &tip, weak = io_dash)

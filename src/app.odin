@@ -214,10 +214,15 @@ refresh :: proc(app: ^App) {
 	machine_sample(&app.machine, now._nsec, app.tab == .Performance && app.device.kind == .Cpu, history = history)
 	app.sample_extra = false
 	sample(&app.sampler, now._nsec, app.machine.d_total_ns, &app.catalog, history)
-	gpu_mem := gpu_proc_mem(&app.machine)
-	for &p in app.sampler.procs { p.gpu_mem = gpu_mem[p.pid] }
-	// (the GPUs' numbers are read while they are shown: a GPU that may sleep is let go otherwise)
-	gpu_want(&app.machine.gpu, app.tab == .Performance || app.table.layout.shown[int(Column.GPU_Memory)])
+	gpu := gpu_procs(&app.machine)
+	for &p in app.sampler.procs {
+		use := gpu[p.pid]
+		p.gpu_mem, p.gpu = use.bytes, use.util
+	}
+	// (the GPUs' numbers are read while they are shown: a GPU that may sleep is let go otherwise. The summary's tile does
+	// not ask for them: it would keep a laptop's GPU awake whenever Processes is shown; a GPU that is always on is read
+	// anyway)
+	gpu_want(&app.machine.gpu, app.tab == .Performance || app.table.layout.shown[int(Column.GPU_Memory)] || app.table.layout.shown[int(Column.GPU)])
 	table_group(&app.table, app.sampler.procs[:])
 	rows_again(app)
 	app.next_sample = time.tick_add(now, time.Duration(app.settings.refresh_ms) * time.Millisecond)
