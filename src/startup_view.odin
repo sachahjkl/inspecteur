@@ -1,12 +1,8 @@
 package inspecteur
 
-// The Startup section (startup.odin): what starts with the session. Its bar and a row's menu act on the selected item:
-//
-//   Enable              Ctrl+E        it starts with the session
-//   Disable             Ctrl+D        it does not
-//   Enable or disable   Space
-//   Open file location  Enter         its file's folder in the file manager
-//   Copy command        Ctrl+C
+// The Startup section (startup.odin): what starts with the session. Its bar, a row's menu and the keys (commands.odin)
+// act on the selected item: Enable (it starts with the session), Disable, Enable or disable (Space), Open file location
+// (its file's folder in the file manager), Copy command.
 
 import "core:fmt"
 import lucide "gt:lucide"
@@ -28,52 +24,34 @@ build_startup :: proc(app: ^App, em: f32) {
 	section_bar(app, "Startup", note, em, startup_actions)
 	ev := section_table_build(&s.rows, s.list != nil ? "Nothing starts with the session." : "")
 	if ev.sorted { ui.table_apply(&s.rows.table, &s.rows.data, app.query) }
-	if ev.activated { startup_open(app) }
+	if ev.activated && cmd_can(app, .Startup_Open) { startup_open(app) }
 	if ev.menu { startup_menu_open(app, ev.menu_at) }
 	startup_menu(app, em)
 }
 
-@(private = "file")
-Startup_Can :: struct { enable, disable, open, copy: bool }
-
-@(private = "file")
-startup_can :: proc(app: ^App) -> (can: Startup_Can) {
+// Whether a command of the section can act on the selected item now.
+startup_can :: proc(app: ^App, c: Cmd) -> bool {
 	it, ok := selected_startup(app)
-	if !ok || app.startup.pending { return }
-	can.enable = it.can_toggle && !it.enabled
-	can.disable = it.can_toggle && it.enabled
-	can.open = it.path != ""
-	can.copy = it.command != ""
-	return
+	if !ok || app.startup.pending { return false }
+	#partial switch c {
+	case .Startup_Enable:  return it.can_toggle && !it.enabled
+	case .Startup_Disable: return it.can_toggle && it.enabled
+	case .Startup_Toggle:  return it.can_toggle
+	case .Startup_Open:    return it.path != ""
+	case .Startup_Copy:    return it.command != ""
+	}
+	return false
 }
 
 @(private = "file")
 startup_actions :: proc(app: ^App, em: f32) {
-	can := startup_can(app)
-	if tool_button(app, "st_enable", lucide.CHECK, "Enable: it starts with the session (Ctrl+E)", can.enable, em) { startup_toggle(app, true) }
-	if tool_button(app, "st_disable", lucide.X, "Disable: it does not start with the session (Ctrl+D)", can.disable, em) { startup_toggle(app, false) }
+	cmd_button(app, "st_enable", lucide.CHECK, .Startup_Enable, em)
+	cmd_button(app, "st_disable", lucide.X, .Startup_Disable, em)
 	vrule(em)
-	if tool_button(app, "st_open", lucide.FOLDER_OPEN, "Open file location (Enter)", can.open, em) { startup_open(app) }
-	if tool_button(app, "st_copy", lucide.COPY, "Copy command (Ctrl+C)", can.copy, em) { startup_copy(app) }
+	cmd_button(app, "st_open", lucide.FOLDER_OPEN, .Startup_Open, em)
+	cmd_button(app, "st_copy", lucide.COPY, .Startup_Copy, em)
 }
 
-// The keys of the section (view_keys calls it when no menu or dialog is open). `field_keeps`: the filter keeps its keys.
-startup_keys :: proc(app: ^App, field_keeps: bool) {
-	s := &app.startup
-	keys := ui.table_keys(&s.rows.table)
-	can := startup_can(app)
-	if ui.key_press(.E, {.Ctrl}) && can.enable { startup_toggle(app, true) }
-	if ui.key_press(.D, {.Ctrl}) && can.disable { startup_toggle(app, false) }
-	if !field_keeps {
-		if ui.key_press(.C, {.Ctrl}) && can.copy { startup_copy(app) }
-	}
-	// (Space is the filter's while it has the keyboard: a space in a name)
-	if ui.focus_key() != app.search_key && ui.key_press(.Space) && (can.enable || can.disable) { startup_toggle(app, can.enable) }
-	if keys.activated && can.open { startup_open(app) }
-	if keys.menu { startup_menu_open(app, keys.menu_at, true) }
-}
-
-@(private = "file")
 startup_menu_open :: proc(app: ^App, pos: ui.Vec2, from_keyboard := false) {
 	s := &app.startup
 	if _, ok := selected_startup(app); !ok { return }
@@ -85,18 +63,16 @@ startup_menu_open :: proc(app: ^App, pos: ui.Vec2, from_keyboard := false) {
 startup_menu :: proc(app: ^App, em: f32) {
 	s := &app.startup
 	if s.menu == 0 { return }
-	if ui.ctx_menu(s.menu, em * MENU_WIDTH_EM) {
+	if ui.ctx_menu(s.menu) {
 		if _, ok := selected_startup(app); !ok { ui.ctx_menu_close(); return }
-		can := startup_can(app)
-		if ui.menu_item("Enable", "Ctrl+E", enabled = can.enable).clicked { startup_toggle(app, true) }
-		if ui.menu_item("Disable", "Ctrl+D", enabled = can.disable).clicked { startup_toggle(app, false) }
+		cmd_item(app, .Startup_Enable)
+		cmd_item(app, .Startup_Disable)
 		ui.menu_separator()
-		if ui.menu_item("Open file location", "Enter", enabled = can.open).clicked { startup_open(app) }
-		if ui.menu_item("Copy command", "Ctrl+C", enabled = can.copy).clicked { startup_copy(app) }
+		cmd_item(app, .Startup_Open)
+		cmd_item(app, .Startup_Copy)
 	}
 }
 
-@(private = "file")
 startup_toggle :: proc(app: ^App, on: bool) {
 	it, ok := selected_startup(app)
 	if !ok { return }
@@ -105,14 +81,12 @@ startup_toggle :: proc(app: ^App, on: bool) {
 	startup_ask(app, true, it, on)
 }
 
-@(private = "file")
 startup_open :: proc(app: ^App) {
 	it, ok := selected_startup(app)
 	if !ok || it.path == "" { return }
 	if platform.reveal_in_folder(it.path) { say(app, "Opened the folder of %s", it.path) } else { say(app, "No file manager opens %s", it.path) }
 }
 
-@(private = "file")
 startup_copy :: proc(app: ^App) {
 	it, ok := selected_startup(app)
 	if !ok || it.command == "" { return }

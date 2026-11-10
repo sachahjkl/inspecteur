@@ -1,24 +1,37 @@
-// inspecteur: a system monitor for Linux (Wayland first), on gui_toolkit.
+// inspecteur: a task manager and system monitor for Linux (Wayland first), on gui_toolkit.
 //
-// One window: the processes read from /proc each second, grouped into apps and background processes, sorted by any
-// column, filtered as you type (app.odin, view.odin).
+// One window of six sections (app.odin, view.odin): the processes, grouped into apps and background processes, sorted by
+// any column, filtered as you type; the machine's performance; the services; what starts with the session; the network
+// connections; what the system is. The system's side of each is in a *_linux.odin file (docs/architecture.md).
 package inspecteur
 
 import "core:fmt"
 import "core:os"
+import ascii "gt:ascii"
 import config "gt:config"
 
 APP_VERSION :: "0.1.0"
 
-USAGE :: `inspecteur: the processes of the system
+USAGE :: `inspecteur: what runs on this computer
 
   inspecteur                  the window
+  inspecteur --section name   the window, on a section: processes, performance, services, startup, connections,
+                              information (the desktop entry's actions)
   inspecteur --first-frame    the window; prints when its first frame was drawn (unix time, ns) and where the
                               time went, then at the end what a sample and a frame cost (for inspecteurtool bench)
+  inspecteur --demo           the window, with made-up processes, devices, services and sockets in place of the
+                              system's (the pictures of the documentation: inspecteurtool shots); it acts on nothing
+  inspecteur setup            the desktop entry and the icon, for this executable (--uninstall, --status)
   inspecteur prefs            every preference, its value and what it does
   inspecteur version
   --pref name=value           a preference for this run only
 `
+
+// A section by its name in lower case ("services").
+tab_of :: proc(name: string) -> (Tab, bool) {
+	for t in Tab { if ascii.equal_fold(TAB_LABELS[t], name) { return t, true } }
+	return .Processes, false
+}
 
 main :: proc() {
 	os.exit(run(os.args[1:]))
@@ -31,8 +44,26 @@ run :: proc(all_args: []string) -> int {
 	for p in problems { fmt.eprintfln("inspecteur: %s", p) }
 	verb := len(args) > 0 ? args[0] : ""
 	switch verb {
-	case "", "--first-frame":
-		return app_run(&prefs, first_frame = verb == "--first-frame")
+	case "", "--first-frame", "--section", "--demo":
+		opts: Run_Options
+		for i := 0; i < len(args); i += 1 {
+			switch args[i] {
+			case "--first-frame": opts.first_frame = true
+			case "--demo":        opts.demo = true
+			case "--section":
+				if i + 1 >= len(args) { fmt.eprint(USAGE); return 2 }
+				i += 1
+				tab, ok := tab_of(args[i])
+				if !ok { fmt.eprintfln("inspecteur: no section %s", args[i]); return 2 }
+				opts.tab = tab
+			case:
+				fmt.eprint(USAGE)
+				return 2
+			}
+		}
+		return app_run(&prefs, opts)
+	case "setup":
+		return cmd_setup(args[1:])
 	case "prefs":
 		for name in config.sorted_names(&prefs) {
 			r := config.ref_of(&prefs, name)

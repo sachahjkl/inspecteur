@@ -3,7 +3,7 @@ package inspecteur
 // The Services section's model: the services of the system's service manager or of the user's, their state, whether
 // they start by themselves, their main process and memory. The system's side is services_linux.odin (systemd over
 // D-Bus): services_read lists, service_act starts, stops, restarts, enables or disables. Both run on a thread of their
-// own (worker.odin): a call to the manager can wait for an authorisation for seconds. The list is read while the
+// own (the toolkit's ui.Worker): a call to the manager can wait for an authorization for seconds. The list is read while the
 // section is shown, every services.refresh_ms, and at once after an action.
 
 import "core:mem/virtual"
@@ -62,6 +62,7 @@ Service_Ask :: struct {
 Services :: struct {
 	worker:  ui.Worker,
 	bus:     Service_Bus,      // the thread's own (services_linux.odin)
+	demo:    ^Demo,            // not nil: the services are the demo's
 	ask:     Service_Ask,      // under the worker's mutex
 	shared:  ^Service_List,    // the thread's last reading, under the worker's mutex
 	list:    ^Service_List,    // the window's
@@ -85,6 +86,7 @@ SERVICE_COLUMNS := [?]ui.Table_Column{
 services_init :: proc(s: ^Services, app: ^App) {
 	section_table_init(&s.rows, app, SERVICE_COLUMNS[:])
 	s.manager = app.settings.manager
+	s.demo = app.demo
 	ui.worker_start(&s.worker, services_job, s, app.main.win)
 }
 
@@ -132,9 +134,9 @@ services_job :: proc(w: ^ui.Worker) {
 	if ask.action != .None {
 		l.action = ask.action
 		l.unit = strings.clone(string(ask.unit[:ask.unit_len]), a)
-		l.failure = strings.clone(service_act(&s.bus, ask.manager, ask.action, l.unit), a)
+		l.failure = strings.clone(s.demo != nil ? DEMO_REFUSED : service_act(&s.bus, ask.manager, ask.action, l.unit), a)
 	}
-	l.problem = strings.clone(services_read(&s.bus, ask.manager, &l.units, a), a)
+	l.problem = strings.clone(s.demo != nil ? demo_services_read(s.demo, ask.manager, &l.units, a) : services_read(&s.bus, ask.manager, &l.units, a), a)
 	ui.worker_lock(w)
 	old := s.shared
 	s.shared = l

@@ -75,7 +75,7 @@
       # the crates of the toolkit's text library, vendored: cargo makes no request
       cargoDeps = pkgs.rustPlatform.importCargoLock {lockFile = ./ext/gui_toolkit/native/text/Cargo.lock;};
 
-      nativeBuildInputs = [odin pkgs.cargo pkgs.rustc pkgs.clang pkgs.lld pkgs.autoPatchelfHook pkgs.copyDesktopItems];
+      nativeBuildInputs = [odin pkgs.cargo pkgs.rustc pkgs.clang pkgs.lld pkgs.autoPatchelfHook];
       buildInputs = [pkgs.fontconfig pkgs.freetype pkgs.stdenv.cc.cc.lib];
       # what it opens with dlopen goes in its RUNPATH; the Vulkan driver is the system's (/run/opengl-driver)
       runtimeDependencies = runtime;
@@ -103,23 +103,12 @@
         runHook postBuild
       '';
 
-      desktopItems = [
-        (pkgs.makeDesktopItem {
-          name = "inspecteur";
-          desktopName = "Inspecteur";
-          genericName = "System Monitor";
-          comment = "The processes of the system: what they use, sorted and filtered as you type.";
-          exec = "inspecteur";
-          icon = "utilities-system-monitor";
-          categories = ["System" "Monitor"];
-          keywords = ["task" "process" "monitor" "cpu" "memory"];
-          startupWMClass = "inspecteur";
-        })
-      ];
-
       installPhase = ''
         runHook preInstall
         install -Dm755 build/inspecteur $out/bin/inspecteur
+        # the desktop entry (Categories=System;Monitor;, an action per section) and the logo in the hicolor theme, as
+        # `inspecteur setup` writes them for a user
+        odin run tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/inspecteurtool -- desktop_files $out
         install -Dm644 -t $out/share/doc/inspecteur LICENSE README.md CHANGELOG.md
         install -Dm644 ext/gui_toolkit/src/lucide/LICENSE.txt $out/share/doc/inspecteur/LUCIDE-LICENSE.txt
         runHook postInstall

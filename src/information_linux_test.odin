@@ -31,13 +31,3 @@ an_edid_names_its_monitor :: proc(t: ^testing.T) {
 	copy(d[5:], "LG HDR 4K\n   ")
 	testing.expect_value(t, edid_name(edid[:]), "LG HDR 4K")
 }
-
-@(test)
-a_mountinfo_line_gives_its_mount :: proc(t: ^testing.T) {
-	m, ok := parse_mountinfo_line("36 35 98:0 / /mnt/my\\040disk rw,noatime master:1 - ext4 /dev/sdb1 rw,errors=continue")
-	testing.expect(t, ok)
-	testing.expect_value(t, m.mount, "/mnt/my disk")
-	testing.expect_value(t, m.kind, "ext4")
-	testing.expect_value(t, m.device, "/dev/sdb1")
-	testing.expect(t, storage_kind("btrfs") && !storage_kind("tmpfs") && !storage_kind("proc"))
-}

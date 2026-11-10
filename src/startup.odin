@@ -3,7 +3,7 @@ package inspecteur
 // The Startup section's model: what starts with the user's session, whether it is on, and turning it on or off. The
 // system's side is startup_linux.odin (the XDG autostart entries and the user's systemd services that the session's
 // targets want): startup_read lists, startup_set_enabled turns one on or off. Both run on a thread of their own
-// (worker.odin): they read files and ask the user's service manager. The list is read when the section is shown, on F5
+// (the toolkit's ui.Worker): they read files and ask the user's service manager. The list is read when the section is shown, on F5
 // and after a change.
 
 import "core:mem/virtual"
@@ -57,6 +57,7 @@ Startup_Ask :: struct {
 Startup :: struct {
 	worker:  ui.Worker,
 	bus:     Startup_Bus,      // the thread's own (startup_linux.odin)
+	demo:    ^Demo,            // not nil: the items are the demo's
 	ask:     Startup_Ask,      // under the worker's mutex
 	shared:  ^Startup_List,
 	list:    ^Startup_List,    // the window's
@@ -76,6 +77,7 @@ STARTUP_COLUMNS := [?]ui.Table_Column{
 
 startup_init :: proc(s: ^Startup, app: ^App) {
 	section_table_init(&s.rows, app, STARTUP_COLUMNS[:])
+	s.demo = app.demo
 	ui.worker_start(&s.worker, startup_job, s, app.main.win)
 }
 
@@ -122,9 +124,9 @@ startup_job :: proc(w: ^ui.Worker) {
 	if ask.change {
 		l.changed, l.on = true, ask.on
 		l.name = strings.clone(string(ask.name[:ask.name_len]), a)
-		l.failure = strings.clone(startup_set_enabled(&s.bus, ask.kind, string(ask.id[:ask.id_len]), ask.on), a)
+		l.failure = strings.clone(s.demo != nil ? DEMO_REFUSED : startup_set_enabled(&s.bus, ask.kind, string(ask.id[:ask.id_len]), ask.on), a)
 	}
-	l.problem = strings.clone(startup_read(&s.bus, &l.items, a), a)
+	l.problem = strings.clone(s.demo != nil ? demo_startup_read(s.demo, &l.items, a) : startup_read(&s.bus, &l.items, a), a)
 	ui.worker_lock(w)
 	old := s.shared
 	s.shared = l

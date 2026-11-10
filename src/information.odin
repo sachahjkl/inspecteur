@@ -29,12 +29,14 @@ Info_Static :: struct {
 
 Information :: struct {
 	worker: ui.Worker,
+	demo:   ^Demo,          // not nil: the system is the demo's
 	shared: ^Info_Static,   // the thread's last reading, under the worker's mutex (taken by the window)
 	data:   ^Info_Static,   // the window's
 	asked:  bool,
 }
 
 information_init :: proc(inf: ^Information, app: ^App) {
+	inf.demo = app.demo
 	ui.worker_start(&inf.worker, information_job, inf, app.main.win)
 }
 
@@ -72,7 +74,7 @@ information_job :: proc(w: ^ui.Worker) {
 	inf := (^Information)(w.user)
 	s := new(Info_Static)
 	context.allocator = virtual.arena_allocator(&s.arena)
-	info_read(s)
+	if inf.demo != nil { demo_info_read(s) } else { info_read(s) }
 	ui.worker_lock(w)
 	old := inf.shared
 	inf.shared = s

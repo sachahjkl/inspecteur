@@ -1,11 +1,13 @@
 package inspecteur
 
 // The Performance section: the devices on the left (CPU, memory, each disk, each network interface, each GPU), each with
-// a sparkline of its last minute; the selected device on the right: its graphs and its numbers. The CPU's page shows one
-// graph for all the processors, or one per logical processor (the grid).
+// a sparkline of its history; the selected device on the right: its graphs and its numbers. The CPU's page shows one
+// graph for all the processors, or one per logical processor (the grid, Ctrl+G). Up and Down go from a device to the
+// next. A graph's span is its points times the period of its readings: processes.refresh_ms, or GPU_PERIOD for a GPU.
 
 import "core:fmt"
 import "core:strings"
+import "core:time"
 import "gt:draw"
 import "gt:ui"
 
@@ -28,6 +30,9 @@ ADDRESSES_SHOWN :: 3    // an interface's addresses of each kind shown
 
 // The hues of the devices (hue).
 HUE_CPU, HUE_MEMORY, HUE_DISK, HUE_NETWORK, HUE_GPU, HUE_SECOND :: 1, 2, 3, 4, 6, 7
+// The least top of a rate's graph: a disk at rest, or an interface, does not fill its graph with its noise.
+DISK_FLOOR :: 1024 * 1024          // 1 MB/s
+NET_FLOOR  :: 1_000_000 / 8        // 1 Mbit/s, in bytes per second
 
 build_performance :: proc(app: ^App, em: f32) {
 	m := &app.machine
@@ -43,6 +48,11 @@ build_performance :: proc(app: ^App, em: f32) {
 			labels := []string{"Overall", "Logical processors"}
 			sel := app.cpu_grid ? 1 : 0
 			if ui.segmented("###cpu_view", labels, &sel) { app.cpu_grid = sel == 1 }
+			ui.spacer(ui.px(em * 0.4))
+			if ui.tags("weak") {
+				ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0, font_size = em * 0.85})
+				ui.label(fmt.tprintf("%s###cpu_view_key", ui.command_shortcut(COMMANDS[.Cpu_Grid])))
+			}
 		}
 		ui.spacer(ui.px(em * 0.6))
 	}
@@ -53,17 +63,21 @@ build_performance :: proc(app: ^App, em: f32) {
 		if ui.parent(list) {
 			ui.next({width = ui.fill(), height = ui.fill()})
 			if ui.scroll_y("###devices_scroll") {
-				device_row(app, {.Cpu, 0}, "CPU", fmt.tprintf("%.0f%%  %s", m.cpu, mhz_text(m.mhz)), {{&m.cpu_hist, hue(app, HUE_CPU), ""}}, 100, em)
-				device_row(app, {.Memory, 0}, "Memory", fmt.tprintf("%s / %s (%.0f%%)", size_text(mem_used(m)), size_text(m.mem.total), ui.value_history_last(&m.mem_hist)), {{&m.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, em)
+				device_row(app, {.Cpu, 0}, "CPU", fmt.tprintf("%.0f%%  %s", m.cpu, mhz_text(m.mhz)), {{&m.cpu_hist, hue(app, HUE_CPU), ""}}, 100, 0, em)
+				device_row(app, {.Memory, 0}, "Memory", fmt.tprintf("%s / %s (%.0f%%)", size_text(mem_used(m)), size_text(m.mem.total), ui.value_history_last(&m.mem_hist)), {{&m.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, 0, em)
 				for &d, i in m.disks {
-					device_row(app, {.Disk, i}, fmt.tprintf("Disk %d (%s)", i, d.name), fmt.tprintf("%s  %.0f%%", d.kind, d.active), {{&d.active_hist, hue(app, HUE_DISK), ""}}, 100, em)
+					device_row(app, {.Disk, i}, fmt.tprintf("Disk %d (%s)", i, d.name), fmt.tprintf("%s  %.0f%%", d.kind, d.active), {{&d.active_hist, hue(app, HUE_DISK), ""}}, 100, 0, em)
 				}
 				for &n, i in m.nets {
-					device_row(app, {.Network, i}, n.kind, fmt.tprintf("%s  S: %s R: %s", n.name, bits_text(n.tx_rate), bits_text(n.rx_rate)), {{&n.rx_hist, hue(app, HUE_NETWORK), ""}, {&n.tx_hist, hue(app, HUE_SECOND), ""}}, 0, em)
+					device_row(app, {.Network, i}, n.kind, fmt.tprintf("%s  S: %s R: %s", n.name, bits_text(n.tx_rate), bits_text(n.rx_rate)), {{&n.rx_hist, hue(app, HUE_NETWORK), ""}, {&n.tx_hist, hue(app, HUE_SECOND), ""}}, 0, NET_FLOOR, em)
 				}
 				for &g, i in m.gpus {
-					sub := g.read.has_util ? fmt.tprintf("%s  %.0f%%", gpu_name(&g.read), g.read.util) : gpu_name(&g.read)
-					device_row(app, {.Gpu, i}, fmt.tprintf("GPU %d", i), sub, {{&g.util_hist, hue(app, HUE_GPU), ""}}, 100, em)
+					sub := gpu_name(&g.read)
+					switch {
+					case g.read.asleep:   sub = fmt.tprintf("%s  asleep", sub)
+					case g.read.has_util: sub = fmt.tprintf("%s  %.0f%%", sub, g.read.util)
+					}
+					device_row(app, {.Gpu, i}, fmt.tprintf("GPU %d", i), sub, {{&g.util_hist, hue(app, HUE_GPU), ""}}, 100, 0, em)
 				}
 			}
 		}
@@ -88,6 +102,25 @@ build_performance :: proc(app: ^App, em: f32) {
 			ui.spacer(ui.px(em * 0.8))
 		}
 	}
+}
+
+// The device after (`dir` 1) or before (-1) the one shown, in the list's order.
+device_step :: proc(app: ^App, dir: int) {
+	m := &app.machine
+	list := make([dynamic]Device, context.temp_allocator)
+	append(&list, Device{.Cpu, 0}, Device{.Memory, 0})
+	for _, i in m.disks { append(&list, Device{.Disk, i}) }
+	for _, i in m.nets { append(&list, Device{.Network, i}) }
+	for _, i in m.gpus { append(&list, Device{.Gpu, i}) }
+	at := 0
+	for d, i in list { if d == app.device { at = i } }
+	app.device = list[clamp(at + dir, 0, len(list) - 1)]
+}
+
+// The CPU's page: one graph, or one per logical processor.
+cpu_grid_switch :: proc(app: ^App) {
+	app.device = {.Cpu, 0}
+	app.cpu_grid = !app.cpu_grid
 }
 
 // A device that went (an interface, a GPU no longer read): back to the CPU.
@@ -125,7 +158,7 @@ hue :: proc(app: ^App, i: int) -> ui.Color {
 }
 
 @(private = "file")
-device_row :: proc(app: ^App, d: Device, title, sub: string, series: []Series, top: f32, em: f32) {
+device_row :: proc(app: ^App, d: Device, title, sub: string, series: []Series, top, floor: f32, em: f32) {
 	on := app.device == d
 	flags := ui.Box_Flags{.Clickable, .Draw_Hot_Effects, .Hot_Within}
 	if on { flags += {.Draw_Background} }
@@ -138,7 +171,7 @@ device_row :: proc(app: ^App, d: Device, title, sub: string, series: []Series, t
 		frame := ui.build_box({.Draw_Border}, "###spark_frame")
 		if ui.parent(frame) {
 			ui.next({width = ui.fill(), height = ui.fill()})
-			ui.sparkline("###spark", line_series(series), top, HISTORY_POINTS)
+			ui.sparkline("###spark", line_series(series), top, HISTORY_POINTS, floor)
 		}
 		ui.spacer(ui.px(em * 0.6))
 		ui.next({width = ui.fill(), height = ui.pct(1), axis = .Y})
@@ -148,13 +181,18 @@ device_row :: proc(app: ^App, d: Device, title, sub: string, series: []Series, t
 			ui.label(fmt.tprintf("%s###t", title))
 			if ui.tags("weak") {
 				ui.next({width = ui.fill(), height = ui.px(em * 1.25), text_pad = 0, font_size = em * 0.86})
-				ui.label(fmt.tprintf("%s###s", ui.text_shown(sub)))
+				sub_box := ui.build_box({.Draw_Text}, fmt.tprintf("%s###s", ui.text_shown(sub)))
+				// (a subtitle too long for the list says itself whole when the pointer rests on the device)
+				if text_cut(sub_box, sub) { tip_after(sig, sub) }
 			}
 			ui.spacer(ui.fill())
 		}
 		ui.spacer(ui.px(em * 0.4))
 	}
-	if sig.clicked { app.device = d }
+	if sig.clicked {
+		app.device = d
+		ui.set_focus(0)   // (Up and Down then go from a device to the next, not from a button to another)
+	}
 }
 
 ////////////////////////////////
@@ -178,9 +216,9 @@ page_title :: proc(title, what: string, em: f32) {
 
 // A graph with its captions: what it shows and its top above it, its span and its bottom under it.
 @(private = "file")
-captioned_graph :: proc(app: ^App, id, what: string, series: []Series, top: f32, top_text: proc(v: f32) -> string, em: f32, height: ui.Size) {
+captioned_graph :: proc(app: ^App, id, what: string, series: []Series, top: f32, top_text: proc(v: f32) -> string, em: f32, height: ui.Size, floor: f32 = 0, period_ms := 0) {
 	lines := line_series(series)
-	shown_top := ui.line_graph_top(lines, {top = top})
+	shown_top := ui.line_graph_top(lines, {top = top, floor = floor})
 	// what it shows, the legend of its series (a swatch and a name each), its top
 	ui.next({width = ui.fill(), height = ui.px(em * 1.5)})
 	if ui.row(.Center, {}, fmt.tprintf("###%s_caption", id)) {
@@ -204,7 +242,7 @@ captioned_graph :: proc(app: ^App, id, what: string, series: []Series, top: f32,
 	}
 	ui.next({width = ui.fill(), height = height})
 	ui.line_graph(fmt.tprintf("###%s", id), lines, {top = shown_top, points = HISTORY_POINTS, grid = true})
-	caption(fmt.tprintf("%d seconds", HISTORY_POINTS * app.settings.refresh_ms / 1000), "0", em)
+	caption(span_text(HISTORY_POINTS, period_ms > 0 ? period_ms : app.settings.refresh_ms), "0", em)
 }
 
 @(private = "file")
@@ -224,7 +262,6 @@ caption :: proc(left, right: string, em: f32) {
 
 percent_top :: proc(v: f32) -> string { return fmt.tprintf("%.0f%%", v) }
 rate_top :: proc(v: f32) -> string { return fmt.tprintf("%s/s", size_text(u64(v))) }
-bits_top :: proc(v: f32) -> string { return bits_text(f64(v)) }
 
 // The numbers under the graphs: big ones on the left, a table of details on the right.
 Stat :: struct { label, value: string }
@@ -276,7 +313,7 @@ cpu_page :: proc(app: ^App, em: f32) {
 		cols := 1
 		for cols * cols < n { cols += 1 }
 		rows := (n + cols - 1) / cols
-		caption("% Utilization of each logical processor over 60 seconds", "100%", em)
+		caption(fmt.tprintf("%% Utilization of each logical processor over %s", span_text(HISTORY_POINTS, app.settings.refresh_ms)), "100%", em)
 		ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
 		if ui.column(id = "###grid") {
 			for r in 0 ..< rows {
@@ -293,7 +330,7 @@ cpu_page :: proc(app: ^App, em: f32) {
 			}
 		}
 	} else {
-		captioned_graph(app, "cpu_graph", "% Utilization over 60 seconds", {{&m.cpu_hist, c, ""}}, 100, percent_top, em, ui.fill())
+		captioned_graph(app, "cpu_graph", "% Utilization", {{&m.cpu_hist, c, ""}}, 100, percent_top, em, ui.fill())
 	}
 	threads: i32
 	for p in app.sampler.procs { threads += p.threads }
@@ -329,13 +366,14 @@ memory_page :: proc(app: ^App, em: f32) {
 	parts := []Bar_Part{{in_use, c, "In use"}, {reclaimable, faded(c, 0.45), "Cache, given back when needed"}, {min(mem.free, mem.available), ui.color("border"), "Free"}}
 	composition_bar(parts, mem.total, em)
 	swap_used := mem.swap_total - min(mem.swap_total, mem.swap_free)
-	cache := mem.buffers + mem.cached + mem.reclaimable
+	// (the numbers of the composition, and what the kernel keeps besides: the files it caches, the buffers of the disks,
+	// what processes share, what is still to be written)
 	stats_block({
-		{"In use", size_text(in_use)}, {"Available", size_text(mem.available)}, {"Page cache", size_text(cache)},
+		{"In use", size_text(in_use)}, {"Available", size_text(mem.available)}, {"Free", size_text(mem.free)},
 		{"Committed", fmt.tprintf("%s / %s", size_text(mem.committed), size_text(mem.commit_limit))}, {"Swap", fmt.tprintf("%s / %s", size_text(swap_used), size_text(mem.swap_total))},
 	}, {
-		{"Total", size_text(mem.total)}, {"Buffers", size_text(mem.buffers)}, {"Shared", size_text(mem.shared)}, {"Modified", size_text(mem.dirty)},
-		{"Speed, slots", "need root (the firmware's tables)"},
+		{"Total", size_text(mem.total)}, {"Files cached", size_text(mem.cached)}, {"Disk buffers", size_text(mem.buffers)},
+		{"Kernel, reclaimable", size_text(mem.reclaimable)}, {"Shared memory", size_text(mem.shared)}, {"To be written", size_text(mem.dirty)},
 	}, em)
 }
 
@@ -345,7 +383,7 @@ disk_page :: proc(app: ^App, d: ^Disk, em: f32) {
 	c := hue(app, HUE_DISK)
 	captioned_graph(app, "disk_active", "Active time", {{&d.active_hist, c, ""}}, 100, percent_top, em, ui.fill())
 	ui.spacer(ui.px(em * 0.4))
-	captioned_graph(app, "disk_rate", "Transfer rate", {{&d.read_hist, c, "Read"}, {&d.write_hist, hue(app, HUE_SECOND), "Write"}}, 0, rate_top, em, ui.fill())
+	captioned_graph(app, "disk_rate", "Transfer rate", {{&d.read_hist, c, "Read"}, {&d.write_hist, hue(app, HUE_SECOND), "Write"}}, 0, rate_top, em, ui.fill(), DISK_FLOOR)
 	mounts := strings.join(d.mounts[:], ", ", context.temp_allocator)
 	stats_block({
 		{"Active time", fmt.tprintf("%.0f%%", d.active)}, {"Read speed", fmt.tprintf("%s/s", size_text(u64(d.read_rate)))}, {"Write speed", fmt.tprintf("%s/s", size_text(u64(d.write_rate)))},
@@ -357,7 +395,7 @@ disk_page :: proc(app: ^App, d: ^Disk, em: f32) {
 @(private = "file")
 net_page :: proc(app: ^App, n: ^Net, em: f32) {
 	page_title(n.kind, n.name, em)
-	captioned_graph(app, "net_rate", "Throughput", {{&n.rx_hist, hue(app, HUE_NETWORK), "Receive"}, {&n.tx_hist, hue(app, HUE_SECOND), "Send"}}, 0, proc(v: f32) -> string { return bits_text(f64(v)) }, em, ui.fill())
+	captioned_graph(app, "net_rate", "Throughput", {{&n.rx_hist, hue(app, HUE_NETWORK), "Receive"}, {&n.tx_hist, hue(app, HUE_SECOND), "Send"}}, 0, proc(v: f32) -> string { return bits_text(f64(v)) }, em, ui.fill(), NET_FLOOR)
 	v4 := make([dynamic]string, context.temp_allocator)
 	v6 := make([dynamic]string, context.temp_allocator)
 	for a in n.addrs { if strings.contains(a, ":") { append(&v6, a) } else { append(&v4, a) } }
@@ -380,17 +418,22 @@ net_page :: proc(app: ^App, n: ^Net, em: f32) {
 gpu_page :: proc(app: ^App, g: ^Gpu, em: f32) {
 	r := &g.read
 	page_title(fmt.tprintf("GPU %d", app.device.index), gpu_name(r), em)
+	gpu_ms := int(time.duration_milliseconds(GPU_PERIOD))
 	if r.has_util {
-		captioned_graph(app, "gpu_util", "Utilization", {{&g.util_hist, hue(app, HUE_GPU), ""}}, 100, percent_top, em, ui.fill())
+		captioned_graph(app, "gpu_util", "Utilization", {{&g.util_hist, hue(app, HUE_GPU), ""}}, 100, percent_top, em, ui.fill(), period_ms = gpu_ms)
 	}
 	if r.has_mem {
 		ui.spacer(ui.px(em * 0.4))
-		captioned_graph(app, "gpu_mem", "Dedicated memory usage", {{&g.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, proc(v: f32) -> string { return "100%" }, em, ui.fill())
+		captioned_graph(app, "gpu_mem", "Dedicated memory usage", {{&g.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, proc(v: f32) -> string { return "100%" }, em, ui.fill(), period_ms = gpu_ms)
 	}
 	if !r.has_util && !r.has_mem {
 		if ui.tags("weak") {
 			ui.next({width = ui.fill(), height = ui.px(em * 3)})
-			ui.label("This GPU's driver tells no utilisation without root.###none")
+			switch {
+			case r.asleep:          ui.label("This GPU is asleep: the system turned it off while nothing uses it. Reading it would wake it.###none")
+			case r.vendor == "NVIDIA": ui.label("This GPU's numbers come with NVIDIA's driver library (libnvidia-ml), not found or not answering.###none")
+			case:                   ui.label("This GPU's driver tells no utilization without root.###none")
+			}
 		}
 		ui.spacer(ui.fill())
 	}
@@ -401,6 +444,7 @@ gpu_page :: proc(app: ^App, g: ^Gpu, em: f32) {
 	if r.has_power { append(&big, Stat{"Power", fmt.tprintf("%.0f W", r.power_w)}) }
 	details := make([dynamic]Stat, context.temp_allocator)
 	append(&details, Stat{"Vendor", r.vendor})
+	append(&details, Stat{"State", r.asleep ? "asleep" : "awake"})
 	if r.has_clock { append(&details, Stat{"Clock", mhz_text(r.clock_mhz)}) }
 	if r.driver_len > 0 { append(&details, Stat{"Driver version", gpu_driver(r)}) }
 	stats_block(big[:], details[:], em)
@@ -442,30 +486,3 @@ faded :: proc(c: ui.Color, a: f32) -> ui.Color {
 	out.a *= a
 	return out
 }
-
-////////////////////////////////
-// Units
-
-mhz_text :: proc(mhz: f32) -> string {
-	if mhz <= 0 { return "–" }
-	if mhz >= 1000 { return fmt.tprintf("%.2f GHz", mhz / 1000) }
-	return fmt.tprintf("%.0f MHz", mhz)
-}
-
-// A network rate in bits per second, as links are told ("12.4 Mbit/s").
-bits_text :: proc(bytes_per_s: f64) -> string {
-	b := bytes_per_s * 8
-	switch {
-	case b >= 1e9: return fmt.tprintf("%.1f Gbit/s", b / 1e9)
-	case b >= 1e6: return fmt.tprintf("%.1f Mbit/s", b / 1e6)
-	case b >= 1e3: return fmt.tprintf("%.0f kbit/s", b / 1e3)
-	}
-	return fmt.tprintf("%.0f bit/s", b)
-}
-
-// "3:04:12:09" (days:hours:minutes:seconds), as Task Manager.
-uptime_text :: proc(seconds: f64) -> string {
-	s := i64(seconds)
-	return fmt.tprintf("%d:%02d:%02d:%02d", s / 86400, (s / 3600) % 24, (s / 60) % 60, s % 60)
-}
-

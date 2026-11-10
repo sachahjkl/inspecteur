@@ -1,12 +1,8 @@
 package inspecteur
 
-// The Connections section (connections.odin): a table of the sockets and their processes. Its bar and a row's menu
-// act on the selected socket's process:
-//
-//   End task           Delete        SIGTERM to the process
-//   Kill…              Shift+Delete  SIGKILL, after a confirmation
-//   Open in Processes  Enter         the process, selected in the Processes section
-//   Copy address       Ctrl+C        the remote address, else the local one
+// The Connections section (connections.odin): a table of the sockets and their processes. Its bar, a row's menu and the
+// keys (commands.odin) act on the selected socket's process: End task, Kill (after a confirmation), Open in Processes
+// (the process, selected there), Copy address (the remote address, else the local one).
 
 import "core:fmt"
 import "core:strings"
@@ -23,7 +19,7 @@ build_connections :: proc(app: ^App, em: f32) {
 	section_bar(app, "Connections", note, em, connections_actions)
 	ev := section_table_build(&c.rows, c.read ? "No socket." : "")
 	if ev.sorted { ui.table_apply(&c.rows.table, &c.rows.data, app.query) }
-	if ev.activated { connection_reveal(app) }
+	if ev.activated && cmd_can(app, .Socket_Open) { connection_reveal(app) }
 	if ev.menu { connections_menu_open(app, ev.menu_at) }
 	connections_menu(app, em)
 }
@@ -37,29 +33,13 @@ selected_socket :: proc(app: ^App) -> (s: Socket, ok: bool) {
 
 @(private = "file")
 connections_actions :: proc(app: ^App, em: f32) {
-	s, ok := selected_socket(app)
-	owned := ok && s.pid > 0
-	if tool_button(app, "end_task", lucide.X, "End task (Delete)", owned, em) { connection_signal(app, false) }
-	if tool_button(app, "kill", lucide.ZAP, "Kill (Shift+Delete)", owned, em) { connection_signal(app, true) }
+	cmd_button(app, "end_task", lucide.X, .Socket_End_Task, em)
+	cmd_button(app, "kill", lucide.ZAP, .Socket_Kill, em)
 	vrule(em)
-	if tool_button(app, "open_process", lucide.LAYOUT_LIST, "Open in Processes (Enter)", owned, em) { connection_reveal(app) }
-	if tool_button(app, "copy_address", lucide.COPY, "Copy address (Ctrl+C)", ok, em) { connection_copy(app) }
+	cmd_button(app, "open_process", lucide.LAYOUT_LIST, .Socket_Open, em)
+	cmd_button(app, "copy_address", lucide.COPY, .Socket_Copy, em)
 }
 
-// The keys of the section (view_keys calls it when no menu or dialog is open). `field_keeps`: the filter keeps Delete.
-connections_keys :: proc(app: ^App, field_keeps: bool) {
-	c := &app.connections
-	keys := ui.table_keys(&c.rows.table)
-	if !field_keeps {
-		if ui.key_press(.Delete) { connection_signal(app, false) }
-		if ui.key_press(.Delete, {.Shift}) { connection_signal(app, true) }
-		if ui.key_press(.C, {.Ctrl}) { connection_copy(app) }
-	}
-	if keys.activated { connection_reveal(app) }
-	if keys.menu { connections_menu_open(app, keys.menu_at, true) }
-}
-
-@(private = "file")
 connections_menu_open :: proc(app: ^App, pos: ui.Vec2, from_keyboard := false) {
 	c := &app.connections
 	if _, ok := selected_socket(app); !ok { return }
@@ -71,20 +51,19 @@ connections_menu_open :: proc(app: ^App, pos: ui.Vec2, from_keyboard := false) {
 connections_menu :: proc(app: ^App, em: f32) {
 	c := &app.connections
 	if c.menu == 0 { return }
-	if ui.ctx_menu(c.menu, em * MENU_WIDTH_EM) {
+	if ui.ctx_menu(c.menu) {
 		s, ok := selected_socket(app)
 		if !ok { ui.ctx_menu_close(); return }
-		owned := s.pid > 0
-		if ui.menu_item("End task", "Delete", enabled = owned).clicked { connection_signal(app, false) }
-		if ui.menu_item("Kill…", "Shift+Del", enabled = owned).clicked { connection_signal(app, true) }
+		_ = s
+		cmd_item(app, .Socket_End_Task)
+		cmd_item(app, .Socket_Kill)
 		ui.menu_separator()
-		if ui.menu_item("Open in Processes", "Enter", enabled = owned).clicked { connection_reveal(app) }
-		if ui.menu_item("Copy address", "Ctrl+C").clicked { connection_copy(app) }
+		cmd_item(app, .Socket_Open)
+		cmd_item(app, .Socket_Copy)
 	}
 }
 
 // End task on the selected socket's process; Kill asks first, as in the Processes section.
-@(private = "file")
 connection_signal :: proc(app: ^App, kill: bool) {
 	s, ok := selected_socket(app)
 	if !ok || s.pid <= 0 { return }
@@ -94,17 +73,15 @@ connection_signal :: proc(app: ^App, kill: bool) {
 	defer chosen_free(&c)
 	append(&c.targets, Target{p.pid, p.start})
 	c.name = strings.clone(fmt.tprintf("%s (PID %d)", p.name, p.pid))
-	if kill { kill_ask(app, c) } else { send_signal(app, &c, .Terminate) }
+	if kill { confirm_ask(app, c, .Kill) } else { signal_or_confirm(app, &c, .Terminate) }
 }
 
-@(private = "file")
 connection_reveal :: proc(app: ^App) {
 	s, ok := selected_socket(app)
 	if !ok || s.pid <= 0 { return }
 	if !processes_reveal(app, s.pid, s.start) { say(app, "PID %d has ended", s.pid) }
 }
 
-@(private = "file")
 connection_copy :: proc(app: ^App) {
 	s, ok := selected_socket(app)
 	if !ok { return }

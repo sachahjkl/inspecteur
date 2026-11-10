@@ -185,29 +185,6 @@ filesystems_find :: proc(s: ^Info_Static) {
 	}
 }
 
-Mount_Line :: struct { mount, kind, device, root: string }
-
-// A line of /proc/self/mountinfo: "36 35 98:0 /mnt1 /mnt/parent rw,noatime master:1 - ext3 /dev/root rw,errors=continue".
-// The mount point is the fifth field (spaces in it are "\040"); after " - ": the type and the device.
-parse_mountinfo_line :: proc(line: string) -> (m: Mount_Line, ok: bool) {
-	dash := strings.index(line, " - ")
-	if dash < 0 { return }
-	head := strings.fields(line[:dash], context.temp_allocator)
-	tail := strings.fields(line[dash + 3:], context.temp_allocator)
-	if len(head) < 5 || len(tail) < 2 { return }
-	mount, _ := strings.replace_all(head[4], "\\040", " ", context.temp_allocator)
-	return {mount = mount, root = head[3], kind = tail[0], device = tail[1]}, true
-}
-
-// The file systems that hold files on a disk (or a network's); not the kernel's own (proc, sysfs, tmpfs...).
-storage_kind :: proc(kind: string) -> bool {
-	switch kind {
-	case "ext2", "ext3", "ext4", "btrfs", "xfs", "zfs", "f2fs", "vfat", "exfat", "ntfs", "ntfs3", "fuseblk", "bcachefs", "jfs", "reiserfs", "nfs", "nfs4", "cifs", "smb3", "iso9660", "udf":
-		return true
-	}
-	return false
-}
-
 ////////////////////////////////
 // Screens
 

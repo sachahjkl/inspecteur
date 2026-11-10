@@ -1,14 +1,14 @@
 package inspecteur
 
 // Which processes are apps. Wayland does not let a program see the other programs' windows, so an app is what the
-// desktop's menu knows: a desktop entry (XDG: applications/*.desktop under each data folder) whose program, id or
-// window class names the process. A process matches by its own name or executable first, then by the systemd unit its
-// launcher made for it (app-<launcher>-<desktop id>-<random>.scope). Its children belong to the same app (processes.odin).
+// desktop's menu knows: an entry of the catalog (apps_linux.odin reads the XDG desktop entries) whose program, id or
+// window class names the process. A process matches by its own name or executable first, then by the unit its launcher
+// made for it (Linux: the systemd scope app-<launcher>-<desktop id>-<random>.scope). Its children belong to the same app
+// (processes.odin).
 //
 // The app's icon is the entry's, from the person's icon theme (the toolkit's desktop.theme_icon: the theme, what it
 // inherits, hicolor, pixmaps; PNG or SVG), drawn from a texture made the first time it is shown.
 
-import "core:os"
 import "core:strings"
 import desktop "gt:desktop"
 import "gt:render"
@@ -25,41 +25,12 @@ Catalog :: struct {
 	dirs:    [dynamic]string,      // the data folders, the user's first (owned)
 }
 
-catalog_load :: proc(c: ^Catalog) {
-	home := os.get_env("XDG_DATA_HOME", context.temp_allocator)
-	if home == "" { home = strings.concatenate({os.get_env("HOME", context.temp_allocator), "/.local/share"}, context.temp_allocator) }
-	append(&c.dirs, strings.clone(home))
-	dirs := os.get_env("XDG_DATA_DIRS", context.temp_allocator)
-	if dirs == "" { dirs = "/usr/local/share:/usr/share" }
-	for d in strings.split(dirs, ":", context.temp_allocator) {
-		if d == "" { continue }
-		seen := false
-		for e in c.dirs { if e == d { seen = true } }
-		if !seen { append(&c.dirs, strings.clone(d)) }
-	}
-	for d in c.dirs {
-		folder := strings.concatenate({d, "/applications"}, context.temp_allocator)
-		files, err := os.read_all_directory_by_path(folder, context.temp_allocator)
-		if err != nil { continue }
-		for f in files {
-			if !strings.has_suffix(f.name, ".desktop") { continue }
-			data, rerr := os.read_entire_file(f.fullpath, context.temp_allocator)
-			if rerr != nil { continue }
-			catalog_add(c, strings.trim_suffix(f.name, ".desktop"), string(data))
-		}
-	}
-}
-
-// One desktop entry: an application that has a window (not hidden, not run in a terminal).
-catalog_add :: proc(c: ^Catalog, id, text: string) {
-	value :: proc(text, key: string) -> string { v, _ := desktop.entry_value(text, key); return v }
-	if value(text, "Type") != "Application" || value(text, "NoDisplay") == "true" || value(text, "Hidden") == "true" || value(text, "Terminal") == "true" { return }
-	name := value(text, "Name")
-	if name == "" { return }
+// Adds an entry and the names that lead to it: its id, the last part of a reverse-domain id, its program, its window class.
+catalog_add_entry :: proc(c: ^Catalog, id, name, icon, program, window_class: string) {
 	// a desktop file id names one entry: the first folder's (the user's) wins
 	if key_of(id) in c.keys { return }
 	at := len(c.entries)
-	append(&c.entries, App_Entry{id = strings.clone(id), name = strings.clone(desktop.unescape_value(name)), icon = strings.clone(value(text, "Icon"))})
+	append(&c.entries, App_Entry{id = strings.clone(id), name = strings.clone(name), icon = strings.clone(icon)})
 	add :: proc(c: ^Catalog, key: string, at: int) {
 		k := unwrapped(key_of(key))
 		if k == "" || k in c.keys { return }
@@ -68,11 +39,21 @@ catalog_add :: proc(c: ^Catalog, id, text: string) {
 	add(c, id, at)
 	// (the last part of a reverse-domain id: org.chromium.Chromium is also chromium)
 	if i := strings.last_index_byte(id, '.'); i >= 0 { add(c, id[i + 1:], at) }
-	program := desktop.exec_program(value(text, "Exec"))
-	if i := strings.last_index_byte(program, '/'); i >= 0 { program = program[i + 1:] }
+	base := program
+	if i := strings.last_index_byte(base, '/'); i >= 0 { base = base[i + 1:] }
 	// (a launcher that runs another program says nothing of the process: env, flatpak, sh)
-	if program != "env" && program != "flatpak" && program != "sh" && program != "bash" { add(c, program, at) }
-	add(c, value(text, "StartupWMClass"), at)
+	if base != "env" && base != "flatpak" && base != "sh" && base != "bash" { add(c, base, at) }
+	add(c, window_class, at)
+}
+
+// A name without a Nix wrapper's marks: ".firefox-wrapped" (or its cut ".firefox-wrappe") is "firefox".
+unwrapped :: proc(name: string) -> string {
+	n := name
+	if strings.has_prefix(n, ".") && strings.contains(n, "-wrap") {
+		n = n[1:]
+		if i := strings.last_index(n, "-wrap"); i > 0 { n = n[:i] }
+	}
+	return n
 }
 
 catalog_destroy :: proc(c: ^Catalog) {
@@ -100,17 +81,17 @@ catalog_match :: proc(c: ^Catalog, name, exe, scope: string) -> int {
 
 // "app-org.chromium.Chromium-56418.scope", "app-ShojiWM-ghostty-d5e1a437.scope", "app-com.mitchellh.ghostty.service":
 // the whole name between "app-" and the unit's type, then each of its parts apart by '-'.
-@(private = "file")
 scope_match :: proc(c: ^Catalog, scope: string) -> int {
 	if !strings.has_prefix(scope, "app-") { return -1 }
 	s := scope[4:]
 	if i := strings.last_index_byte(s, '.'); i >= 0 && (strings.has_suffix(s, ".scope") || strings.has_suffix(s, ".service")) { s = s[:i] }
 	if i := strings.index_byte(s, '@'); i >= 0 { s = s[:i] }
-	s, _ = strings.replace_all(s, "\\x2d", "-", context.temp_allocator)
-	if at, ok := c.keys[key_of(s)]; ok { return at }
-	// (the parts: launcher, id, random; the id may hold dots, never a '-' that systemd did not escape)
+	unescape :: proc(s: string) -> string { out, _ := strings.replace_all(s, "\\x2d", "-", context.temp_allocator); return out }
+	if at, ok := c.keys[key_of(unescape(s))]; ok { return at }
+	// (the parts: launcher, id, random, apart by '-'; a '-' of the id itself is escaped, \x2d: split first, then
+	// unescape each part)
 	for part in strings.split(s, "-", context.temp_allocator) {
-		if at, ok := c.keys[key_of(part)]; ok { return at }
+		if at, ok := c.keys[key_of(unescape(part))]; ok { return at }
 	}
 	return -1
 }

@@ -16,8 +16,6 @@ import "gt:ui"
 INDENT_EM  :: 1.6
 CHEVRON_EM :: 1.4
 ICON_EM    :: 1.5
-// The columns shown by default (processes.columns' default says the same).
-DEFAULT_COLUMNS :: bit_set[Column]{.Name, .PID, .User, .CPU, .Memory, .Read, .Write, .Threads}
 // The tint of a busy cell (the theme's warning hue): the CPU % (of the machine) and the share of the memory at which it is
 // strongest, the least it shows for (a quiet cell stays plain), and its strongest opacity.
 HEAT_CPU_FULL :: 25.0
@@ -47,40 +45,44 @@ build_processes :: proc(app: ^App, em: f32) {
 build_bar :: proc(app: ^App, em: f32) {
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * BAR_EM))})
 	if ui.row(.Center, {.Draw_Side_Bottom}, "###bar") {
+		app.bar_rect = ui.parent_box().rect
 		ui.spacer(ui.px(em * 0.4))
-		p: ^Proc
-		if r, ok := selected_row(app); ok { p, _ = row_process(app, r) }
-		if tool_button(app, "end_task", lucide.X, "End task (Delete)", p != nil, em) { end_selected(app) }
-		if tool_button(app, "kill", lucide.ZAP, "Kill (Shift+Delete)", p != nil, em) { kill_selected(app) }
+		cmd_button(app, "end_task", lucide.X, .End_Task, em)
+		cmd_button(app, "kill", lucide.ZAP, .Kill, em)
+		p := selected_proc(app)
+		cmd_button(app, "suspend", p != nil && p.state == .Stopped ? lucide.PLAY : lucide.SQUARE, .Suspend, em)
 		vrule(em)
-		if tool_button(app, "open_location", lucide.FOLDER_OPEN, "Open file location", p != nil && p.exe != "", em) { open_location(app, p) }
-		if tool_button(app, "copy_command", lucide.COPY, "Copy command line", p != nil && p.cmdline != "", em) { copy_command(app, p) }
+		cmd_button(app, "properties", lucide.INFO, .Properties, em)
+		cmd_button(app, "open_location", lucide.FOLDER_OPEN, .Open_Location, em)
+		cmd_button(app, "copy_command", lucide.COPY, .Copy_Command, em)
 		vrule(em)
 		ui.spacer(ui.px(em * 0.3))
 		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
 		ui.label("Processes###bar_title")
 		ui.spacer(ui.px(em * 0.8))
 		if ui.tags("weak") {
+			counts := fmt.tprintf("%s, %s", count_text(app.table.shown_apps, "app", "apps"), count_text(app.table.shown_background, "background process", "background processes"))
 			ui.next({width = ui.fill(), height = ui.pct(1)})
-			ui.label(fmt.tprintf("%s, %s###counts", count_text(app.table.shown_apps, "app", "apps"), count_text(app.table.shown_background, "background process", "background processes")))
+			label_tip(fmt.tprintf("%s###counts", counts), counts)
 		}
 	}
 }
 
-// A flat button with an icon of Lucide; its tooltip says what it does. A button that cannot act now is greyed.
+// A flat button with an icon of Lucide; its tooltip says what it does and its key. A button that cannot act now is
+// greyed (its tooltip still says what it would do).
 tool_button :: proc(app: ^App, id, icon, tip: string, enabled: bool, em: f32) -> bool {
 	sig: ui.Signal
 	if ui.disabled(!enabled) {
 		ui.next({width = ui.px(em * 2.2), height = ui.px(ui.dense(em * 2)), font = app.icons})
 		if ui.tags("ghost_button") { sig = ui.button(fmt.tprintf("%s###%s", icon, id)) }
 	}
-	if ui.hovered_for(sig, 0.4) {
-		if ui.tooltip() {
-			ui.next({width = ui.text_size(em * 0.6), height = ui.px(ui.dense(em * 1.8))})
-			ui.label(fmt.tprintf("%s###tip", tip))
-		}
-	}
+	tip_after(sig, tip)
 	return sig.clicked && enabled
+}
+
+// The button of a command: greyed when it cannot act; clicked, it runs.
+cmd_button :: proc(app: ^App, id, icon: string, c: Cmd, em: f32) {
+	if tool_button(app, id, icon, cmd_tip(c), cmd_can(app, c), em) { cmd_run(app, c) }
 }
 
 // The columns' titles (the toolkit's header: a click sorts, again reverses; the rule before a title, dragged, resizes
@@ -102,6 +104,15 @@ build_header :: proc(app: ^App, em: f32) {
 	columns_menu(app, em)
 }
 
+// Opens the menu of the columns under the table's header (Ctrl+Shift+C).
+columns_menu_open :: proc(app: ^App) {
+	tab_show(app, .Processes)
+	if app.columns_menu == 0 { app.columns_menu = ui.key_from_string(0, "inspecteur_columns") }
+	// (under the header: the bar's rect, as the last layout made it, and the header's height)
+	em := ui.font_size()
+	ui.ctx_menu_open(app.columns_menu, {app.bar_rect.min.x + em * 2, app.bar_rect.max.y + ui.dense(em * HEADER_EM)}, from_keyboard = true)
+}
+
 // The menu of the columns: each one but the name, shown or not; the defaults back.
 @(private = "file")
 columns_menu :: proc(app: ^App, em: f32) {
@@ -116,6 +127,8 @@ columns_menu :: proc(app: ^App, em: f32) {
 		if ui.menu_item("Default columns").clicked {
 			sort := t.layout.sort
 			ui.table_layout_reset(&t.layout)
+			// (the sort's column may be one the defaults hide: the rows go by name then)
+			if !t.layout.shown[t.layout.sort] { t.layout.sort = int(Column.Name) }
 			if t.layout.sort != sort { rows_again(app) }
 			table_layout_save(t, &app.prefs)
 		}
@@ -147,7 +160,7 @@ build_rows :: proc(app: ^App, em: f32) {
 		if ui.parent(row.box) { tip = build_cells(app, r, em, hot) }
 		ui.table_cell_tip(row, tip)
 		if i == app.vl.sel { app.sel_rect = row.box.rect }
-		if row.double_clicked { if r.kind == .App { group_toggle(app, r) } else { props_selected(app) } }
+		if row.double_clicked { default_action(app) }
 		if row.right_clicked {
 			select_row(app, i)
 			row_menu_open(app, ui.mouse_pos())
@@ -192,7 +205,7 @@ build_cells :: proc(app: ^App, r: Row, em: f32, hot: ui.Color) -> (tip: string) 
 	t := &app.table
 	p: Proc
 	cpu: f32
-	rss, gpu_mem: u64
+	private, resident, gpu_mem: u64
 	read, write: f64
 	threads: i32
 	name: string
@@ -201,13 +214,13 @@ build_cells :: proc(app: ^App, r: Row, em: f32, hot: ui.Color) -> (tip: string) 
 	switch r.kind {
 	case .Process:
 		p = s.procs[r.index]
-		cpu, rss, gpu_mem, read, write, threads, name = p.cpu, p.rss, p.gpu_mem, p.read_rate, p.write_rate, p.threads, p.name
+		cpu, private, resident, gpu_mem, read, write, threads, name = p.cpu, p.private, p.resident, p.gpu_mem, p.read_rate, p.write_rate, p.threads, p.name
 		if p.entry >= 0 && r.depth == 0 { icon_name = app.catalog.entries[p.entry].icon }
 	case .App:
 		g := t.groups[r.index]
 		p = s.procs[g.root]
 		e := app.catalog.entries[g.entry]
-		cpu, rss, gpu_mem, read, write, threads, name = g.cpu, g.rss, g.gpu_mem, g.read_rate, g.write_rate, g.threads, e.name
+		cpu, private, resident, gpu_mem, read, write, threads, name = g.cpu, g.private, g.resident, g.gpu_mem, g.read_rate, g.write_rate, g.threads, e.name
 		icon_name = e.icon
 		count = g.count
 	case .Section:
@@ -234,7 +247,9 @@ build_cells :: proc(app: ^App, r: Row, em: f32, hot: ui.Color) -> (tip: string) 
 			if ui.tags("weak") {
 				ui.next({width = ui.px(em * CHEVRON_EM), height = ui.pct(1), font = app.icons, text_align = .Center})
 				chev := ui.build_box({.Clickable, .Draw_Text, .No_Text_Trunc}, fmt.tprintf("%s###chev", open ? lucide.CHEVRON_DOWN : lucide.CHEVRON_RIGHT))
-				if ui.signal(chev).clicked && t.query == "" { group_toggle(app, r) }
+				csig := ui.signal(chev)
+				if csig.clicked && t.query == "" { group_toggle(app, r) }
+				tip_after(csig, t.query != "" ? "Open while the filter finds some of its processes" : open ? cmd_tip(.Close_Group) : cmd_tip(.Open_Group))
 			}
 		} else {
 			ui.spacer(ui.px(em * CHEVRON_EM))
@@ -258,23 +273,24 @@ build_cells :: proc(app: ^App, r: Row, em: f32, hot: ui.Color) -> (tip: string) 
 	}
 
 	weak := r.kind == .App   // (an app's pid, user and the like are its first process's)
-	io_dash := r.kind == .Process && p.io_denied
+	io_dash := r.kind == .Process && !p.io_known
 	for c in Column {
 		if c == .Name || !t.layout.shown[int(c)] { continue }
 		switch c {
 		case .Name:
 		case .PID:        cell(t, c, fmt.tprintf("%d", p.pid), &tip, weak = true)
 		case .PPID:       cell(t, c, fmt.tprintf("%d", p.ppid), &tip, weak = true)
-		case .User:       cell(t, c, user_name(s, p.uid), &tip, weak = true)
-		case .State:      cell(t, c, state_text(p.state), &tip, weak = p.state != 'T' && p.state != 'Z')
+		case .User:       cell(t, c, p.user, &tip, weak = true)
+		case .State:      cell(t, c, state_text(p.state), &tip, weak = p.state != .Stopped && p.state != .Zombie)
 		case .Nice:       cell(t, c, fmt.tprintf("%d", p.nice), &tip, weak = p.nice == 0)
 		case .CPU:        cell(t, c, fmt.tprintf("%.1f%%", cpu), &tip, heat = cpu / HEAT_CPU_FULL, hot = hot)
-		case .Memory:     cell(t, c, size_text(rss), &tip, heat = app.machine.mem.total > 0 ? f32(f64(rss) / f64(app.machine.mem.total) / HEAT_MEM_FULL) : 0, hot = hot)
+		case .Memory:     cell(t, c, size_text(private), &tip, heat = app.machine.mem.total > 0 ? f32(f64(private) / f64(app.machine.mem.total) / HEAT_MEM_FULL) : 0, hot = hot)
+		case .Resident:   cell(t, c, size_text(resident), &tip, weak = true)
 		case .GPU_Memory: cell(t, c, gpu_mem > 0 ? size_text(gpu_mem) : "", &tip)
 		case .Read:       cell(t, c, io_dash ? "–" : rate_text(read), &tip, weak = io_dash)
 		case .Write:      cell(t, c, io_dash ? "–" : rate_text(write), &tip, weak = io_dash)
 		case .Threads:    cell(t, c, fmt.tprintf("%d", threads), &tip, weak = weak)
-		case .Started:    cell(t, c, started_text(app, p.start), &tip, weak = true)
+		case .Started:    cell(t, c, started_text(app, p.started), &tip, weak = true)
 		case .Command:    cell(t, c, p.cmdline, &tip, weak = true)
 		case .Executable: cell(t, c, p.exe, &tip, weak = true)
 		}
@@ -283,14 +299,14 @@ build_cells :: proc(app: ^App, r: Row, em: f32, hot: ui.Color) -> (tip: string) 
 	return
 }
 
-// When a process started: its time today, else its date and time (local time).
-started_text :: proc(app: ^App, start_ticks: u64) -> string {
-	if app.machine.boot_time == 0 { return "" }
+// When a process started (unix seconds): its time today, else its date and time (local time).
+started_text :: proc(app: ^App, started: i64) -> string {
+	if started <= 0 { return "" }
 	if !app.tz_tried {
 		app.tz_tried = true
 		app.tz, _ = timezone.region_load("local")
 	}
-	at := time.unix(app.machine.boot_time + i64(start_ticks / CLOCK_TICKS), 0)
+	at := time.unix(started, 0)
 	when_dt, ok := time.time_to_datetime(at)
 	now_dt, nok := time.time_to_datetime(time.now())
 	if !ok || !nok { return "" }

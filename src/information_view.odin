@@ -111,17 +111,6 @@ info_report :: proc(app: ^App) -> []Info_Group {
 	return groups[:]
 }
 
-// A duration in words: "3 days, 4 h 12 min", "10 h 47 min", "5 min".
-duration_words :: proc(seconds: f64) -> string {
-	s := i64(seconds)
-	days, hours, minutes := s / 86400, (s / 3600) % 24, (s / 60) % 60
-	switch {
-	case days > 0:  return fmt.tprintf("%s, %d h %d min", count_text(int(days), "day", "days"), hours, minutes)
-	case hours > 0: return fmt.tprintf("%d h %d min", hours, minutes)
-	}
-	return fmt.tprintf("%d min", minutes)
-}
-
 // The report as plain text: a title per group, then "label: value" lines.
 info_text :: proc(groups: []Info_Group) -> string {
 	b := strings.builder_make(context.temp_allocator)
@@ -177,15 +166,10 @@ info_line :: proc(l: Info_Line, i: int, em: f32) {
 
 @(private = "file")
 info_actions :: proc(app: ^App, em: f32) {
-	if tool_button(app, "copy_all", lucide.COPY, "Copy all (Ctrl+C)", true, em) { info_copy(app) }
-	if tool_button(app, "read_again", lucide.REFRESH_CW, "Read again (F5)", !ui.worker_busy(&app.information.worker), em) { information_ask(&app.information) }
+	cmd_button(app, "copy_all", lucide.COPY, .Info_Copy, em)
+	if tool_button(app, "read_again", lucide.REFRESH_CW, cmd_tip(.Read_Again), !ui.worker_busy(&app.information.worker), em) { refresh_now(app) }
 }
 
-information_keys :: proc(app: ^App) {
-	if ui.key_press(.C, {.Ctrl}) { info_copy(app) }
-}
-
-@(private = "file")
 info_copy :: proc(app: ^App) {
 	text := info_text(info_report(app))
 	platform.set_clipboard(app.main.win, text)

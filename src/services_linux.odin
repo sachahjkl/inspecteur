@@ -9,9 +9,8 @@ package inspecteur
 //   Properties.Get        MainPID and MemoryCurrent of each running service, asked all at once (pipelined)
 //   StartUnit, StopUnit, RestartUnit (mode "replace"); EnableUnitFiles, DisableUnitFiles, then Reload
 //
-// A system service's change is the manager's to allow: it asks polkit. Polkit's answer, when it refuses, is shown as it
-// is. (The toolkit's client sets no ALLOW_INTERACTIVE_AUTHORIZATION flag, so polkit cannot ask for a password: the
-// actions an administrator's rules do not allow outright are refused.)
+// A system service's change is the manager's to allow: it asks polkit. The calls allow interactive authorization, so
+// polkit can ask the user for a password; its answer, when it refuses, is shown as it is.
 
 import "base:runtime"
 import "core:os"
@@ -25,7 +24,7 @@ SYSTEMD_PATH  :: "/org/freedesktop/systemd1"
 SYSTEMD_IFACE :: "org.freedesktop.systemd1.Manager"
 // How long the properties of all the services may take to come.
 PROPERTIES_WAIT :: 3 * time.Second
-// How long an action may take: a start waits for its job to be queued, an authorisation for the person to answer
+// How long an action may take: a start waits for its job to be queued, an authorization for the person to answer
 // polkit's password dialog.
 ACTION_TIMEOUT_MS :: 120_000
 
@@ -228,7 +227,7 @@ unit_act :: proc(c: ^dbus.Conn, action: Service_Action, name: string) -> (failur
 	return ""
 }
 
-// What a call that failed came to, in words: the manager's own message, and what an authorisation refused means.
+// What a call that failed came to, in words: the manager's own message, and what an authorization refused means.
 @(private = "file")
 call_failure :: proc(msg: ^dbus.Message, silent: string) -> string {
 	if msg.type != .Error { return silent }

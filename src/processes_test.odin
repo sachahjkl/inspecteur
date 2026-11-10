@@ -103,3 +103,45 @@ apps_take_their_children :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@(test)
+statm_passwd_and_maps_are_read :: proc(t: ^testing.T) {
+	m, ok := parse_statm("1000 300 120 10 0 200 0\n")
+	testing.expect(t, ok && m.resident == 300 && m.shared == 120, "statm: resident and shared pages")
+	_, short := parse_statm("1000 300")
+	testing.expect(t, !short, "a statm cut short is refused")
+	users := parse_passwd("root:x:0:0::/root:/bin/sh\nalex:x:1000:100::/home/alex:/bin/bash\nbroken\nalex2:x:1000:100::/:/bin/sh\n")
+	testing.expect_value(t, users[0], "root")
+	testing.expect_value(t, users[1000], "alex")   // (the first line of a uid)
+	mods := parse_maps("00400000-00452000 r-xp 00000000 08:02 173521 /usr/bin/a b\n00651000-00652000 rw-p 00051000 08:02 173521 /usr/bin/a b\n7f00-8f00 r--p 0 0 0 [heap]\n1000-2000 r-xp 0 08:02 9 /lib/libc.so\n")
+	testing.expect_value(t, len(mods), 2)
+	testing.expect_value(t, mods[0].path, "/usr/bin/a b")   // (a path may hold spaces)
+	testing.expect_value(t, mods[0].size, u64(0x52000 + 0x1000))
+	testing.expect_value(t, proc_state_of('T'), Proc_State.Stopped)
+	testing.expect_value(t, proc_state_of('?'), Proc_State.Unknown)
+}
+
+// A unit's name escapes a '-' of the desktop id (\x2d): the parts are split first, then unescaped.
+@(test)
+a_scope_names_its_app :: proc(t: ^testing.T) {
+	c: Catalog
+	defer catalog_destroy(&c)
+	catalog_add_entry(&c, "org.gnome.Text-Editor", "Text Editor", "", "gnome-text-editor", "")
+	testing.expect_value(t, catalog_match(&c, "x", "", "app-gnome-org.gnome.Text\\x2dEditor-1234.scope"), 0)
+	testing.expect_value(t, catalog_match(&c, "x", "", "app-org.gnome.Text\\x2dEditor@autostart.service"), 0)
+	testing.expect_value(t, catalog_match(&c, "x", "", "session-3.scope"), -1)
+}
+
+// The paths of mountinfo are escaped: a space, a tab, a newline and a backslash.
+@(test)
+a_mount_point_is_unescaped :: proc(t: ^testing.T) {
+	m, ok := parse_mountinfo_line("36 35 98:0 / /mnt/my\\040disk\\011x\\134y rw,noatime master:1 - ext4 /dev/sdb1 rw,errors=continue")
+	testing.expect(t, ok)
+	testing.expect_value(t, m.mount, "/mnt/my disk\tx\\y")
+	testing.expect_value(t, m.kind, "ext4")
+	testing.expect_value(t, m.device, "/dev/sdb1")
+	testing.expect_value(t, m.options, "rw,errors=continue")
+	testing.expect_value(t, mount_unescape("/plain"), "/plain")
+	testing.expect_value(t, mount_unescape("/end\\04"), "/end\\04")   // (a cut escape stays as it is)
+	testing.expect(t, storage_kind("btrfs") && !storage_kind("tmpfs") && !storage_kind("proc"))
+}

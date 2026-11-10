@@ -24,10 +24,11 @@ COMMANDS :: [?]Command{
 	{name = "build", about = "[release]: the toolkit's text library when its sources changed, then build/inspecteur", run = run_build},
 	{name = "test", about = "the unit tests of the program", run = run_test},
 	{name = "check", about = "odin check of the program and of this tool (-vet), the tests, then a release build", run = run_check},
-	{name = "live", about = "[--keep]: the real program in a sway nobody sees: rows, filter, sort, menu, End task and Kill on its own child", run = run_live},
+	{name = "live", about = "[--keep]: the real program in a sway nobody sees, driven as a person would; it acts only on what it made", run = run_live},
 	{name = "logo", about = "assets/logo*.png and .project/image.png, drawn by the toolkit's paint package", run = run_logo},
-	{name = "shots", about = "[--out folder]: the pictures of the README, the program's own frames in a sway nobody sees", run = run_shots},
+	{name = "shots", about = "[--out folder]: the pictures of the documentation, of the demo's made-up machine, in a sway nobody sees", run = run_shots},
 	{name = "bench", about = "[seconds]: a release build in a sway nobody sees: the time to its first frame, its CPU use at rest", run = run_bench},
+	{name = "desktop_files", about = "<prefix>: the desktop entry and the icons under <prefix>/share (the Nix package's)", run = run_desktop_files},
 }
 
 main :: proc() {
@@ -49,5 +50,5 @@ main :: proc() {
 usage :: proc() {
 	fmt.println("inspecteurtool <command> [arguments]")
 	commands := COMMANDS
-	for c in commands { fmt.printfln("  %-6s %s", c.name, c.about) }
+	for c in commands { fmt.printfln("  %-13s %s", c.name, c.about) }
 }

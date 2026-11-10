@@ -17,25 +17,27 @@ import "core:strings"
 import "gt:ascii"
 import "gt:ui"
 
-Column :: enum u8 { Name, PID, PPID, User, State, Nice, CPU, Memory, GPU_Memory, Read, Write, Threads, Started, Command, Executable }
+// Memory is a process's private memory: the pages that are its own. The resident memory counts the pages it shares with
+// others too (its libraries, shared memory): summed over a group, it would count them once per process.
+Column :: enum u8 { Name, PID, PPID, User, State, Nice, CPU, Memory, Resident, GPU_Memory, Read, Write, Threads, Started, Command, Executable }
 
 COLUMN_NAMES := [Column]string{
 	.Name = "Name", .PID = "PID", .PPID = "Parent PID", .User = "User", .State = "State", .Nice = "Nice", .CPU = "CPU",
-	.Memory = "Memory", .GPU_Memory = "GPU memory", .Read = "Disk read", .Write = "Disk write", .Threads = "Threads",
-	.Started = "Started", .Command = "Command line", .Executable = "Executable",
+	.Memory = "Private memory", .Resident = "Resident", .GPU_Memory = "GPU memory", .Read = "Disk read", .Write = "Disk write",
+	.Threads = "Threads", .Started = "Started", .Command = "Command line", .Executable = "Executable",
 }
 // The names in the preferences (processes.columns, processes.widths, processes.sort).
 COLUMN_KEYS := [Column]string{
 	.Name = "name", .PID = "pid", .PPID = "ppid", .User = "user", .State = "state", .Nice = "nice", .CPU = "cpu",
-	.Memory = "memory", .GPU_Memory = "gpu_memory", .Read = "read", .Write = "write", .Threads = "threads",
-	.Started = "started", .Command = "command", .Executable = "executable",
+	.Memory = "memory", .Resident = "resident", .GPU_Memory = "gpu_memory", .Read = "read", .Write = "write",
+	.Threads = "threads", .Started = "started", .Command = "command", .Executable = "executable",
 }
 // The columns of text, on the left of their cells; numbers are on the right.
 COLUMN_TEXT :: bit_set[Column]{.Name, .User, .State, .Started, .Command, .Executable}
 // Each column's width when none was chosen, in ems (Name takes the room the others leave).
 COLUMN_DEFAULT_EM := [Column]f32{
-	.Name = 0, .PID = 5.5, .PPID = 6.5, .User = 6.5, .State = 7, .Nice = 4.5, .CPU = 5.5, .Memory = 6.5, .GPU_Memory = 7,
-	.Read = 7, .Write = 7, .Threads = 5.5, .Started = 9.5, .Command = 22, .Executable = 18,
+	.Name = 0, .PID = 5.5, .PPID = 6.5, .User = 6.5, .State = 7, .Nice = 4.5, .CPU = 5.5, .Memory = 8.5, .Resident = 7,
+	.GPU_Memory = 7, .Read = 7, .Write = 7, .Threads = 5.5, .Started = 9.5, .Command = 22, .Executable = 18,
 }
 
 column_of :: proc(key: string) -> (c: Column, ok: bool) {
@@ -49,7 +51,8 @@ Group :: struct {
 	key:     u64,     // its identity (its entry)
 	first, count: int,   // its processes: Table.members[first:first + count]
 	cpu:     f32,
-	rss:     u64,
+	private: u64,    // the sum of its processes' private memory (their resident memory would count shared pages again)
+	resident: u64,
 	gpu_mem: u64,
 	read_rate, write_rate: f64,
 	threads: i32,
@@ -79,15 +82,25 @@ Table :: struct {
 }
 
 // The columns of the table for the toolkit's header: texts at the left, numbers at the right; a pid and a nice value
-// sorted from the lowest at the first click, an amount from the largest.
+// sorted from the lowest at the first click, an amount from the largest. Those shown by default are processes.columns'
+// default (settings.odin).
 table_columns_init :: proc(t: ^Table) {
+	shown := columns_of(PREF_DEFS[PREF_COLUMNS].default.s)
 	for c in Column {
 		t.columns[int(c)] = {
 			title = COLUMN_NAMES[c], width = COLUMN_DEFAULT_EM[c], number = c not_in COLUMN_TEXT,
-			low_first = c == .PID || c == .PPID || c == .Nice, hidden = c not_in DEFAULT_COLUMNS,
+			low_first = c == .PID || c == .PPID || c == .Nice, hidden = c != .Name && c not_in shown,
 		}
 	}
 	ui.table_layout_init(&t.layout, t.columns[:])
+}
+
+// The columns a list of their keys names ("pid,user,cpu"); a key it does not know is left out.
+columns_of :: proc(keys: string) -> (out: bit_set[Column]) {
+	for key in strings.split(keys, ",", context.temp_allocator) {
+		if c, ok := column_of(strings.trim_space(key)); ok { out += {c} }
+	}
+	return
 }
 
 // The sort's column.
@@ -172,7 +185,8 @@ table_group :: proc(t: ^Table, procs: []Proc) {
 		fill[k] += 1
 		p := procs[i]
 		g.cpu += p.cpu
-		g.rss += p.rss
+		g.private += p.private
+		g.resident += p.resident
 		g.gpu_mem += p.gpu_mem
 		g.read_rate += p.read_rate
 		g.write_rate += p.write_rate
@@ -184,7 +198,7 @@ table_group :: proc(t: ^Table, procs: []Proc) {
 }
 
 // The app's processes of a group: each of its members that is the highest of its app in its line of parents (the
-// processes an End task on the group signals; the others are theirs).
+// processes an End task on the group asks to end; the others are theirs, and end with them).
 group_roots :: proc(t: ^Table, g: Group, allocator := context.temp_allocator) -> []int {
 	out := make([dynamic]int, allocator)
 	for m in t.members[g.first:][:g.count] { if t.owner[m] == m { append(&out, m) } }
@@ -279,7 +293,8 @@ sort_item_group :: proc(t: ^Table, s: ^Sampler, g: Group, k: int, name: string) 
 	#partial switch table_sort(t) {
 	case .Name:       it.text = name
 	case .CPU:        it.num = f64(g.cpu)
-	case .Memory:     it.num = f64(g.rss)
+	case .Memory:     it.num = f64(g.private)
+	case .Resident:   it.num = f64(g.resident)
 	case .GPU_Memory: it.num = f64(g.gpu_mem)
 	case .Read:       it.num = g.read_rate
 	case .Write:      it.num = g.write_rate
@@ -295,34 +310,20 @@ sort_value :: proc(it: ^Sort_Item, c: Column, s: ^Sampler, p: ^Proc) {
 	case .Name:       it.text = p.name
 	case .PID:        it.num = f64(p.pid)
 	case .PPID:       it.num = f64(p.ppid)
-	case .User:       it.text = user_name(s, p.uid)
+	case .User:       it.text = p.user
 	case .State:      it.text = state_text(p.state)
 	case .Nice:       it.num = f64(p.nice)
 	case .CPU:        it.num = f64(p.cpu)
-	case .Memory:     it.num = f64(p.rss)
+	case .Memory:     it.num = f64(p.private)
+	case .Resident:   it.num = f64(p.resident)
 	case .GPU_Memory: it.num = f64(p.gpu_mem)
 	case .Read:       it.num = p.read_rate
 	case .Write:      it.num = p.write_rate
 	case .Threads:    it.num = f64(p.threads)
-	case .Started:    it.num = f64(p.start)
+	case .Started:    it.num = f64(p.started)
 	case .Command:    it.text = p.cmdline
 	case .Executable: it.text = p.exe
 	}
-}
-
-// A process's state as words (the letter of /proc/<pid>/stat).
-state_text :: proc(state: u8) -> string {
-	switch state {
-	case 'R': return "Running"
-	case 'S': return "Sleeping"
-	case 'D': return "Disk wait"
-	case 'T': return "Suspended"
-	case 't': return "Traced"
-	case 'Z': return "Zombie"
-	case 'X': return "Dead"
-	case 'I': return "Idle"
-	}
-	return "?"
 }
 
 @(private = "file")

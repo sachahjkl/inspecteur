@@ -90,7 +90,7 @@ section_bar :: proc(app: ^App, title, note: string, em: f32, actions: proc(app: 
 		ui.spacer(ui.px(em * 0.8))
 		if ui.tags("weak") {
 			ui.next({width = ui.fill(), height = ui.pct(1)})
-			ui.label(fmt.tprintf("%s###counts", note))
+			label_tip(fmt.tprintf("%s###counts", ui.text_shown(note)), note)
 		}
 		if right != nil {
 			right(app, em)

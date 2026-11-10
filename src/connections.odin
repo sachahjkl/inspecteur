@@ -2,7 +2,7 @@ package inspecteur
 
 // The Connections section's model: the TCP and UDP sockets of the machine, IPv4 and IPv6, each with the process that
 // holds it when the user may know it. The reading is the system's (connections_linux.odin: sockets_read); it runs on a
-// thread of its own (worker.odin), and only while the section is shown: telling each socket's process costs some
+// thread of its own (the toolkit's ui.Worker), and only while the section is shown: telling each socket's process costs some
 // milliseconds.
 
 import "core:net"
@@ -42,6 +42,7 @@ Socket :: struct {
 Connections :: struct {
 	worker:  ui.Worker,
 	reader:  Socket_Reader,     // the thread's own (connections_linux.odin)
+	demo:    ^Demo,             // not nil: the sockets are the demo's
 	shared:  [dynamic]Socket,   // the thread's last reading, under the worker's mutex
 	sockets: [dynamic]Socket,   // the window's copy
 	rows:    Section_Table,
@@ -60,6 +61,7 @@ CONN_COLUMNS := [?]ui.Table_Column{
 
 connections_init :: proc(c: ^Connections, app: ^App) {
 	section_table_init(&c.rows, app, CONN_COLUMNS[:])
+	c.demo = app.demo
 	ui.worker_start(&c.worker, connections_job, c, app.main.win)
 }
 
@@ -75,7 +77,7 @@ connections_destroy :: proc(c: ^Connections) {
 connections_job :: proc(w: ^ui.Worker) {
 	c := (^Connections)(w.user)
 	list := make([dynamic]Socket, context.temp_allocator)
-	sockets_read(&c.reader, &list)
+	if c.demo != nil { demo_sockets_read(c.demo, &list) } else { sockets_read(&c.reader, &list) }
 	ui.worker_lock(w)
 	clear(&c.shared)
 	append(&c.shared, ..list[:])

@@ -1,15 +1,9 @@
 package inspecteur
 
 // The Services section (services.odin): a table of the services of the system's manager or of the user's (System and
-// User at the right of its bar, Ctrl+U). Its bar and a row's menu act on the selected service:
-//
-//   Start              Ctrl+S
-//   Stop               Delete
-//   Restart            Ctrl+R
-//   Enable             Ctrl+E        it starts by itself (at boot, or with the user's session)
-//   Disable            Ctrl+D
-//   Open in Processes  Enter         its main process, selected in the Processes section
-//   Copy name          Ctrl+C
+// User at the right of its bar, Ctrl+U). Its bar, a row's menu and the keys (commands.odin) act on the selected service:
+// Start, Stop, Restart, Enable (it starts by itself, at boot or with the user's session), Disable, Open in Processes
+// (its main process, selected there), Copy name.
 
 import "core:fmt"
 import "core:time"
@@ -33,7 +27,7 @@ build_services :: proc(app: ^App, em: f32) {
 	if s.list != nil && s.list.manager == s.manager { empty = s.list.problem != "" ? s.list.problem : "No service." }
 	ev := section_table_build(&s.rows, empty)
 	if ev.sorted { ui.table_apply(&s.rows.table, &s.rows.data, app.query) }
-	if ev.activated { service_reveal(app) }
+	if ev.activated && cmd_can(app, .Service_Open) { service_reveal(app) }
 	if ev.menu { services_menu_open(app, ev.menu_at) }
 	services_menu(app, em)
 }
@@ -49,37 +43,34 @@ services_due_ms :: proc(app: ^App) -> int {
 	return max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), app.services.next))) + 1, 1)
 }
 
-// What can be done to the selected service now.
-@(private = "file")
-Service_Can :: struct { start, stop, restart, enable, disable, open, any: bool }
-
-@(private = "file")
-service_can :: proc(app: ^App) -> (can: Service_Can) {
+// Whether a command of the section can act on the selected service now.
+service_can :: proc(app: ^App, c: Cmd) -> bool {
 	u, ok := selected_service(app)
-	if !ok || app.services.pending != .None { return }
+	if !ok || app.services.pending != .None { return false }
 	running := u.active == "active" || u.active == "activating" || u.active == "reloading"
-	can.any = true
-	can.start = !running && u.load != "masked"
-	can.stop = running
-	can.restart = u.load != "masked" && u.load != "not-found"
-	can.enable = u.file == "disabled"
-	can.disable = u.file == "enabled" || u.file == "enabled-runtime" || u.file == "linked"
-	can.open = u.pid > 0
-	return
+	#partial switch c {
+	case .Service_Start:   return !running && u.load != "masked"
+	case .Service_Stop:    return running
+	case .Service_Restart: return u.load != "masked" && u.load != "not-found"
+	case .Service_Enable:  return u.file == "disabled"
+	case .Service_Disable: return u.file == "enabled" || u.file == "enabled-runtime" || u.file == "linked"
+	case .Service_Open:    return u.pid > 0
+	case .Service_Copy:    return true
+	}
+	return false
 }
 
 @(private = "file")
 services_actions :: proc(app: ^App, em: f32) {
-	can := service_can(app)
-	if tool_button(app, "svc_start", lucide.PLAY, "Start (Ctrl+S)", can.start, em) { service_do(app, .Start) }
-	if tool_button(app, "svc_stop", lucide.SQUARE, "Stop (Delete)", can.stop, em) { service_do(app, .Stop) }
-	if tool_button(app, "svc_restart", lucide.ROTATE_CCW, "Restart (Ctrl+R)", can.restart, em) { service_do(app, .Restart) }
+	cmd_button(app, "svc_start", lucide.PLAY, .Service_Start, em)
+	cmd_button(app, "svc_stop", lucide.SQUARE, .Service_Stop, em)
+	cmd_button(app, "svc_restart", lucide.ROTATE_CCW, .Service_Restart, em)
 	vrule(em)
-	if tool_button(app, "svc_enable", lucide.CHECK, "Enable: it starts by itself (Ctrl+E)", can.enable, em) { service_do(app, .Enable) }
-	if tool_button(app, "svc_disable", lucide.X, "Disable: it does not start by itself (Ctrl+D)", can.disable, em) { service_do(app, .Disable) }
+	cmd_button(app, "svc_enable", lucide.CHECK, .Service_Enable, em)
+	cmd_button(app, "svc_disable", lucide.X, .Service_Disable, em)
 	vrule(em)
-	if tool_button(app, "svc_open", lucide.LAYOUT_LIST, "Open in Processes (Enter)", can.open, em) { service_reveal(app) }
-	if tool_button(app, "svc_copy", lucide.COPY, "Copy name (Ctrl+C)", can.any, em) { service_copy(app) }
+	cmd_button(app, "svc_open", lucide.LAYOUT_LIST, .Service_Open, em)
+	cmd_button(app, "svc_copy", lucide.COPY, .Service_Copy, em)
 }
 
 // System or User, at the right of the bar.
@@ -103,25 +94,6 @@ services_switch :: proc(app: ^App, m: Manager) {
 	services_ask(app)
 }
 
-// The keys of the section (view_keys calls it when no menu or dialog is open). `field_keeps`: the filter keeps Delete.
-services_keys :: proc(app: ^App, field_keeps: bool) {
-	s := &app.services
-	keys := ui.table_keys(&s.rows.table)
-	can := service_can(app)
-	if ui.key_press(.U, {.Ctrl}) { services_switch(app, s.manager == .System ? .User : .System) }
-	if ui.key_press(.S, {.Ctrl}) && can.start { service_do(app, .Start) }
-	if ui.key_press(.R, {.Ctrl}) && can.restart { service_do(app, .Restart) }
-	if ui.key_press(.E, {.Ctrl}) && can.enable { service_do(app, .Enable) }
-	if ui.key_press(.D, {.Ctrl}) && can.disable { service_do(app, .Disable) }
-	if !field_keeps {
-		if ui.key_press(.Delete) && can.stop { service_do(app, .Stop) }
-		if ui.key_press(.C, {.Ctrl}) && can.any { service_copy(app) }
-	}
-	if keys.activated && can.open { service_reveal(app) }
-	if keys.menu { services_menu_open(app, keys.menu_at, true) }
-}
-
-@(private = "file")
 services_menu_open :: proc(app: ^App, pos: ui.Vec2, from_keyboard := false) {
 	s := &app.services
 	if _, ok := selected_service(app); !ok { return }
@@ -133,23 +105,21 @@ services_menu_open :: proc(app: ^App, pos: ui.Vec2, from_keyboard := false) {
 services_menu :: proc(app: ^App, em: f32) {
 	s := &app.services
 	if s.menu == 0 { return }
-	if ui.ctx_menu(s.menu, em * MENU_WIDTH_EM) {
+	if ui.ctx_menu(s.menu) {
 		if _, ok := selected_service(app); !ok { ui.ctx_menu_close(); return }
-		can := service_can(app)
-		if ui.menu_item("Start", "Ctrl+S", enabled = can.start).clicked { service_do(app, .Start) }
-		if ui.menu_item("Stop", "Delete", enabled = can.stop).clicked { service_do(app, .Stop) }
-		if ui.menu_item("Restart", "Ctrl+R", enabled = can.restart).clicked { service_do(app, .Restart) }
+		cmd_item(app, .Service_Start)
+		cmd_item(app, .Service_Stop)
+		cmd_item(app, .Service_Restart)
 		ui.menu_separator()
-		if ui.menu_item("Enable", "Ctrl+E", enabled = can.enable).clicked { service_do(app, .Enable) }
-		if ui.menu_item("Disable", "Ctrl+D", enabled = can.disable).clicked { service_do(app, .Disable) }
+		cmd_item(app, .Service_Enable)
+		cmd_item(app, .Service_Disable)
 		ui.menu_separator()
-		if ui.menu_item("Open in Processes", "Enter", enabled = can.open).clicked { service_reveal(app) }
-		if ui.menu_item("Copy name", "Ctrl+C").clicked { service_copy(app) }
+		cmd_item(app, .Service_Open)
+		cmd_item(app, .Service_Copy)
 	}
 }
 
 // Asks the manager to act on the selected service; the footer says it is asked, then what came of it (services_take).
-@(private = "file")
 service_do :: proc(app: ^App, action: Service_Action) {
 	u, ok := selected_service(app)
 	if !ok { return }
@@ -158,7 +128,6 @@ service_do :: proc(app: ^App, action: Service_Action) {
 	services_ask(app, action, u.name)
 }
 
-@(private = "file")
 service_reveal :: proc(app: ^App) {
 	u, ok := selected_service(app)
 	if !ok || u.pid <= 0 { return }
@@ -166,7 +135,6 @@ service_reveal :: proc(app: ^App) {
 	if p == nil || !processes_reveal(app, p.pid, p.start) { say(app, "PID %d is not in the processes' last sample", u.pid) }
 }
 
-@(private = "file")
 service_copy :: proc(app: ^App) {
 	u, ok := selected_service(app)
 	if !ok { return }

@@ -17,7 +17,6 @@ import cdp "gt:cdp"
 
 LIVE_DIR  :: "build/live"
 LIVE_PORT :: 9371
-SCREENSHOT :: "docs/screenshots/processes.png"
 
 Live :: struct {
 	using session: Session,
@@ -37,7 +36,7 @@ run_live :: proc(args: []string) -> int {
 	keep := len(args) > 0 && args[0] == "--keep"
 	if run_build(nil) != 0 { return 1 }
 	l: Live
-	if why := session_start(&l.session, LIVE_DIR, LIVE_PORT, user_bus = true); why != "" {
+	if why := session_start(&l.session, LIVE_DIR, LIVE_PORT, user_bus = true, welcome = true, before = live_app_entry); why != "" {
 		fmt.eprintfln("inspecteurtool live: %s", why)
 		session_stop(&l.session)
 		return 1
@@ -54,7 +53,8 @@ run_live :: proc(args: []string) -> int {
 	code := session_stop(&l.session)
 	check(&l, code == 0, "inspecteur closed: it ends, with 0 (%d)", code)
 	log, _ := os.read_entire_file(output, context.temp_allocator)
-	check(&l, !strings.contains(string(log), "error"), "inspecteur wrote no error (%s)", output)
+	problem := log_problem(string(log))
+	check(&l, problem == "", "inspecteur wrote no error, no panic (%s)%s", output, problem != "" ? fmt.tprintf(": %q", problem) : "")
 	fmt.printfln("live: %d checks, %d failed", l.checks, l.failures)
 	if !keep && l.failures == 0 { _ = os.remove_all(dir) }
 	return l.failures == 0 ? 0 : 1
@@ -63,10 +63,11 @@ run_live :: proc(args: []string) -> int {
 @(private = "file")
 live_window :: proc(l: ^Live) {
 	c := &l.c
+	live_welcome(l)
 	check(l, cdp.wait_for(c, "Background processes", SESSION_WAIT), "the table has its sections")
 	pids := column_numbers(c, "c1")
 	check(l, len(pids) >= 10, "the table has rows (%d in view)", len(pids))
-	check(l, cdp.wait_for(c, "processes", SESSION_WAIT), "the header counts the processes")
+	check(l, wait_named_contains(c, "counts", "background processes"), "the bar counts the apps and the background processes")
 
 	// sorting: PID from the lowest, then from the highest (in each section: at most one turn between the two)
 	check(l, cdp.click_name(c, "hd_1"), "click the PID header")
@@ -103,8 +104,13 @@ live_window :: proc(l: ^Live) {
 	check(l, len(shown) >= 1 && len(shown) <= 2 && contains_int(shown, child.pid), "the search leaves the other processes out (%v)", shown)
 	// the filter has the keyboard and text: Delete is the field's (at the end of its text, it erases nothing)
 	check(l, cdp.key(c, "Delete"), "Delete in the filter")
-	time.sleep(500 * time.Millisecond)
-	check(l, wait_state(child.pid, 'S'), "it is the filter's: the child still sleeps")
+	cdp.wait_idle(c, SESSION_WAIT)
+	check(l, wait_state(child.pid, 'S') && cdp.wait_for(c, fmt.tprintf("Selected: sleep, PID %s", pid), SESSION_WAIT), "it is the filter's: the child still sleeps, still selected")
+	// the filter by the pid alone finds it too
+	check(l, cdp.key(c, "Escape") && cdp.type_text(c, pid), "filter by its PID, %s", pid)
+	check(l, cdp.wait_for(c, fmt.tprintf("Selected: sleep, PID %s", pid), SESSION_WAIT), "the PID selects it")
+	check(l, cdp.key(c, "Escape") && cdp.type_text(c, mark), "filter by its mark again")
+	check(l, cdp.wait_for(c, fmt.tprintf("Selected: sleep, PID %s", pid), SESSION_WAIT), "it is selected")
 	at := pid_cell(c, pid)
 	_, mok := cdp.call(c, "Toolkit.click", fmt.tprintf(`{{"name":"c1","index":%d,"button":"right"}}`, max(at, 0)))
 	check(l, at >= 0 && mok && cdp.wait_for(c, "Copy command line", SESSION_WAIT), "a right click on its row opens the row's menu")
@@ -121,17 +127,44 @@ live_window :: proc(l: ^Live) {
 	if !live_kill(l) { return }
 
 	live_properties(l)
+	live_guards(l)
+	live_access_denied(l)
+	live_group_kill(l)
+	live_commands(l)
+	live_setup(l)
 
-	// the picture: every process, the busiest first
+	// a picture of the window, for the person who runs the test (build/live, kept with --keep or a failure: it shows
+	// the machine's own processes, so it is not one of the documentation's pictures)
 	check(l, cdp.key(c, "Escape"), "Escape clears the search")
-	check(l, click_header(c, "CPU"), "sort by CPU")
+	check(l, cdp.key(c, "ctrl+1") && click_header(c, "CPU"), "sort by CPU")
 	cdp.wait_for(c, "Background processes", SESSION_WAIT)
-	time.sleep(1500 * time.Millisecond)   // (two samples: every row has its CPU %)
 	cdp.wait_idle(c, SESSION_WAIT)
-	_ = os.make_directory_all("docs/screenshots")
-	check(l, cdp.shot(c, SCREENSHOT), "a picture of the window: %s", SCREENSHOT)
-	cdp.wait_idle(c, SESSION_WAIT)
-	check(l, cdp.shot(c, fmt.tprintf("%s/window.png", l.dir)), "and one in %s", l.dir)
+	check(l, cdp.shot(c, fmt.tprintf("%s/window.png", l.dir)), "a picture in %s", l.dir)
+}
+
+// The first line of the log that says something went wrong: a panic, a failed assertion, a signal, or inspecteur's own
+// "inspecteur: ..." ("" when there is none).
+@(private = "file")
+log_problem :: proc(log: string) -> string {
+	rest := log
+	for line in strings.split_lines_iterator(&rest) {
+		low := strings.to_lower(line, context.temp_allocator)
+		for mark in ([]string{"panic", "assertion", "segmentation", "runtime error"}) {
+			if strings.contains(low, mark) { return line }
+		}
+		if strings.has_prefix(line, "inspecteur: ") { return line }
+	}
+	return ""
+}
+
+// A box named `name` comes to hold `text`.
+wait_named_contains :: proc(c: ^cdp.Client, name, text: string) -> bool {
+	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
+	for time.tick_diff(time.tick_now(), deadline) > 0 {
+		for b in cdp.find_name(c, name) { if strings.contains(b.text, text) { return true } }
+		time.sleep(SESSION_POLL)
+	}
+	return false
 }
 
 // A second child: Shift+Delete asks first, Kill kills it. False: the test cannot go on safely.
@@ -235,7 +268,6 @@ column_numbers :: proc(c: ^cdp.Client, name: string) -> []int {
 }
 
 // How many times a list turns against the order.
-@(private = "file")
 turns :: proc(xs: []int, ascending: bool) -> int {
 	n := 0
 	for i in 1 ..< len(xs) {
@@ -245,7 +277,6 @@ turns :: proc(xs: []int, ascending: bool) -> int {
 	return n
 }
 
-@(private = "file")
 contains_int :: proc(xs: []int, x: int) -> bool {
 	for v in xs { if v == x { return true } }
 	return false

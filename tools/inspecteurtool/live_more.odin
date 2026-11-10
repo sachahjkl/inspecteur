@@ -7,6 +7,7 @@ package inspecteurtool
 import "core:fmt"
 import "core:os"
 import "core:slice"
+import "core:strconv"
 import "core:strings"
 import "core:sys/linux"
 import "core:time"
@@ -17,7 +18,7 @@ import cdp "gt:cdp"
 GRAPH_DRAWN_SHARE :: 0.01
 GRAPH_COLOR_SLACK :: 12
 // The Performance section's graphs get some points first.
-PERF_POINTS_WAIT :: 4 * time.Second
+PERF_POINTS_WAIT :: 8 * time.Second
 // The busy children end by themselves after this many seconds, whatever becomes of this tool.
 BUSY_SECONDS :: "30"
 
@@ -44,8 +45,7 @@ live_performance :: proc(l: ^Live) {
 
 	check(l, cdp.click_text(c, "Performance"), "click the Performance section")
 	check(l, cdp.wait_name(c, "cpu_graph", SESSION_WAIT), "the CPU's graph is there")
-	time.sleep(PERF_POINTS_WAIT)
-	share := drawn_share(c, "cpu_graph")
+	share := wait_drawn(c, "cpu_graph")
 	check(l, share > GRAPH_DRAWN_SHARE, "the CPU's graph is drawn (%.1f%% of its pixels)", share * 100)
 	check(l, cdp.wait_for(c, "Logical processors", SESSION_WAIT), "it counts the logical processors")
 
@@ -54,7 +54,7 @@ live_performance :: proc(l: ^Live) {
 	check(l, cdp.click_text(c, "Logical processors"), "the per-processor view")
 	check(l, cdp.wait_name(c, fmt.tprintf("core_%d", cores - 1), SESSION_WAIT), "a graph for each of the %d logical processors", cores)
 	check(l, !cdp.wait_name(c, fmt.tprintf("core_%d", cores), 300 * time.Millisecond), "and no more")
-	share = drawn_share(c, "core_0")
+	share = wait_drawn(c, "core_0")
 	check(l, share > GRAPH_DRAWN_SHARE, "the first processor's graph is drawn (%.1f%%)", share * 100)
 	check(l, cdp.click_text(c, "Overall"), "back to one graph")
 	check(l, cdp.wait_name(c, "cpu_graph", SESSION_WAIT), "it is back")
@@ -63,13 +63,43 @@ live_performance :: proc(l: ^Live) {
 	check(l, cdp.click_name(c, "dev_1_0"), "click Memory in the devices")
 	check(l, cdp.wait_name(c, "memory_graph", SESSION_WAIT), "the memory's graph is there")
 	check(l, cdp.wait_for(c, "Memory composition", SESSION_WAIT), "and its composition")
-	share = drawn_share(c, "memory_graph")
+	share = wait_drawn(c, "memory_graph")
 	check(l, share > GRAPH_DRAWN_SHARE, "the memory's graph is drawn (%.1f%%)", share * 100)
-	check(l, cdp.click_name(c, "dev_0_0"), "back to the CPU")
+
+	// the other devices' pages, when the machine has them (Down goes from a device to the next)
+	pages := [?]struct { device, graph, what: string }{
+		{"dev_2_0", "disk_active", "a disk's active time"}, {"dev_3_0", "net_rate", "an interface's throughput"}, {"dev_4_0", "", "a GPU's page"},
+	}
+	for p in pages {
+		if len(cdp.find_name(c, p.device)) == 0 { check(l, true, "no %s here: skipped", p.what); continue }
+		check(l, cdp.click_name(c, p.device), "click %s", p.device)
+		if p.graph != "" {
+			check(l, cdp.wait_name(c, p.graph, SESSION_WAIT), "%s: its graph is there", p.what)
+		} else {
+			check(l, cdp.wait_for(c, "GPU 0", SESSION_WAIT), "%s: its title", p.what)
+		}
+	}
+	check(l, cdp.click_name(c, "dev_0_0") && cdp.wait_name(c, "cpu_graph", SESSION_WAIT), "back to the CPU")
+	check(l, cdp.key(c, "ArrowDown") && cdp.wait_name(c, "memory_graph", SESSION_WAIT), "Down: the next device, the memory")
+	check(l, cdp.key(c, "ArrowUp") && cdp.wait_name(c, "cpu_graph", SESSION_WAIT), "Up: back to the CPU")
+	check(l, cdp.key(c, "ctrl+g") && cdp.wait_name(c, "core_0", SESSION_WAIT), "Ctrl+G: a graph per logical processor")
+	check(l, cdp.key(c, "ctrl+g") && cdp.wait_name(c, "cpu_graph", SESSION_WAIT), "Ctrl+G again: one graph")
+}
+
+// The share of a graph's pixels that are drawn, once it is more than GRAPH_DRAWN_SHARE or after PERF_POINTS_WAIT.
+@(private = "file")
+wait_drawn :: proc(c: ^cdp.Client, name: string) -> f64 {
+	deadline := time.tick_add(time.tick_now(), PERF_POINTS_WAIT)
+	share := 0.0
+	for time.tick_diff(time.tick_now(), deadline) > 0 {
+		share = drawn_share(c, name)
+		if share > GRAPH_DRAWN_SHARE { break }
+		time.sleep(250 * time.Millisecond)
+	}
+	return share
 }
 
 // The share of the box's pixels that are not its three commonest colours.
-@(private = "file")
 drawn_share :: proc(c: ^cdp.Client, name: string) -> f64 {
 	boxes := cdp.find_name(c, name)
 	if len(boxes) == 0 { return 0 }
@@ -197,10 +227,15 @@ live_properties :: proc(l: ^Live) {
 	if !check(l, props_is(c, pid), "the dialog is still the child's") { return }
 	if !check(l, cdp.click_name(c, "props_suspend"), "Resume") { return }
 	check(l, wait_state(child.pid, 'S'), "the process sleeps again (S)")
-	_ = os.make_directory_all("docs/screenshots")
+	// its priority, lowered from the keyboard (a user may lower a priority: nice 0 to the next line, 5)
+	if !check(l, props_is(c, pid), "the dialog is still the child's") { return }
+	check(l, cdp.key(c, "ctrl+ArrowDown"), "Ctrl+Down: a lower priority")
+	check(l, wait_nice(child.pid, 5), "the process runs at nice 5")
+	check(l, cdp.key(c, "ctrl+p") && wait_state(child.pid, 'T'), "Ctrl+P suspends it")
+	check(l, props_is(c, pid) && cdp.key(c, "ctrl+p") && wait_state(child.pid, 'S'), "Ctrl+P again resumes it")
 	cdp.click_name(c, "props_tab_0")
 	cdp.wait_idle(c, SESSION_WAIT)
-	check(l, cdp.shot(c, "docs/screenshots/properties.png"), "a picture of the Properties")
+	check(l, cdp.shot(c, fmt.tprintf("%s/properties.png", l.dir)), "a picture of the Properties")
 	if !check(l, props_is(c, pid), "the dialog is still the child's") { return }
 	if !check(l, cdp.click_name(c, "props_end"), "End task") { return }
 	state, werr := os.process_wait(child, SESSION_WAIT)
@@ -211,8 +246,30 @@ live_properties :: proc(l: ^Live) {
 	check(l, cdp.key(c, "Escape"), "Escape clears the search")
 }
 
+// The nice value of /proc/<pid>/stat (its 19th field) becomes `want`.
+wait_nice :: proc(pid: int, want: int) -> bool {
+	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
+	for time.tick_diff(time.tick_now(), deadline) > 0 {
+		data, err := os.read_entire_file(fmt.tprintf("/proc/%d/stat", pid), context.temp_allocator)
+		if err == nil {
+			text := string(data)
+			rest := text[strings.last_index_byte(text, ')') + 1:]
+			field := 3
+			for word in strings.fields_iterator(&rest) {
+				if field == 19 {
+					v := strconv.parse_int(word, 10) or_else -99
+					if v == want { return true }
+					break
+				}
+				field += 1
+			}
+		}
+		time.sleep(SESSION_POLL)
+	}
+	return false
+}
+
 // Whether the Properties dialog's title names sleep, PID `pid` (its boxes props_name and props_pid).
-@(private = "file")
 props_is :: proc(c: ^cdp.Client, pid: string) -> bool {
 	names := cdp.find_name(c, "props_name")
 	pids := cdp.find_name(c, "props_pid")
@@ -231,7 +288,7 @@ click_last :: proc(c: ^cdp.Client, text: string) -> bool {
 	return ok
 }
 
-@(private = "file")
+// The file comes to hold `text`.
 file_has :: proc(path, text: string) -> bool {
 	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
 	for time.tick_diff(time.tick_now(), deadline) > 0 {
@@ -253,9 +310,9 @@ wait_cell :: proc(c: ^cdp.Client, text: string) -> bool {
 	return false
 }
 
-// The state letter of /proc/<pid>/stat becomes `want`.
-wait_state :: proc(pid: int, want: u8) -> bool {
-	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
+// The state letter of /proc/<pid>/stat becomes `want` within the time.
+wait_state :: proc(pid: int, want: u8, within := SESSION_WAIT) -> bool {
+	deadline := time.tick_add(time.tick_now(), within)
 	for time.tick_diff(time.tick_now(), deadline) > 0 {
 		data, err := os.read_entire_file(fmt.tprintf("/proc/%d/stat", pid), context.temp_allocator)
 		if err == nil {

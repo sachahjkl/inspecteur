@@ -1,8 +1,8 @@
 package inspecteur
 
 // The window and its loop. The loop sleeps in the toolkit's wait until input or the next sample (processes.refresh_ms):
-// a sample reads /proc (procfs.odin), groups the processes (processes.odin) and the window is built again. Between two
-// samples, with no input, nothing runs.
+// a sample reads the machine and the processes (machine.odin, sampler.odin), groups the processes (processes.odin) and
+// the window is built again. Between two samples, with no input, nothing runs.
 
 import "core:fmt"
 import "core:time"
@@ -16,6 +16,7 @@ import lucide "gt:lucide"
 import "gt:platform"
 import "gt:render"
 import "gt:ui"
+import identity "identity"
 
 // The corners: nearly square (a table of numbers, not cards): about a pixel on a button, none to see on a row.
 ROUNDING :: 0.25
@@ -36,10 +37,13 @@ App :: struct {
 	devtools:    ^devtools.Server,  // TOOLKIT_DEVTOOLS=<port>: driven and captured over the Chrome DevTools Protocol
 	theme_shown: ui.Theme_Shown,
 
+	demo:        ^Demo,             // not nil: every reading is the demo's (--demo: the pictures of the documentation)
+	display_server: i32,            // the pid of the compositor that shows the window (session_linux.odin), 0: unknown
 	sampler:     Sampler,
 	machine:     Machine,           // the CPU, the memory, the disks, the network, the GPUs (machine.odin, gpu.odin)
 	catalog:     Catalog,
 	app_icons:   map[string]Icon,   // the apps' icons by name (apps.odin)
+	logo:        Icon,              // the title bar's (assets/logo_64.png)
 	table:       Table,
 	next_sample: time.Tick,
 
@@ -52,7 +56,11 @@ App :: struct {
 	device:      Device,            // the Performance section's device shown (perf_view.odin)
 	cpu_grid:    bool,              // the CPU's page shows a graph per logical processor
 	columns_menu: ui.Key,           // the menu of the table's columns (table_view.odin)
+	bar_rect:    ui.Rect,           // the Processes section's bar, as last laid out (the columns' menu opens under it)
 	theme_menu:  ui.Key,            // the menu of the theme (view.odin)
+	palette:     ui.Key,            // the command palette (commands.odin)
+	shortcuts_open: bool,           // the sheet of the keys
+	setup:       Setup_Page,        // the welcome page, and the desktop integration (setup_view.odin)
 	tz:          ^datetime.TZ_Region,   // local time, for the processes' start (loaded when first needed)
 	tz_tried:    bool,
 	search:      ui.Text_Field,
@@ -60,6 +68,7 @@ App :: struct {
 	vl:          ui.Virtual_List,   // the rows (vl.sel: the selected row)
 	sel_rect:    ui.Rect,           // the selected row, as last built (where the Menu key opens the menu)
 	menu:        Row_Menu,          // the row's menu, the confirmation of a kill (menu.odin)
+	sample_extra: bool,             // the next sample comes sooner than the period (after an action): no point of the graphs
 	props:       Props,             // the Properties dialog (props.odin, props_view.odin)
 	props_lists: [Props_Tab]ui.Virtual_List,
 	status:      string,            // a message for the status bar (owned), until status_until (ui clock, ms)
@@ -69,22 +78,38 @@ App :: struct {
 	refreshes, frames: int,
 }
 
-app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
+// How the window starts: its first section, the first frame's times printed, the demo's readings.
+Run_Options :: struct {
+	first_frame: bool,
+	tab:         Tab,
+	demo:        bool,
+}
+
+app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	app := new(App)
 	defer free(app)
 	app.prefs = prefs^
 	prefs^ = {}
 	app.settings = prefs_read(&app.prefs)
+	demo: Demo
+	if opts.demo {
+		demo_init(&demo)
+		app.demo = &demo
+		app.props.demo = &demo
+	}
+	defer if opts.demo { demo_destroy(&demo) }
 
 	// the processes before the window: its first frame shows them
 	t_main := time.tick_now()
-	if !sampler_init(&app.sampler) {
-		fmt.eprintln("inspecteur: /proc cannot be read")
+	if !sampler_init(&app.sampler, app.demo) {
+		fmt.eprintln("inspecteur: the processes cannot be read (/proc)")
 		return 1
 	}
-	catalog_load(&app.catalog)
-	machine_init(&app.machine)
+	if app.demo != nil { demo_catalog(&app.catalog) } else { catalog_load(&app.catalog) }
+	machine_init(&app.machine, app.demo)
+	if app.demo != nil { demo_preroll(app.demo, &app.machine, time.tick_now()._nsec) }
 	table_layout_load(&app.table, app.settings)
+	app.tab = opts.tab
 	refresh(app)
 
 	t_read := time.tick_now()
@@ -96,6 +121,11 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	h := &app.main
 	win := h.win
 	app.icons, _ = font.load_embedded(&app.shared.fonts, lucide.DATA)
+	if img, ok := platform.clipboard_image_decode("image/png", identity.ICONS[4].png, context.temp_allocator); ok {
+		app.logo.tex = render.create_texture_rgba(&app.shared.r, img.size.x, img.size.y)
+		render.update_texture_rgba(&app.shared.r, app.logo.tex, 0, 0, img.size.x, img.size.y, img.rgba)
+		app.logo.ok = true
+	}
 	h.state.icon_font = app.icons
 	h.after_input = FRAMES_AFTER_INPUT
 	h.partial_redraw = true   // (a sample changes some cells: only they are drawn again)
@@ -103,15 +133,18 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	h.params = app_params
 	app.devtools = devtools.start_from_env(win, "inspecteur")
 	h.before_input = proc(h: ^host.Host) { app := (^App)(h.user); devtools.service(app.devtools, &h.state, &app.shared.r) }
+	if app.demo == nil { app.display_server = display_server_pid() }
 	connections_init(&app.connections, app)
 	information_init(&app.information, app)
 	services_init(&app.services, app)
 	startup_init(&app.startup, app)
+	section_first_show(app)
+	setup_offer(app)
 
 	t_window := time.tick_now()
 	platform.show_window(win)
 	host.host_frame(h)
-	if first_frame {
+	if opts.first_frame {
 		// (a tool reads it: the end of the first frame, then where the time went since main)
 		ms :: proc(a, b: time.Tick) -> f64 { return time.duration_milliseconds(time.tick_diff(a, b)) }
 		fmt.printfln("first-frame %d read %.1f window %.1f frame %.1f (draw %.1f, present %.1f)", time.now()._nsec, ms(t_main, t_read), ms(t_read, t_window), ms(t_window, time.tick_now()), time.duration_milliseconds(h.times.draw), time.duration_milliseconds(h.times.present))
@@ -127,7 +160,7 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 		app.frames += 1
 	}
 
-	if first_frame {
+	if opts.first_frame {
 		mean :: proc(d: time.Duration, n: int) -> f64 { return n > 0 ? time.duration_milliseconds(d) / f64(n) : 0 }
 		fmt.printfln("costs: %d samples, %.2f ms each; %d frames, %.2f ms each", app.refreshes, mean(app.refresh_time, app.refreshes), app.frames, mean(app.frame_time, app.frames))
 	}
@@ -138,6 +171,8 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	startup_destroy(&app.startup)
 	delete(app.query)
 	icons_destroy(&app.app_icons, &app.shared.r)
+	if app.logo.ok { render.destroy_texture(&app.shared.r, app.logo.tex) }
+	if app.setup.logo_made && app.setup.logo != {} { render.destroy_texture(&app.shared.r, app.setup.logo) }
 	host.host_close(h)
 	ui.field_destroy(&app.search)
 	ui.vlist_destroy(&app.vl)
@@ -149,6 +184,7 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	delete(app.status)
 	row_menu_destroy(&app.menu)
 	props_destroy(&app.props)
+	setup_destroy(&app.setup)
 	for &vl in app.props_lists { ui.vlist_destroy(&vl) }
 	settings_free(&app.settings)
 	config.prefs_destroy(&app.prefs)
@@ -158,14 +194,18 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 // A new sample, its groups and its rows; the next one is due a period later.
 refresh :: proc(app: ^App) {
 	now := time.tick_now()
-	machine_sample(&app.machine, now._nsec, app.tab == .Performance && app.device.kind == .Cpu)
-	sample(&app.sampler, now._nsec, app.machine.d_total, &app.catalog)
+	// (a sample sooner than the period, after an action, gives the graphs no point: their span stays the period's)
+	machine_sample(&app.machine, now._nsec, app.tab == .Performance && app.device.kind == .Cpu, history = !app.sample_extra)
+	app.sample_extra = false
+	sample(&app.sampler, now._nsec, app.machine.d_total_ns, &app.catalog)
 	gpu_mem := gpu_proc_mem(&app.machine)
 	for &p in app.sampler.procs { p.gpu_mem = gpu_mem[p.pid] }
+	// (the GPUs' numbers are read while they are shown: a GPU that may sleep is let go otherwise)
+	gpu_want(&app.machine.gpu, app.tab == .Performance || app.table.layout.shown[int(Column.GPU_Memory)])
 	table_group(&app.table, app.sampler.procs[:])
 	rows_again(app)
 	app.next_sample = time.tick_add(now, time.Duration(app.settings.refresh_ms) * time.Millisecond)
-	if app.props.open { props_read(&app.props) }
+	if app.props.open { props_tick(&app.props, find_proc(&app.sampler, app.props.pid, app.props.start) != nil) }
 	// (a section that reads on a thread of its own reads only while it is shown)
 	if app.tab == .Connections { ui.worker_ask(&app.connections.worker) }
 	app.refresh_time += time.tick_since(now)
@@ -191,7 +231,14 @@ rows_again :: proc(app: ^App) {
 tab_show :: proc(app: ^App, tab: Tab) {
 	if app.tab == tab { return }
 	app.tab = tab
-	#partial switch tab {
+	section_first_show(app)
+	if tab == .Performance { gpu_want(&app.machine.gpu, true) }
+}
+
+// What the section shown reads when it is shown.
+@(private = "file")
+section_first_show :: proc(app: ^App) {
+	#partial switch app.tab {
 	case .Connections: ui.worker_ask(&app.connections.worker)
 	case .Information: if !app.information.asked { information_ask(&app.information) }
 	case .Services:    services_ask(app)
@@ -229,7 +276,7 @@ selected_row :: proc(app: ^App) -> (r: Row, ok: bool) {
 	return app.table.rows[app.vl.sel], true
 }
 
-// The process a row stands for: its own, or a group's app process.
+// The process a row stands for: its own, or a group's first app process.
 row_process :: proc(app: ^App, r: Row) -> (p: ^Proc, ok: bool) {
 	switch r.kind {
 	case .Process: return &app.sampler.procs[r.index], true
