@@ -216,11 +216,13 @@ live_properties :: proc(l: ^Live) {
 	// (the dialog's buttons act on the process its title names: they are clicked only when it names the child)
 	cdp.wait_name(c, "props_name", SESSION_WAIT)
 	if !check(l, props_is(c, pid), "its Properties open, on sleep PID %s", pid) { return }
-	check(l, cdp.click_name(c, "props_tab_1"), "the Threads tab")
+	check(l, cdp.click_name(c, "props_tab_1"), "the History tab")
+	check(l, cdp.wait_name(c, "hist_cpu", SESSION_WAIT) && cdp.wait_name(c, "hist_memory", SESSION_WAIT), "it graphs the process's CPU and memory since it started")
+	check(l, cdp.click_name(c, "props_tab_2"), "the Threads tab")
 	check(l, wait_cell(c, pid), "it lists the process's thread (TID %s)", pid)
-	check(l, cdp.click_name(c, "props_tab_2"), "the Open files tab")
+	check(l, cdp.click_name(c, "props_tab_3"), "the Open files tab")
 	check(l, cdp.wait_for(c, "child-output.txt", SESSION_WAIT), "it lists the file of its output")
-	check(l, cdp.click_name(c, "props_tab_3"), "the Modules tab")
+	check(l, cdp.click_name(c, "props_tab_4"), "the Modules tab")
 	check(l, cdp.wait_for(c, "libc", SESSION_WAIT), "it lists the C library")
 	if !check(l, props_is(c, pid), "the dialog is still the child's") { return }
 	if !check(l, cdp.click_name(c, "props_suspend"), "Suspend") { return }
@@ -236,7 +238,7 @@ live_properties :: proc(l: ^Live) {
 	check(l, cdp.key(c, "ctrl+p") && wait_state(child.pid, 'T'), "Ctrl+P suspends it")
 	check(l, props_is(c, pid) && cdp.key(c, "ctrl+p") && wait_state(child.pid, 'S'), "Ctrl+P again resumes it")
 	// the filter of the lists: Ctrl+F, a text no thread has
-	check(l, cdp.click_name(c, "props_tab_1") && cdp.key(c, "ctrl+f") && cdp.type_text(c, "zzqx"), "Ctrl+F in the Threads tab, a text")
+	check(l, cdp.click_name(c, "props_tab_2") && cdp.key(c, "ctrl+f") && cdp.type_text(c, "zzqx"), "Ctrl+F in the Threads tab, a text")
 	check(l, cdp.wait_for(c, "Nothing matches “zzqx”.", SESSION_WAIT), "it filters the threads out")
 	cdp.click_name(c, "props_tab_0")
 	cdp.wait_idle(c, SESSION_WAIT)

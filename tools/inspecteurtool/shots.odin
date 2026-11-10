@@ -58,6 +58,8 @@ run_shots :: proc(args: []string) -> int {
 	if need(cdp.wait_name(&c, "props_name", SESSION_WAIT), "no Properties", &failed) {
 		shot(&c, out, "properties", &failed)
 		cdp.click_name(&c, "props_tab_1")
+		if need(cdp.wait_name(&c, "hist_cpu", SESSION_WAIT), "no History tab", &failed) { shot(&c, out, "properties_history", &failed) }
+		cdp.click_name(&c, "props_tab_2")
 		cdp.wait_name(&c, "threads", SESSION_WAIT)
 		shot(&c, out, "properties_threads", &failed)
 		cdp.key(&c, "Escape")

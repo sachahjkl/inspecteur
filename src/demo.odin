@@ -143,13 +143,15 @@ demo_destroy :: proc(d: ^Demo) {}
 @(private = "file")
 demo_seconds :: proc(d: ^Demo) -> f64 { return time.duration_seconds(time.since(d.start)) + d.shift }
 
-// The minute before the start, read a second at a time: the Performance section's graphs are full at once (the
-// pictures of the documentation are not a minute long to make).
-demo_preroll :: proc(d: ^Demo, m: ^Machine, now_ns: i64) {
+// The minute before the start, read a second at a time: the Performance section's graphs and the processes' are full at
+// once (the pictures of the documentation are not a minute long to make).
+demo_preroll :: proc(d: ^Demo, m: ^Machine, s: ^Sampler, c: ^Catalog, now_ns: i64) {
 	for i in 0 ..< HISTORY_POINTS {
 		back := HISTORY_POINTS - i
 		d.shift = -f64(back)
-		machine_sample(m, now_ns - i64(back) * 1_000_000_000, false)
+		at := now_ns - i64(back) * 1_000_000_000
+		machine_sample(m, at, false)
+		sample(s, at, m.d_total_ns, c)
 		// (the GPUs: their thread reads every GPU_PERIOD; here a point every two seconds of the minute)
 		if i % 2 == 0 {
 			snap: Gpu_Snapshot
@@ -409,7 +411,7 @@ demo_props_read :: proc(d: ^Demo, p: ^Props, a: mem.Allocator) {
 	p.cwd, p.cwd_read, p.list_read = "/home/alex", .Read, .Read
 	p.cpus = fmt.aprintf("0-%d", DEMO_LOGICAL - 1, allocator = a)
 	switch p.tab {
-	case .General:
+	case .General, .History:
 	case .Threads:
 		for k in 0 ..< int(q.threads) {
 			name := q.name

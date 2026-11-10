@@ -113,7 +113,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	}
 	if app.demo != nil { demo_catalog(&app.catalog) } else { catalog_load(&app.catalog) }
 	machine_init(&app.machine, app.demo)
-	if app.demo != nil { demo_preroll(app.demo, &app.machine, time.tick_now()._nsec) }
+	if app.demo != nil { demo_preroll(app.demo, &app.machine, &app.sampler, &app.catalog, time.tick_now()._nsec) }
 	table_layout_load(&app.table, app.settings)
 	app.table.tree = app.settings.tree
 	app.vl.multi = true   // (Ctrl and Shift clicks, Ctrl+A: End task and Kill act on every row marked)
@@ -210,9 +210,10 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 refresh :: proc(app: ^App) {
 	now := time.tick_now()
 	// (a sample sooner than the period, after an action, gives the graphs no point: their span stays the period's)
-	machine_sample(&app.machine, now._nsec, app.tab == .Performance && app.device.kind == .Cpu, history = !app.sample_extra)
+	history := !app.sample_extra
+	machine_sample(&app.machine, now._nsec, app.tab == .Performance && app.device.kind == .Cpu, history = history)
 	app.sample_extra = false
-	sample(&app.sampler, now._nsec, app.machine.d_total_ns, &app.catalog)
+	sample(&app.sampler, now._nsec, app.machine.d_total_ns, &app.catalog, history)
 	gpu_mem := gpu_proc_mem(&app.machine)
 	for &p in app.sampler.procs { p.gpu_mem = gpu_mem[p.pid] }
 	// (the GPUs' numbers are read while they are shown: a GPU that may sleep is let go otherwise)

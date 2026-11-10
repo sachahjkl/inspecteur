@@ -8,6 +8,11 @@ and the versions follow [semantic versioning](https://semver.org/).
 ### Added
 - **Tables in stripes, with a rule under each row** (Processes, Services, Startup, Connections, the Properties' lists):
   `view.zebra` and `view.rules` turn them off.
+- **A CPU graph in each row** (the `cpu_graph` column, shown by default): the last 30 samples of a process's or an
+  app's CPU, a bar each in the colours of the load; its tooltip says the mean and the highest; sorted, it orders by the
+  mean.
+- **History in Properties**: graphs of the process's CPU, private memory and disk since Inspecteur saw it start (5
+  minutes at most at the default period).
 
 ### Changed
 - **Busy cells go from green through yellow and orange to red** as the load grows, in full colours with a darker

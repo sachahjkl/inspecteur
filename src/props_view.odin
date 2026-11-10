@@ -35,7 +35,7 @@ props_build :: proc(app: ^App, em: f32) {
 				tabs_tip := fmt.tprintf("%s (%s), %s (%s)", COMMANDS[.Props_Next_Tab].label, ui.command_shortcut(COMMANDS[.Props_Next_Tab]), COMMANDS[.Props_Previous_Tab].label, ui.command_shortcut(COMMANDS[.Props_Previous_Tab]))
 				for i in 0 ..< len(Props_Tab) { hover_tip(fmt.tprintf("props_tab_%d", i), tabs_tip) }
 				ui.spacer(ui.fill())
-				if pp.tab != .General { props_filter_field(app, em) }
+				if props_tab_listed(pp.tab) { props_filter_field(app, em) }
 			}
 			ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
 			if ui.column(id = "###props_body") {
@@ -44,6 +44,7 @@ props_build :: proc(app: ^App, em: f32) {
 				} else {
 					switch pp.tab {
 					case .General:     props_general(app, p, em)
+					case .History:     props_history(app, p, em)
 					case .Threads:     props_threads(app, em)
 					case .Files:       props_files(app, em)
 					case .Modules:     props_modules(app, em)
@@ -139,6 +140,53 @@ props_general :: proc(app: ^App, p: ^Proc, em: f32) {
 		if p.gpu_mem > 0 { props_line("GPU memory", size_text(p.gpu_mem), em) }
 		props_line("Threads", fmt.tprintf("%d", p.threads), em)
 		props_line("Disk", !p.io_known ? "Access denied (another user's process)" : fmt.tprintf("%s read, %s written since it started", size_text(p.io_read), size_text(p.io_write)), em)
+	}
+}
+
+// The History tab: the process's CPU, memory and disk since Inspecteur saw it start (PROC_HISTORY_POINTS samples at
+// most), a graph each with its span, its top and its last value.
+@(private = "file")
+props_history :: proc(app: ^App, p: ^Proc, em: f32) {
+	if p.hist == nil || p.hist.cpu.count < 2 {
+		props_note("Its history starts at the next samples.", em)
+		return
+	}
+	h := p.hist
+	period := app.settings.refresh_ms
+	ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
+	if ui.column(id = "###history") {
+		ui.spacer(ui.px(em * 0.6))
+		graph :: proc(id, what: string, hist: ^ui.Value_History(PROC_HISTORY_POINTS), color: ui.Color, top, floor: f32, value: proc(v: f32) -> string, period: int, em: f32) {
+			values := ui.value_history_values(hist)
+			series := []ui.Line_Series{{values, color}}
+			shown_top := ui.line_graph_top(series, {top = top, floor = floor})
+			ui.next({width = ui.fill(), height = ui.px(em * 1.5)})
+			if ui.row(.Center, {}, fmt.tprintf("###%s_caption", id)) {
+				ui.spacer(ui.px(em))
+				ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
+				ui.label(fmt.tprintf("%s  %s###l", what, value(ui.value_history_last(hist))))
+				ui.spacer(ui.fill())
+				if ui.tags("weak") {
+					ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0, font_size = em * 0.85})
+					ui.label(fmt.tprintf("%s, top %s###r", span_text(hist.count, period), value(shown_top)))
+				}
+				ui.spacer(ui.px(em))
+			}
+			ui.next({width = ui.fill(), height = ui.fill()})
+			if ui.row(id = fmt.tprintf("###%s_row", id)) {
+				ui.spacer(ui.px(em))
+				ui.next({width = ui.fill(), height = ui.pct(1)})
+				// (the whole history across the width, at least a minute's points: it spreads as it grows)
+				ui.line_graph(fmt.tprintf("###%s", id), series, {top = shown_top, points = max(hist.count, HISTORY_POINTS), grid = true})
+				ui.spacer(ui.px(em))
+			}
+			ui.spacer(ui.px(em * 0.5))
+		}
+		graph("hist_cpu", "CPU", &h.cpu, hue(app, HUE_CPU), 0, 5, proc(v: f32) -> string { return fmt.tprintf("%.1f%%", v) }, period, em)
+		graph("hist_memory", "Private memory", &h.memory, hue(app, HUE_MEMORY), 0, 16 * 1024 * 1024, proc(v: f32) -> string { return size_text(u64(v)) }, period, em)
+		if p.io_known {
+			graph("hist_disk", "Disk", &h.disk, hue(app, HUE_DISK), 0, DISK_FLOOR, proc(v: f32) -> string { return fmt.tprintf("%s/s", size_text(u64(v))) }, period, em)
+		}
 	}
 }
 
@@ -321,7 +369,7 @@ props_filter_field :: proc(app: ^App, em: f32) {
 // Ctrl+F in the dialog: its filter gets the keyboard (on the General tab, the Threads tab is shown first).
 props_filter_focus :: proc(app: ^App) {
 	pp := &app.props
-	if pp.tab == .General { pp.tab = .Threads }
+	if !props_tab_listed(pp.tab) { pp.tab = .Threads }
 	if pp.filter_key != 0 { ui.set_focus(pp.filter_key) }
 }
 

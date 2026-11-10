@@ -19,16 +19,16 @@ import "gt:ui"
 
 // Memory is a process's private memory: the pages that are its own. The resident memory counts the pages it shares with
 // others too (its libraries, shared memory): summed over a group, it would count them once per process.
-Column :: enum u8 { Name, PID, PPID, User, State, Nice, CPU, Memory, Resident, GPU_Memory, Read, Write, Threads, Started, Command, Executable }
+Column :: enum u8 { Name, PID, PPID, User, State, Nice, CPU, CPU_Graph, Memory, Resident, GPU_Memory, Read, Write, Threads, Started, Command, Executable }
 
 COLUMN_NAMES := [Column]string{
-	.Name = "Name", .PID = "PID", .PPID = "Parent PID", .User = "User", .State = "State", .Nice = PRIORITY_COLUMN, .CPU = "CPU",
+	.Name = "Name", .PID = "PID", .PPID = "Parent PID", .User = "User", .State = "State", .Nice = PRIORITY_COLUMN, .CPU = "CPU", .CPU_Graph = "CPU, 30 s",
 	.Memory = "Private memory", .Resident = "Resident", .GPU_Memory = "GPU memory", .Read = "Disk read", .Write = "Disk write",
 	.Threads = "Threads", .Started = "Started", .Command = "Command line", .Executable = "Executable",
 }
 // The names in the preferences (processes.columns, processes.widths, processes.sort).
 COLUMN_KEYS := [Column]string{
-	.Name = "name", .PID = "pid", .PPID = "ppid", .User = "user", .State = "state", .Nice = "nice", .CPU = "cpu",
+	.Name = "name", .PID = "pid", .PPID = "ppid", .User = "user", .State = "state", .Nice = "nice", .CPU = "cpu", .CPU_Graph = "cpu_graph",
 	.Memory = "memory", .Resident = "resident", .GPU_Memory = "gpu_memory", .Read = "read", .Write = "write",
 	.Threads = "threads", .Started = "started", .Command = "command", .Executable = "executable",
 }
@@ -36,7 +36,7 @@ COLUMN_KEYS := [Column]string{
 COLUMN_TEXT :: bit_set[Column]{.Name, .User, .State, .Started, .Command, .Executable}
 // Each column's width when none was chosen, in ems (Name takes the room the others leave).
 COLUMN_DEFAULT_EM := [Column]f32{
-	.Name = 0, .PID = 5.5, .PPID = 6.5, .User = 6.5, .State = 7, .Nice = 4.5, .CPU = 5.5, .Memory = 8.5, .Resident = 7,
+	.Name = 0, .PID = 5.5, .PPID = 6.5, .User = 6.5, .State = 7, .Nice = 4.5, .CPU = 5.5, .CPU_Graph = 6.5, .Memory = 8.5, .Resident = 7,
 	.GPU_Memory = 7, .Read = 7, .Write = 7, .Threads = 5.5, .Started = 9.5, .Command = 22, .Executable = 18,
 }
 
@@ -357,6 +357,7 @@ sort_item_group :: proc(t: ^Table, s: ^Sampler, g: Group, k: int, name: string) 
 	#partial switch table_sort(t) {
 	case .Name:       it.text = name
 	case .CPU:        it.num = f64(g.cpu)
+	case .CPU_Graph:  for m in t.members[g.first:][:g.count] { it.num += f64(cpu_recent(&s.procs[m])) }
 	case .Memory:     it.num = f64(g.private)
 	case .Resident:   it.num = f64(g.resident)
 	case .GPU_Memory: it.num = f64(g.gpu_mem)
@@ -378,6 +379,7 @@ sort_value :: proc(it: ^Sort_Item, c: Column, s: ^Sampler, p: ^Proc) {
 	case .State:      it.text = state_text(p.state)
 	case .Nice:       it.num = f64(p.nice)
 	case .CPU:        it.num = f64(p.cpu)
+	case .CPU_Graph:  it.num = f64(cpu_recent(p))
 	case .Memory:     it.num = f64(p.private)
 	case .Resident:   it.num = f64(p.resident)
 	case .GPU_Memory: it.num = f64(p.gpu_mem)

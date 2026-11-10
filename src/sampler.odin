@@ -10,6 +10,19 @@ package inspecteur
 // 12.5 %.
 
 import "core:strings"
+import "gt:ui"
+
+// The points of a process's history (its graphs in Properties: 5 minutes at the default period), and the last of them
+// its CPU cell's graph shows (30 s).
+PROC_HISTORY_POINTS :: 300
+CPU_GRAPH_POINTS    :: 30
+
+// A process's history since Inspecteur saw it start, bounded: it goes with the process (proc_free).
+Proc_History :: struct {
+	cpu:    ui.Value_History(PROC_HISTORY_POINTS),   // percent of the machine
+	memory: ui.Value_History(PROC_HISTORY_POINTS),   // private bytes
+	disk:   ui.Value_History(PROC_HISTORY_POINTS),   // bytes read and written per second
+}
 
 Proc_State :: enum u8 { Unknown, Running, Sleeping, Disk_Wait, Stopped, Traced, Zombie, Dead, Idle }
 
@@ -67,6 +80,7 @@ Proc :: struct {
 	io_read, io_write: u64,
 	read_rate, write_rate: f64,   // bytes per second since the last sample
 	io_known:   bool,
+	hist:       ^Proc_History,   // owned
 }
 
 Sampler :: struct {
@@ -96,23 +110,24 @@ proc_free :: proc(p: ^Proc) {
 	delete(p.exe)
 	delete(p.unit)
 	delete(p.search)
+	free(p.hist)
 }
 
 // Reads every process again. `now_ns`: a monotonic clock. `d_total_ns`: the time of all the machine's processors since
 // the last sample (machine.odin): a process's CPU % is its share. `catalog`: matches each new process to an app (nil:
-// none).
-sample :: proc(s: ^Sampler, now_ns: i64, d_total_ns: u64, catalog: ^Catalog) {
+// none). `history`: the sample is one of the period's, which the processes' histories get a point of.
+sample :: proc(s: ^Sampler, now_ns: i64, d_total_ns: u64, catalog: ^Catalog, history := true) {
 	dt := s.last_ns > 0 ? f64(now_ns - s.last_ns) / 1e9 : 0
 	s.last_ns = now_ns
 	s.samples += 1
 	counters := make([dynamic]Proc_Counters, 0, len(s.procs) + 64, context.temp_allocator)
 	if s.demo != nil { demo_procs_read(s.demo, now_ns, &counters) } else { procs_read(&s.reader, &counters) }
-	procs_merge(s, counters[:], dt, d_total_ns, catalog)
+	procs_merge(s, counters[:], dt, d_total_ns, catalog, history)
 }
 
 // The processes from a reading (sorted by pid): those already known keep what was learnt of them and get their rates;
 // a new one (a new pid, or a pid with another start) is learnt.
-procs_merge :: proc(s: ^Sampler, counters: []Proc_Counters, dt: f64, d_total_ns: u64, catalog: ^Catalog) {
+procs_merge :: proc(s: ^Sampler, counters: []Proc_Counters, dt: f64, d_total_ns: u64, catalog: ^Catalog, history := true) {
 	next := make([dynamic]Proc, 0, len(counters))
 	old := 0
 	for c in counters {
@@ -134,6 +149,12 @@ procs_merge :: proc(s: ^Sampler, counters: []Proc_Counters, dt: f64, d_total_ns:
 			proc_learn(&p, c, f, catalog)
 		}
 		proc_update(&p, c, known, dt, d_total_ns)
+		// (a process seen for the first time has no rates yet: its first point is its second sample's)
+		if history && known {
+			ui.value_history_push(&p.hist.cpu, p.cpu)
+			ui.value_history_push(&p.hist.memory, f32(p.private))
+			ui.value_history_push(&p.hist.disk, f32(p.read_rate + p.write_rate))
+		}
 		append(&next, p)
 	}
 	for ; old < len(s.procs); old += 1 { proc_free(&s.procs[old]) }
@@ -144,6 +165,7 @@ procs_merge :: proc(s: ^Sampler, counters: []Proc_Counters, dt: f64, d_total_ns:
 @(private = "file")
 proc_learn :: proc(p: ^Proc, c: Proc_Counters, f: Proc_Facts, catalog: ^Catalog) {
 	p.pid, p.start, p.started, p.user = c.pid, c.start, f.started, f.user
+	p.hist = new(Proc_History)
 	p.name = strings.clone(f.name != "" ? f.name : c.comm)
 	p.cmdline = strings.clone(f.cmdline)
 	p.exe = strings.clone(f.exe)
@@ -168,6 +190,23 @@ proc_update :: proc(p: ^Proc, c: Proc_Counters, known: bool, dt: f64, d_total_ns
 		}
 		p.io_read, p.io_write = c.io_read, c.io_write
 	}
+}
+
+// The last `n` points of a history (fewer while it is young), oldest first, into `out`; returns how many.
+history_tail :: proc(h: ^ui.Value_History(PROC_HISTORY_POINTS), out: []f32) -> int {
+	n := min(len(out), h.count)
+	for i in 0 ..< n { out[i] = ui.value_history_at(h, h.count - n + i) }
+	return n
+}
+
+// The mean of the last CPU_GRAPH_POINTS points of a process's CPU (what the CPU graph column sorts by).
+cpu_recent :: proc(p: ^Proc) -> f32 {
+	if p.hist == nil { return 0 }
+	buf: [CPU_GRAPH_POINTS]f32
+	n := history_tail(&p.hist.cpu, buf[:])
+	sum: f32
+	for v in buf[:n] { sum += v }
+	return n > 0 ? sum / f32(n) : 0
 }
 
 // A counter's rate per second between two readings `dt` seconds apart; 0 when the counter went back (it was reset).

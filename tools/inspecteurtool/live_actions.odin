@@ -60,7 +60,7 @@ live_access_denied :: proc(l: ^Live) {
 	cdp.wait_idle(c, SESSION_WAIT)
 	if !check(l, ok && strings.has_suffix(selected_row_name(c), ", PID 1"), "PID 1 is selected (%q)", selected_row_name(c)) { return }
 	check(l, cdp.key(c, "alt+Enter") && cdp.wait_name(c, "props_name", SESSION_WAIT), "its Properties open")
-	check(l, cdp.click_name(c, "props_tab_2"), "the Open files tab")
+	check(l, cdp.click_name(c, "props_tab_3"), "the Open files tab")
 	check(l, cdp.wait_for(c, "Access denied", SESSION_WAIT), "it says Access denied")
 	check(l, cdp.key(c, "Escape") && cdp.wait_name(c, "props_name", SESSION_WAIT, gone = true), "Escape closes it")
 }

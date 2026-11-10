@@ -242,7 +242,7 @@ cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 	case .Info_Copy: return true
 	case .Props_Suspend, .Props_End_Task, .Props_Kill, .Props_Raise_Priority, .Props_Lower_Priority, .Props_Affinity:
 		return app.props.open && find_proc(&app.sampler, app.props.pid, app.props.start) != nil
-	case .Props_Filter: return app.props.open && app.props.tab != .General
+	case .Props_Filter: return app.props.open && props_tab_listed(app.props.tab)
 	case .Props_Next_Tab, .Props_Previous_Tab, .Props_Close: return app.props.open
 	}
 	return false

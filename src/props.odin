@@ -12,9 +12,12 @@ import "core:time"
 import process "gt:process"
 import "gt:ui"
 
-Props_Tab :: enum u8 { General, Threads, Files, Modules, Environment }
+Props_Tab :: enum u8 { General, History, Threads, Files, Modules, Environment }
 
-PROPS_TAB_LABELS := [Props_Tab]string{.General = "General", .Threads = "Threads", .Files = "Open files", .Modules = "Modules", .Environment = "Environment"}
+PROPS_TAB_LABELS := [Props_Tab]string{.General = "General", .History = "History", .Threads = "Threads", .Files = "Open files", .Modules = "Modules", .Environment = "Environment"}
+
+// The tabs with a list (and its filter): the others read no list.
+props_tab_listed :: proc(tab: Props_Tab) -> bool { return tab != .General && tab != .History }
 
 // How often the tab shown is read again while the dialog is open.
 PROPS_REFRESH_MS :: 3000
@@ -107,6 +110,7 @@ props_read :: proc(p: ^Props) {
 			for i in 0 ..< process.CPU_SET_MAX { append(&cpus, process.cpu_set_has(set, i)) }
 			p.cpus = strings.clone(cpu_list_text(cpus[:]), a)
 		}
+	case .History:     // (the sampler's: Proc.hist)
 	case .Threads:     p.list_read = proc_threads(p.pid, p.start, &p.threads, a)
 	case .Files:       p.list_read = proc_files(p.pid, p.start, &p.files, a)
 	case .Modules:     p.list_read = proc_modules(p.pid, p.start, &p.modules, a)

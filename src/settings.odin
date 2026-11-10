@@ -15,7 +15,7 @@ APP_NAME :: "inspecteur"
 PREF_COLUMNS :: 0
 
 PREF_DEFS := [?]config.Def{
-	{name = "processes.columns", category = "processes", description = "The columns of the Processes table besides the name, apart by commas: pid, ppid, user, state, nice, cpu, memory (private memory), resident, gpu_memory, read, write, threads, started, command, executable. A right click on the table's header (or Ctrl+Shift+C) changes them.", kind = .String, default = {s = "pid,user,cpu,memory,read,write,threads"}},
+	{name = "processes.columns", category = "processes", description = "The columns of the Processes table besides the name, apart by commas: pid, ppid, user, state, nice, cpu, cpu_graph (the CPU of the last 30 seconds), memory (private memory), resident, gpu_memory, read, write, threads, started, command, executable. A right click on the table's header (or Ctrl+Shift+C) changes them.", kind = .String, default = {s = "pid,user,cpu,cpu_graph,memory,read,write,threads"}},
 	{name = "processes.widths", category = "processes", description = "The widths of the columns that were resized, in ems, apart by commas (pid=6,command=30). Dragging the line before a column's title changes them.", kind = .String, default = {s = ""}},
 	{name = "processes.sort", category = "processes", description = "The column the processes are sorted by (one of processes.columns, or name).", kind = .String, default = {s = "name"}},
 	{name = "processes.descending", category = "processes", description = "Sort from the largest (or from Z) down.", kind = .Bool, default = {b = false}},

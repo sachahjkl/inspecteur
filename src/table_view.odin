@@ -357,6 +357,8 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 		case .State:      cell(t, c, state_text(p.state), &tip, weak = p.state != .Stopped && p.state != .Zombie)
 		case .Nice:       cell(t, c, fmt.tprintf("%d", p.nice), &tip, weak = p.nice == 0)
 		case .CPU:        cell(t, c, fmt.tprintf("%.1f%%", cpu), &tip, heat = cpu / HEAT_CPU_FULL, page = page)
+		case .CPU_Graph:
+			if text := cpu_graph_cell(app, r, page, em); text != "" { tip = text }
 		case .Memory:     cell(t, c, size_text(private), &tip, heat = app.machine.mem.total > 0 ? f32(f64(private) / f64(app.machine.mem.total) / HEAT_MEM_FULL) : 0, page = page)
 		case .Resident:   cell(t, c, size_text(resident), &tip, weak = true)
 		case .GPU_Memory: cell(t, c, gpu_mem > 0 ? size_text(gpu_mem) : "", &tip)
@@ -370,6 +372,77 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 	}
 	ui.table_row_end()
 	return
+}
+
+// The CPU graph's cell of a row: a bar per sample of the last CPU_GRAPH_POINTS, its height and colour the load's (a
+// group's: the sum of its processes'). Returns its numbers when the pointer is on it (the row's tooltip).
+@(private = "file")
+cpu_graph_cell :: proc(app: ^App, r: Row, page: ui.Color, em: f32) -> (tip: string) {
+	d := ui.frame_new(Cpu_Graph_Draw)
+	d.dark = luminance(page) < HEAT_DARK_PAGE
+	d.scale = ui.scale()
+	buf: [CPU_GRAPH_POINTS]f32
+	#partial switch r.kind {
+	case .Process:
+		p := &app.sampler.procs[r.index]
+		if p.hist != nil { d.count = history_tail(&p.hist.cpu, d.values[:]) }
+	case .App:
+		g := app.table.groups[r.index]
+		for m in app.table.members[g.first:][:g.count] {
+			q := &app.sampler.procs[m]
+			if q.hist == nil { continue }
+			n := history_tail(&q.hist.cpu, buf[:])
+			// (each process's points end at the same sample: the newest at the right)
+			for k in 0 ..< n { d.values[CPU_GRAPH_POINTS - n + k] += buf[k] }
+			d.count = max(d.count, n)
+		}
+		copy(d.values[:], d.values[CPU_GRAPH_POINTS - d.count:])
+	}
+	w := app.table.layout.width[int(Column.CPU_Graph)]
+	ui.next({width = w == 0 ? ui.fill() : ui.px(em * w), height = ui.pct(1)})
+	box := ui.custom(fmt.tprintf("###c%d", int(Column.CPU_Graph)), cpu_graph_draw, d, {.Clip})
+	m := ui.mouse_pos()
+	if d.count > 0 && m.x >= box.rect.min.x && m.x < box.rect.max.x && m.y >= box.rect.min.y && m.y < box.rect.max.y {
+		sum, top: f32
+		for v in d.values[:d.count] { sum += v; top = max(top, v) }
+		tip = fmt.tprintf("CPU over the last %s: %.1f%% on average, %.1f%% at most", span_text(d.count, app.settings.refresh_ms), sum / f32(d.count), top)
+	}
+	return
+}
+
+@(private = "file")
+Cpu_Graph_Draw :: struct {
+	values: [CPU_GRAPH_POINTS]f32,
+	count:  int,
+	dark:   bool,
+	scale:  f32,
+}
+
+// The height a bar takes at most (the rest is the cell's margin), and its least when the process used anything. A bar's
+// height is the square root of its share of HEAT_CPU_FULL: the same scale on every row, and a light load still has a
+// shape.
+CPU_GRAPH_HEIGHT :: 0.66
+CPU_GRAPH_LEAST  :: 0.05   // percent
+
+@(private = "file")
+cpu_graph_draw :: proc(b: ^ui.Box, user: rawptr, dc: ^draw.Context) {
+	d := (^Cpu_Graph_Draw)(user)
+	r := b.rect
+	pad := (r.max.x - r.min.x) * 0.06
+	left, right := r.min.x + pad, r.max.x - pad
+	h := (r.max.y - r.min.y) * CPU_GRAPH_HEIGHT
+	bottom := math.round(r.max.y - (r.max.y - r.min.y - h) * 0.5)
+	px := max(1, math.round(d.scale))
+	slot := (right - left) / CPU_GRAPH_POINTS
+	// (the newest at the right edge: a history not full yet starts on the right)
+	first := CPU_GRAPH_POINTS - d.count
+	for v, i in d.values[:d.count] {
+		if v < CPU_GRAPH_LEAST { continue }
+		x0 := math.round(left + slot * f32(first + i))
+		x1 := max(x0 + px, math.round(left + slot * f32(first + i + 1)) - (slot >= 3 * px ? px : 0))
+		top := bottom - max(px, math.round(h * math.sqrt(min(v / HEAT_CPU_FULL, 1))))
+		draw.rect(dc, {{x0, top}, {x1, bottom}}, heat_hue(v / HEAT_CPU_FULL, d.dark))
+	}
 }
 
 // When a process started (unix seconds): its time today, else its date and time (local time).
