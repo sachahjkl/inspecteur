@@ -38,7 +38,20 @@ and the versions follow [semantic versioning](https://semver.org/).
 - **Information**: the system (name, kernel, computer, motherboard, firmware, session, uptime), the processor, the memory,
   the GPUs (with their PCI ids and driver), the disks and file systems with their free room, the network interfaces with
   their MAC and addresses, the screens (their EDID's name and mode), the batteries. **Copy all** (Ctrl+C) copies it as text.
-- A table's cell too narrow for its text shows the whole text when the pointer rests on it.
+- A table's cell too narrow for its text shows the whole text when the pointer rests on it, in the Processes table too.
 - **Keys**: Ctrl+F gives the filter the keyboard, Ctrl+1 to Ctrl+6 show a section, F5 reads again now; the filter
   filters the section shown, and Escape clears it in every section.
 - Preferences: the services listed and how often (`services.manager`, `services.refresh_ms`), refresh period, theme, light or dark, finish, text size, window size (`docs/configuration.md`).
+
+### Changed
+- The tables, the graphs, the sidebar's bars, the readers' threads, typing to filter, the network interfaces' addresses
+  and the names' order are gui_toolkit's now (`ui.table_build`, `ui.table_header`, `ui.line_graph`, `ui.sparkline`,
+  `ui.meter_bar`, `ui.Worker`, `ui.type_to_field`, `platform.interface_addresses`, `ascii.compare_fold`), on gui_toolkit
+  0.139.0.
+- A signal and a priority go through a pidfd: the process's start time is read again while the pid is pinned, so a pid
+  given to another process is never signalled. A priority is set on every thread of the process, not on its main thread
+  alone.
+- Start, Stop, Restart, Enable and Disable of a system service let polkit ask for a password (interactive
+  authorization), and wait up to two minutes for it.
+- The apps' icons come from the user's icon theme (and its SVG icons), not from hicolor alone.
+- Typing while a menu is open no longer fills the filter.

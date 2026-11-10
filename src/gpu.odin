@@ -16,6 +16,7 @@ import "core:strconv"
 import "core:sync"
 import "core:thread"
 import "core:time"
+import "gt:ui"
 
 GPU_PERIOD :: 2 * time.Second
 GPU_MAX :: 4
@@ -92,8 +93,8 @@ gpus_sample :: proc(m: ^Machine) {
 	if len(m.gpus) != snap.count { resize(&m.gpus, snap.count) }
 	for &g, i in m.gpus {
 		g.read = snap.gpus[i]
-		history_push(&g.util_hist, g.read.util)
-		history_push(&g.mem_hist, g.read.mem_total > 0 ? 100 * f32(f64(g.read.mem_used) / f64(g.read.mem_total)) : 0)
+		ui.value_history_push(&g.util_hist, g.read.util)
+		ui.value_history_push(&g.mem_hist, g.read.mem_total > 0 ? 100 * f32(f64(g.read.mem_used) / f64(g.read.mem_total)) : 0)
 	}
 }
 

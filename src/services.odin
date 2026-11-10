@@ -60,20 +60,19 @@ Service_Ask :: struct {
 }
 
 Services :: struct {
-	worker:  Worker,
+	worker:  ui.Worker,
 	bus:     Service_Bus,      // the thread's own (services_linux.odin)
 	ask:     Service_Ask,      // under the worker's mutex
 	shared:  ^Service_List,    // the thread's last reading, under the worker's mutex
 	list:    ^Service_List,    // the window's
-	data:    Grid_Data,
-	grid:    Grid,
+	rows:    Section_Table,
 	manager: Manager,          // the one shown
 	menu:    ui.Key,
 	next:    time.Tick,        // the next reading while the section is shown
 	pending: Service_Action,   // an action asked and not answered yet
 }
 
-SERVICE_COLUMNS := [?]Grid_Column{
+SERVICE_COLUMNS := [?]ui.Table_Column{
 	{title = "Name", width = 0},
 	{title = "Description", width = 22, weak = true},
 	{title = "State", width = 11},
@@ -84,18 +83,17 @@ SERVICE_COLUMNS := [?]Grid_Column{
 }
 
 services_init :: proc(s: ^Services, app: ^App) {
-	grid_init(&s.grid, SERVICE_COLUMNS[:])
+	section_table_init(&s.rows, app, SERVICE_COLUMNS[:])
 	s.manager = app.settings.manager
-	worker_start(&s.worker, services_job, s, app.main.win)
+	ui.worker_start(&s.worker, services_job, s, app.main.win)
 }
 
 services_destroy :: proc(s: ^Services) {
-	worker_stop(&s.worker)
+	ui.worker_stop(&s.worker)
 	service_bus_close(&s.bus)
 	service_list_free(s.shared)
 	service_list_free(s.list)
-	grid_data_destroy(&s.data)
-	grid_destroy(&s.grid)
+	section_table_destroy(&s.rows)
 }
 
 @(private = "file")
@@ -108,24 +106,24 @@ service_list_free :: proc(l: ^Service_List) {
 // Asks for a reading of the manager shown, after `action` on `unit` when there is one.
 services_ask :: proc(app: ^App, action := Service_Action.None, unit := "") {
 	s := &app.services
-	worker_lock(&s.worker)
+	ui.worker_lock(&s.worker)
 	s.ask.manager = s.manager
 	if action != .None {
 		s.ask.action = action
 		s.ask.unit_len = copy(s.ask.unit[:], unit)
 	}
-	worker_unlock(&s.worker)
-	worker_ask(&s.worker)
+	ui.worker_unlock(&s.worker)
+	ui.worker_ask(&s.worker)
 	s.next = time.tick_add(time.tick_now(), time.Duration(app.settings.services_ms) * time.Millisecond)
 }
 
 @(private = "file")
-services_job :: proc(w: ^Worker) {
+services_job :: proc(w: ^ui.Worker) {
 	s := (^Services)(w.user)
-	worker_lock(w)
+	ui.worker_lock(w)
 	ask := s.ask
 	s.ask.action = .None
-	worker_unlock(w)
+	ui.worker_unlock(w)
 	l := new(Service_List)
 	// (the reading's texts in its arena; the bus's connections keep the heap: they outlive the reading)
 	a := virtual.arena_allocator(&l.arena)
@@ -137,22 +135,22 @@ services_job :: proc(w: ^Worker) {
 		l.failure = strings.clone(service_act(&s.bus, ask.manager, ask.action, l.unit), a)
 	}
 	l.problem = strings.clone(services_read(&s.bus, ask.manager, &l.units, a), a)
-	worker_lock(w)
+	ui.worker_lock(w)
 	old := s.shared
 	s.shared = l
-	worker_unlock(w)
+	ui.worker_unlock(w)
 	service_list_free(old)
-	worker_published(w)
+	ui.worker_published(w)
 }
 
 // The window's turn: a new reading becomes the rows; what an action came to is said.
 services_take :: proc(app: ^App) {
 	s := &app.services
-	if !worker_take(&s.worker) { return }
-	worker_lock(&s.worker)
+	if !ui.worker_take(&s.worker) { return }
+	ui.worker_lock(&s.worker)
 	old := s.list
 	s.list, s.shared = s.shared, nil
-	worker_unlock(&s.worker)
+	ui.worker_unlock(&s.worker)
 	service_list_free(old)
 	l := s.list
 	if l == nil { return }
@@ -173,32 +171,32 @@ services_take :: proc(app: ^App) {
 // shown).
 services_rows :: proc(app: ^App) {
 	s := &app.services
-	d := &s.data
-	grid_data_reset(d, len(SERVICE_COLUMNS))
+	st := &s.rows
+	section_rows_reset(st, len(SERVICE_COLUMNS))
 	if s.list != nil && s.list.manager == s.manager {
 		for u in s.list.units {
 			state := u.sub != "" && u.sub != u.active ? strings.concatenate({u.active, " (", u.sub, ")"}, context.temp_allocator) : u.active
-			tone := Grid_Tone.Normal
+			tone := ui.Table_Tone.Normal
 			if u.active == "failed" { tone = .Bad } else if u.active != "active" && u.active != "activating" && u.active != "reloading" { tone = .Dim }
 			pid := u.pid > 0 ? uint_text(u64(u.pid)) : ""
 			memory := u.memory != MEMORY_UNKNOWN && u.memory > 0 ? size_text(u.memory) : ""
-			grid_row(d, name_id(u.name), strings.join({u.name, u.description, state, u.file, pid}, " ", context.temp_allocator), {}, tone)
-			grid_cell(d, u.name)
-			grid_cell(d, u.description)
-			grid_cell(d, state)
-			grid_cell(d, u.file)
-			grid_cell(d, u.load)
-			grid_cell(d, pid, f64(u.pid))
-			grid_cell(d, memory, u.memory == MEMORY_UNKNOWN ? -1 : f64(u.memory))
+			section_row(st, name_id(u.name), strings.join({u.name, u.description, state, u.file, pid}, " ", context.temp_allocator), {}, tone)
+			ui.table_data_cell(&st.data, u.name)
+			ui.table_data_cell(&st.data, u.description)
+			ui.table_data_cell(&st.data, state)
+			ui.table_data_cell(&st.data, u.file)
+			ui.table_data_cell(&st.data, u.load)
+			ui.table_data_cell(&st.data, pid, f64(u.pid))
+			ui.table_data_cell(&st.data, memory, u.memory == MEMORY_UNKNOWN ? -1 : f64(u.memory))
 		}
 	}
-	grid_apply(&s.grid, d, app.query)
+	ui.table_apply(&st.table, &st.data, app.query)
 }
 
 // The selected service, when there is one.
 selected_service :: proc(app: ^App) -> (u: Service, ok: bool) {
 	s := &app.services
-	i := grid_selected(&s.grid)
+	i := ui.table_selected(&s.rows.table)
 	if s.list == nil || s.list.manager != s.manager || i < 0 || i >= len(s.list.units) { return }
 	return s.list.units[i], true
 }

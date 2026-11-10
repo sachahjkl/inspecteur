@@ -16,21 +16,21 @@ import "gt:ui"
 
 build_connections :: proc(app: ^App, em: f32) {
 	c := &app.connections
-	if c.grid.query != app.query { grid_apply(&c.grid, &c.data, app.query) }
+	if c.rows.table.query != app.query { ui.table_apply(&c.rows.table, &c.rows.data, app.query) }
 	listening := 0
 	for s in c.sockets { if socket_listens(s) { listening += 1 } }
 	note := c.read ? fmt.tprintf("%s, %d listening or open", count_text(len(c.sockets), "socket", "sockets"), listening) : "Reading…"
 	section_bar(app, "Connections", note, em, connections_actions)
-	ev := grid_build(app, &c.grid, &c.data, c.read ? "No socket." : "", em)
-	if ev.sorted { grid_apply(&c.grid, &c.data, app.query) }
+	ev := section_table_build(&c.rows, c.read ? "No socket." : "")
+	if ev.sorted { ui.table_apply(&c.rows.table, &c.rows.data, app.query) }
 	if ev.activated { connection_reveal(app) }
-	if ev.menu { connections_menu_open(app, ui.mouse_pos()) }
+	if ev.menu { connections_menu_open(app, ev.menu_at) }
 	connections_menu(app, em)
 }
 
 // The selected socket, when there is one.
 selected_socket :: proc(app: ^App) -> (s: Socket, ok: bool) {
-	i := grid_selected(&app.connections.grid)
+	i := ui.table_selected(&app.connections.rows.table)
 	if i < 0 || i >= len(app.connections.sockets) { return }
 	return app.connections.sockets[i], true
 }
@@ -49,14 +49,14 @@ connections_actions :: proc(app: ^App, em: f32) {
 // The keys of the section (view_keys calls it when no menu or dialog is open). `field_keeps`: the filter keeps Delete.
 connections_keys :: proc(app: ^App, field_keeps: bool) {
 	c := &app.connections
-	grid_keys(&c.grid)
+	keys := ui.table_keys(&c.rows.table)
 	if !field_keeps {
 		if ui.key_press(.Delete) { connection_signal(app, false) }
 		if ui.key_press(.Delete, {.Shift}) { connection_signal(app, true) }
 		if ui.key_press(.C, {.Ctrl}) { connection_copy(app) }
 	}
-	if ui.key_press(.Return) { connection_reveal(app) }
-	if ui.key_press(.Menu) || ui.key_press(.F10, {.Shift}) { connections_menu_open(app, {c.grid.sel_rect.min.x + 40, c.grid.sel_rect.max.y}, true) }
+	if keys.activated { connection_reveal(app) }
+	if keys.menu { connections_menu_open(app, keys.menu_at, true) }
 }
 
 @(private = "file")
@@ -94,7 +94,7 @@ connection_signal :: proc(app: ^App, kill: bool) {
 	defer chosen_free(&c)
 	append(&c.targets, Target{p.pid, p.start})
 	c.name = strings.clone(fmt.tprintf("%s (PID %d)", p.name, p.pid))
-	if kill { kill_ask(app, c) } else { send_signal(app, &c, .SIGTERM) }
+	if kill { kill_ask(app, c) } else { send_signal(app, &c, .Terminate) }
 }
 
 @(private = "file")

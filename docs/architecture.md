@@ -10,15 +10,16 @@ inspecteur ─ the window's thread (app.odin)
                sleeps in the toolkit's wait until input, the next sample, or a reader's result
                a sample: /proc (procfs.odin) -> groups (processes.odin) -> rows -> a frame
            ─ the GPUs' thread (gpu.odin): NVML or amdgpu every 2 s
-           ─ a thread per section that reads something slow (worker.odin): Services, Startup, Connections, Information
+           ─ a thread per section that reads something slow (ui.Worker): Services, Startup, Connections, Information
 ```
 
 A sample reads about 200 processes in 6 to 7 ms. It runs on the window's thread: a second thread would cost more in
 locks and copies than it saves. Between two samples, with no input, nothing runs. In a window the user is not in, the
 filter's caret neither shows nor blinks (`Build_Params.inactive`): at rest, one frame per sample.
 
-What can wait for a long time runs on a thread of its own, a `Worker`: a call to systemd that waits for polkit, a file
-system on a network that does not answer, the scan of every process's descriptors. The window asks (`worker_ask`); the
+What can wait for a long time runs on a thread of its own, the toolkit's `ui.Worker`: a call to systemd that waits for
+polkit, a file system on a network that does not answer, the scan of every process's descriptors. The window asks
+(`ui.worker_ask`); the
 thread reads into a new reading of its own, swaps it in under the worker's mutex, and wakes the window
 (`platform.wake`), which takes it at its next turn. A section reads only while it is shown (Information: when it is first
 shown, and on F5): the other sections cost nothing.
@@ -30,7 +31,7 @@ Each section is a model, its reader and its view:
 | Section | Model | Reader (Linux) | View |
 |---|---|---|---|
 | Processes | `processes.odin` | `procfs.odin` | `table_view.odin`, `menu.odin`, `props_view.odin` |
-| Performance | `machine.odin`, `gpu.odin` | the same files | `perf_view.odin`, `graph.odin` |
+| Performance | `machine.odin`, `gpu.odin` | the same files | `perf_view.odin` |
 | Services | `services.odin` | `services_linux.odin` | `services_view.odin` |
 | Startup | `startup.odin` | `startup_linux.odin` | `startup_view.odin` |
 | Connections | `connections.odin` | `connections_linux.odin` | `connections_view.odin` |
@@ -41,9 +42,12 @@ The readers of the new sections are in `*_linux.odin` files (Odin builds them on
 (`services_read`, `service_act`, `startup_read`, `startup_set_enabled`, `sockets_read`, `info_read`). The views read
 the structs and call those procs: they have no Linux in them.
 
-The Services, Startup and Connections tables are one generic table (`grid.odin`): a section fills a `Grid_Data` with its
-cells' texts and the numbers a column sorts by when its reading changes; the grid filters and sorts row indices, keeps the
-selection by the row's identity, and draws as the Processes table does.
+The Services, Startup and Connections tables are the toolkit's table (`ui.Table`, `section.odin`): a section fills a
+`ui.Table_Data` with its cells' texts and the numbers a column sorts by when its reading changes, and the icon of each row;
+the table filters and sorts row indices, keeps the selection by the row's identity, and draws as the Processes table
+does. The Processes table builds its own rows (groups, tinted cells) under the toolkit's header (`ui.table_header`,
+`ui.table_cell`). The graphs are the toolkit's (`ui.line_graph`, `ui.sparkline`, over `ui.Value_History`), and so are the
+sidebar's bars (`ui.meter_bar`).
 
 ## Services and Startup: systemd over D-Bus
 
@@ -51,7 +55,8 @@ The services come from systemd's managers over D-Bus, through the toolkit's own 
 `systemctl` started): `ListUnits` and `ListUnitFiles`, then `MainPID` and `MemoryCurrent` of each running service, all
 asked before any answer is read. Start, Stop and Restart are `StartUnit`, `StopUnit` and `RestartUnit`; Enable and Disable
 are `EnableUnitFiles` and `DisableUnitFiles`, then `Reload`, as `systemctl` does. A system service's change is the
-manager's to allow: it asks polkit, and what polkit refuses is said in the footer. Inspecteur never runs `sudo`.
+manager's to allow: it asks polkit. The call allows interactive authorization (`interactive` of `dbus.call`), so polkit
+can ask the user for a password; what it refuses is said in the footer. Inspecteur never runs `sudo`.
 
 The Startup section reads the XDG autostart entries itself (the Desktop Application Autostart Specification) and asks the
 user's manager which services the session's targets want (their `Wants` property). An autostart entry of the system is
@@ -101,12 +106,15 @@ A group is one entry: every process of that app and the processes under it, unle
 started from a terminal is the browser's). Two windows of one app are one group. End task on a group signals each of
 the app's processes (`group_roots`); the processes under them end with them.
 
-The app's icon is its entry's PNG in the hicolor theme or in `pixmaps`, made into a texture the first time it is shown.
+The app's icon is its entry's, from the user's icon theme (`desktop.theme_icon`: the theme, what it inherits, hicolor,
+then `pixmaps`; PNG or SVG), made into a texture the first time it is shown.
 
 ## Signals (src/menu.odin)
 
-End task sends SIGTERM, Kill sends SIGKILL after a confirmation. Just before a signal, the process's start time is read
-again: a pid freed and given to another process is not signalled.
+End task sends SIGTERM, Kill sends SIGKILL after a confirmation. The toolkit's `process.signal_process` pins the pid with
+a pidfd, reads the process's start time again, and signals through the pidfd only when it is the same: a pid freed and
+given to another process is not signalled, even between the check and the signal. A priority is set the same way, on
+every thread of the process (`process.set_priority`).
 
 ## The window (src/view.odin, src/table_view.odin)
 

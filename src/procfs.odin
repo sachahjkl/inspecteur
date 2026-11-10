@@ -181,14 +181,6 @@ proc_learn :: proc(s: ^Sampler, p: ^Proc, pid: i32, st: Stat_Fields, catalog: ^C
 	}
 }
 
-// Whether the process (pid, start) runs now, read again from /proc (not from the last sample).
-proc_alive :: proc(s: ^Sampler, pid: i32, start: u64) -> bool {
-	text, ok := read_at(s, path_of(pid, "stat"))
-	if !ok { return false }
-	st, parsed := parse_stat(string(text))
-	return parsed && st.start == start
-}
-
 // The name a process is shown with: its command name, whole when the kernel cut it (15 bytes) and the first argument
 // or the executable holds it, and without the dot and "-wrapped" of a Nix wrapper (.firefox-wrapped is firefox).
 display_name :: proc(comm, argv0, exe: string) -> string {

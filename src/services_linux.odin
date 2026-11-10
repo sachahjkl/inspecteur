@@ -25,8 +25,9 @@ SYSTEMD_PATH  :: "/org/freedesktop/systemd1"
 SYSTEMD_IFACE :: "org.freedesktop.systemd1.Manager"
 // How long the properties of all the services may take to come.
 PROPERTIES_WAIT :: 3 * time.Second
-// How long an action may take: a start waits for its job to be queued, an authorisation for polkit.
-ACTION_TIMEOUT_MS :: 30_000
+// How long an action may take: a start waits for its job to be queued, an authorisation for the person to answer
+// polkit's password dialog.
+ACTION_TIMEOUT_MS :: 120_000
 
 Service_Bus :: struct {
 	conns:        [Manager]^dbus.Conn,
@@ -216,11 +217,12 @@ unit_act :: proc(c: ^dbus.Conn, action: Service_Action, name: string) -> (failur
 		dbus.w_bool(&w, false)   // runtime: no, for good
 		if action == .Enable { dbus.w_bool(&w, false) }   // force: no
 	}
-	msg, ok := dbus.call(c, SYSTEMD_DEST, SYSTEMD_PATH, SYSTEMD_IFACE, member, sig, w.buf[:], ACTION_TIMEOUT_MS)
+	// (interactive: polkit may ask the user for a password before the system's manager acts)
+	msg, ok := dbus.call(c, SYSTEMD_DEST, SYSTEMD_PATH, SYSTEMD_IFACE, member, sig, w.buf[:], ACTION_TIMEOUT_MS, interactive = true)
 	if !ok { return call_failure(&msg, "the service manager did not answer") }
 	if action == .Enable || action == .Disable {
 		// (systemctl does the same: the manager reads the links it was given)
-		rmsg, rok := dbus.call(c, SYSTEMD_DEST, SYSTEMD_PATH, SYSTEMD_IFACE, "Reload", "", nil, ACTION_TIMEOUT_MS)
+		rmsg, rok := dbus.call(c, SYSTEMD_DEST, SYSTEMD_PATH, SYSTEMD_IFACE, "Reload", "", nil, ACTION_TIMEOUT_MS, interactive = true)
 		if !rok { return call_failure(&rmsg, "the service manager did not reload") }
 	}
 	return ""

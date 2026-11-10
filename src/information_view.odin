@@ -135,7 +135,7 @@ info_text :: proc(groups: []Info_Group) -> string {
 
 build_information :: proc(app: ^App, em: f32) {
 	inf := &app.information
-	busy := worker_busy(&inf.worker)
+	busy := ui.worker_busy(&inf.worker)
 	section_bar(app, "Information", busy && inf.data == nil ? "Reading…" : "This computer and its system", em, info_actions)
 	groups := info_report(app)
 	ui.next({width = ui.fill(), height = ui.fill()})
@@ -165,11 +165,11 @@ info_line :: proc(l: Info_Line, i: int, em: f32) {
 		ui.spacer(ui.px(em * 3))
 		if ui.tags("weak") {
 			ui.next({width = ui.px(em * INFO_KEY_EM)})
-			if ui.style({text_pad = 0}) { ui.paragraph(fmt.tprintf("%s###k", shown_text(l.key))) }
+			if ui.style({text_pad = 0}) { ui.paragraph(fmt.tprintf("%s###k", ui.text_shown(l.key))) }
 		}
 		ui.spacer(ui.px(em * 0.6))
 		ui.next({width = ui.px(em * INFO_WIDTH_EM)})
-		if ui.style({text_pad = 0}) { ui.paragraph(fmt.tprintf("%s###v", shown_text(l.value))) }
+		if ui.style({text_pad = 0}) { ui.paragraph(fmt.tprintf("%s###v", ui.text_shown(l.value))) }
 		ui.spacer(ui.fill())
 	}
 	ui.spacer(ui.px(em * 0.3))
@@ -178,7 +178,7 @@ info_line :: proc(l: Info_Line, i: int, em: f32) {
 @(private = "file")
 info_actions :: proc(app: ^App, em: f32) {
 	if tool_button(app, "copy_all", lucide.COPY, "Copy all (Ctrl+C)", true, em) { info_copy(app) }
-	if tool_button(app, "read_again", lucide.REFRESH_CW, "Read again (F5)", !worker_busy(&app.information.worker), em) { information_ask(&app.information) }
+	if tool_button(app, "read_again", lucide.REFRESH_CW, "Read again (F5)", !ui.worker_busy(&app.information.worker), em) { information_ask(&app.information) }
 }
 
 information_keys :: proc(app: ^App) {

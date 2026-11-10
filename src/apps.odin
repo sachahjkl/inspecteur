@@ -5,13 +5,12 @@ package inspecteur
 // window class names the process. A process matches by its own name or executable first, then by the systemd unit its
 // launcher made for it (app-<launcher>-<desktop id>-<random>.scope). Its children belong to the same app (processes.odin).
 //
-// The app's icon is the entry's: a PNG of the hicolor theme (or of pixmaps), drawn from a texture made the first time
-// it is shown. An SVG-only icon gets the generic one: the toolkit has no SVG rasterizer.
+// The app's icon is the entry's, from the person's icon theme (the toolkit's desktop.theme_icon: the theme, what it
+// inherits, hicolor, pixmaps; PNG or SVG), drawn from a texture made the first time it is shown.
 
 import "core:os"
 import "core:strings"
 import desktop "gt:desktop"
-import "gt:png"
 import "gt:render"
 
 App_Entry :: struct {
@@ -25,9 +24,6 @@ Catalog :: struct {
 	keys:    map[string]int,       // a lower-case name -> entry; keys owned
 	dirs:    [dynamic]string,      // the data folders, the user's first (owned)
 }
-
-// The icon sizes looked for, best first (a row's icon is about 16 to 24 pixels: mipmaps take the larger ones down).
-@(private = "file") ICON_SIZES :: [?]string{"32x32", "48x48", "64x64", "24x24", "128x128", "256x256", "22x22", "16x16"}
 
 catalog_load :: proc(c: ^Catalog) {
 	home := os.get_env("XDG_DATA_HOME", context.temp_allocator)
@@ -124,22 +120,21 @@ scope_match :: proc(c: ^Catalog, scope: string) -> int {
 
 Icon :: struct { tex: render.Texture, ok: bool }
 
-// The texture of an entry's icon, made the first time it is asked; ok false when the icon is not a PNG that can be
-// found (the row draws the generic icon).
-icon_of :: proc(c: ^Catalog, icons: ^map[string]Icon, r: ^render.Renderer, name: string) -> Icon {
+// The pixels an app's icon is asked at: a row's icon is about 16 to 24 pixels; mipmaps take the larger one down.
+ICON_PX :: 32
+
+// The texture of an app's icon (a desktop entry's Icon=: a name in the person's icon theme, or a file), made the first
+// time it is asked; ok false when there is none (the row draws the generic icon).
+icon_of :: proc(app: ^App, name: string) -> Icon {
 	if name == "" { return {} }
-	if ic, done := icons[name]; done { return ic }
+	if ic, done := app.app_icons[name]; done { return ic }
 	ic: Icon
-	if path := icon_path(c, name); path != "" {
-		if data, err := os.read_entire_file(path, context.temp_allocator); err == nil {
-			if rgba, w, h, ok := png.decode(data, context.temp_allocator); ok {
-				ic.tex = render.create_texture_rgba(r, w, h)
-				render.update_texture_rgba(r, ic.tex, 0, 0, w, h, rgba)
-				ic.ok = true
-			}
-		}
+	if pic, ok := desktop.theme_icon(name, ICON_PX, context.temp_allocator); ok {
+		ic.tex = render.create_texture_rgba(&app.shared.r, pic.size.x, pic.size.y)
+		render.update_texture_rgba(&app.shared.r, ic.tex, 0, 0, pic.size.x, pic.size.y, pic.rgba)
+		ic.ok = true
 	}
-	icons[strings.clone(name)] = ic
+	app.app_icons[strings.clone(name)] = ic
 	return ic
 }
 
@@ -149,24 +144,4 @@ icons_destroy :: proc(icons: ^map[string]Icon, r: ^render.Renderer) {
 		delete(name)
 	}
 	delete(icons^)
-}
-
-// The PNG of an icon name: an absolute path, else the hicolor theme of each data folder at the sizes of ICON_SIZES,
-// else pixmaps. "" when there is none.
-@(private = "file")
-icon_path :: proc(c: ^Catalog, name: string) -> string {
-	if strings.has_prefix(name, "/") { return strings.has_suffix(name, ".png") && os.exists(name) ? name : "" }
-	file := strings.concatenate({name, ".png"}, context.temp_allocator)
-	sizes := ICON_SIZES
-	for size in sizes {
-		for d in c.dirs {
-			p := strings.concatenate({d, "/icons/hicolor/", size, "/apps/", file}, context.temp_allocator)
-			if os.exists(p) { return p }
-		}
-	}
-	for d in c.dirs {
-		p := strings.concatenate({d, "/pixmaps/", file}, context.temp_allocator)
-		if os.exists(p) { return p }
-	}
-	return ""
 }

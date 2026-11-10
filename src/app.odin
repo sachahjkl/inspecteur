@@ -57,7 +57,6 @@ App :: struct {
 	tz_tried:    bool,
 	search:      ui.Text_Field,
 	search_key:  ui.Key,
-	typed:       bool,              // a character was typed this frame: the filter takes the keyboard (app_input)
 	vl:          ui.Virtual_List,   // the rows (vl.sel: the selected row)
 	sel_rect:    ui.Rect,           // the selected row, as last built (where the Menu key opens the menu)
 	menu:        Row_Menu,          // the row's menu, the confirmation of a kill (menu.odin)
@@ -102,7 +101,6 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	h.partial_redraw = true   // (a sample changes some cells: only they are drawn again)
 	ui.set_rounding(&h.state, ROUNDING)
 	h.params = app_params
-	h.input = app_input
 	app.devtools = devtools.start_from_env(win, "inspecteur")
 	h.before_input = proc(h: ^host.Host) { app := (^App)(h.user); devtools.service(app.devtools, &h.state, &app.shared.r) }
 	connections_init(&app.connections, app)
@@ -169,7 +167,7 @@ refresh :: proc(app: ^App) {
 	app.next_sample = time.tick_add(now, time.Duration(app.settings.refresh_ms) * time.Millisecond)
 	if app.props.open { props_read(&app.props) }
 	// (a section that reads on a thread of its own reads only while it is shown)
-	if app.tab == .Connections { worker_ask(&app.connections.worker) }
+	if app.tab == .Connections { ui.worker_ask(&app.connections.worker) }
 	app.refresh_time += time.tick_since(now)
 	app.refreshes += 1
 	app.main.settle = max(app.main.settle, 1)
@@ -194,7 +192,7 @@ tab_show :: proc(app: ^App, tab: Tab) {
 	if app.tab == tab { return }
 	app.tab = tab
 	#partial switch tab {
-	case .Connections: worker_ask(&app.connections.worker)
+	case .Connections: ui.worker_ask(&app.connections.worker)
 	case .Information: if !app.information.asked { information_ask(&app.information) }
 	case .Services:    services_ask(app)
 	case .Startup:     startup_ask(app)
@@ -268,10 +266,3 @@ say :: proc(app: ^App, format: string, args: ..any) {
 
 STATUS_SHOWN_MS :: 4000
 
-// The input before the interface sees it: a character typed, wherever the keyboard is, is for the filter.
-@(private = "file")
-app_input :: proc(h: ^host.Host, events: []platform.Event) -> []platform.Event {
-	app := (^App)(h.user)
-	for e in events { if e.kind == .Text && e.text >= ' ' { app.typed = true } }
-	return events
-}

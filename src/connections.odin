@@ -40,17 +40,16 @@ Socket :: struct {
 }
 
 Connections :: struct {
-	worker:  Worker,
+	worker:  ui.Worker,
 	reader:  Socket_Reader,     // the thread's own (connections_linux.odin)
 	shared:  [dynamic]Socket,   // the thread's last reading, under the worker's mutex
 	sockets: [dynamic]Socket,   // the window's copy
-	data:    Grid_Data,
-	grid:    Grid,
+	rows:    Section_Table,
 	read:    bool,              // a reading came at least once
 	menu:    ui.Key,
 }
 
-CONN_COLUMNS := [?]Grid_Column{
+CONN_COLUMNS := [?]ui.Table_Column{
 	{title = "Process", width = 0},
 	{title = "PID", width = 5.5, number = true, weak = true},
 	{title = "Protocol", width = 6},
@@ -60,39 +59,38 @@ CONN_COLUMNS := [?]Grid_Column{
 }
 
 connections_init :: proc(c: ^Connections, app: ^App) {
-	grid_init(&c.grid, CONN_COLUMNS[:])
-	worker_start(&c.worker, connections_job, c, app.main.win)
+	section_table_init(&c.rows, app, CONN_COLUMNS[:])
+	ui.worker_start(&c.worker, connections_job, c, app.main.win)
 }
 
 connections_destroy :: proc(c: ^Connections) {
-	worker_stop(&c.worker)
+	ui.worker_stop(&c.worker)
 	socket_reader_destroy(&c.reader)
 	delete(c.shared)
 	delete(c.sockets)
-	grid_data_destroy(&c.data)
-	grid_destroy(&c.grid)
+	section_table_destroy(&c.rows)
 }
 
 @(private = "file")
-connections_job :: proc(w: ^Worker) {
+connections_job :: proc(w: ^ui.Worker) {
 	c := (^Connections)(w.user)
 	list := make([dynamic]Socket, context.temp_allocator)
 	sockets_read(&c.reader, &list)
-	worker_lock(w)
+	ui.worker_lock(w)
 	clear(&c.shared)
 	append(&c.shared, ..list[:])
-	worker_unlock(w)
-	worker_published(w)
+	ui.worker_unlock(w)
+	ui.worker_published(w)
 }
 
 // The window's turn: a new reading becomes the rows.
 connections_take :: proc(app: ^App) {
 	c := &app.connections
-	if !worker_take(&c.worker) { return }
-	worker_lock(&c.worker)
+	if !ui.worker_take(&c.worker) { return }
+	ui.worker_lock(&c.worker)
 	clear(&c.sockets)
 	append(&c.sockets, ..c.shared[:])
-	worker_unlock(&c.worker)
+	ui.worker_unlock(&c.worker)
 	c.read = true
 	connections_rows(app)
 }
@@ -100,13 +98,13 @@ connections_take :: proc(app: ^App) {
 // The rows again from the sockets.
 connections_rows :: proc(app: ^App) {
 	c := &app.connections
-	d := &c.data
-	grid_data_reset(d, len(CONN_COLUMNS))
+	st := &c.rows
+	section_rows_reset(st, len(CONN_COLUMNS))
 	buf: [16]u8
 	for s in c.sockets {
 		name := "—"
 		pid := ""
-		icon := Grid_Icon{glyph = lucide.SQUARE_TERMINAL}
+		icon := Row_Icon{glyph = lucide.SQUARE_TERMINAL}
 		if s.pid > 0 {
 			pid = strings.clone(strconv.write_int(buf[:], i64(s.pid), 10), context.temp_allocator)
 			name = pid
@@ -119,15 +117,15 @@ connections_rows :: proc(app: ^App) {
 		local := endpoint_text(s.local, s.lport, s.v6)
 		remote := remote_text(s)
 		state := SOCKET_STATE_TEXT[s.state]
-		grid_row(d, socket_id(s), strings.join({name, pid, proto, local, remote, state}, " ", context.temp_allocator), icon, s.pid > 0 ? .Normal : .Dim)
-		grid_cell(d, name)
-		grid_cell(d, pid, f64(s.pid))
-		grid_cell(d, proto)
-		grid_cell(d, local)
-		grid_cell(d, remote)
-		grid_cell(d, state)
+		section_row(st, socket_id(s), strings.join({name, pid, proto, local, remote, state}, " ", context.temp_allocator), icon, s.pid > 0 ? .Normal : .Dim)
+		ui.table_data_cell(&st.data, name)
+		ui.table_data_cell(&st.data, pid, f64(s.pid))
+		ui.table_data_cell(&st.data, proto)
+		ui.table_data_cell(&st.data, local)
+		ui.table_data_cell(&st.data, remote)
+		ui.table_data_cell(&st.data, state)
 	}
-	grid_apply(&c.grid, d, app.query)
+	ui.table_apply(&st.table, &st.data, app.query)
 }
 
 // Whether the socket waits for others: a TCP socket that listens, a UDP socket open to anyone.

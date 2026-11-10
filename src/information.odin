@@ -7,6 +7,7 @@ package inspecteur
 // last sample of Performance (machine.odin) when the section is built.
 
 import "core:mem/virtual"
+import "gt:ui"
 
 Info_Gpu :: struct { name, vendor, ids, driver, slot: string, named: bool }   // named: the device's own name is known
 Info_Fs :: struct { mount, device, kind: string, size, free: u64 }
@@ -27,18 +28,18 @@ Info_Static :: struct {
 }
 
 Information :: struct {
-	worker: Worker,
+	worker: ui.Worker,
 	shared: ^Info_Static,   // the thread's last reading, under the worker's mutex (taken by the window)
 	data:   ^Info_Static,   // the window's
 	asked:  bool,
 }
 
 information_init :: proc(inf: ^Information, app: ^App) {
-	worker_start(&inf.worker, information_job, inf, app.main.win)
+	ui.worker_start(&inf.worker, information_job, inf, app.main.win)
 }
 
 information_destroy :: proc(inf: ^Information) {
-	worker_stop(&inf.worker)
+	ui.worker_stop(&inf.worker)
 	info_free(inf.shared)
 	info_free(inf.data)
 }
@@ -53,30 +54,30 @@ info_free :: proc(s: ^Info_Static) {
 // Asks for a reading (the first time the section is shown, and on F5).
 information_ask :: proc(inf: ^Information) {
 	inf.asked = true
-	worker_ask(&inf.worker)
+	ui.worker_ask(&inf.worker)
 }
 
 // The window's turn: a new reading replaces the last.
 information_take :: proc(inf: ^Information) {
-	if !worker_take(&inf.worker) { return }
-	worker_lock(&inf.worker)
+	if !ui.worker_take(&inf.worker) { return }
+	ui.worker_lock(&inf.worker)
 	old := inf.data
 	inf.data, inf.shared = inf.shared, nil
-	worker_unlock(&inf.worker)
+	ui.worker_unlock(&inf.worker)
 	info_free(old)
 }
 
 @(private = "file")
-information_job :: proc(w: ^Worker) {
+information_job :: proc(w: ^ui.Worker) {
 	inf := (^Information)(w.user)
 	s := new(Info_Static)
 	context.allocator = virtual.arena_allocator(&s.arena)
 	info_read(s)
-	worker_lock(w)
+	ui.worker_lock(w)
 	old := inf.shared
 	inf.shared = s
-	worker_unlock(w)
+	ui.worker_unlock(w)
 	info_free(old)
-	worker_published(w)
+	ui.worker_published(w)
 }
 

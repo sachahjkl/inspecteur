@@ -15,7 +15,7 @@ import "gt:ui"
 
 build_startup :: proc(app: ^App, em: f32) {
 	s := &app.startup
-	if s.grid.query != app.query { grid_apply(&s.grid, &s.data, app.query) }
+	if s.rows.table.query != app.query { ui.table_apply(&s.rows.table, &s.rows.data, app.query) }
 	note := "Reading…"
 	if s.pending {
 		note = "Changing…"
@@ -26,10 +26,10 @@ build_startup :: proc(app: ^App, em: f32) {
 		if s.list.problem != "" { note = fmt.tprintf("%s. %s", note, s.list.problem) }
 	}
 	section_bar(app, "Startup", note, em, startup_actions)
-	ev := grid_build(app, &s.grid, &s.data, s.list != nil ? "Nothing starts with the session." : "", em)
-	if ev.sorted { grid_apply(&s.grid, &s.data, app.query) }
+	ev := section_table_build(&s.rows, s.list != nil ? "Nothing starts with the session." : "")
+	if ev.sorted { ui.table_apply(&s.rows.table, &s.rows.data, app.query) }
 	if ev.activated { startup_open(app) }
-	if ev.menu { startup_menu_open(app, ui.mouse_pos()) }
+	if ev.menu { startup_menu_open(app, ev.menu_at) }
 	startup_menu(app, em)
 }
 
@@ -60,7 +60,7 @@ startup_actions :: proc(app: ^App, em: f32) {
 // The keys of the section (view_keys calls it when no menu or dialog is open). `field_keeps`: the filter keeps its keys.
 startup_keys :: proc(app: ^App, field_keeps: bool) {
 	s := &app.startup
-	grid_keys(&s.grid)
+	keys := ui.table_keys(&s.rows.table)
 	can := startup_can(app)
 	if ui.key_press(.E, {.Ctrl}) && can.enable { startup_toggle(app, true) }
 	if ui.key_press(.D, {.Ctrl}) && can.disable { startup_toggle(app, false) }
@@ -69,8 +69,8 @@ startup_keys :: proc(app: ^App, field_keeps: bool) {
 	}
 	// (Space is the filter's while it has the keyboard: a space in a name)
 	if ui.focus_key() != app.search_key && ui.key_press(.Space) && (can.enable || can.disable) { startup_toggle(app, can.enable) }
-	if ui.key_press(.Return) && can.open { startup_open(app) }
-	if ui.key_press(.Menu) || ui.key_press(.F10, {.Shift}) { startup_menu_open(app, {s.grid.sel_rect.min.x + 40, s.grid.sel_rect.max.y}, true) }
+	if keys.activated && can.open { startup_open(app) }
+	if keys.menu { startup_menu_open(app, keys.menu_at, true) }
 }
 
 @(private = "file")

@@ -19,7 +19,7 @@ import "gt:ui"
 
 build_services :: proc(app: ^App, em: f32) {
 	s := &app.services
-	if s.grid.query != app.query { grid_apply(&s.grid, &s.data, app.query) }
+	if s.rows.table.query != app.query { ui.table_apply(&s.rows.table, &s.rows.data, app.query) }
 	note := "Reading…"
 	if s.pending != .None {
 		note = "Waiting for the service manager…"
@@ -31,16 +31,16 @@ build_services :: proc(app: ^App, em: f32) {
 	section_bar(app, "Services", note, em, services_actions, services_manager_choice)
 	empty := ""
 	if s.list != nil && s.list.manager == s.manager { empty = s.list.problem != "" ? s.list.problem : "No service." }
-	ev := grid_build(app, &s.grid, &s.data, empty, em)
-	if ev.sorted { grid_apply(&s.grid, &s.data, app.query) }
+	ev := section_table_build(&s.rows, empty)
+	if ev.sorted { ui.table_apply(&s.rows.table, &s.rows.data, app.query) }
 	if ev.activated { service_reveal(app) }
-	if ev.menu { services_menu_open(app, ui.mouse_pos()) }
+	if ev.menu { services_menu_open(app, ev.menu_at) }
 	services_menu(app, em)
 }
 
 // Each period while the section is shown (refresh calls it at each sample).
 services_tick :: proc(app: ^App) {
-	if app.tab == .Services && time.tick_diff(app.services.next, time.tick_now()) >= 0 && !worker_busy(&app.services.worker) { services_ask(app) }
+	if app.tab == .Services && time.tick_diff(app.services.next, time.tick_now()) >= 0 && !ui.worker_busy(&app.services.worker) { services_ask(app) }
 }
 
 // The milliseconds until the next reading of the services is due, while they are shown (the window wakes for it).
@@ -98,7 +98,7 @@ services_switch :: proc(app: ^App, m: Manager) {
 	s.manager = m
 	app.settings.manager = m
 	pref_save(&app.prefs, "services.manager", MANAGER_KEYS[m])
-	s.grid.vl.sel = -1
+	s.rows.table.vl.sel = -1
 	services_rows(app)
 	services_ask(app)
 }
@@ -106,7 +106,7 @@ services_switch :: proc(app: ^App, m: Manager) {
 // The keys of the section (view_keys calls it when no menu or dialog is open). `field_keeps`: the filter keeps Delete.
 services_keys :: proc(app: ^App, field_keeps: bool) {
 	s := &app.services
-	grid_keys(&s.grid)
+	keys := ui.table_keys(&s.rows.table)
 	can := service_can(app)
 	if ui.key_press(.U, {.Ctrl}) { services_switch(app, s.manager == .System ? .User : .System) }
 	if ui.key_press(.S, {.Ctrl}) && can.start { service_do(app, .Start) }
@@ -117,8 +117,8 @@ services_keys :: proc(app: ^App, field_keeps: bool) {
 		if ui.key_press(.Delete) && can.stop { service_do(app, .Stop) }
 		if ui.key_press(.C, {.Ctrl}) && can.any { service_copy(app) }
 	}
-	if ui.key_press(.Return) && can.open { service_reveal(app) }
-	if ui.key_press(.Menu) || ui.key_press(.F10, {.Shift}) { services_menu_open(app, {s.grid.sel_rect.min.x + 40, s.grid.sel_rect.max.y}, true) }
+	if keys.activated && can.open { service_reveal(app) }
+	if keys.menu { services_menu_open(app, keys.menu_at, true) }
 }
 
 @(private = "file")

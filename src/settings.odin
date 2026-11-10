@@ -91,20 +91,21 @@ pref_save :: proc(p: ^config.Prefs, name, value: string) -> bool {
 
 // The table's columns from the settings: those shown, their widths, the sort.
 table_layout_load :: proc(t: ^Table, s: Settings) {
-	for c in Column { t.shown[c], t.width[c] = c == .Name, COLUMN_DEFAULT_EM[c] }
+	table_columns_init(t)
+	for c in Column { t.layout.shown[int(c)] = c == .Name }
 	for key in strings.split(s.columns, ",", context.temp_allocator) {
-		if c, ok := column_of(strings.trim_space(key)); ok { t.shown[c] = true }
+		if c, ok := column_of(strings.trim_space(key)); ok { t.layout.shown[int(c)] = true }
 	}
 	for pair in strings.split(s.widths, ",", context.temp_allocator) {
 		eq := strings.index_byte(pair, '=')
 		if eq < 0 { continue }
 		c, ok := column_of(strings.trim_space(pair[:eq]))
 		w, wok := strconv.parse_f32(strings.trim_space(pair[eq + 1:]))
-		if ok && wok && c != .Name { t.width[c] = clamp(w, COLUMN_MIN_EM, COLUMN_MAX_EM) }
+		if ok && wok && c != .Name { t.layout.width[int(c)] = clamp(w, ui.TABLE_COLUMN_MIN_EM, ui.TABLE_COLUMN_MAX_EM) }
 	}
-	t.sort = .Name
-	if c, ok := column_of(s.sort); ok { t.sort = c }
-	t.descending = s.descending
+	t.layout.sort = 0
+	if c, ok := column_of(s.sort); ok && t.layout.shown[int(c)] { t.layout.sort = int(c) }
+	t.layout.descending = s.descending
 }
 
 // The table's columns into the preferences, written.
@@ -113,12 +114,12 @@ table_layout_save :: proc(t: ^Table, p: ^config.Prefs) {
 	widths := make([dynamic]string, context.temp_allocator)
 	for c in Column {
 		if c == .Name { continue }
-		if t.shown[c] { append(&shown, COLUMN_KEYS[c]) }
-		if t.width[c] != COLUMN_DEFAULT_EM[c] { append(&widths, fmt.tprintf("%s=%.1f", COLUMN_KEYS[c], t.width[c])) }
+		if t.layout.shown[int(c)] { append(&shown, COLUMN_KEYS[c]) }
+		if t.layout.width[int(c)] != COLUMN_DEFAULT_EM[c] { append(&widths, fmt.tprintf("%s=%.1f", COLUMN_KEYS[c], t.layout.width[int(c)])) }
 	}
 	config.set_from_string(p, "processes.columns", strings.join(shown[:], ",", context.temp_allocator), .User)
 	config.set_from_string(p, "processes.widths", strings.join(widths[:], ",", context.temp_allocator), .User)
-	config.set_from_string(p, "processes.sort", COLUMN_KEYS[t.sort], .User)
-	config.set_from_string(p, "processes.descending", t.descending ? "true" : "false", .User)
+	config.set_from_string(p, "processes.sort", COLUMN_KEYS[table_sort(t)], .User)
+	config.set_from_string(p, "processes.descending", t.layout.descending ? "true" : "false", .User)
 	config.save_user(p, prefs_file())
 }

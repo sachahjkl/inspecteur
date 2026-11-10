@@ -6,7 +6,7 @@ package inspecteur
 
 import "core:fmt"
 import "core:strings"
-import "core:sys/linux"
+import process "gt:process"
 import "core:time"
 import lucide "gt:lucide"
 import "gt:ui"
@@ -62,7 +62,7 @@ props_title :: proc(app: ^App, p: ^Proc, em: f32) {
 		ui.spacer(ui.px(em * 0.4))
 		name := p != nil ? p.name : "?"
 		ui.next({width = ui.text_size(), height = ui.pct(1), font_size = em * 1.25, text_pad = 0})
-		ui.label(fmt.tprintf("%s###props_name", shown_text(name)))
+		ui.label(fmt.tprintf("%s###props_name", ui.text_shown(name)))
 		if ui.tags("weak") {
 			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = em * 0.6})
 			ui.label(fmt.tprintf("PID %d%s###props_pid", app.props.pid, p != nil ? fmt.tprintf("  ·  %s", state_text(p.state)) : ""))
@@ -95,7 +95,7 @@ props_line :: proc(label, value: string, em: f32) {
 			ui.label(fmt.tprintf("%s###k", label))
 		}
 		ui.next({width = ui.fill()})
-		if ui.style({text_pad = 0}) { ui.paragraph(fmt.tprintf("%s###v", shown_text(value))) }
+		if ui.style({text_pad = 0}) { ui.paragraph(fmt.tprintf("%s###v", ui.text_shown(value))) }
 		ui.spacer(ui.px(em))
 	}
 	ui.spacer(ui.px(em * 0.25))
@@ -165,7 +165,7 @@ props_list :: proc(app: ^App, id: string, state: Read_State, titles: []string, w
 			for _, k in titles {
 				if k > 0 { ui.push_tags("weak") }
 				ui.next({width = widths[k] > 0 ? ui.px(em * widths[k]) : ui.fill(), height = ui.pct(1), text_pad = 0})
-				ui.build_box({.Draw_Text, .Clip}, fmt.tprintf("%s###c%d", shown_text(cell(app, i, k)), k))
+				ui.build_box({.Draw_Text, .Clip}, fmt.tprintf("%s###c%d", ui.text_shown(cell(app, i, k)), k))
 				if k > 0 { ui.pop_tags() }
 			}
 		}
@@ -252,11 +252,11 @@ props_actions :: proc(app: ^App, p: ^Proc, em: f32) {
 			stopped := p.state == 'T'
 			ui.next({height = ui.px(ui.dense(em * 2.1))})
 			if ui.button_icon("props_suspend", stopped ? lucide.PLAY : lucide.SQUARE, stopped ? "Resume" : "Suspend").clicked {
-				send_signal(app, &c, stopped ? .SIGCONT : .SIGSTOP)
+				send_signal(app, &c, stopped ? .Continue : .Stop)
 			}
 			ui.spacer(ui.px(em * 0.4))
 			ui.next({height = ui.px(ui.dense(em * 2.1))})
-			if ui.button_icon("props_end", lucide.X, "End task").clicked { send_signal(app, &c, .SIGTERM) }
+			if ui.button_icon("props_end", lucide.X, "End task").clicked { send_signal(app, &c, .Terminate) }
 			ui.spacer(ui.px(em * 0.4))
 			ui.next({height = ui.px(ui.dense(em * 2.1))})
 			if ui.button_icon("props_kill", lucide.ZAP, "Kill…").clicked { kill_ask(app, c) }
@@ -267,16 +267,17 @@ props_actions :: proc(app: ^App, p: ^Proc, em: f32) {
 	}
 }
 
-// Sets a process's nice value; a user may only lower a priority (setpriority refuses the rest).
+// Sets a process's nice value, on each of its threads; a user may only lower a priority (setpriority refuses the rest).
 @(private = "file")
 set_priority :: proc(app: ^App, p: ^Proc, nice: i8) {
-	if !proc_alive(&app.sampler, p.pid, p.start) { say(app, "The process has ended already"); return }
-	#partial switch linux.setpriority(.PROCESS, p.pid, i32(nice)) {
-	case .NONE:
+	#partial switch r, _ := process.set_priority(p.pid, p.start, int(nice)); r {
+	case .Gone:
+		say(app, "The process has ended already")
+	case .Done:
 		say(app, "%s (PID %d) now runs at nice %d", p.name, p.pid, nice)
 		p.nice = nice
 		app.next_sample = time.tick_add(time.tick_now(), SAMPLE_AFTER_SIGNAL)
-	case .EACCES, .EPERM:
+	case .Denied:
 		say(app, "Access denied: a higher priority, or another user's process, needs root")
 	case:
 		say(app, "The priority cannot be changed")

@@ -6,6 +6,7 @@ package inspecteur
 
 import "core:fmt"
 import "core:strings"
+import "gt:draw"
 import "gt:ui"
 
 Device_Kind :: enum u8 { Cpu, Memory, Disk, Network, Gpu }
@@ -25,7 +26,7 @@ KEYS_W_EM       :: 26     // the page's table of details
 CPU_GRID_GAP_EM :: 0.4
 ADDRESSES_SHOWN :: 3    // an interface's addresses of each kind shown
 
-// The hues of the devices (graph.odin's hue).
+// The hues of the devices (hue).
 HUE_CPU, HUE_MEMORY, HUE_DISK, HUE_NETWORK, HUE_GPU, HUE_SECOND :: 1, 2, 3, 4, 6, 7
 
 build_performance :: proc(app: ^App, em: f32) {
@@ -53,7 +54,7 @@ build_performance :: proc(app: ^App, em: f32) {
 			ui.next({width = ui.fill(), height = ui.fill()})
 			if ui.scroll_y("###devices_scroll") {
 				device_row(app, {.Cpu, 0}, "CPU", fmt.tprintf("%.0f%%  %s", m.cpu, mhz_text(m.mhz)), {{&m.cpu_hist, hue(app, HUE_CPU), ""}}, 100, em)
-				device_row(app, {.Memory, 0}, "Memory", fmt.tprintf("%s / %s (%.0f%%)", size_text(mem_used(m)), size_text(m.mem.total), history_last(&m.mem_hist)), {{&m.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, em)
+				device_row(app, {.Memory, 0}, "Memory", fmt.tprintf("%s / %s (%.0f%%)", size_text(mem_used(m)), size_text(m.mem.total), ui.value_history_last(&m.mem_hist)), {{&m.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, em)
 				for &d, i in m.disks {
 					device_row(app, {.Disk, i}, fmt.tprintf("Disk %d (%s)", i, d.name), fmt.tprintf("%s  %.0f%%", d.kind, d.active), {{&d.active_hist, hue(app, HUE_DISK), ""}}, 100, em)
 				}
@@ -102,7 +103,26 @@ device_check :: proc(app: ^App) {
 	}
 }
 
-history_last :: proc(h: ^History) -> f32 { return h.count > 0 ? history_at(h, h.count - 1) : 0 }
+// A series of a graph: its history, its colour, its name in the graph's legend ("": none).
+Series :: struct {
+	hist:  ^History,
+	color: ui.Color,
+	name:  string,
+}
+
+// The series as the toolkit's graph takes them.
+@(private = "file")
+line_series :: proc(series: []Series) -> []ui.Line_Series {
+	out := make([]ui.Line_Series, len(series), context.temp_allocator)
+	for s, i in series { out[i] = {ui.value_history_values(s.hist), s.color} }
+	return out
+}
+
+// The theme's hue `i` (0 accent, 1 blue, 2 purple, 3 green, 4 yellow, 5 red, 6 cyan, 7 rose) in the version shown.
+hue :: proc(app: ^App, i: int) -> ui.Color {
+	c, _ := ui.theme_version(app.theme_shown.def, app.theme_shown.light)
+	return draw.hex(c.hues[i])
+}
 
 @(private = "file")
 device_row :: proc(app: ^App, d: Device, title, sub: string, series: []Series, top: f32, em: f32) {
@@ -118,7 +138,7 @@ device_row :: proc(app: ^App, d: Device, title, sub: string, series: []Series, t
 		frame := ui.build_box({.Draw_Border}, "###spark_frame")
 		if ui.parent(frame) {
 			ui.next({width = ui.fill(), height = ui.fill()})
-			graph("###spark", series, top, grid = false)
+			ui.sparkline("###spark", line_series(series), top, HISTORY_POINTS)
 		}
 		ui.spacer(ui.px(em * 0.6))
 		ui.next({width = ui.fill(), height = ui.pct(1), axis = .Y})
@@ -128,7 +148,7 @@ device_row :: proc(app: ^App, d: Device, title, sub: string, series: []Series, t
 			ui.label(fmt.tprintf("%s###t", title))
 			if ui.tags("weak") {
 				ui.next({width = ui.fill(), height = ui.px(em * 1.25), text_pad = 0, font_size = em * 0.86})
-				ui.label(fmt.tprintf("%s###s", shown_text(sub)))
+				ui.label(fmt.tprintf("%s###s", ui.text_shown(sub)))
 			}
 			ui.spacer(ui.fill())
 		}
@@ -150,7 +170,7 @@ page_title :: proc(title, what: string, em: f32) {
 		ui.spacer(ui.fill())
 		if ui.tags("weak") {
 			ui.next({width = ui.text_size(), height = ui.pct(1), font_size = em * 1.05, text_pad = 0})
-			ui.label(fmt.tprintf("%s###what", shown_text(what)))
+			ui.label(fmt.tprintf("%s###what", ui.text_shown(what)))
 		}
 	}
 	ui.spacer(ui.px(em * 0.5))
@@ -159,7 +179,8 @@ page_title :: proc(title, what: string, em: f32) {
 // A graph with its captions: what it shows and its top above it, its span and its bottom under it.
 @(private = "file")
 captioned_graph :: proc(app: ^App, id, what: string, series: []Series, top: f32, top_text: proc(v: f32) -> string, em: f32, height: ui.Size) {
-	shown_top := top > 0 ? top : graph_top(series_max(series))
+	lines := line_series(series)
+	shown_top := ui.line_graph_top(lines, {top = top})
 	// what it shows, the legend of its series (a swatch and a name each), its top
 	ui.next({width = ui.fill(), height = ui.px(em * 1.5)})
 	if ui.row(.Center, {}, fmt.tprintf("###%s_caption", id)) {
@@ -182,15 +203,8 @@ captioned_graph :: proc(app: ^App, id, what: string, series: []Series, top: f32,
 		}
 	}
 	ui.next({width = ui.fill(), height = height})
-	graph(fmt.tprintf("###%s", id), series, shown_top)
+	ui.line_graph(fmt.tprintf("###%s", id), lines, {top = shown_top, points = HISTORY_POINTS, grid = true})
 	caption(fmt.tprintf("%d seconds", HISTORY_POINTS * app.settings.refresh_ms / 1000), "0", em)
-}
-
-@(private = "file")
-series_max :: proc(series: []Series) -> f32 {
-	m: f32
-	for s in series { m = max(m, history_max(s.hist)) }
-	return m
 }
 
 @(private = "file")
@@ -230,7 +244,7 @@ stats_block :: proc(big: []Stat, details: []Stat, em: f32) {
 						ui.label(fmt.tprintf("%s###l", s.label))
 					}
 					ui.next({width = ui.fill(), height = ui.px(em * 1.8), font_size = em * 1.3, text_pad = 0})
-					ui.label(fmt.tprintf("%s###v", shown_text(s.value)))
+					ui.label(fmt.tprintf("%s###v", ui.text_shown(s.value)))
 				}
 			}
 		}
@@ -245,7 +259,7 @@ stats_block :: proc(big: []Stat, details: []Stat, em: f32) {
 						ui.label(fmt.tprintf("%s###l", s.label))
 					}
 					ui.next({width = ui.fill()})
-					if ui.style({text_pad = 0}) { ui.paragraph(fmt.tprintf("%s###v", shown_text(s.value))) }
+					if ui.style({text_pad = 0}) { ui.paragraph(fmt.tprintf("%s###v", ui.text_shown(s.value))) }
 				}
 			}
 		}
@@ -273,7 +287,7 @@ cpu_page :: proc(app: ^App, em: f32) {
 						i := r * cols + k
 						if k > 0 { ui.spacer(ui.px(em * CPU_GRID_GAP_EM)) }
 						ui.next({width = ui.fill(), height = ui.fill()})
-						if i < n { graph(fmt.tprintf("###core_%d", i), {{&m.core_hist[i], c, ""}}) } else { ui.spacer(ui.fill()) }
+						if i < n { ui.line_graph(fmt.tprintf("###core_%d", i), line_series({{&m.core_hist[i], c, ""}}), {top = 100, points = HISTORY_POINTS, grid = true}) } else { ui.spacer(ui.fill()) }
 					}
 				}
 			}

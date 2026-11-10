@@ -23,7 +23,6 @@ package inspecteur
 
 import "core:fmt"
 import "core:strings"
-import "gt:draw"
 import "gt:host"
 import "gt:platform"
 import lucide "gt:lucide"
@@ -47,9 +46,8 @@ METER_FULL :: 0.9
 view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	app := (^App)(h.user)
 	em := ui.font_size()
-	// typing anywhere filters: a character typed gives the filter the keyboard (app_input)
-	if app.typed && !app.menu.kill_open && !app.props.open && app.search_key != 0 { ui.set_focus(app.search_key) }
-	app.typed = false
+	// typing anywhere filters: a character typed gives the filter the keyboard (an open menu searches its own items)
+	if !app.menu.kill_open && !app.props.open && !ui.ctx_menu_any_open() { ui.type_to_field(app.search_key) }
 	if !app.menu.kill_open && !app.props.open && !ui.ctx_menu_any_open() { view_keys(app) }
 	ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
 	page := ui.build_box({.Draw_Background}, "###page")
@@ -290,17 +288,6 @@ build_meters :: proc(app: ^App, em: f32) {
 }
 
 @(private = "file")
-Bar_Draw :: struct { used: f32, bar, track: ui.Color }
-
-@(private = "file")
-bar_draw :: proc(b: ^ui.Box, user: rawptr, dc: ^draw.Context) {
-	d := (^Bar_Draw)(user)
-	r := b.rect
-	draw.rect(dc, r, d.track)
-	draw.rect(dc, {r.min, {r.min.x + (r.max.x - r.min.x) * clamp(d.used, 0, 1), r.max.y}}, d.bar)
-}
-
-@(private = "file")
 meter :: proc(app: ^App, id, icon, title, value: string, used: f32, em: f32) {
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.7))})
 	if ui.row(.Center, {}, fmt.tprintf("###meter_%s", id)) {
@@ -321,12 +308,8 @@ meter :: proc(app: ^App, id, icon, title, value: string, used: f32, em: f32) {
 				}
 			}
 			ui.spacer(ui.px(em * 0.2))
-			d := ui.frame_new(Bar_Draw)
-			full: ui.Color
-			if ui.tags("bad") { full = ui.color("text") }
-			d^ = {used, used > METER_FULL ? full : ui.color("accent"), ui.color("border")}
 			ui.next({width = ui.fill(), height = ui.px(max(3, em * 0.25))})
-			ui.custom("###bar", bar_draw, d)
+			ui.meter_bar("###bar", used, METER_FULL)
 			ui.spacer(ui.fill())
 		}
 		ui.spacer(ui.px(em * 0.8))
@@ -347,7 +330,7 @@ build_footer :: proc(app: ^App, em: f32) {
 			if msg == "" || ui.now_ms() > app.status_until {
 				msg = ""
 				if r, ok := selected_row(app); ok && app.tab == .Processes {
-					if p, has := row_process(app, r); has { msg = fmt.tprintf("Selected: %s, PID %d", shown_text(p.name), p.pid) }
+					if p, has := row_process(app, r); has { msg = fmt.tprintf("Selected: %s, PID %d", ui.text_shown(p.name), p.pid) }
 				}
 			}
 			if ui.tags("weak") {
@@ -373,14 +356,6 @@ counter :: proc(app: ^App, id, icon, value: string, em: f32) {
 		ui.label(fmt.tprintf("%s###v", value))
 		ui.spacer(ui.px(em * 0.4))
 	}
-}
-
-// Text to show as it is: a "##" in it would end the shown part of a box's id string (ui's key rules), so a zero-width
-// space goes between the two signs.
-shown_text :: proc(text: string, allocator := context.temp_allocator) -> string {
-	if !strings.contains(text, "##") { return text }
-	out, _ := strings.replace_all(text, "##", "#​#", allocator)
-	return out
 }
 
 // "1 app", "3 apps".

@@ -14,6 +14,8 @@ import "core:slice"
 import "core:strconv"
 import "core:strings"
 import "core:sys/linux"
+import "gt:platform"
+import "gt:ui"
 
 // The points of a graph: one per sample (60 s at the default period).
 HISTORY_POINTS :: 60
@@ -22,28 +24,8 @@ NET_STATIC_SAMPLES :: 10
 // A disk's sector, as /proc/diskstats counts them (always 512 bytes, whatever the disk's own).
 SECTOR_BYTES :: 512
 
-History :: struct {
-	values: [HISTORY_POINTS]f32,
-	head:   int,   // where the next value goes
-	count:  int,
-}
-
-history_push :: proc(h: ^History, v: f32) {
-	h.values[h.head] = v
-	h.head = (h.head + 1) % HISTORY_POINTS
-	h.count = min(h.count + 1, HISTORY_POINTS)
-}
-
-// The `i`th value, oldest first (0 ..< count).
-history_at :: proc(h: ^History, i: int) -> f32 {
-	return h.values[(h.head - h.count + i + HISTORY_POINTS * 2) % HISTORY_POINTS]
-}
-
-history_max :: proc(h: ^History) -> f32 {
-	m: f32
-	for i in 0 ..< h.count { m = max(m, history_at(h, i)) }
-	return m
-}
+// The last HISTORY_POINTS values of a graph (the toolkit's ring).
+History :: ui.Value_History(HISTORY_POINTS)
 
 Cpu_Info :: struct {
 	model:            string,   // owned
@@ -158,14 +140,14 @@ machine_sample :: proc(m: ^Machine, now_ns: i64, cpu_shown: bool) {
 			dt_core := t.core_total[i] - min(m.core_total[i], t.core_total[i])
 			if m.core_total[i] > 0 && dt_core > 0 { m.core_cpu[i] = 100 * (1 - f32(t.core_idle[i] - min(m.core_idle[i], t.core_idle[i])) / f32(dt_core)) }
 			m.core_total[i], m.core_idle[i] = t.core_total[i], t.core_idle[i]
-			if m.samples > 1 { history_push(&m.core_hist[i], m.core_cpu[i]) }
+			if m.samples > 1 { ui.value_history_push(&m.core_hist[i], m.core_cpu[i]) }
 		}
-		if m.samples > 1 { history_push(&m.cpu_hist, m.cpu) }
+		if m.samples > 1 { ui.value_history_push(&m.cpu_hist, m.cpu) }
 		m.boot_time = t.boot_time
 	}
 	if text, _, ok := read_file(m.buf, linux.AT_FDCWD, "/proc/meminfo"); ok {
 		m.mem = parse_meminfo(string(text))
-		history_push(&m.mem_hist, m.mem.total > 0 ? 100 * f32(f64(mem_used(m)) / f64(m.mem.total)) : 0)
+		ui.value_history_push(&m.mem_hist, m.mem.total > 0 ? 100 * f32(f64(mem_used(m)) / f64(m.mem.total)) : 0)
 	}
 	if text, _, ok := read_file(m.buf, linux.AT_FDCWD, "/proc/loadavg"); ok { m.load = parse_loadavg(string(text)) }
 	if text, _, ok := read_file(m.buf, linux.AT_FDCWD, "/proc/uptime"); ok { m.uptime = strconv.parse_f64(first_field(string(text))) or_else 0 }
@@ -327,9 +309,9 @@ disks_sample :: proc(m: ^Machine, text: string, dt: f64) {
 				d.read_rate = f64(s.sectors_read - min(d.sectors_read, s.sectors_read)) * SECTOR_BYTES / dt
 				d.write_rate = f64(s.sectors_written - min(d.sectors_written, s.sectors_written)) * SECTOR_BYTES / dt
 				d.active = min(100, f32(f64(s.io_ms - min(d.io_ms, s.io_ms)) / (dt * 10)))
-				history_push(&d.read_hist, f32(d.read_rate))
-				history_push(&d.write_hist, f32(d.write_rate))
-				history_push(&d.active_hist, d.active)
+				ui.value_history_push(&d.read_hist, f32(d.read_rate))
+				ui.value_history_push(&d.write_hist, f32(d.write_rate))
+				ui.value_history_push(&d.active_hist, d.active)
 			}
 			d.sectors_read, d.sectors_written, d.io_ms = s.sectors_read, s.sectors_written, max(s.io_ms, 1)
 		}
@@ -371,8 +353,8 @@ nets_sample :: proc(m: ^Machine, text: string, dt: f64) {
 			if dt > 0 && (n.rx > 0 || n.tx > 0) {
 				n.rx_rate = f64(s.rx - min(n.rx, s.rx)) / dt
 				n.tx_rate = f64(s.tx - min(n.tx, s.tx)) / dt
-				history_push(&n.rx_hist, f32(n.rx_rate))
-				history_push(&n.tx_hist, f32(n.tx_rate))
+				ui.value_history_push(&n.rx_hist, f32(n.rx_rate))
+				ui.value_history_push(&n.tx_hist, f32(n.tx_rate))
 			}
 			n.rx, n.tx = max(s.rx, 1), max(s.tx, 1)
 		}
@@ -390,54 +372,22 @@ nets_static :: proc(m: ^Machine) {
 		for a in n.addrs { delete(a) }
 		clear(&n.addrs)
 	}
-	head: ^Ifaddrs
-	if getifaddrs(&head) != 0 { return }
-	defer freeifaddrs(head)
-	for family in ([]u16{AF_INET, AF_INET6}) {
-		for a := head; a != nil; a = a.next {
-			if a.addr == nil || a.addr.family != family { continue }
-			name := string(a.name)
+	addrs := platform.interface_addresses(context.temp_allocator)
+	for family in ([]platform.Address_Family{.IP4, .IP6}) {
+		for a in addrs {
+			if a.family != family { continue }
 			for &n in m.nets {
-				if n.name != name { continue }
+				if n.name != a.name { continue }
 				text: string
-				if family == AF_INET {
-					text = net.address_to_string(net.IP4_Address((^Sockaddr_In)(a.addr).addr), context.temp_allocator)
+				if family == .IP4 {
+					text = net.address_to_string(net.IP4_Address{a.addr[0], a.addr[1], a.addr[2], a.addr[3]}, context.temp_allocator)
 				} else {
-					text = net.address_to_string(net.IP6_Address(transmute([8]u16be)(^Sockaddr_In6)(a.addr).addr), context.temp_allocator)
+					text = net.address_to_string(net.IP6_Address(transmute([8]u16be)a.addr), context.temp_allocator)
 				}
 				append(&n.addrs, strings.clone(text))
 			}
 		}
 	}
-}
-
-// The C library's list of the interfaces' addresses (core:net has none on Linux).
-foreign import libc "system:c"
-
-AF_INET  :: 2
-AF_INET6 :: 10
-
-@(private = "file")
-Sockaddr :: struct { family: u16 }
-@(private = "file")
-Sockaddr_In :: struct { family: u16, port: u16be, addr: [4]u8 }
-@(private = "file")
-Sockaddr_In6 :: struct { family: u16, port: u16be, flowinfo: u32, addr: [16]u8, scope_id: u32 }
-@(private = "file")
-Ifaddrs :: struct {
-	next:    ^Ifaddrs,
-	name:    cstring,
-	flags:   u32,
-	addr:    ^Sockaddr,
-	netmask: ^Sockaddr,
-	ifu:     ^Sockaddr,
-	data:    rawptr,
-}
-
-@(default_calling_convention = "c", private = "file")
-foreign libc {
-	getifaddrs  :: proc(ifap: ^^Ifaddrs) -> i32 ---
-	freeifaddrs :: proc(ifa: ^Ifaddrs) ---
 }
 
 ////////////////////////////////

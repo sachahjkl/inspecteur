@@ -24,8 +24,8 @@ Information.
 - **Performance**: CPU (overall or per logical processor), memory, disks, network interfaces and GPUs, a minute of
   history each.
 - **Services**: systemd's services, the system's or the user's: their state, whether they start by themselves, their
-  main process and memory. Start, Stop, Restart, Enable, Disable, over D-Bus; the manager asks polkit for a system
-  service, and the footer says what it answered.
+  main process and memory. Start, Stop, Restart, Enable, Disable, over D-Bus; for a system service the manager asks
+  polkit, which can ask for a password, and the footer says what it answered.
 - **Startup**: the XDG autostart entries and the user's systemd services that start with the session; turn one on or off,
   open its file's folder.
 - **Connections**: every TCP and UDP socket, IPv4 and IPv6, with its process; End task, Kill, Open in Processes.

@@ -55,19 +55,18 @@ Startup_Ask :: struct {
 }
 
 Startup :: struct {
-	worker:  Worker,
+	worker:  ui.Worker,
 	bus:     Startup_Bus,      // the thread's own (startup_linux.odin)
 	ask:     Startup_Ask,      // under the worker's mutex
 	shared:  ^Startup_List,
 	list:    ^Startup_List,    // the window's
-	data:    Grid_Data,
-	grid:    Grid,
+	rows:    Section_Table,
 	menu:    ui.Key,
 	pending: bool,             // a change asked and not answered yet
 	asked:   bool,
 }
 
-STARTUP_COLUMNS := [?]Grid_Column{
+STARTUP_COLUMNS := [?]ui.Table_Column{
 	{title = "Name", width = 0},
 	{title = "Command", width = 18, weak = true},
 	{title = "Type", width = 9},
@@ -76,17 +75,16 @@ STARTUP_COLUMNS := [?]Grid_Column{
 }
 
 startup_init :: proc(s: ^Startup, app: ^App) {
-	grid_init(&s.grid, STARTUP_COLUMNS[:])
-	worker_start(&s.worker, startup_job, s, app.main.win)
+	section_table_init(&s.rows, app, STARTUP_COLUMNS[:])
+	ui.worker_start(&s.worker, startup_job, s, app.main.win)
 }
 
 startup_destroy :: proc(s: ^Startup) {
-	worker_stop(&s.worker)
+	ui.worker_stop(&s.worker)
 	startup_bus_close(&s.bus)
 	startup_list_free(s.shared)
 	startup_list_free(s.list)
-	grid_data_destroy(&s.data)
-	grid_destroy(&s.grid)
+	section_table_destroy(&s.rows)
 }
 
 @(private = "file")
@@ -100,23 +98,23 @@ startup_list_free :: proc(l: ^Startup_List) {
 startup_ask :: proc(app: ^App, change := false, item := Startup_Item{}, on := false) {
 	s := &app.startup
 	s.asked = true
-	worker_lock(&s.worker)
+	ui.worker_lock(&s.worker)
 	if change {
 		s.ask.change, s.ask.on, s.ask.kind = true, on, item.kind
 		s.ask.id_len = copy(s.ask.id[:], item.id)
 		s.ask.name_len = copy(s.ask.name[:], item.name)
 	}
-	worker_unlock(&s.worker)
-	worker_ask(&s.worker)
+	ui.worker_unlock(&s.worker)
+	ui.worker_ask(&s.worker)
 }
 
 @(private = "file")
-startup_job :: proc(w: ^Worker) {
+startup_job :: proc(w: ^ui.Worker) {
 	s := (^Startup)(w.user)
-	worker_lock(w)
+	ui.worker_lock(w)
 	ask := s.ask
 	s.ask.change = false
-	worker_unlock(w)
+	ui.worker_unlock(w)
 	l := new(Startup_List)
 	// (the reading's texts in its arena; the bus's connection keeps the heap: it outlives the reading)
 	a := virtual.arena_allocator(&l.arena)
@@ -127,22 +125,22 @@ startup_job :: proc(w: ^Worker) {
 		l.failure = strings.clone(startup_set_enabled(&s.bus, ask.kind, string(ask.id[:ask.id_len]), ask.on), a)
 	}
 	l.problem = strings.clone(startup_read(&s.bus, &l.items, a), a)
-	worker_lock(w)
+	ui.worker_lock(w)
 	old := s.shared
 	s.shared = l
-	worker_unlock(w)
+	ui.worker_unlock(w)
 	startup_list_free(old)
-	worker_published(w)
+	ui.worker_published(w)
 }
 
 // The window's turn: a new reading becomes the rows; what a change came to is said.
 startup_take :: proc(app: ^App) {
 	s := &app.startup
-	if !worker_take(&s.worker) { return }
-	worker_lock(&s.worker)
+	if !ui.worker_take(&s.worker) { return }
+	ui.worker_lock(&s.worker)
 	old := s.list
 	s.list, s.shared = s.shared, nil
-	worker_unlock(&s.worker)
+	ui.worker_unlock(&s.worker)
 	startup_list_free(old)
 	l := s.list
 	if l == nil { return }
@@ -159,21 +157,21 @@ startup_take :: proc(app: ^App) {
 
 startup_rows :: proc(app: ^App) {
 	s := &app.startup
-	d := &s.data
-	grid_data_reset(d, len(STARTUP_COLUMNS))
+	st := &s.rows
+	section_rows_reset(st, len(STARTUP_COLUMNS))
 	if s.list != nil {
 		for it in s.list.items {
-			icon := Grid_Icon{app = it.icon, glyph = it.kind == .Autostart ? lucide.POWER : lucide.SETTINGS}
+			icon := Row_Icon{app = it.icon, glyph = it.kind == .Autostart ? lucide.POWER : lucide.SETTINGS}
 			kind := STARTUP_KIND_TEXT[it.kind]
-			grid_row(d, name_id(strings.concatenate({kind, it.id}, context.temp_allocator)), strings.join({it.name, it.id, it.command, it.status, kind}, " ", context.temp_allocator), icon, it.enabled ? .Normal : .Dim)
-			grid_cell(d, it.name)
-			grid_cell(d, command_shown(it.command))
-			grid_cell(d, kind)
-			grid_cell(d, it.status)
-			grid_cell(d, it.path)
+			section_row(st, name_id(strings.concatenate({kind, it.id}, context.temp_allocator)), strings.join({it.name, it.id, it.command, it.status, kind}, " ", context.temp_allocator), icon, it.enabled ? .Normal : .Dim)
+			ui.table_data_cell(&st.data, it.name)
+			ui.table_data_cell(&st.data, command_shown(it.command))
+			ui.table_data_cell(&st.data, kind)
+			ui.table_data_cell(&st.data, it.status)
+			ui.table_data_cell(&st.data, it.path)
 		}
 	}
-	grid_apply(&s.grid, d, app.query)
+	ui.table_apply(&st.table, &st.data, app.query)
 }
 
 // A command as the table shows it: its program by its name when its path is long ("/nix/store/…-foo-1.2/bin/foo -x" is
@@ -188,7 +186,7 @@ command_shown :: proc(command: string) -> string {
 
 selected_startup :: proc(app: ^App) -> (it: Startup_Item, ok: bool) {
 	s := &app.startup
-	i := grid_selected(&s.grid)
+	i := ui.table_selected(&s.rows.table)
 	if s.list == nil || i < 0 || i >= len(s.list.items) { return }
 	return s.list.items[i], true
 }

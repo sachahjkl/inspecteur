@@ -40,17 +40,3 @@ cpu_topology_is_counted :: proc(t: ^testing.T) {
 	testing.expect_value(t, c.sockets, 2)
 	testing.expect_value(t, c.cores, 4)
 }
-
-@(test)
-a_history_keeps_the_last_points :: proc(t: ^testing.T) {
-	h: History
-	for i in 0 ..< HISTORY_POINTS + 5 { history_push(&h, f32(i)) }
-	testing.expect_value(t, h.count, HISTORY_POINTS)
-	testing.expect_value(t, history_at(&h, 0), f32(5))
-	testing.expect_value(t, history_at(&h, HISTORY_POINTS - 1), f32(HISTORY_POINTS + 4))
-	testing.expect_value(t, history_max(&h), f32(HISTORY_POINTS + 4))
-	testing.expect_value(t, graph_top(0.3), f32(1))
-	testing.expect_value(t, graph_top(130), f32(200))
-	testing.expect_value(t, graph_top(4000), f32(5000))
-}
-

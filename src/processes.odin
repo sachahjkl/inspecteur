@@ -14,6 +14,8 @@ package inspecteur
 import "core:slice"
 import "core:strconv"
 import "core:strings"
+import "gt:ascii"
+import "gt:ui"
 
 Column :: enum u8 { Name, PID, PPID, User, State, Nice, CPU, Memory, GPU_Memory, Read, Write, Threads, Started, Command, Executable }
 
@@ -35,8 +37,6 @@ COLUMN_DEFAULT_EM := [Column]f32{
 	.Name = 0, .PID = 5.5, .PPID = 6.5, .User = 6.5, .State = 7, .Nice = 4.5, .CPU = 5.5, .Memory = 6.5, .GPU_Memory = 7,
 	.Read = 7, .Write = 7, .Threads = 5.5, .Started = 9.5, .Command = 22, .Executable = 18,
 }
-COLUMN_MIN_EM :: 3
-COLUMN_MAX_EM :: 80
 
 column_of :: proc(key: string) -> (c: Column, ok: bool) {
 	for k, col in COLUMN_KEYS { if k == key { return col, true } }
@@ -73,12 +73,25 @@ Table :: struct {
 	selectable: [dynamic]bool,
 	shown_apps, shown_background: int,   // the rows each section counts (the filter's matches)
 	expanded:   map[u64]bool,    // the groups open, by key
-	sort:       Column,
-	shown:      [Column]bool,    // the columns shown (Name always)
-	width:      [Column]f32,     // their widths, in ems
-	descending: bool,
+	columns:    [len(Column)]ui.Table_Column,   // what the layout's columns are (table_columns_init)
+	layout:     ui.Table_Layout,  // the columns shown, their widths, the sort (the header edits it; settings.odin saves it)
 	query:      string,          // the filter, in lower case (owned)
 }
+
+// The columns of the table for the toolkit's header: texts at the left, numbers at the right; a pid and a nice value
+// sorted from the lowest at the first click, an amount from the largest.
+table_columns_init :: proc(t: ^Table) {
+	for c in Column {
+		t.columns[int(c)] = {
+			title = COLUMN_NAMES[c], width = COLUMN_DEFAULT_EM[c], number = c not_in COLUMN_TEXT,
+			low_first = c == .PID || c == .PPID || c == .Nice, hidden = c not_in DEFAULT_COLUMNS,
+		}
+	}
+	ui.table_layout_init(&t.layout, t.columns[:])
+}
+
+// The sort's column.
+table_sort :: proc(t: ^Table) -> Column { return Column(t.layout.sort) }
 
 SECTION_IDS :: [2]u64{0x5ec7_0000_0000_0001, 0x5ec7_0000_0000_0002}
 APP_ID_MARK :: u64(1) << 63
@@ -95,6 +108,7 @@ table_destroy :: proc(t: ^Table) {
 	delete(t.selectable)
 	delete(t.expanded)
 	delete(t.query)
+	ui.table_layout_destroy(&t.layout)
 }
 
 // Groups the processes into apps and the rest (after a sample).
@@ -208,7 +222,7 @@ table_rows :: proc(t: ^Table, s: ^Sampler, c: ^Catalog) {
 		if !name_hit && !member_hit { continue }
 		append(&order, sort_item_group(t, s, g, k, name))
 	}
-	sort_items(order[:], t.descending)
+	sort_items(order[:], t.layout.descending)
 	t.shown_apps = len(order)
 	if len(order) > 0 {
 		add(t, {kind = .Section, index = 0}, SECTION_IDS[0], false)
@@ -223,7 +237,7 @@ table_rows :: proc(t: ^Table, s: ^Sampler, c: ^Catalog) {
 			for m in t.members[g.first:][:g.count] {
 				if q == "" || proc_matches(procs[m], q) { append(&members, sort_item_proc(t, s, m)) }
 			}
-			sort_items(members[:], t.descending)
+			sort_items(members[:], t.layout.descending)
 			for m in members { add(t, {kind = .Process, depth = 1, index = i32(m.index)}, proc_key(procs[m.index]), true) }
 		}
 	}
@@ -232,7 +246,7 @@ table_rows :: proc(t: ^Table, s: ^Sampler, c: ^Catalog) {
 	for i in t.background {
 		if proc_matches(procs[i], q) { append(&order, sort_item_proc(t, s, i)) }
 	}
-	sort_items(order[:], t.descending)
+	sort_items(order[:], t.layout.descending)
 	t.shown_background = len(order)
 	if len(order) > 0 {
 		add(t, {kind = .Section, index = 1}, SECTION_IDS[1], false)
@@ -253,7 +267,7 @@ Sort_Item :: struct {
 sort_item_proc :: proc(t: ^Table, s: ^Sampler, i: int) -> Sort_Item {
 	p := &s.procs[i]
 	it := Sort_Item{pid = p.pid, index = i}
-	sort_value(&it, t.sort, s, p)
+	sort_value(&it, table_sort(t), s, p)
 	return it
 }
 
@@ -262,7 +276,7 @@ sort_item_proc :: proc(t: ^Table, s: ^Sampler, i: int) -> Sort_Item {
 sort_item_group :: proc(t: ^Table, s: ^Sampler, g: Group, k: int, name: string) -> Sort_Item {
 	root := &s.procs[g.root]
 	it := Sort_Item{pid = root.pid, index = k}
-	#partial switch t.sort {
+	#partial switch table_sort(t) {
 	case .Name:       it.text = name
 	case .CPU:        it.num = f64(g.cpu)
 	case .Memory:     it.num = f64(g.rss)
@@ -270,7 +284,7 @@ sort_item_group :: proc(t: ^Table, s: ^Sampler, g: Group, k: int, name: string) 
 	case .Read:       it.num = g.read_rate
 	case .Write:      it.num = g.write_rate
 	case .Threads:    it.num = f64(g.threads)
-	case:             sort_value(&it, t.sort, s, root)
+	case:             sort_value(&it, table_sort(t), s, root)
 	}
 	return it
 }
@@ -315,7 +329,7 @@ state_text :: proc(state: u8) -> string {
 sort_items :: proc(items: []Sort_Item, descending: bool) {
 	slice.sort_by(items, proc(a, b: Sort_Item) -> bool {
 		if a.text != b.text {
-			c := compare_fold(a.text, b.text)
+			c := ascii.compare_fold(a.text, b.text)
 			if c != 0 { return c < 0 }
 		}
 		if a.num != b.num { return a.num < b.num }
@@ -324,26 +338,3 @@ sort_items :: proc(items: []Sort_Item, descending: bool) {
 	if descending { slice.reverse(items) }
 }
 
-// Compares two names, case ignored (ASCII: process and app names), then as they are.
-@(private = "file")
-compare_fold :: proc(a, b: string) -> int {
-	for i in 0 ..< min(len(a), len(b)) {
-		x, y := a[i], b[i]
-		if x >= 'A' && x <= 'Z' { x += 32 }
-		if y >= 'A' && y <= 'Z' { y += 32 }
-		if x != y { return int(x) - int(y) }
-	}
-	if len(a) != len(b) { return len(a) - len(b) }
-	return strings.compare(a, b)
-}
-
-// Clicks on a column's header: the first sorts by it (texts A to Z; pids and nice values from the lowest; amounts and
-// the latest start, largest first), the next reverses it.
-table_sort_by :: proc(t: ^Table, c: Column) {
-	if t.sort == c {
-		t.descending = !t.descending
-	} else {
-		t.sort = c
-		t.descending = c not_in COLUMN_TEXT && c != .PID && c != .PPID && c != .Nice
-	}
-}

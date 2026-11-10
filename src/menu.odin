@@ -15,7 +15,7 @@ package inspecteur
 
 import "core:fmt"
 import "core:strings"
-import "core:sys/linux"
+import process "gt:process"
 import "core:time"
 import "gt:platform"
 import "gt:ui"
@@ -98,7 +98,7 @@ row_menu_items :: proc(app: ^App, em: f32) {
 		// (the file and the command line are the first process's)
 		p := len(m.menu.targets) > 0 ? find_proc(&app.sampler, m.menu.targets[0].pid, m.menu.targets[0].start) : nil
 		if p == nil { ui.ctx_menu_close(); return }
-		if ui.menu_item("End task", "Delete").clicked { send_signal(app, &m.menu, .SIGTERM) }
+		if ui.menu_item("End task", "Delete").clicked { send_signal(app, &m.menu, .Terminate) }
 		if ui.menu_item("Kill…", "Shift+Del").clicked { kill_ask(app, m.menu) }
 		ui.menu_separator()
 		if ui.menu_item("Open file location", enabled = p.exe != "").clicked { open_location(app, p) }
@@ -124,7 +124,7 @@ copy_command :: proc(app: ^App, p: ^Proc) {
 end_selected :: proc(app: ^App) {
 	c, ok := chosen_of_selection(app)
 	defer chosen_free(&c)
-	if ok { send_signal(app, &c, .SIGTERM) }
+	if ok { send_signal(app, &c, .Terminate) }
 }
 
 // Asks to confirm a kill of the selected row's processes.
@@ -156,7 +156,7 @@ kill_build :: proc(app: ^App, em: f32) {
 				ui.next({width = ui.px(w - 2 * pad), height = ui.children_sum(), axis = .Y})
 				if ui.column() {
 					ui.next({width = ui.fill(), font_size = em * 1.15})
-					ui.label(fmt.tprintf("Kill %s?###kill_title", shown_text(m.kill.name)))
+					ui.label(fmt.tprintf("Kill %s?###kill_title", ui.text_shown(m.kill.name)))
 					ui.spacer(ui.px(em * 0.4))
 					if ui.tags("weak") {
 						ui.next({width = ui.fill()})
@@ -172,7 +172,7 @@ kill_build :: proc(app: ^App, em: f32) {
 						ui.next({width = ui.text_size(em * 1.2), height = ui.px(ui.dense(em * 2.2))})
 						if ui.tags("danger_button") {
 							if ui.button("Kill###kill_confirm").clicked || ui.key_press(.Return) {
-								send_signal(app, &m.kill, .SIGKILL)
+								send_signal(app, &m.kill, .Kill)
 								m.kill_open = false
 							}
 						}
@@ -185,31 +185,34 @@ kill_build :: proc(app: ^App, em: f32) {
 }
 
 // Sends `sig` to each process chosen that is still that process; says what came of it.
-send_signal :: proc(app: ^App, c: ^Chosen, sig: linux.Signal) {
+// (the toolkit pins each pid with a pidfd and reads its start time again before it signals: a pid given to another
+// process since the sample is not signalled)
+send_signal :: proc(app: ^App, c: ^Chosen, sig: process.Signal) {
 	sent := 0
-	refused: linux.Errno
+	refused: process.Act_Result
+	errno := 0
 	owner := ""
 	for t in c.targets {
 		p := find_proc(&app.sampler, t.pid, t.start)
-		if p == nil || !proc_alive(&app.sampler, t.pid, t.start) { continue }
-		#partial switch e := linux.kill(linux.Pid(t.pid), sig); e {
-		case .NONE:  sent += 1
-		case .ESRCH:   // (it ended in between)
+		if p == nil { continue }
+		#partial switch r, e := process.signal_process(t.pid, t.start, sig); r {
+		case .Done: sent += 1
+		case .Gone:   // (it ended in between)
 		case:
-			refused = e
+			refused, errno = r, e
 			owner = user_name(&app.sampler, p.uid)
 		}
 	}
 	switch {
-	case refused == .EPERM:
+	case refused == .Denied:
 		say(app, "%s is %s's: Inspecteur may not end it", c.name, owner)
-	case refused != .NONE:
-		say(app, "%s cannot be ended (%v)", c.name, refused)
+	case refused != .Done:
+		say(app, "%s cannot be ended (%v, error %d)", c.name, refused, errno)
 	case sent > 0:
 		#partial switch sig {
-		case .SIGKILL: say(app, "Killed %s", c.name)
-		case .SIGSTOP: say(app, "Suspended %s", c.name)
-		case .SIGCONT: say(app, "Resumed %s", c.name)
+		case .Kill:     say(app, "Killed %s", c.name)
+		case .Stop:     say(app, "Suspended %s", c.name)
+		case .Continue: say(app, "Resumed %s", c.name)
 		case:          say(app, "Asked %s to end", c.name)
 		}
 	case:
