@@ -168,5 +168,26 @@ run_shots :: proc(args: []string) -> int {
 	for _ in 0 ..< 4 { cdp.key(&c, "ctrl+=") }
 	cdp.wait_idle(&c, SESSION_WAIT)
 	shot(&c, out, "processes_large_text", &failed)
+	if !failed && out == SHOTS_OUT && !site_pictures(out) { failed = true }
 	return failed ? 1 : 0
+}
+
+// The site's pictures (site/img) and the documentation's they are copies of: shots writes them both, so neither falls
+// behind the other.
+SITE_PICTURES :: [?][2]string{
+	{"main", "processes"}, {"properties", "properties"}, {"kill", "kill_confirm"}, {"performance", "performance_cpu"},
+	{"services", "services"}, {"tree", "processes_tree"},
+}
+
+@(private = "file")
+site_pictures :: proc(out: string) -> bool {
+	for p in SITE_PICTURES {
+		to := fmt.tprintf("site/img/%s.png", p[0])
+		if err := os.copy_file(to, fmt.tprintf("%s/%s.png", out, p[1])); err != nil {
+			fmt.eprintfln("inspecteurtool shots: %s cannot be written: %v", to, err)
+			return false
+		}
+		fmt.printfln("wrote %s", to)
+	}
+	return true
 }
