@@ -353,8 +353,9 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 	}
 
 	// Name: the indent, the chevron of a group, the icon, the name
-	ui.next({width = ui.fill(), height = ui.pct(1), axis = .X, cross = .Center})
-	if ui.row(id = "###c_name") {
+	// (the name column's width as the header's, cut: a narrow window does not let a name run over the next columns)
+	ui.next({width = ui.table_width(&t.layout, int(Column.Name)), height = ui.pct(1), axis = .X, cross = .Center})
+	if ui.row(flags = {.Clip}, id = "###c_name") {
 		ui.spacer(ui.px(em * (0.3 + INDENT_EM * f32(r.depth))))
 		if r.kind == .App || r.branch {
 			open := t.query != "" || (r.kind == .App ? t.expanded[t.groups[r.index].key] : !t.collapsed[proc_key(p)])

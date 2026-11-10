@@ -43,6 +43,12 @@ run_shots :: proc(args: []string) -> int {
 	click_header(&c, "CPU")   // the busiest first
 	time.sleep(2500 * time.Millisecond)   // (some samples: every row has its CPU %)
 	shot(&c, out, "processes", &failed)
+	// larger text, as a narrow window: the name column keeps its width, the last columns go past the edge
+	for _ in 0 ..< 4 { cdp.key(&c, "ctrl+=") }
+	cdp.wait_idle(&c, SESSION_WAIT)
+	shot(&c, out, "processes_large_text", &failed)
+	cdp.key(&c, "ctrl+0")
+	cdp.wait_idle(&c, SESSION_WAIT)
 
 	// the first app's group, open, and its menu
 	cdp.click_name(&c, "lrow_1")   // (row 0 is the section's title)
