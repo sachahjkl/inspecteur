@@ -89,7 +89,8 @@ selected_proc :: proc(app: ^App) -> ^Proc {
 	r, ok := selected_row(app)
 	if !ok { return nil }
 	p, has := row_process(app, r)
-	return has ? p : nil
+	// (a process that ended keeps its row a moment, fading: nothing acts on it)
+	return has && !p.ended ? p : nil
 }
 
 // Whether the selected row is a process's (not an app's group).

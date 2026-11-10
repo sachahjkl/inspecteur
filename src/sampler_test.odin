@@ -29,11 +29,31 @@ a_pid_used_again_is_a_new_process :: proc(t: ^testing.T) {
 	testing.expect_value(t, s.procs[0].name, "b")
 	testing.expect_value(t, s.procs[0].cpu, 0)
 	testing.expect_value(t, s.procs[0].read_rate, 0.0)
-	// a process that went is gone; one whose io is not known has no rate
-	procs_merge(&s, {{pid = 90002, start = 5, comm = "c", io_known = false}}, 1, 4 * SECOND, nil)
+	// a process that went stays ENDED_KEEP_NS, ended and at rest, then is gone; one whose io is not known has no rate
+	T :: i64(100 * SECOND)
+	procs_merge(&s, {{pid = 90002, start = 5, comm = "c", io_known = false}}, 1, 4 * SECOND, nil, now_ns = T)
+	testing.expect_value(t, len(s.procs), 2)
+	testing.expect(t, s.procs[0].ended && s.procs[0].cpu == 0, "the process that went is kept, ended, its rates at 0")
+	testing.expect_value(t, s.procs[1].pid, i32(90002))
+	testing.expect(t, !s.procs[1].io_known)
+	procs_merge(&s, {{pid = 90002, start = 5, comm = "c", io_known = false}}, 1, 4 * SECOND, nil, now_ns = T + ENDED_KEEP_NS)
 	testing.expect_value(t, len(s.procs), 1)
 	testing.expect_value(t, s.procs[0].pid, i32(90002))
-	testing.expect(t, !s.procs[0].io_known)
+}
+
+// A process that comes after the first sample is new (born_ns); those of the first sample were there before.
+@(test)
+a_process_that_comes_is_new :: proc(t: ^testing.T) {
+	d: Demo
+	s := Sampler{demo = &d}
+	defer sampler_destroy(&s)
+	s.samples = 1
+	procs_merge(&s, {{pid = 90010, start = 1, comm = "old"}}, 0, 0, nil, now_ns = 10)
+	testing.expect_value(t, s.procs[0].born_ns, i64(0))
+	s.samples = 2
+	procs_merge(&s, {{pid = 90010, start = 1, comm = "old"}, {pid = 90011, start = 2, comm = "new"}}, 1, 1, nil, now_ns = 20)
+	testing.expect_value(t, s.procs[0].born_ns, i64(0))
+	testing.expect_value(t, s.procs[1].born_ns, i64(20))
 }
 
 // The disks and the interfaces listed again: one plugged in comes, one taken away goes, one that stays keeps its history.

@@ -23,6 +23,8 @@ and the versions follow [semantic versioning](https://semver.org/).
   it; read only while a GPU column or Performance is shown, so a sleeping GPU is not woken.
 - **Pinned apps and processes** (Alt+P, `processes.pinned`): a section of their own above the others, whatever the
   sort, kept by name across starts.
+- **What changes shows**: a process that comes flashes green and fades; one that ends stays a moment in red, fading
+  out, and nothing acts on it any more. With the animations off they keep their colour, still.
 - **History in Properties**: graphs of the process's CPU, private memory and disk since Inspecteur saw it start (5
   minutes at most at the default period).
 

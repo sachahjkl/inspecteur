@@ -82,6 +82,9 @@ Proc :: struct {
 	read_rate, write_rate: f64,   // bytes per second since the last sample
 	io_known:   bool,
 	hist:       ^Proc_History,   // owned
+	born_ns:    i64,      // when it was first seen, after the first sample (0: it was there when Inspecteur started)
+	ended:      bool,     // missing from the last reading: it ended; kept ENDED_KEEP_NS so its row fades out
+	ended_ns:   i64,      // when it was first missing
 }
 
 Sampler :: struct {
@@ -123,21 +126,36 @@ sample :: proc(s: ^Sampler, now_ns: i64, d_total_ns: u64, catalog: ^Catalog, his
 	s.samples += 1
 	counters := make([dynamic]Proc_Counters, 0, len(s.procs) + 64, context.temp_allocator)
 	if s.demo != nil { demo_procs_read(s.demo, now_ns, &counters) } else { procs_read(&s.reader, &counters) }
-	procs_merge(s, counters[:], dt, d_total_ns, catalog, history)
+	procs_merge(s, counters[:], dt, d_total_ns, catalog, history, now_ns)
+}
+
+// How long a process that ended keeps its row (in red, fading: table_view.odin), its rates at 0.
+ENDED_KEEP_NS :: 2 * 1_000_000_000
+
+// Keeps a process that ended for ENDED_KEEP_NS (its rates at 0), or frees it after; true when it is kept.
+@(private = "file")
+proc_ended :: proc(p: ^Proc, now_ns: i64) -> bool {
+	if !p.ended {
+		p.ended, p.ended_ns = true, now_ns
+		p.cpu, p.read_rate, p.write_rate = 0, 0, 0
+	}
+	if now_ns - p.ended_ns < ENDED_KEEP_NS { return true }
+	proc_free(p)
+	return false
 }
 
 // The processes from a reading (sorted by pid): those already known keep what was learnt of them and get their rates;
 // a new one (a new pid, or a pid with another start) is learnt.
-procs_merge :: proc(s: ^Sampler, counters: []Proc_Counters, dt: f64, d_total_ns: u64, catalog: ^Catalog, history := true) {
+procs_merge :: proc(s: ^Sampler, counters: []Proc_Counters, dt: f64, d_total_ns: u64, catalog: ^Catalog, history := true, now_ns: i64 = 0) {
 	next := make([dynamic]Proc, 0, len(counters))
 	old := 0
 	for c in counters {
 		for old < len(s.procs) && s.procs[old].pid < c.pid {
-			proc_free(&s.procs[old])
+			if proc_ended(&s.procs[old], now_ns) { append(&next, s.procs[old]) }
 			old += 1
 		}
 		p: Proc
-		known := old < len(s.procs) && s.procs[old].pid == c.pid && s.procs[old].start == c.start
+		known := old < len(s.procs) && s.procs[old].pid == c.pid && s.procs[old].start == c.start && !s.procs[old].ended
 		if known {
 			p = s.procs[old]
 			old += 1
@@ -148,6 +166,8 @@ procs_merge :: proc(s: ^Sampler, counters: []Proc_Counters, dt: f64, d_total_ns:
 			}
 			f := s.demo != nil ? demo_proc_facts(s.demo, c) : proc_facts(&s.reader, c)
 			proc_learn(&p, c, f, catalog)
+			// (the processes of the first sample were there before: only those that come after are new)
+			if s.samples > 1 { p.born_ns = now_ns }
 		}
 		proc_update(&p, c, known, dt, d_total_ns)
 		// (a process seen for the first time has no rates yet: its first point is its second sample's)
@@ -158,7 +178,9 @@ procs_merge :: proc(s: ^Sampler, counters: []Proc_Counters, dt: f64, d_total_ns:
 		}
 		append(&next, p)
 	}
-	for ; old < len(s.procs); old += 1 { proc_free(&s.procs[old]) }
+	for ; old < len(s.procs); old += 1 {
+		if proc_ended(&s.procs[old], now_ns) { append(&next, s.procs[old]) }
+	}
 	delete(s.procs)
 	s.procs = next
 }

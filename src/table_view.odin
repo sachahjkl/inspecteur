@@ -75,6 +75,31 @@ hsv_color :: proc(hue, sat, value: f32) -> ui.Color {
 	return draw.srgb(r + m, g + m, b + m, 1)
 }
 
+// A row that comes flashes green and fades in BORN_FLASH_NS; one whose process ended is red, fading out until the sampler
+// lets it go (ENDED_KEEP_NS). With the animations off they keep their colour, still.
+BORN_FLASH_NS :: 1_500_000_000
+FLASH_ALPHA   :: 0.45
+
+// A row's tint: green for a process that just came, red for one that ended; `moving` while it fades.
+row_tint :: proc(app: ^App, r: Row, now: i64) -> (tint: Maybe(ui.Color), moving: bool) {
+	p, ok := row_process(app, r)
+	if !ok { return }
+	still := !ui.animations_on()
+	if p.ended {
+		left := 1 - f32(now - p.ended_ns) / f32(ENDED_KEEP_NS)
+		a := FLASH_ALPHA * (still ? 1 : clamp(left, 0, 1))
+		red := heat_hue(1)
+		return ui.Color{red.r, red.g, red.b, a}, !still
+	}
+	if p.born_ns != 0 && now - p.born_ns < BORN_FLASH_NS {
+		left := 1 - f32(now - p.born_ns) / f32(BORN_FLASH_NS)
+		a := FLASH_ALPHA * (still ? 1 : clamp(left, 0, 1))
+		green := heat_hue(0)
+		return ui.Color{green.r, green.g, green.b, a}, !still
+	}
+	return
+}
+
 // A busy cell's background (the hue mixed into the page, opaque), the text that reads on it and its outline, for a load
 // `heat` (1: red) over the page `page`.
 heat_colors :: proc(heat: f32, page: ui.Color) -> (bg, fg, border: ui.Color) {
@@ -224,6 +249,10 @@ build_rows :: proc(app: ^App, em: f32) {
 	// (the search has the keyboard, yet the selection is the window's: it shows as strong as a focused list's)
 	app.vl.focused = true
 	page := ui.color("background")   // (the busy cells' tint is seen over it: their text is chosen for the mix)
+	now := time.tick_now()._nsec
+	flashing := false
+	// (a row that comes or goes fades: frames only while one does)
+	defer if flashing { ui.keep_animating() }
 	for i in rows.first ..< rows.last {
 		r := t.rows[i]
 		ui.next({height = ui.px(row_h)})
@@ -232,7 +261,9 @@ build_rows :: proc(app: ^App, em: f32) {
 			if ui.parent(row.box) { build_section(app, r, em) }
 			continue
 		}
-		row := ui.list_row(&app.vl, i, row_label(app, r))
+		tint, moving := row_tint(app, r, now)
+		if moving { flashing = true }
+		row := ui.list_row(&app.vl, i, row_label(app, r), tint = tint)
 		tip := ""
 		if ui.parent(row.box) { tip = build_cells(app, r, em, page) }
 		ui.table_cell_tip(row, tip)
