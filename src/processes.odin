@@ -22,7 +22,7 @@ import "gt:ui"
 Column :: enum u8 { Name, PID, PPID, User, State, Nice, CPU, Memory, Resident, GPU_Memory, Read, Write, Threads, Started, Command, Executable }
 
 COLUMN_NAMES := [Column]string{
-	.Name = "Name", .PID = "PID", .PPID = "Parent PID", .User = "User", .State = "State", .Nice = "Nice", .CPU = "CPU",
+	.Name = "Name", .PID = "PID", .PPID = "Parent PID", .User = "User", .State = "State", .Nice = PRIORITY_COLUMN, .CPU = "CPU",
 	.Memory = "Private memory", .Resident = "Resident", .GPU_Memory = "GPU memory", .Read = "Disk read", .Write = "Disk write",
 	.Threads = "Threads", .Started = "Started", .Command = "Command line", .Executable = "Executable",
 }
@@ -61,9 +61,10 @@ Group :: struct {
 Row_Kind :: enum u8 { Section, App, Process }
 
 Row :: struct {
-	kind:  Row_Kind,
-	depth: u8,     // 1: a process of a group
-	index: i32,    // Section: 0 apps, 1 background; App: the group; Process: the process
+	kind:   Row_Kind,
+	depth:  u8,     // 1: a process of a group; in the tree, the process's depth under its first parent shown
+	branch: bool,   // in the tree: processes are under it (shown, or closed away)
+	index:  i32,    // Section: 0 apps, 1 background; App: the group; Process: the process
 }
 
 Table :: struct {
@@ -76,6 +77,9 @@ Table :: struct {
 	selectable: [dynamic]bool,
 	shown_apps, shown_background: int,   // the rows each section counts (the filter's matches)
 	expanded:   map[u64]bool,    // the groups open, by key
+	tree:       bool,            // every process under its parent (processes.view = tree), not apps and background
+	collapsed:  map[u64]bool,    // in the tree, the processes whose children are closed away, by key
+	shown_tree: int,             // in the tree, the processes the filter shows
 	columns:    [len(Column)]ui.Table_Column,   // what the layout's columns are (table_columns_init)
 	layout:     ui.Table_Layout,  // the columns shown, their widths, the sort (the header edits it; settings.odin saves it)
 	query:      string,          // the filter, in lower case (owned)
@@ -120,6 +124,7 @@ table_destroy :: proc(t: ^Table) {
 	delete(t.ids)
 	delete(t.selectable)
 	delete(t.expanded)
+	delete(t.collapsed)
 	delete(t.query)
 	ui.table_layout_destroy(&t.layout)
 }
@@ -213,18 +218,77 @@ proc_matches :: proc(p: Proc, query: string) -> bool {
 	return strings.has_prefix(strconv.write_int(buf[:], i64(p.pid), 10), query)
 }
 
-// The rows, from the groups: sorted, filtered, groups open or closed.
+@(private = "file")
+add_row :: proc(t: ^Table, r: Row, id: u64, selectable: bool) {
+	append(&t.rows, r)
+	append(&t.ids, id)
+	append(&t.selectable, selectable)
+}
+
+// The deepest a tree's row is drawn (deeper processes are drawn at this depth: the name keeps some room).
+TREE_DEPTH_MAX :: 24
+
+// The rows of the tree: each process under its parent, the siblings sorted; a closed process's children not shown. A
+// filter shows the processes it finds and their lines of parents (open, whatever was closed).
+@(private = "file")
+table_rows_tree :: proc(t: ^Table, s: ^Sampler) {
+	procs := s.procs[:]
+	q := t.query
+	n := len(procs)
+	at := make(map[i32]int, n, context.temp_allocator)
+	for p, i in procs { at[p.pid] = i }
+	parent :: proc(at: ^map[i32]int, p: Proc) -> int {
+		if p.ppid == p.pid { return -1 }
+		if i, ok := at[p.ppid]; ok { return i }
+		return -1
+	}
+	// what the filter shows: the matches and their parents
+	shown := make([]bool, n, context.temp_allocator)
+	for p, i in procs {
+		if !proc_matches(p, q) { continue }
+		for k, steps := i, 0; k >= 0 && !shown[k] && steps <= n; steps += 1 {
+			shown[k] = true
+			k = parent(&at, procs[k])
+		}
+	}
+	children := make([][dynamic]Sort_Item, n, context.temp_allocator)
+	roots := make([dynamic]Sort_Item, context.temp_allocator)
+	has_children := make([]bool, n, context.temp_allocator)
+	t.shown_tree = 0
+	for p, i in procs {
+		up := parent(&at, p)
+		if up >= 0 { has_children[up] = true }
+		if !shown[i] { continue }
+		t.shown_tree += 1
+		if up >= 0 && shown[up] {
+			if children[up] == nil { children[up] = make([dynamic]Sort_Item, context.temp_allocator) }
+			append(&children[up], sort_item_proc(t, s, i))
+		} else {
+			append(&roots, sort_item_proc(t, s, i))
+		}
+	}
+	walk :: proc(t: ^Table, procs: []Proc, children: [][dynamic]Sort_Item, has_children: []bool, items: []Sort_Item, depth: int) {
+		sort_items(items, t.layout.descending)
+		for it in items {
+			p := procs[it.index]
+			key := proc_key(p)
+			add_row(t, {kind = .Process, depth = u8(min(depth, TREE_DEPTH_MAX)), branch = has_children[it.index], index = i32(it.index)}, key, true)
+			if t.query == "" && t.collapsed[key] { continue }
+			walk(t, procs, children, has_children, children[it.index][:], depth + 1)
+		}
+	}
+	walk(t, procs, children, has_children, roots[:], 0)
+}
+
+// The rows, from the groups (or, in the tree, from each process's parent): sorted, filtered, groups open or closed.
 table_rows :: proc(t: ^Table, s: ^Sampler, c: ^Catalog) {
 	clear(&t.rows)
 	clear(&t.ids)
 	clear(&t.selectable)
+	if t.tree { table_rows_tree(t, s); return }
 	procs := s.procs[:]
 	q := t.query
-	add :: proc(t: ^Table, r: Row, id: u64, selectable: bool) {
-		append(&t.rows, r)
-		append(&t.ids, id)
-		append(&t.selectable, selectable)
-	}
+	add :: add_row
 
 	// the groups that pass, and which of their processes
 	order := make([dynamic]Sort_Item, context.temp_allocator)

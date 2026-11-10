@@ -21,6 +21,7 @@ package inspecteur
 
 import "core:fmt"
 import "core:os"
+import "core:slice"
 import "core:strings"
 import process "gt:process"
 import "core:time"
@@ -41,12 +42,29 @@ Chosen :: struct {
 }
 
 Row_Menu :: struct {
-	key:          ui.Key,
-	confirm_open: bool,           // the confirmation of a kill (or of the end of the display server)
-	confirm:      Chosen,
-	confirm_sig:  process.Signal,
-	confirm_note: string,         // owned: why it is asked
+	key:     ui.Key,
+	confirm: Confirm,   // the confirmation of a kill, of an end that would end Inspecteur or the session, of a service's stop
 }
+
+// What a confirmation does when it is confirmed: send a signal to processes, or ask the service manager to act.
+Confirm_Act :: enum u8 { Signal, Service, Dump }
+
+Confirm :: struct {
+	open:    bool,
+	act:     Confirm_Act,
+	chosen:  Chosen,            // Signal: the processes
+	sig:     process.Signal,
+	action:  Service_Action,    // Service: the action on `unit`, of the manager shown
+	unit:    string,            // owned
+	title:   string,            // owned: "Kill sleep (PID 1234)?"
+	note:    string,            // owned: what comes of it
+	lines:   [dynamic]string,   // owned: the processes it acts on, a line each ("sleep, PID 1234")
+	verb:    string,            // the confirming button's label
+	enter_confirms: bool,       // Enter confirms; else Enter cancels (a kill, the end of the session or of Inspecteur)
+}
+
+// The processes a confirmation lists, at most (then "and n more").
+CONFIRM_LINES_MAX :: 8
 
 chosen_free :: proc(c: ^Chosen) {
 	delete(c.targets)
@@ -54,10 +72,17 @@ chosen_free :: proc(c: ^Chosen) {
 	c^ = {}
 }
 
-row_menu_destroy :: proc(m: ^Row_Menu) {
-	chosen_free(&m.confirm)
-	delete(m.confirm_note)
+confirm_free :: proc(c: ^Confirm) {
+	chosen_free(&c.chosen)
+	delete(c.unit)
+	delete(c.title)
+	delete(c.note)
+	for l in c.lines { delete(l) }
+	delete(c.lines)
+	c^ = {}
 }
+
+row_menu_destroy :: proc(m: ^Row_Menu) { confirm_free(&m.confirm) }
 
 // The process the selected row stands for: its own, or a group's first app process; nil when none.
 selected_proc :: proc(app: ^App) -> ^Proc {
@@ -73,31 +98,125 @@ selected_is_process :: proc(app: ^App) -> bool {
 	return ok && r.kind == .Process
 }
 
-// What the selected row stands for: its process, or an app's processes (`whole`: every process of the group; else the
-// app's own, whose children end with them).
+// What the selection stands for: the rows marked (Ctrl and Shift clicks, Ctrl+A), else the selected row. A process's row
+// is that process; an app's row is its processes (`whole`: every process of the group; else the app's own, whose
+// children end with them). A process met twice (its own row and its group's) is chosen once.
 @(private = "file")
 chosen_of_selection :: proc(app: ^App, whole: bool) -> (c: Chosen, ok: bool) {
-	r, has := selected_row(app)
-	if !has { return }
-	#partial switch r.kind {
-	case .Process:
-		p := app.sampler.procs[r.index]
+	rows := make([dynamic]Row, context.temp_allocator)
+	if ui.list_mark_count(&app.vl) > 0 {
+		for r, i in app.table.rows { if r.kind != .Section && ui.list_is_marked(&app.vl, i) { append(&rows, r) } }
+	} else if r, has := selected_row(app); has && r.kind != .Section {
+		append(&rows, r)
+	}
+	seen := make(map[i32]bool, 16, context.temp_allocator)
+	add :: proc(c: ^Chosen, seen: ^map[i32]bool, p: Proc) {
+		if p.pid in seen^ { return }
+		seen[p.pid] = true
 		append(&c.targets, Target{p.pid, p.start})
-		c.name = strings.clone(fmt.tprintf("%s (PID %d)", p.name, p.pid))
-	case .App:
-		g := app.table.groups[r.index]
-		members := whole ? app.table.members[g.first:][:g.count] : group_roots(&app.table, g)
-		for i in members { append(&c.targets, Target{app.sampler.procs[i].pid, app.sampler.procs[i].start}) }
+	}
+	for r in rows {
+		#partial switch r.kind {
+		case .Process:
+			add(&c, &seen, app.sampler.procs[r.index])
+		case .App:
+			g := app.table.groups[r.index]
+			members := whole ? app.table.members[g.first:][:g.count] : group_roots(&app.table, g)
+			for i in members { add(&c, &seen, app.sampler.procs[i]) }
+		}
+	}
+	switch {
+	case len(c.targets) == 0:
+	case len(rows) == 1 && rows[0].kind == .App:
+		g := app.table.groups[rows[0].index]
 		name := app.catalog.entries[g.entry].name
 		switch {
-		case len(members) == 1: c.name = strings.clone(fmt.tprintf("%s (PID %d)", name, app.sampler.procs[members[0]].pid))
-		case whole:             c.name = strings.clone(fmt.tprintf("%s (%d processes)", name, len(members)))
-		case:                   c.name = strings.clone(fmt.tprintf("%s (%d instances)", name, len(members)))
+		case len(c.targets) == 1: c.name = strings.clone(fmt.tprintf("%s (PID %d)", name, c.targets[0].pid))
+		case whole:               c.name = strings.clone(fmt.tprintf("%s (%d processes)", name, len(c.targets)))
+		case:                     c.name = strings.clone(fmt.tprintf("%s (%d instances)", name, len(c.targets)))
 		}
+	case len(c.targets) == 1:
+		p := find_proc(&app.sampler, c.targets[0].pid, c.targets[0].start)
+		c.name = strings.clone(fmt.tprintf("%s (PID %d)", p != nil ? p.name : "?", c.targets[0].pid))
 	case:
-		return
+		c.name = strings.clone(fmt.tprintf("%d processes", len(c.targets)))
 	}
 	return c, len(c.targets) > 0
+}
+
+// The selected process and every process under it (the last sample's line of parents), the deepest first.
+@(private = "file")
+chosen_tree :: proc(app: ^App) -> (c: Chosen, ok: bool) {
+	roots, has := chosen_of_selection(app, whole = true)
+	defer chosen_free(&roots)
+	if !has { return }
+	seen := make(map[i32]bool, 64, context.temp_allocator)
+	for t in roots.targets { seen[t.pid] = true }
+	// (each process whose line of parents meets a chosen one; the samples are sorted by pid, so a parent may come after)
+	for changed := true; changed; {
+		changed = false
+		for p in app.sampler.procs {
+			if p.pid in seen || p.ppid not_in seen { continue }
+			seen[p.pid] = true
+			changed = true
+		}
+	}
+	for p in app.sampler.procs { if p.pid in seen { append(&c.targets, Target{p.pid, p.start}) } }
+	// (the children first: a parent that ends first may take its children with it or let them be adopted)
+	slice.reverse(c.targets[:])
+	under := len(c.targets) - len(roots.targets)
+	c.name = strings.clone(under > 0 ? fmt.tprintf("%s and %s under it", roots.name, count_text(under, "process", "processes")) : roots.name)
+	return c, true
+}
+
+// The service the process belongs to, selected in the Services section (its manager's: the system's or the user's).
+go_to_service :: proc(app: ^App, p: ^Proc) {
+	if p.unit == "" { return }
+	ui.field_clear(&app.search)
+	query_set(app, "")
+	services_switch(app, p.unit_user ? .User : .System)
+	tab_show(app, .Services)
+	service_select(app, p.unit)
+}
+
+// The process's name, searched for on the web (the person's browser).
+search_online :: proc(app: ^App) {
+	p := selected_proc(app)
+	if p == nil { return }
+	name := p.name
+	if r, ok := selected_row(app); ok && r.kind == .App { name = app.catalog.entries[app.table.groups[r.index].entry].name }
+	url := strings.concatenate({SEARCH_URL, url_query(fmt.tprintf("%s process", name))}, context.temp_allocator)
+	if platform.open_url(url) { say(app, "Searched the web for %s", name) } else { say(app, "No browser opens %s", url) }
+}
+
+// The search engine a search online asks (the query follows).
+SEARCH_URL :: "https://duckduckgo.com/?q="
+
+// A text as a URL's query: letters, digits and -._~ as they are, a space as '+', the rest %XX (UTF-8's bytes).
+url_query :: proc(text: string) -> string {
+	b := strings.builder_make(context.temp_allocator)
+	for c in transmute([]u8)text {
+		switch c {
+		case 'a' ..= 'z', 'A' ..= 'Z', '0' ..= '9', '-', '.', '_', '~': strings.write_byte(&b, c)
+		case ' ':                                                      strings.write_byte(&b, '+')
+		case:                                                          fmt.sbprintf(&b, "%%%02X", c)
+		}
+	}
+	return strings.to_string(b)
+}
+
+// Asks to confirm a dump of the process's memory to a file (it may be large, and it holds whatever the process had).
+dump_ask :: proc(app: ^App, p: ^Proc) {
+	m := &app.menu.confirm
+	confirm_free(m)
+	m.act = .Dump
+	append(&m.chosen.targets, Target{p.pid, p.start})
+	m.chosen.name = fmt.aprintf("%s (PID %d)", p.name, p.pid)
+	m.verb = "Create"
+	m.title = fmt.aprintf("Create a dump file of %s?", m.chosen.name)
+	m.note = fmt.aprintf("Its memory is written to a file of %s at most: anything it held, passwords and documents too. %s", size_text(p.resident), DUMP_HOW)
+	m.enter_confirms = true
+	m.open = true
 }
 
 // Opens the menu of the selected row at `pos` (window pixels).
@@ -120,15 +239,21 @@ row_menu_items :: proc(app: ^App) {
 		if selected_proc(app) == nil { ui.ctx_menu_close(); return }
 		cmd_item(app, .End_Task)
 		cmd_item(app, .Kill)
+		cmd_item(app, .End_Tree)
 		p := selected_proc(app)
 		cmd_item(app, .Suspend, p != nil && p.state == .Stopped ? "Resume" : "Suspend")
 		ui.menu_separator()
 		cmd_item(app, .Raise_Priority)
 		cmd_item(app, .Lower_Priority)
+		cmd_item(app, .Affinity)
 		ui.menu_separator()
+		cmd_item(app, .Go_To_Service)
 		cmd_item(app, .Open_Location)
 		cmd_item(app, .Copy_Command)
+		cmd_item(app, .Search_Online)
+		cmd_item(app, .Dump)
 		ui.menu_separator()
+		cmd_item(app, .Select_All)
 		cmd_item(app, .Properties)
 	}
 }
@@ -145,18 +270,25 @@ copy_command :: proc(app: ^App, p: ^Proc) {
 	say(app, "Copied the command line of %s", p.name)
 }
 
-// Asks the selected row's processes to end (SIGTERM).
+// Asks the selected processes to end (SIGTERM).
 end_selected :: proc(app: ^App) {
 	c, ok := chosen_of_selection(app, whole = false)
 	defer chosen_free(&c)
 	if ok { signal_or_confirm(app, &c, .Terminate) }
 }
 
-// Asks to confirm a kill of the selected row's processes (an app's: all of them).
+// Asks to confirm a kill of the selected processes (an app's: all of them).
 kill_selected :: proc(app: ^App) {
 	c, ok := chosen_of_selection(app, whole = true)
 	defer chosen_free(&c)
 	if ok { confirm_ask(app, c, .Kill) }
+}
+
+// Asks to confirm the end of the selected processes and of every process under them.
+end_tree_selected :: proc(app: ^App) {
+	c, ok := chosen_tree(app)
+	defer chosen_free(&c)
+	if ok { confirm_ask(app, c, .Terminate, tree = true) }
 }
 
 // Suspends the selected process, or resumes it when it is suspended.
@@ -198,40 +330,75 @@ guard_of :: proc(app: ^App, pid: i32) -> Guard {
 	return .None
 }
 
-// Sends `sig`, but asks first when it would end the display server (the session ends with it).
+// Sends `sig`, but asks first when it would end the display server (the session ends with it) or Inspecteur.
 signal_or_confirm :: proc(app: ^App, c: ^Chosen, sig: process.Signal) {
 	for t in c.targets {
-		if guard_of(app, t.pid) == .Display_Server { confirm_ask(app, c^, sig); return }
+		if guard_of(app, t.pid) != .None { confirm_ask(app, c^, sig); return }
 	}
 	send_signal(app, c, sig)
 }
 
-confirm_ask :: proc(app: ^App, c: Chosen, sig: process.Signal) {
-	m := &app.menu
-	chosen_free(&m.confirm)
-	for t in c.targets { append(&m.confirm.targets, t) }
-	m.confirm.name = strings.clone(c.name)
-	m.confirm_sig = sig
-	delete(m.confirm_note)
-	server := false
-	for t in c.targets { if guard_of(app, t.pid) == .Display_Server { server = true } }
-	switch {
-	case server:
-		m.confirm_note = strings.clone("It draws the desktop: the session ends with it, and every program of the session with it.")
-	case sig == .Kill:
-		m.confirm_note = strings.clone("It ends at once, without the chance to save its work. End task asks it to end on its own.")
-	case:
-		m.confirm_note = strings.clone("It is asked to end.")
+// Asks to confirm `sig` to the processes of `c` (`tree`: a process and those under it): each one is listed by its name
+// and pid, and the note says what comes of it.
+confirm_ask :: proc(app: ^App, c: Chosen, sig: process.Signal, tree := false) {
+	m := &app.menu.confirm
+	confirm_free(m)
+	m.act, m.sig = .Signal, sig
+	for t in c.targets { append(&m.chosen.targets, t) }
+	m.chosen.name = strings.clone(c.name)
+	server, inspecteur := false, false
+	for t, i in c.targets {
+		switch guard_of(app, t.pid) {
+		case .Display_Server:  server = true
+		case .Self, .Ancestor: inspecteur = true
+		case .None:
+		}
+		if i < CONFIRM_LINES_MAX {
+			p := find_proc(&app.sampler, t.pid, t.start)
+			append(&m.lines, p != nil ? fmt.aprintf("%s, PID %d", p.name, p.pid) : fmt.aprintf("PID %d", t.pid))
+		}
 	}
-	m.confirm_open = true
+	if len(c.targets) > CONFIRM_LINES_MAX { append(&m.lines, fmt.aprintf("and %d more", len(c.targets) - CONFIRM_LINES_MAX)) }
+	many := len(c.targets) > 1
+	verb := sig == .Kill ? "Kill" : "End"
+	m.verb = tree ? "End tree" : verb
+	m.title = fmt.aprintf("%s %s?", verb, c.name)
+	note := strings.builder_make(context.temp_allocator)
+	switch {
+	case server:     strings.write_string(&note, "It draws the desktop: the session ends with it, and every program of the session with it. ")
+	case inspecteur: strings.write_string(&note, "Inspecteur ends with it: it runs under it. ")
+	}
+	switch {
+	case sig == .Kill && many: strings.write_string(&note, "They end at once, without the chance to save their work. End task asks them to end on their own.")
+	case sig == .Kill:         strings.write_string(&note, "It ends at once, without the chance to save its work. End task asks it to end on its own.")
+	case many:                 strings.write_string(&note, "Each is asked to end.")
+	case:                      strings.write_string(&note, "It is asked to end.")
+	}
+	m.note = strings.clone(strings.to_string(note))
+	// (Enter confirms only what is asked and safe: a kill, the session's end and Inspecteur's own are a click)
+	m.enter_confirms = sig != .Kill && !server && !inspecteur
+	m.open = true
+}
+
+// Asks to confirm a service's stop or restart. `danger`: what else ends with it ("" none): Enter cancels then.
+confirm_service :: proc(app: ^App, action: Service_Action, unit, danger: string) {
+	m := &app.menu.confirm
+	confirm_free(m)
+	m.act, m.action = .Service, action
+	m.unit = strings.clone(unit)
+	m.verb = action == .Stop ? "Stop" : "Restart"
+	m.title = fmt.aprintf("%s %s?", m.verb, unit)
+	what := action == .Stop ? "It stops, and its processes end; what needs it may stop too." : "It stops, its processes end, and it starts again."
+	m.note = danger != "" ? fmt.aprintf("%s %s", danger, what) : strings.clone(what)
+	m.enter_confirms = danger == ""
+	m.open = true
 }
 
 @(private = "file")
 confirm_build :: proc(app: ^App, em: f32) {
-	m := &app.menu
+	m := &app.menu.confirm
 	w := em * CONFIRM_WIDTH_EM
-	verb := m.confirm_sig == .Kill ? "Kill" : "End"
-	if ui.modal("kill", w, &m.confirm_open) {
+	if ui.modal("kill", w, &m.open) {
 		pad := em * 1.2
 		if ui.style({width = ui.px(w)}) {
 			ui.spacer(ui.px(pad))
@@ -241,24 +408,33 @@ confirm_build :: proc(app: ^App, em: f32) {
 				ui.next({width = ui.px(w - 2 * pad), height = ui.children_sum(), axis = .Y})
 				if ui.column() {
 					ui.next({width = ui.fill(), font_size = em * 1.15})
-					ui.paragraph(fmt.tprintf("%s %s?###kill_title", verb, ui.text_shown(m.confirm.name)))
+					ui.paragraph(fmt.tprintf("%s###kill_title", ui.text_shown(m.title)))
 					ui.spacer(ui.px(em * 0.4))
 					if ui.tags("weak") {
 						ui.next({width = ui.fill()})
-						ui.paragraph(fmt.tprintf("%s###kill_text", m.confirm_note))
+						ui.paragraph(fmt.tprintf("%s###kill_text", m.note))
+					}
+					// (each process by its name and pid: what Kill acts on is seen before it acts)
+					if len(m.lines) > 1 {
+						ui.spacer(ui.px(em * 0.5))
+						for l, i in m.lines {
+							ui.next({width = ui.fill(), height = ui.px(em * 1.5), text_pad = em * 0.6})
+							ui.label(fmt.tprintf("%s###kill_line_%d", ui.text_shown(l), i))
+						}
 					}
 					ui.spacer(ui.px(em * 1.1))
 					ui.next({width = ui.fill(), height = ui.children_sum()})
 					if ui.row() {
 						ui.spacer(ui.fill())
 						ui.next({width = ui.text_size(em * 1.2), height = ui.px(ui.dense(em * 2.2))})
-						if ui.button("Cancel###kill_cancel").clicked { m.confirm_open = false }
+						cancel := ui.button(fmt.tprintf("Cancel%s###kill_cancel", m.enter_confirms ? "" : " (Enter)"))
+						if cancel.clicked || (!m.enter_confirms && ui.key_press(.Return)) { m.open = false }
 						ui.spacer(ui.px(em * 0.6))
 						ui.next({width = ui.text_size(em * 1.2), height = ui.px(ui.dense(em * 2.2))})
 						if ui.tags("danger_button") {
-							if ui.button(fmt.tprintf("%s###kill_confirm", verb)).clicked || ui.key_press(.Return) {
-								send_signal(app, &m.confirm, m.confirm_sig)
-								m.confirm_open = false
+							if ui.button(fmt.tprintf("%s%s###kill_confirm", m.verb, m.enter_confirms ? " (Enter)" : "")).clicked || (m.enter_confirms && ui.key_press(.Return)) {
+								m.open = false
+								confirm_act(app)
 							}
 						}
 					}
@@ -266,6 +442,17 @@ confirm_build :: proc(app: ^App, em: f32) {
 			}
 			ui.spacer(ui.px(pad))
 		}
+	}
+}
+
+// What the confirmation was asked for, done.
+@(private = "file")
+confirm_act :: proc(app: ^App) {
+	m := &app.menu.confirm
+	switch m.act {
+	case .Signal:  send_signal(app, &m.chosen, m.sig)
+	case .Service: service_act_now(app, m.action, m.unit)
+	case .Dump:    dump_start(app, m.chosen.targets[0], m.chosen.name)
 	}
 }
 
@@ -294,7 +481,7 @@ send_signal :: proc(app: ^App, c: ^Chosen, sig: process.Signal) {
 	}
 	switch {
 	case refused == .Denied:
-		say(app, "%s is %s's: Inspecteur may not %s it (only its owner, or root, may)", c.name, owner, verb)
+		say(app, "%s is %s's: Inspecteur may not %s it (only its owner, or %s, may)", c.name, owner, verb, ADMIN)
 	case refused != .Done:
 		say(app, "%s cannot be %s (error %d)", c.name, verb == "end" ? "ended" : fmt.tprintf("%sed", verb), errno)
 	case sent > 0:
@@ -338,19 +525,19 @@ default_action :: proc(app: ^App) {
 	if r.kind == .App { group_toggle(app, r) } else { props_selected(app) }
 }
 
-// Sets a process's nice value, on each of its threads. A user may only lower a priority (raise the nice value): a
-// higher one needs root.
+// Sets a process's priority (a nice value), on each of its threads. A user may only lower a priority: a higher one
+// needs the administrator (PRIORITY_DENIED).
 set_priority :: proc(app: ^App, p: ^Proc, nice: i8) {
 	if app.demo != nil { say(app, "The demo's processes are not the system's: nothing was changed"); return }
 	#partial switch r, _ := process.set_priority(p.pid, p.start, int(nice)); r {
 	case .Gone:
 		say(app, "%s has ended already", p.name)
 	case .Done:
-		say(app, "%s (PID %d) now runs at nice %d", p.name, p.pid, nice)
+		say(app, "%s (PID %d) now runs at %s", p.name, p.pid, priority_text(nice))
 		p.nice = nice
 		sample_soon(app)
 	case .Denied:
-		say(app, "Access denied: only root may raise a priority, or change another user's process")
+		say(app, "Access denied: %s", PRIORITY_DENIED)
 	case:
 		say(app, "The priority of %s cannot be changed", p.name)
 	}

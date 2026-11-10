@@ -346,7 +346,7 @@ cpu_page :: proc(app: ^App, em: f32) {
 	append(&details, Stat{"Load average", fmt.tprintf("%.2f  %.2f  %.2f", m.load[0], m.load[1], m.load[2])})
 	stats_block({
 		{"Utilization", fmt.tprintf("%.0f%%", m.cpu)}, {"Speed", mhz_text(m.mhz)}, {"Up time", uptime_text(m.uptime)},
-		{"Processes", fmt.tprintf("%d", len(app.sampler.procs))}, {"Threads", fmt.tprintf("%d", threads)}, {"Handles", fmt.tprintf("%d", m.handles)},
+		{"Processes", fmt.tprintf("%d", len(app.sampler.procs))}, {"Threads", fmt.tprintf("%d", threads)}, {"Open files", fmt.tprintf("%d", m.handles)},
 	}, details[:], em)
 }
 
@@ -432,7 +432,7 @@ gpu_page :: proc(app: ^App, g: ^Gpu, em: f32) {
 			switch {
 			case r.asleep:          ui.label("This GPU is asleep: the system turned it off while nothing uses it. Reading it would wake it.###none")
 			case r.vendor == "NVIDIA": ui.label("This GPU's numbers come with NVIDIA's driver library (libnvidia-ml), not found or not answering.###none")
-			case:                   ui.label("This GPU's driver tells no utilization without root.###none")
+			case:                   ui.label(fmt.tprintf("This GPU's driver tells no utilization without %s.###none", ADMIN))
 			}
 		}
 		ui.spacer(ui.fill())

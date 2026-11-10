@@ -15,6 +15,7 @@ package inspecteur
 
 import "core:fmt"
 import "core:strings"
+import "core:time"
 import "gt:host"
 import lucide "gt:lucide"
 import "gt:ui"
@@ -35,7 +36,7 @@ METER_FULL :: 0.9
 view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	app := (^App)(h.user)
 	em := ui.font_size()
-	free_keys := !app.menu.confirm_open && !app.props.open && !app.shortcuts_open && !app.setup.open && !ui.ctx_menu_any_open()
+	free_keys := !app.menu.confirm.open && !app.props.open && !app.affinity.open && !app.shortcuts_open && !app.setup.open && !ui.ctx_menu_any_open()
 	// typing anywhere filters: a character typed gives the filter the keyboard (an open menu searches its own items)
 	if free_keys { ui.type_to_field(app.search_key) }
 	if free_keys { view_keys(app) }
@@ -64,6 +65,7 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 		}
 	}
 	props_build(app, em)
+	affinity_build(app, em)   // (after the Properties: it opens from them)
 	row_menu_build(app, em)   // (after the Properties: the kill's confirmation goes over them)
 	palette_build(app)
 	shortcuts_build(app)
@@ -111,23 +113,37 @@ processes_keys :: proc(app: ^App, field_keeps: bool) {
 	if ui.key_press(.Menu) || ui.key_press(.F10, {.Shift}) { row_menu_open(app, {app.sel_rect.min.x + 40, app.sel_rect.max.y}, from_keyboard = true) }
 }
 
-// Whether the selected row's group can be opened (`open`) or closed; Left on a process of a group goes to its group.
+// Whether a row's children (an app's group's processes, a process's in the tree) are shown.
+row_open :: proc(app: ^App, r: Row) -> bool {
+	t := &app.table
+	if r.kind == .App { return t.expanded[t.groups[r.index].key] }
+	return r.branch && !t.collapsed[proc_key(app.sampler.procs[r.index])]
+}
+
+// Whether the selected row's group (or a process's children, in the tree) can be opened (`open`) or closed; Left on a
+// process under another goes to that one.
 group_can_toggle :: proc(app: ^App, open: bool) -> bool {
 	r, ok := selected_row(app)
 	if !ok || len(app.search.buf) > 0 { return false }
-	if r.kind == .App { return app.table.expanded[app.table.groups[r.index].key] != open }
+	if r.kind == .App || r.branch {
+		if row_open(app, r) != open { return true }
+	}
 	return !open && r.kind == .Process && r.depth > 0
 }
 
 group_set :: proc(app: ^App, open: bool) {
 	r, ok := selected_row(app)
 	if !ok { return }
-	if r.kind == .App {
-		if app.table.expanded[app.table.groups[r.index].key] != open { group_toggle(app, r) }
+	if (r.kind == .App || r.branch) && row_open(app, r) != open {
+		group_toggle(app, r)
 		return
 	}
 	if !open && r.kind == .Process && r.depth > 0 {
-		for i := app.vl.sel; i >= 0; i -= 1 { if app.table.rows[i].kind == .App { select_row(app, i); break } }
+		// (the row above it one level up: its group, or its parent in the tree)
+		for i := app.vl.sel; i >= 0; i -= 1 {
+			q := app.table.rows[i]
+			if q.kind == .App || (q.kind == .Process && q.depth < r.depth) { select_row(app, i); break }
+		}
 	}
 }
 
@@ -142,9 +158,11 @@ select_step :: proc(app: ^App, from, dir, count: int) {
 	if at >= 0 && at < n && at != from { select_row(app, at) }
 }
 
+// Makes `row` the selection (the rows marked, if any, are not: a move alone selects one row).
 select_row :: proc(app: ^App, row: int) {
 	app.vl.sel = row
 	app.vl.reveal = REVEAL_BUILDS
+	ui.list_marks_clear(&app.vl)
 }
 
 // Shows the process (pid, start) selected in the Processes section: the filter cleared, its app's group open. False
@@ -161,6 +179,12 @@ processes_reveal :: proc(app: ^App, pid: i32, start: u64) -> bool {
 	if at >= 0 && at < len(app.table.owner) {
 		if o := app.table.owner[at]; o >= 0 { app.table.expanded[u64(app.sampler.procs[o].entry) | APP_ID_MARK] = true }
 	}
+	// (in the tree: its line of parents opened)
+	for q, steps := find_pid(&app.sampler, p.ppid), 0; q != nil && steps < 64; steps += 1 {
+		delete_key(&app.table.collapsed, proc_key(q^))
+		if q.ppid <= 0 || q.ppid == q.pid { break }
+		q = find_pid(&app.sampler, q.ppid)
+	}
 	tab_show(app, .Processes)
 	rows_again(app)
 	key := proc_key(p^)
@@ -174,12 +198,28 @@ query_set :: proc(app: ^App, q: string) {
 	app.query = strings.clone(q)
 }
 
-// Opens or closes an app's group; the selection stays on it.
+// Opens or closes an app's group, or in the tree a process's children; the selection stays on it.
 group_toggle :: proc(app: ^App, r: Row) {
-	key := app.table.groups[r.index].key
-	if app.table.expanded[key] { delete_key(&app.table.expanded, key) } else { app.table.expanded[key] = true }
+	if r.kind == .App {
+		key := app.table.groups[r.index].key
+		if app.table.expanded[key] { delete_key(&app.table.expanded, key) } else { app.table.expanded[key] = true }
+	} else if r.branch {
+		key := proc_key(app.sampler.procs[r.index])
+		if app.table.collapsed[key] { delete_key(&app.table.collapsed, key) } else { app.table.collapsed[key] = true }
+	}
 	rows_again(app)
 	app.vl.reveal = REVEAL_BUILDS
+}
+
+// The processes as a tree, or as apps and background processes (written to processes.view).
+tree_view_switch :: proc(app: ^App) {
+	app.table.tree = !app.table.tree
+	app.settings.tree = app.table.tree
+	pref_save(&app.prefs, "processes.view", app.table.tree ? "tree" : "apps")
+	tab_show(app, .Processes)
+	rows_again(app)
+	app.vl.reveal = REVEAL_BUILDS
+	say(app, app.table.tree ? "Every process under its parent" : "Apps and background processes")
 }
 
 ////////////////////////////////
@@ -219,6 +259,7 @@ build_title :: proc(app: ^App, em: f32) {
 		ui.next({width = ui.text_size(em * 0.4), height = ui.pct(1)})
 		ui.label("Inspecteur###apptitle")
 		ui.spacer(ui.fill())
+		refresh_button(app, em)
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1), font = app.icons})
 		sig: ui.Signal
 		if ui.tags("ghost_button") { sig = ui.button(fmt.tprintf("%s###palette_button", lucide.COMMAND)) }
@@ -357,9 +398,11 @@ build_footer :: proc(app: ^App, em: f32) {
 					case .Process:
 						p := app.sampler.procs[r.index]
 						msg = fmt.tprintf("Selected: %s, PID %d", p.name, p.pid)
+						if n := ui.list_mark_count(&app.vl); n > 1 { msg = fmt.tprintf("Selected: %d rows", n) }
 					case .App:
 						g := app.table.groups[r.index]
 						msg = fmt.tprintf("Selected: %s, %s", app.catalog.entries[g.entry].name, count_text(g.count, "process", "processes"))
+						if n := ui.list_mark_count(&app.vl); n > 1 { msg = fmt.tprintf("Selected: %d rows", n) }
 					}
 				}
 			}
@@ -370,6 +413,7 @@ build_footer :: proc(app: ^App, em: f32) {
 			counter(app, "f_cpu", lucide.CPU, fmt.tprintf("%.0f%%", app.machine.cpu), em)
 			counter(app, "f_mem", lucide.LAYERS_2, fmt.tprintf("%.0f%%", app.machine.mem.total > 0 ? 100 * f64(mem_used(&app.machine)) / f64(app.machine.mem.total) : 0), em)
 			counter(app, "f_procs", lucide.LAYOUT_LIST, fmt.tprintf("%d", len(app.sampler.procs)), em)
+			counter(app, "f_refresh", app.paused ? lucide.PAUSE : lucide.REFRESH_CW, refresh_text(app), em)
 		}
 		ui.spacer(ui.px(em * 0.6))
 	}
@@ -436,4 +480,76 @@ theme_button :: proc(app: ^App, em: f32) {
 			}
 		}
 	}
+}
+
+////////////////////////////////
+// The refresh: paused, or its period (the title bar's button, the footer, Ctrl+Space, Ctrl+Shift+R)
+
+// The periods the refresh menu offers, in milliseconds (processes.refresh_ms takes any from 250 to 10000).
+REFRESH_SPEEDS := [?]struct { name: string, ms: int }{{"High: 0.5 s", 500}, {"Normal: 1 s", 1000}, {"Low: 2 s", 2000}, {"Very low: 5 s", 5000}}
+
+// "1 s", "0.5 s", "Paused": the footer's.
+refresh_text :: proc(app: ^App) -> string {
+	if app.paused { return "Paused" }
+	return app.settings.refresh_ms % 1000 == 0 ? fmt.tprintf("%d s", app.settings.refresh_ms / 1000) : fmt.tprintf("%.1f s", f64(app.settings.refresh_ms) / 1000)
+}
+
+// Pauses the refresh, or resumes it (then a sample at once).
+refresh_pause :: proc(app: ^App, pause: bool) {
+	app.paused = pause
+	if pause {
+		say(app, "Refresh paused: F5 reads again, Ctrl+Space resumes")
+	} else {
+		app.sample_extra = true
+		refresh(app)
+		say(app, "Refresh every %s", refresh_text(app))
+	}
+}
+
+// Sets the refresh's period (written to processes.refresh_ms); the refresh resumes.
+refresh_speed_set :: proc(app: ^App, ms: int) {
+	app.settings.refresh_ms = ms
+	pref_save(&app.prefs, "processes.refresh_ms", fmt.tprintf("%d", ms))
+	app.paused = false
+	app.next_sample = time.tick_add(time.tick_now(), time.Duration(ms) * time.Millisecond)
+	say(app, "Refresh every %s: the graphs span %s", refresh_text(app), span_text(HISTORY_POINTS, ms))
+}
+
+refresh_menu_open :: proc(app: ^App) {
+	if app.refresh_menu == 0 { app.refresh_menu = ui.key_from_string(0, "inspecteur_refresh") }
+	r := app.refresh_rect
+	ui.ctx_menu_open_rect(app.refresh_menu, r)
+}
+
+@(private = "file")
+refresh_button :: proc(app: ^App, em: f32) {
+	ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1), font = app.icons})
+	sig: ui.Signal
+	if ui.tags("ghost_button") { sig = ui.button(fmt.tprintf("%s###refresh", app.paused ? lucide.PAUSE : lucide.REFRESH_CW)) }
+	app.refresh_rect = sig.box.rect
+	if sig.clicked { refresh_menu_open(app) }
+	tip_after(sig, fmt.tprintf("Refresh: %s. %s (%s), %s (%s)", app.paused ? "paused" : fmt.tprintf("every %s", refresh_text(app)),
+		COMMANDS[.Refresh_Speed].label, ui.command_shortcut(COMMANDS[.Refresh_Speed]), app.paused ? "Resume" : "Pause", ui.command_shortcut(COMMANDS[.Pause_Refresh])))
+	if app.refresh_menu == 0 { return }
+	if ui.ctx_menu(app.refresh_menu) {
+		if ui.menu_item(app.paused ? "Resume" : "Pause", ui.command_shortcut(COMMANDS[.Pause_Refresh]), checked = app.paused).clicked { refresh_pause(app, !app.paused) }
+		cmd_item(app, .Read_Again, "Read again now")
+		ui.menu_separator()
+		ui.menu_heading("Refresh every")
+		for sp in REFRESH_SPEEDS {
+			if ui.menu_item(sp.name, checked = !app.paused && app.settings.refresh_ms == sp.ms).clicked { refresh_speed_set(app, sp.ms) }
+		}
+	}
+}
+
+////////////////////////////////
+// The text size (Ctrl+=, Ctrl+-, Ctrl+0)
+
+// Sets the text size (bounded; written to view.font_size). Every size of the window is in ems: it all follows.
+zoom :: proc(app: ^App, size: f32) {
+	s := clamp(size, FONT_SIZE_MIN, FONT_SIZE_MAX)
+	if s == app.settings.font_size { return }
+	app.settings.font_size = s
+	pref_save(&app.prefs, "view.font_size", fmt.tprintf("%.0f", s))
+	say(app, "Text size %.0f%s", s, s == FONT_SIZE_DEFAULT ? " (the default)" : "")
 }

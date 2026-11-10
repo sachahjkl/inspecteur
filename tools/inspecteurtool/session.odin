@@ -2,7 +2,7 @@ package inspecteurtool
 
 // A session nobody sees, for `live`, `shots` and `bench`: a sway with no screen (headless, pixman) in a runtime
 // directory of its own, and inspecteur started in it with its own configuration and data folders (its preferences, its
-// desktop entry when a test installs it), no session bus (but for live's services, see session_start) and the DevTools
+// desktop entry when a test installs it, its cache: a dump file), no session bus (but for live's services, see session_start) and the DevTools
 // server on a port. The person's desktop is not touched. (/proc is the machine's: inspecteur lists every process, and
 // only reads them; the tests signal only the processes they start.) The welcome page is off unless a test asks for it.
 
@@ -67,9 +67,10 @@ session_start :: proc(s: ^Session, dir: string, port: int, args: []string = nil,
 	}
 	if socket == "" { return fmt.tprintf("sway made no Wayland socket (%s/sway.log)", s.dir) }
 
-	env := toolbox.env_with({"WAYLAND_DISPLAY", "DISPLAY", "DBUS_SESSION_BUS_ADDRESS", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME"},
+	// (no XDG_CURRENT_DESKTOP: the welcome page then offers nothing that writes the person's desktop settings)
+	env := toolbox.env_with({"WAYLAND_DISPLAY", "DISPLAY", "DBUS_SESSION_BUS_ADDRESS", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_CURRENT_DESKTOP"},
 		fmt.tprintf("XDG_RUNTIME_DIR=%s", run), fmt.tprintf("WAYLAND_DISPLAY=%s", socket),
-		fmt.tprintf("XDG_CONFIG_HOME=%s/config", s.dir), fmt.tprintf("XDG_STATE_HOME=%s/state", s.dir),
+		fmt.tprintf("XDG_CONFIG_HOME=%s/config", s.dir), fmt.tprintf("XDG_STATE_HOME=%s/state", s.dir), fmt.tprintf("XDG_CACHE_HOME=%s/cache", s.dir),
 		fmt.tprintf("XDG_DATA_HOME=%s/data", s.dir), fmt.tprintf("TOOLKIT_DEVTOOLS=%d", port))
 	bus := user_bus_address()
 	s.env = make([]string, len(env) + (user_bus && bus != "" ? 1 : 0))

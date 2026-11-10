@@ -39,7 +39,8 @@ Proc_Facts :: struct {
 	cmdline: string,   // its arguments, apart by spaces ("" when it cannot be read)
 	exe:     string,   // its executable's path ("" when it cannot be read: another user's process)
 	user:    string,   // its owner's name
-	scope:   string,   // the unit the session's manager started it in (Linux: its systemd scope), "" none
+	scope:   string,   // the unit the service manager runs it in (Linux: its systemd unit, a scope or a service), "" none
+	user_unit: bool,   // that unit is the user's service manager's, not the system's
 	started: i64,      // when it started, unix seconds (0: unknown)
 }
 
@@ -51,6 +52,8 @@ Proc :: struct {
 	name:       string,   // owned
 	cmdline:    string,   // owned
 	exe:        string,   // owned
+	unit:       string,   // owned: the service it is a process of ("sshd.service"), "" none (Go to service)
+	unit_user:  bool,     // that service is the user's service manager's
 	search:     string,   // owned: the name and the command line in lower case (the filter reads it)
 	entry:      int,      // the desktop entry the process itself matches (apps.odin), -1: none
 	cpu_ns:     u64,      // at the last sample
@@ -91,6 +94,7 @@ proc_free :: proc(p: ^Proc) {
 	delete(p.name)
 	delete(p.cmdline)
 	delete(p.exe)
+	delete(p.unit)
 	delete(p.search)
 }
 
@@ -143,8 +147,9 @@ proc_learn :: proc(p: ^Proc, c: Proc_Counters, f: Proc_Facts, catalog: ^Catalog)
 	p.name = strings.clone(f.name != "" ? f.name : c.comm)
 	p.cmdline = strings.clone(f.cmdline)
 	p.exe = strings.clone(f.exe)
+	if strings.has_suffix(f.scope, ".service") { p.unit, p.unit_user = strings.clone(f.scope), f.user_unit }
 	p.search = strings.to_lower(strings.concatenate({p.name, " ", p.cmdline}, context.temp_allocator))
-	p.entry = catalog != nil ? catalog_match(catalog, p.name, p.exe, f.scope) : -1
+	p.entry = catalog != nil ? catalog_match(catalog, p.name, p.exe, f.scope, p.cmdline) : -1
 }
 
 // What moves: the counters of this sample, and the rates since the last one (none for a process seen for the first time).

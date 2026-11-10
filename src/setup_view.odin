@@ -58,7 +58,7 @@ setup_build :: proc(app: ^App, em: f32) {
 					ui.paragraph("Welcome to Inspecteur###setup_title")
 					if ui.tags("weak") {
 						ui.next({width = ui.fill()})
-						ui.paragraph("What runs on this computer, what it uses, and a way to end it.###setup_sub")
+						ui.paragraph("What runs, what it uses, and a way to end it.###setup_sub")
 					}
 				}
 				ui.spacer(ui.px(pad))
@@ -94,16 +94,25 @@ setup_build :: proc(app: ^App, em: f32) {
 				}
 			}
 			ui.spacer(ui.px(em))
-			setup_heading("The desktop's task manager", w, pad, em)
-			setup_text("shojiwm-win7 opens the program SHOJIWM_WIN7_TASK_MANAGER names: set it to inspecteur in the session's environment (on NixOS, environment.sessionVariables). Another desktop: bind Ctrl+Shift+Escape to the command inspecteur in its keyboard settings.###setup_tm", w, pad, true)
+			// (the demo's desktop is GNOME's: the pictures say nothing of the machine they are made on)
+			hint := task_manager_hint(app.demo != nil ? "GNOME" : current_desktop())
+			setup_heading(hint.desktop != "" ? fmt.tprintf("The task manager of %s", hint.desktop) : "The desktop's task manager", w, pad, em)
+			setup_text(fmt.tprintf("%s###setup_tm", hint.steps), w, pad, true)
 			ui.spacer(ui.px(em * 0.6))
 			ui.next({width = ui.px(w), height = ui.children_sum()})
 			if ui.row(.Center, {}, "###setup_tm_buttons") {
 				ui.spacer(ui.px(pad))
 				ui.next({width = ui.text_size(em * 1.2), height = ui.px(ui.dense(em * 2.2))})
-				if ui.button("Copy SHOJIWM_WIN7_TASK_MANAGER=inspecteur###setup_copy").clicked {
-					platform.set_clipboard(app.main.win, "SHOJIWM_WIN7_TASK_MANAGER=inspecteur")
-					say(app, "Copied SHOJIWM_WIN7_TASK_MANAGER=inspecteur")
+				if hint.can_bind {
+					if ui.button("Add Shortcut###setup_bind").clicked {
+						why := app.demo != nil ? DEMO_REFUSED : task_manager_bind()
+						if why == "" { say(app, "Ctrl+Shift+Escape opens Inspecteur") } else { say(app, "No shortcut: %s", why) }
+					}
+				} else if hint.copy != "" {
+					if ui.button(fmt.tprintf("%s###setup_copy", hint.copy_label)).clicked {
+						platform.set_clipboard(app.main.win, hint.copy)
+						say(app, "Copied %s", hint.copy)
+					}
 				}
 			}
 			ui.spacer(ui.px(em * 1.2))

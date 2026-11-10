@@ -53,3 +53,24 @@ a_scope_names_its_app :: proc(t: ^testing.T) {
 	testing.expect_value(t, catalog_match(&c, "x", "", "app-org.gnome.Text\\x2dEditor@autostart.service"), 0)
 	testing.expect_value(t, catalog_match(&c, "x", "", "session-3.scope"), -1)
 }
+
+// A launcher or an interpreter is no app: past a launcher the program is further on, and an interpreter's is its script.
+@(test)
+launchers_and_interpreters_name_no_app :: proc(t: ^testing.T) {
+	testing.expect_value(t, program_of({"env", "FOO=1", "sudo", "-u", "alex", "/usr/bin/firefox", "%U"}), "firefox")
+	testing.expect_value(t, program_of({"python3", "-u", "/opt/app/main.py"}), "main.py")
+	testing.expect_value(t, program_of({"sh", "-c", "exec foo --x"}), "foo")
+	testing.expect_value(t, program_of({"flatpak", "run", "--branch=stable", "org.gnome.Maps"}), "org.gnome.Maps")
+	testing.expect_value(t, program_of({"python3"}), "")
+	testing.expect_value(t, program_of({"python3.12", "-m", "app"}), "app")
+	testing.expect_value(t, program_of({"nice", "-n", "5", "make"}), "make")
+	testing.expect_value(t, program_of({"systemd-run", "--user", "--unit", "x", "--", "electron32", "/opt/notes/app.asar"}), "app.asar")
+	c: Catalog
+	defer catalog_destroy(&c)
+	catalog_add_entry(&c, "org.example.Notes", "Notes", "", program_of({"python3", "/opt/notes/notes.py"}), "")
+	catalog_add_entry(&c, "terminal", "Terminal", "", program_of({"bash", "-c", "terminal --login"}), "")
+	testing.expect_value(t, catalog_match(&c, "python3", "/usr/bin/python3.12", "", "python3 /opt/notes/notes.py --x"), 0)
+	testing.expect_value(t, catalog_match(&c, "python3", "/usr/bin/python3.12", "", "python3 /opt/other.py"), -1)
+	testing.expect_value(t, catalog_match(&c, "bash", "/usr/bin/bash", "", "bash"), -1)
+	testing.expect_value(t, catalog_match(&c, "terminal", "", ""), 1)
+}

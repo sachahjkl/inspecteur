@@ -61,6 +61,7 @@ CONN_COLUMNS := [?]ui.Table_Column{
 
 connections_init :: proc(c: ^Connections, app: ^App) {
 	section_table_init(&c.rows, app, CONN_COLUMNS[:])
+	section_layout_load(&c.rows.table, &app.prefs, "connections")
 	c.demo = app.demo
 	ui.worker_start(&c.worker, connections_job, c, app.main.win)
 }

@@ -126,6 +126,10 @@ live_window :: proc(l: ^Live) {
 	check(l, cdp.key(c, "Escape"), "Escape clears the search")
 	if !live_kill(l) { return }
 
+	live_marks(l)
+	live_end_tree(l)
+	live_affinity_dump(l)
+	live_view_keys(l)
 	live_properties(l)
 	live_guards(l)
 	live_access_denied(l)

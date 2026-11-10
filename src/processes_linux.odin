@@ -18,8 +18,10 @@ import "core:sys/linux"
 PROC_READ_MAX :: 64 * 1024
 // The flag of a kernel thread in the stat's flags (PF_KTHREAD): not a program, not shown.
 PF_KTHREAD :: 0x00200000
-// Bytes of a memory page (x86-64 and arm64's usual size; statm counts pages).
-PAGE_BYTES :: 4096
+// Bytes of a memory page when the system does not say (statm counts pages): x86-64's; arm64 may have 16 or 64 KB pages.
+PAGE_BYTES_USUAL :: 4096
+// The auxiliary vector's key of the page size (AT_PAGESZ, <elf.h>).
+AT_PAGESZ :: 6
 // The unit of the CPU times and start times of /proc (USER_HZ, the same on every Linux).
 CLOCK_TICKS :: 100
 // Nanoseconds of a clock tick.
@@ -34,6 +36,7 @@ Proc_Reader :: struct {
 	io_denied: map[i32]Io_Denied,  // the processes whose io is not ours to read: never asked again
 	readings:  int,
 	boot_time: i64,                // unix seconds (btime of /proc/stat): a process's start is its ticks after it
+	page_bytes: u64,               // the system's memory page (page_size)
 }
 
 @(private = "file")
@@ -44,6 +47,7 @@ proc_reader_init :: proc(r: ^Proc_Reader) -> bool {
 	if err != .NONE { return false }
 	r.proc_dir = fd
 	r.buf = make([]u8, PROC_READ_MAX)
+	r.page_bytes = page_size(r.buf)
 	users_read(r)
 	if text, _, ok := read_file(r.buf, linux.AT_FDCWD, "/proc/stat"); ok { r.boot_time = parse_cpu_times(string(text)).boot_time }
 	return true
@@ -72,12 +76,12 @@ procs_read :: proc(r: ^Proc_Reader, out: ^[dynamic]Proc_Counters) {
 		c := Proc_Counters{
 			pid = pid, ppid = st.ppid, start = st.start, comm = strings.clone(st.comm, context.temp_allocator),
 			cpu_ns = st.ticks * TICK_NS, threads = st.threads, state = proc_state_of(st.state), nice = st.nice,
-			resident = st.rss_pages * PAGE_BYTES,
+			resident = st.rss_pages * r.page_bytes,
 		}
 		if mtext, mok := read_at(r, path_of(pid, "statm")); mok {
 			if m, pok := parse_statm(string(mtext)); pok {
-				c.resident = m.resident * PAGE_BYTES
-				c.private = (m.resident - min(m.shared, m.resident)) * PAGE_BYTES
+				c.resident = m.resident * r.page_bytes
+				c.private = (m.resident - min(m.shared, m.resident)) * r.page_bytes
 			}
 		}
 		if d, denied := r.io_denied[pid]; denied && d.start == st.start {
@@ -120,7 +124,11 @@ proc_facts :: proc(r: ^Proc_Reader, c: Proc_Counters) -> (f: Proc_Facts) {
 	if linux.fstatat(r.proc_dir, strings.clone_to_cstring(path_of(c.pid, ""), context.temp_allocator), &stat, {}) == .NONE {
 		f.user = user_name_of(r, u32(stat.uid))
 	}
-	if text, ok := read_at(r, path_of(c.pid, "cgroup")); ok { f.scope = strings.clone(cgroup_scope(string(text)), context.temp_allocator) }
+	if text, ok := read_at(r, path_of(c.pid, "cgroup")); ok {
+		f.scope = strings.clone(cgroup_scope(string(text)), context.temp_allocator)
+		// (a unit of the user's manager is under its user@<uid>.service)
+		f.user_unit = strings.contains(string(text), "/user@")
+	}
 	if r.boot_time > 0 { f.started = r.boot_time + i64(c.start / CLOCK_TICKS) }
 	return
 }
@@ -135,6 +143,19 @@ user_name_of :: proc(r: ^Proc_Reader, uid: u32) -> string {
 	name := strings.clone(uint_text(u64(uid)))
 	r.users[uid] = name
 	return name
+}
+
+// The size of a memory page: AT_PAGESZ of the process's auxiliary vector (/proc/self/auxv: pairs of words, key and
+// value, as the kernel gave them to the program), else the usual 4096.
+@(private = "file")
+page_size :: proc(buf: []u8) -> u64 {
+	data, _, ok := read_file(buf, linux.AT_FDCWD, "/proc/self/auxv")
+	if !ok { return PAGE_BYTES_USUAL }
+	words := slice.reinterpret([]u64, data[:len(data) / 8 * 8])
+	for i := 0; i + 1 < len(words); i += 2 {
+		if words[i] == AT_PAGESZ && words[i + 1] > 0 { return words[i + 1] }
+	}
+	return PAGE_BYTES_USUAL
 }
 
 // uid -> login name, from /etc/passwd (whole: a file of many users is longer than the buffer).

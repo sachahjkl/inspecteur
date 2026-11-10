@@ -24,6 +24,7 @@ build_startup :: proc(app: ^App, em: f32) {
 	section_bar(app, "Startup", note, em, startup_actions)
 	ev := section_table_build(&s.rows, s.list != nil ? "Nothing starts with the session." : "")
 	if ev.sorted { ui.table_apply(&s.rows.table, &s.rows.data, app.query) }
+	if ev.sorted || ev.resized { section_layout_save(&s.rows.table, &app.prefs, "startup") }
 	if ev.activated && cmd_can(app, .Startup_Open) { startup_open(app) }
 	if ev.menu { startup_menu_open(app, ev.menu_at) }
 	startup_menu(app, em)

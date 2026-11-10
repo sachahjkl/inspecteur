@@ -61,7 +61,7 @@ row_icon_lead :: proc(t: ^ui.Table, row: int, size: f32) {
 	icon := st.icons[row]
 	ic := icon.app != "" ? icon_of(app, icon.app) : Icon{}
 	if ic.ok {
-		icon_box(ic, size)
+		icon_box(ic, size, app.icons)
 	} else if icon.glyph != "" {
 		if ui.tags("weak") { glyph(app, icon.glyph, size) }
 	} else {

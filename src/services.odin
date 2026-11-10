@@ -59,7 +59,37 @@ Service_Ask :: struct {
 	unit_len: int,
 }
 
+// The details of one service (the Services section's pane, Ctrl+I): its unit file, since when it is in its state, its
+// tasks, its CPU time, its restarts, and its journal's last lines. All of its texts in its arena.
+Unit_Details :: struct {
+	arena:    virtual.Arena,
+	manager:  Manager,
+	name:     string,
+	file:     string,     // its unit file ("" none)
+	since:    i64,        // unix seconds: when it entered its state (0: unknown)
+	tasks:    u64,        // its processes and threads now (DETAIL_UNKNOWN: not counted)
+	cpu_ns:   u64,        // its CPU time (DETAIL_UNKNOWN: not counted)
+	restarts: u32,        // the manager restarted it this many times
+	journal:  [dynamic]string,   // its journal's last lines, the oldest first
+	journal_problem: string,     // why there are none ("" when they were read)
+}
+
+// A number of the details the manager does not count.
+DETAIL_UNKNOWN :: max(u64)
+// The journal's lines the pane shows, at most.
+JOURNAL_LINES :: 50
+
 Services :: struct {
+	details_worker: ui.Worker,
+	details_bus:  Service_Bus,       // the details' thread's own
+	details_ask:  struct { manager: Manager, name: [SERVICE_NAME_MAX]u8, name_len: int },   // under its mutex
+	details_shared: ^Unit_Details,   // its last reading, under its mutex
+	details:      ^Unit_Details,     // the window's
+	select_name:  string,            // owned: a service to select once a reading lists it (Go to service)
+	details_for:  u64,               // the service the pane was asked for (its name's id)
+	journal_vl:   ui.Virtual_List,   // the pane's lines
+	journal_for:  u64,               // the service and the lines the list was put at the end for
+	journal_lines: int,
 	worker:  ui.Worker,
 	bus:     Service_Bus,      // the thread's own (services_linux.odin)
 	demo:    ^Demo,            // not nil: the services are the demo's
@@ -85,14 +115,22 @@ SERVICE_COLUMNS := [?]ui.Table_Column{
 
 services_init :: proc(s: ^Services, app: ^App) {
 	section_table_init(&s.rows, app, SERVICE_COLUMNS[:])
+	section_layout_load(&s.rows.table, &app.prefs, "services")
 	s.manager = app.settings.manager
 	s.demo = app.demo
 	ui.worker_start(&s.worker, services_job, s, app.main.win)
+	ui.worker_start(&s.details_worker, details_job, s, app.main.win)
 }
 
 services_destroy :: proc(s: ^Services) {
 	ui.worker_stop(&s.worker)
+	ui.worker_stop(&s.details_worker)
 	service_bus_close(&s.bus)
+	service_bus_close(&s.details_bus)
+	unit_details_free(s.details_shared)
+	unit_details_free(s.details)
+	delete(s.select_name)
+	ui.vlist_destroy(&s.journal_vl)
 	service_list_free(s.shared)
 	service_list_free(s.list)
 	section_table_destroy(&s.rows)
@@ -145,6 +183,55 @@ services_job :: proc(w: ^ui.Worker) {
 	ui.worker_published(w)
 }
 
+@(private = "file")
+unit_details_free :: proc(d: ^Unit_Details) {
+	if d == nil { return }
+	virtual.arena_destroy(&d.arena)
+	free(d)
+}
+
+// Asks for the details of the service `name` of the manager shown (its unit, its journal).
+details_ask :: proc(app: ^App, name: string) {
+	s := &app.services
+	ui.worker_lock(&s.details_worker)
+	s.details_ask.manager = s.manager
+	s.details_ask.name_len = copy(s.details_ask.name[:], name)
+	ui.worker_unlock(&s.details_worker)
+	ui.worker_ask(&s.details_worker)
+}
+
+@(private = "file")
+details_job :: proc(w: ^ui.Worker) {
+	s := (^Services)(w.user)
+	ui.worker_lock(w)
+	ask := s.details_ask
+	ui.worker_unlock(w)
+	d := new(Unit_Details)
+	a := virtual.arena_allocator(&d.arena)
+	d.journal = make([dynamic]string, a)
+	d.manager = ask.manager
+	d.name = strings.clone(string(ask.name[:ask.name_len]), a)
+	d.tasks, d.cpu_ns = DETAIL_UNKNOWN, DETAIL_UNKNOWN
+	if s.demo != nil { demo_unit_details(s.demo, d, a) } else { unit_details_read(&s.details_bus, d, a) }
+	ui.worker_lock(w)
+	old := s.details_shared
+	s.details_shared = d
+	ui.worker_unlock(w)
+	unit_details_free(old)
+	ui.worker_published(w)
+}
+
+// The window's turn: the details read become the pane's.
+details_take :: proc(app: ^App) {
+	s := &app.services
+	if !ui.worker_take(&s.details_worker) { return }
+	ui.worker_lock(&s.details_worker)
+	old := s.details
+	s.details, s.details_shared = s.details_shared, nil
+	ui.worker_unlock(&s.details_worker)
+	unit_details_free(old)
+}
+
 // The window's turn: a new reading becomes the rows; what an action came to is said.
 services_take :: proc(app: ^App) {
 	s := &app.services
@@ -193,6 +280,21 @@ services_rows :: proc(app: ^App) {
 		}
 	}
 	ui.table_apply(&st.table, &st.data, app.query)
+	if s.select_name != "" && s.list != nil && s.list.manager == s.manager {
+		if !ui.table_select_id(&st.table, name_id(s.select_name)) { say(app, "%s is not among the %s services", s.select_name, MANAGER_KEYS[s.manager]) }
+		delete(s.select_name)
+		s.select_name = ""
+	}
+	// (the pane follows the selection, and each reading: the journal moves)
+	if app.settings.details { if u, ok := selected_service(app); ok { details_ask(app, u.name) } }
+}
+
+// Selects the service `name` once a reading of the manager shown lists it.
+service_select :: proc(app: ^App, name: string) {
+	s := &app.services
+	delete(s.select_name)
+	s.select_name = strings.clone(name)
+	services_rows(app)
 }
 
 // The selected service, when there is one.

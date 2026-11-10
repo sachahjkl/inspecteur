@@ -19,6 +19,7 @@ build_connections :: proc(app: ^App, em: f32) {
 	section_bar(app, "Connections", note, em, connections_actions)
 	ev := section_table_build(&c.rows, c.read ? "No socket." : "")
 	if ev.sorted { ui.table_apply(&c.rows.table, &c.rows.data, app.query) }
+	if ev.sorted || ev.resized { section_layout_save(&c.rows.table, &app.prefs, "connections") }
 	if ev.activated && cmd_can(app, .Socket_Open) { connection_reveal(app) }
 	if ev.menu { connections_menu_open(app, ev.menu_at) }
 	connections_menu(app, em)

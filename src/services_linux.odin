@@ -13,6 +13,7 @@ package inspecteur
 // polkit can ask the user for a password; its answer, when it refuses, is shown as it is.
 
 import "base:runtime"
+import "core:fmt"
 import "core:os"
 import "core:strings"
 import "core:sys/linux"
@@ -240,4 +241,63 @@ call_failure :: proc(msg: ^dbus.Message, silent: string) -> string {
 	}
 	if text != "" { return text }
 	return strings.clone(msg.error_name, context.temp_allocator)
+}
+
+// The details of the service `d.name` of manager `d.manager`: its unit's properties over D-Bus (LoadUnit, then
+// FragmentPath, StateChangeTimestamp, TasksCurrent, CPUUsageNSec, NRestarts) and its journal's last lines from
+// journalctl (the journal's own program: its files' format is journald's to read). Runs on the details' thread.
+unit_details_read :: proc(b: ^Service_Bus, d: ^Unit_Details, a: runtime.Allocator) {
+	if c := service_conn(b, d.manager); c != nil {
+		w := dbus.body_writer()
+		dbus.w_string(&w, d.name)
+		if msg, ok := dbus.call(c, SYSTEMD_DEST, SYSTEMD_PATH, SYSTEMD_IFACE, "LoadUnit", "s", w.buf[:]); ok {
+			r := dbus.msg_reader(&msg)
+			path := strings.clone(dbus.r_string(&r), context.temp_allocator)
+			UNIT :: "org.freedesktop.systemd1.Unit"
+			SERVICE :: "org.freedesktop.systemd1.Service"
+			if v, has := unit_property(c, path, UNIT, "FragmentPath"); has { d.file = strings.clone(v.text, a) }
+			if v, has := unit_property(c, path, UNIT, "StateChangeTimestamp"); has && v.number > 0 { d.since = i64(v.number / 1_000_000) }
+			if v, has := unit_property(c, path, SERVICE, "TasksCurrent"); has { d.tasks = v.number }
+			if v, has := unit_property(c, path, SERVICE, "CPUUsageNSec"); has { d.cpu_ns = v.number }
+			if v, has := unit_property(c, path, SERVICE, "NRestarts"); has { d.restarts = u32(v.number) }
+		}
+	}
+	args := make([dynamic]string, context.temp_allocator)
+	append(&args, "journalctl")
+	if d.manager == .User { append(&args, "--user") }
+	append(&args, "-u", d.name, "-n", fmt.tprintf("%d", JOURNAL_LINES), "--no-pager", "-q", "-o", "short-iso")
+	state, stdout, stderr, err := os.process_exec({command = args[:]}, context.temp_allocator)
+	switch {
+	case err != nil:
+		d.journal_problem = "journalctl cannot be run: the journal is not read"
+	case !state.exited || state.exit_code != 0:
+		text := strings.trim_space(string(stderr))
+		d.journal_problem = strings.clone(text != "" ? text : "journalctl failed", a)
+	case:
+		rest := string(stdout)
+		for line in strings.split_lines_iterator(&rest) { if line != "" { append(&d.journal, strings.clone(line, a)) } }
+		// (a user that is not in the systemd-journal group or adm reads its own units' lines alone)
+		if len(d.journal) == 0 { d.journal_problem = "No line in the journal that this user may read." }
+	}
+}
+
+// A property's value: a number (a 't' or a 'u') or a text (an 's' or an 'o').
+@(private = "file")
+Property :: struct { number: u64, text: string }
+
+@(private = "file")
+unit_property :: proc(c: ^dbus.Conn, path, iface, name: string) -> (v: Property, ok: bool) {
+	w := dbus.body_writer()
+	dbus.w_string(&w, iface)
+	dbus.w_string(&w, name)
+	msg, called := dbus.call(c, SYSTEMD_DEST, path, "org.freedesktop.DBus.Properties", "Get", "ss", w.buf[:])
+	if !called { return }
+	r := dbus.msg_reader(&msg)
+	switch dbus.r_variant_sig(&r) {
+	case "t":      v.number = dbus.r_u64(&r)
+	case "u":      v.number = u64(dbus.r_u32(&r))
+	case "s", "o": v.text = strings.clone(dbus.r_string(&r), context.temp_allocator)
+	case:          return
+	}
+	return v, !r.err
 }

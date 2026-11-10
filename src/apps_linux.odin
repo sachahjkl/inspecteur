@@ -38,5 +38,7 @@ catalog_add :: proc(c: ^Catalog, id, text: string) {
 	if value(text, "Type") != "Application" || value(text, "NoDisplay") == "true" || value(text, "Hidden") == "true" || value(text, "Terminal") == "true" { return }
 	name := value(text, "Name")
 	if name == "" { return }
-	catalog_add_entry(c, id, desktop.unescape_value(name), value(text, "Icon"), desktop.exec_program(value(text, "Exec")), value(text, "StartupWMClass"))
+	words := make([dynamic]string, context.temp_allocator)
+	for a in desktop.exec_arguments(value(text, "Exec")) { append(&words, a.text) }
+	catalog_add_entry(c, id, desktop.unescape_value(name), value(text, "Icon"), program_of(words[:]), value(text, "StartupWMClass"))
 }

@@ -6,6 +6,7 @@ package inspecteur
 import "core:fmt"
 import "core:strings"
 import "gt:draw"
+import "gt:font"
 import lucide "gt:lucide"
 import "core:time"
 import "core:time/timezone"
@@ -49,6 +50,7 @@ build_bar :: proc(app: ^App, em: f32) {
 		ui.spacer(ui.px(em * 0.4))
 		cmd_button(app, "end_task", lucide.X, .End_Task, em)
 		cmd_button(app, "kill", lucide.ZAP, .Kill, em)
+		cmd_button(app, "end_tree", lucide.GIT_FORK, .End_Tree, em)
 		p := selected_proc(app)
 		cmd_button(app, "suspend", p != nil && p.state == .Stopped ? lucide.PLAY : lucide.SQUARE, .Suspend, em)
 		vrule(em)
@@ -56,12 +58,15 @@ build_bar :: proc(app: ^App, em: f32) {
 		cmd_button(app, "open_location", lucide.FOLDER_OPEN, .Open_Location, em)
 		cmd_button(app, "copy_command", lucide.COPY, .Copy_Command, em)
 		vrule(em)
+		cmd_button(app, "tree_view", app.table.tree ? lucide.APP_WINDOW : lucide.LIST_TREE, .Tree_View, em)
+		vrule(em)
 		ui.spacer(ui.px(em * 0.3))
 		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
 		ui.label("Processes###bar_title")
 		ui.spacer(ui.px(em * 0.8))
 		if ui.tags("weak") {
 			counts := fmt.tprintf("%s, %s", count_text(app.table.shown_apps, "app", "apps"), count_text(app.table.shown_background, "background process", "background processes"))
+			if app.table.tree { counts = fmt.tprintf("%s, as a tree", count_text(app.table.shown_tree, "process", "processes")) }
 			ui.next({width = ui.fill(), height = ui.pct(1)})
 			label_tip(fmt.tprintf("%s###counts", counts), counts)
 		}
@@ -162,7 +167,8 @@ build_rows :: proc(app: ^App, em: f32) {
 		if i == app.vl.sel { app.sel_rect = row.box.rect }
 		if row.double_clicked { default_action(app) }
 		if row.right_clicked {
-			select_row(app, i)
+			// (the list made it the active row; a right click on a marked row keeps the marks: the menu acts on them)
+			app.vl.reveal = REVEAL_BUILDS
 			row_menu_open(app, ui.mouse_pos())
 		}
 	}
@@ -215,7 +221,8 @@ build_cells :: proc(app: ^App, r: Row, em: f32, hot: ui.Color) -> (tip: string) 
 	case .Process:
 		p = s.procs[r.index]
 		cpu, private, resident, gpu_mem, read, write, threads, name = p.cpu, p.private, p.resident, p.gpu_mem, p.read_rate, p.write_rate, p.threads, p.name
-		if p.entry >= 0 && r.depth == 0 { icon_name = app.catalog.entries[p.entry].icon }
+		// (in a group, the app's icon is the group's; in the tree, each app's process has its own)
+		if p.entry >= 0 && (r.depth == 0 || t.tree) { icon_name = app.catalog.entries[p.entry].icon }
 	case .App:
 		g := t.groups[r.index]
 		p = s.procs[g.root]
@@ -242,8 +249,8 @@ build_cells :: proc(app: ^App, r: Row, em: f32, hot: ui.Color) -> (tip: string) 
 	ui.next({width = ui.fill(), height = ui.pct(1), axis = .X, cross = .Center})
 	if ui.row(id = "###c_name") {
 		ui.spacer(ui.px(em * (0.3 + INDENT_EM * f32(r.depth))))
-		if r.kind == .App {
-			open := t.expanded[t.groups[r.index].key] || t.query != ""
+		if r.kind == .App || r.branch {
+			open := t.query != "" || (r.kind == .App ? t.expanded[t.groups[r.index].key] : !t.collapsed[proc_key(p)])
 			if ui.tags("weak") {
 				ui.next({width = ui.px(em * CHEVRON_EM), height = ui.pct(1), font = app.icons, text_align = .Center})
 				chev := ui.build_box({.Clickable, .Draw_Text, .No_Text_Trunc}, fmt.tprintf("%s###chev", open ? lucide.CHEVRON_DOWN : lucide.CHEVRON_RIGHT))
@@ -256,7 +263,7 @@ build_cells :: proc(app: ^App, r: Row, em: f32, hot: ui.Color) -> (tip: string) 
 		}
 		ic := icon_of(app, icon_name)
 		if ic.ok {
-			icon_box(ic, em * ICON_EM)
+			icon_box(ic, em * ICON_EM, app.icons)
 		} else if ui.tags("weak") {
 			glyph(app, r.kind == .App ? lucide.APP_WINDOW : lucide.SQUARE_TERMINAL, em * ICON_EM)
 		}
@@ -318,16 +325,22 @@ started_text :: proc(app: ^App, started: i64) -> string {
 	return fmt.tprintf("%04d-%02d-%02d %02d:%02d", when_dt.year, when_dt.month, when_dt.day, when_dt.hour, when_dt.minute)
 }
 
-// An app's icon, `width` wide, the row's height.
-icon_box :: proc(ic: Icon, width: f32) {
+// An app's icon, `width` wide, the row's height: its texture, or a glyph on its tile (the demo's).
+icon_box :: proc(ic: Icon, width: f32, glyph_font: font.Font_Id = 0) {
 	d := ui.frame_new(Icon_Draw)
-	d.tex = ic.tex
+	d.tex, d.tile, d.tint = ic.tex, ic.glyph != "", ic.tint
 	ui.next({width = ui.px(width), height = ui.pct(1)})
-	ui.custom("###icon", icon_draw, d)
+	box := ui.custom("###icon", icon_draw, d)
+	if ic.glyph == "" { return }
+	if ui.parent(box) {
+		// (the glyph over the tile, white, centred: the box's own text)
+		ui.next({width = ui.pct(1), height = ui.pct(1), font = glyph_font, font_size = ui.font_size() * 0.95, text_align = .Center, fg = ui.Color{1, 1, 1, 1}})
+		ui.build_box({.Draw_Text, .No_Text_Trunc}, fmt.tprintf("%s###glyph", ic.glyph))
+	}
 }
 
 @(private = "file")
-Icon_Draw :: struct { tex: render.Texture }
+Icon_Draw :: struct { tex: render.Texture, tile: bool, tint: [4]f32 }
 
 @(private = "file")
 icon_draw :: proc(b: ^ui.Box, user: rawptr, dc: ^draw.Context) {
@@ -335,5 +348,6 @@ icon_draw :: proc(b: ^ui.Box, user: rawptr, dc: ^draw.Context) {
 	h := b.rect.max.y - b.rect.min.y
 	side := min(b.rect.max.x - b.rect.min.x, h * 0.72)
 	at := ui.Vec2{b.rect.min.x + (b.rect.max.x - b.rect.min.x - side) * 0.5, b.rect.min.y + (h - side) * 0.5}
+	if d.tile { draw.rect(dc, {at, at + side}, ui.Color(d.tint), side * 0.22); return }
 	draw.image(dc, d.tex, {at, at + side})
 }

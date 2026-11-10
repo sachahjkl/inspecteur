@@ -7,7 +7,10 @@ package inspecteur
 // strings of a reading are in an arena, emptied at the next.
 
 import "core:mem/virtual"
+import "core:strings"
 import "core:time"
+import process "gt:process"
+import "gt:ui"
 
 Props_Tab :: enum u8 { General, Threads, Files, Modules, Environment }
 
@@ -53,16 +56,18 @@ Props :: struct {
 	env:      [dynamic]string,
 	list_read: Read_State,  // what came of reading the list of the tab read (Threads to Environment)
 	nice_sel: int,          // the priority menu's choice (PRIORITIES)
+	cpus:     string,       // the General tab's: the processors it may run on ("0-3, 8"), "" unknown (in the arena)
+	filter:   ui.Text_Field,   // the filter of the lists (Ctrl+F)
+	filter_key: ui.Key,
 }
 
-// The priorities offered, as nice values. A user may only lower a process's priority (raise its nice) without
-// CAP_SYS_NICE: the others are refused ("Access denied").
-PRIORITIES := [?]struct { name: string, nice: i8 }{
-	{"High (-10)", -10}, {"Above normal (-5)", -5}, {"Normal (0)", 0}, {"Below normal (5)", 5}, {"Low (10)", 10}, {"Idle (19)", 19},
-}
+// A priority offered (PRIORITIES, the system's: system_linux.odin): its name and its value as a nice value (-20 the
+// highest, 19 the lowest).
+Priority :: struct { name: string, nice: i8 }
 
 props_destroy :: proc(p: ^Props) {
 	virtual.arena_destroy(&p.arena)
+	ui.field_destroy(&p.filter)
 	delete(p.threads)
 	delete(p.files)
 	delete(p.modules)
@@ -71,6 +76,7 @@ props_destroy :: proc(p: ^Props) {
 
 props_open :: proc(p: ^Props, pid: i32, start: u64) {
 	p.open, p.pid, p.start, p.tab, p.gone = true, pid, start, .General, false
+	ui.field_clear(&p.filter)
 	props_read(p)
 }
 
@@ -89,16 +95,22 @@ props_read :: proc(p: ^Props) {
 	clear(&p.files)
 	clear(&p.modules)
 	clear(&p.env)
-	p.cwd = ""
+	p.cwd, p.cpus = "", ""
 	p.read_tab, p.read_at = p.tab, time.tick_now()
 	a := virtual.arena_allocator(&p.arena)
 	if p.demo != nil { demo_props_read(p.demo, p, a); return }
 	switch p.tab {
-	case .General:     p.cwd, p.cwd_read = proc_cwd(p.pid, a)
-	case .Threads:     p.list_read = proc_threads(p.pid, &p.threads, a)
-	case .Files:       p.list_read = proc_files(p.pid, &p.files, a)
-	case .Modules:     p.list_read = proc_modules(p.pid, &p.modules, a)
-	case .Environment: p.list_read = proc_environment(p.pid, &p.env, a)
+	case .General:
+		p.cwd, p.cwd_read = proc_cwd(p.pid, p.start, a)
+		if set, r, _ := process.affinity(p.pid, p.start); r == .Done {
+			cpus := make([dynamic]bool, context.temp_allocator)
+			for i in 0 ..< process.CPU_SET_MAX { append(&cpus, process.cpu_set_has(set, i)) }
+			p.cpus = strings.clone(cpu_list_text(cpus[:]), a)
+		}
+	case .Threads:     p.list_read = proc_threads(p.pid, p.start, &p.threads, a)
+	case .Files:       p.list_read = proc_files(p.pid, p.start, &p.files, a)
+	case .Modules:     p.list_read = proc_modules(p.pid, p.start, &p.modules, a)
+	case .Environment: p.list_read = proc_environment(p.pid, p.start, &p.env, a)
 	}
 }
 

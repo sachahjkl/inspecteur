@@ -16,6 +16,23 @@ SO_PEERCRED :: 17
 @(private = "file")
 Ucred :: struct { pid: i32, uid, gid: u32 }
 
+// The units Inspecteur runs in (owned), the outermost first: the parts of its cgroup's path that are units of a service
+// manager (cgroup v2, /proc/self/cgroup "0::/user.slice/user-1000.slice/user@1000.service/app.slice/app-x.scope"):
+// stopping one of them ends Inspecteur.
+own_units :: proc() -> []string {
+	data, err := os.read_entire_file("/proc/self/cgroup", context.temp_allocator)
+	if err != nil { return nil }
+	out := make([dynamic]string)
+	rest := string(data)
+	for line in strings.split_lines_iterator(&rest) {
+		if !strings.has_prefix(line, "0::") { continue }
+		for part in strings.split(line[3:], "/", context.temp_allocator) {
+			if strings.has_suffix(part, ".service") || strings.has_suffix(part, ".scope") { append(&out, strings.clone(part)) }
+		}
+	}
+	return out[:]
+}
+
 // The pid of the display server the window is shown by (0 when it cannot be told: X11, or no socket).
 display_server_pid :: proc() -> i32 {
 	display := os.get_env("WAYLAND_DISPLAY", context.temp_allocator)

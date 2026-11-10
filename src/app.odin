@@ -39,6 +39,7 @@ App :: struct {
 
 	demo:        ^Demo,             // not nil: every reading is the demo's (--demo: the pictures of the documentation)
 	display_server: i32,            // the pid of the compositor that shows the window (session_linux.odin), 0: unknown
+	own_units:   []string,          // the units Inspecteur runs in, the outermost first (session_linux.odin; owned)
 	sampler:     Sampler,
 	machine:     Machine,           // the CPU, the memory, the disks, the network, the GPUs (machine.odin, gpu.odin)
 	catalog:     Catalog,
@@ -46,6 +47,9 @@ App :: struct {
 	logo:        Icon,              // the title bar's (assets/logo_64.png)
 	table:       Table,
 	next_sample: time.Tick,
+	paused:      bool,              // the refresh is paused (Ctrl+Space): nothing is read but on F5
+	refresh_menu: ui.Key,           // the menu of the refresh's speed (view.odin)
+	refresh_rect: ui.Rect,          // its button in the title bar, as last laid out (the menu opens under it)
 
 	tab:         Tab,
 	query:       string,            // the filter, in lower case (owned): each section with a table applies it
@@ -70,6 +74,8 @@ App :: struct {
 	menu:        Row_Menu,          // the row's menu, the confirmation of a kill (menu.odin)
 	sample_extra: bool,             // the next sample comes sooner than the period (after an action): no point of the graphs
 	props:       Props,             // the Properties dialog (props.odin, props_view.odin)
+	affinity:    Affinity,          // the affinity dialog (affinity_view.odin)
+	dump:        Dump,              // a dump file written on a thread of its own (dump.odin)
 	props_lists: [Props_Tab]ui.Virtual_List,
 	status:      string,            // a message for the status bar (owned), until status_until (ui clock, ms)
 	status_until: f64,
@@ -109,6 +115,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	machine_init(&app.machine, app.demo)
 	if app.demo != nil { demo_preroll(app.demo, &app.machine, time.tick_now()._nsec) }
 	table_layout_load(&app.table, app.settings)
+	app.table.tree = app.settings.tree
+	app.vl.multi = true   // (Ctrl and Shift clicks, Ctrl+A: End task and Kill act on every row marked)
 	app.tab = opts.tab
 	refresh(app)
 
@@ -133,11 +141,15 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	h.params = app_params
 	app.devtools = devtools.start_from_env(win, "inspecteur")
 	h.before_input = proc(h: ^host.Host) { app := (^App)(h.user); devtools.service(app.devtools, &h.state, &app.shared.r) }
-	if app.demo == nil { app.display_server = display_server_pid() }
+	if app.demo == nil {
+		app.display_server = display_server_pid()
+		app.own_units = own_units()
+	}
 	connections_init(&app.connections, app)
 	information_init(&app.information, app)
 	services_init(&app.services, app)
 	startup_init(&app.startup, app)
+	dump_init(&app.dump, app)
 	section_first_show(app)
 	setup_offer(app)
 
@@ -151,8 +163,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	}
 	for !platform.is_closed(win) {
 		host.hosts_wait({h})
-		if time.tick_diff(app.next_sample, time.tick_now()) >= 0 { refresh(app) }
-		services_tick(app)
+		if !app.paused && time.tick_diff(app.next_sample, time.tick_now()) >= 0 { refresh(app) }
+		if !app.paused { services_tick(app) }
 		sections_take(app)
 		t_frame := time.tick_now()
 		host.host_frame(h)
@@ -169,6 +181,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	information_destroy(&app.information)
 	services_destroy(&app.services)
 	startup_destroy(&app.startup)
+	dump_destroy(&app.dump)
 	delete(app.query)
 	icons_destroy(&app.app_icons, &app.shared.r)
 	if app.logo.ok { render.destroy_texture(&app.shared.r, app.logo.tex) }
@@ -183,6 +196,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	if app.tz != nil { timezone.region_destroy(app.tz) }
 	delete(app.status)
 	row_menu_destroy(&app.menu)
+	for u in app.own_units { delete(u) }
+	delete(app.own_units)
 	props_destroy(&app.props)
 	setup_destroy(&app.setup)
 	for &vl in app.props_lists { ui.vlist_destroy(&vl) }
@@ -262,7 +277,9 @@ sections_take :: proc(app: ^App) {
 	connections_take(app)
 	information_take(&app.information)
 	services_take(app)
+	details_take(app)
 	startup_take(app)
+	dump_take(app)
 }
 
 selected_id :: proc(app: ^App) -> u64 {
@@ -286,8 +303,9 @@ row_process :: proc(app: ^App, r: Row) -> (p: ^Proc, ok: bool) {
 	return
 }
 
-// The milliseconds until the next sample (at least 1).
+// The milliseconds until the next sample (at least 1; max(int) while the refresh is paused).
 until_sample :: proc(app: ^App) -> int {
+	if app.paused { return max(int) }
 	return max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), app.next_sample))) + 1, 1)
 }
 
@@ -300,6 +318,8 @@ app_params :: proc(h: ^host.Host, bp: ^ui.Build_Params) {
 	if ui.theme_show(&app.shared.theme, ui.THEMES[:], choice, &app.theme_shown, render.blend_space(&app.shared.r)) { platform.set_dark_title(h.win, !app.theme_shown.light) }
 	// (in a window the user is not in, the search's caret neither shows nor blinks: at rest, one frame per sample)
 	bp.inactive = !h.win.active
+	// (Ctrl+=, Ctrl+- and Ctrl+0 are Inspecteur's commands: they set view.font_size, which is kept)
+	bp.disable_zoom = true
 	bp.base = ui.Style{pref = {.X = ui.text_size(), .Y = ui.px(26)}, font = app.shared.font, font_size = app.settings.font_size, text_pad = 6, cursor = .Arrow}
 }
 

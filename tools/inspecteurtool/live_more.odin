@@ -235,6 +235,9 @@ live_properties :: proc(l: ^Live) {
 	check(l, wait_nice(child.pid, 5), "the process runs at nice 5")
 	check(l, cdp.key(c, "ctrl+p") && wait_state(child.pid, 'T'), "Ctrl+P suspends it")
 	check(l, props_is(c, pid) && cdp.key(c, "ctrl+p") && wait_state(child.pid, 'S'), "Ctrl+P again resumes it")
+	// the filter of the lists: Ctrl+F, a text no thread has
+	check(l, cdp.click_name(c, "props_tab_1") && cdp.key(c, "ctrl+f") && cdp.type_text(c, "zzqx"), "Ctrl+F in the Threads tab, a text")
+	check(l, cdp.wait_for(c, "Nothing matches “zzqx”.", SESSION_WAIT), "it filters the threads out")
 	cdp.click_name(c, "props_tab_0")
 	cdp.wait_idle(c, SESSION_WAIT)
 	check(l, cdp.shot(c, fmt.tprintf("%s/properties.png", l.dir)), "a picture of the Properties")

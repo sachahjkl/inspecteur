@@ -14,16 +14,18 @@ import "gt:ui"
 
 Cmd :: enum u8 {
 	// Window
-	Palette, Shortcuts, Filter, Clear_Filter, Read_Again, Light_Dark, Setup,
+	Palette, Shortcuts, Filter, Clear_Filter, Read_Again, Pause_Refresh, Refresh_Speed, Zoom_In, Zoom_Out, Zoom_Reset,
+	Light_Dark, Setup,
 	// Sections
 	Show_Processes, Show_Performance, Show_Services, Show_Startup, Show_Connections, Show_Information, Next_Section, Previous_Section,
 	// Processes
-	End_Task, Kill, Suspend, Properties, Open_Location, Copy_Command, Default_Action, Open_Group, Close_Group,
-	Raise_Priority, Lower_Priority, Columns,
+	End_Task, Kill, End_Tree, Select_All, Suspend, Properties, Open_Location, Copy_Command, Default_Action, Open_Group,
+	Close_Group, Raise_Priority, Lower_Priority, Affinity, Go_To_Service, Dump, Search_Online, Tree_View, Columns,
 	// Performance
 	Cpu_Grid, Next_Device, Previous_Device,
 	// Services
-	Service_Start, Service_Stop, Service_Restart, Service_Enable, Service_Disable, Service_Open, Service_Copy, Service_Manager,
+	Service_Start, Service_Stop, Service_Restart, Service_Enable, Service_Disable, Service_Open, Service_Copy, Service_Details,
+	Service_Open_File, Service_Manager,
 	// Startup
 	Startup_Enable, Startup_Disable, Startup_Toggle, Startup_Open, Startup_Copy,
 	// Connections
@@ -31,7 +33,8 @@ Cmd :: enum u8 {
 	// Information
 	Info_Copy,
 	// Properties (the dialog)
-	Props_Suspend, Props_End_Task, Props_Kill, Props_Raise_Priority, Props_Lower_Priority, Props_Next_Tab, Props_Previous_Tab, Props_Close,
+	Props_Suspend, Props_End_Task, Props_Kill, Props_Raise_Priority, Props_Lower_Priority, Props_Affinity, Props_Filter,
+	Props_Next_Tab, Props_Previous_Tab, Props_Close,
 }
 
 COMMANDS := [Cmd]ui.Command{
@@ -40,6 +43,11 @@ COMMANDS := [Cmd]ui.Command{
 	.Filter           = {label = "Filter", group = "Window", keys = {{.F, {.Ctrl}}, {}}},
 	.Clear_Filter     = {label = "Clear the filter", group = "Window", keys = {{.Escape, {}}, {}}},
 	.Read_Again       = {label = "Read again", group = "Window", keys = {{.F5, {}}, {}}},
+	.Pause_Refresh    = {label = "Pause or resume the refresh", group = "Window", keys = {{.Space, {.Ctrl}}, {}}},
+	.Refresh_Speed    = {label = "Refresh speed…", group = "Window", keys = {{.R, {.Ctrl, .Shift}}, {}}},
+	.Zoom_In          = {label = "Larger text", group = "Window", keys = {{.Equal, {.Ctrl}}, {.Num_Add, {.Ctrl}}}},
+	.Zoom_Out         = {label = "Smaller text", group = "Window", keys = {{.Minus, {.Ctrl}}, {.Num_Subtract, {.Ctrl}}}},
+	.Zoom_Reset       = {label = "Text size as the default", group = "Window", keys = {{.N0, {.Ctrl}}, {}}},
 	.Light_Dark       = {label = "Light or dark", group = "Window", keys = {{.L, {.Ctrl, .Shift}}, {}}},
 	.Setup            = {label = "Desktop integration…", group = "Window", keys = {{.I, {.Ctrl, .Shift}}, {}}},
 
@@ -54,6 +62,8 @@ COMMANDS := [Cmd]ui.Command{
 
 	.End_Task         = {label = "End task", group = "Processes", keys = {{.Delete, {}}, {}}},
 	.Kill             = {label = "Kill…", group = "Processes", keys = {{.Delete, {.Shift}}, {}}},
+	.End_Tree         = {label = "End process tree…", group = "Processes", keys = {{.Delete, {.Ctrl}}, {}}},
+	.Select_All       = {label = "Select all", group = "Processes", keys = {{.A, {.Ctrl}}, {}}},
 	.Suspend          = {label = "Suspend or resume", group = "Processes", keys = {{.P, {.Ctrl}}, {}}},
 	.Properties       = {label = "Properties", group = "Processes", keys = {{.Return, {.Alt}}, {}}},
 	.Open_Location    = {label = "Open file location", group = "Processes", keys = {{.O, {.Ctrl}}, {}}},
@@ -63,6 +73,11 @@ COMMANDS := [Cmd]ui.Command{
 	.Close_Group      = {label = "Close the group", group = "Processes", keys = {{.Left, {}}, {}}},
 	.Raise_Priority   = {label = "Raise the priority", group = "Processes", keys = {{.Up, {.Ctrl}}, {}}},
 	.Lower_Priority   = {label = "Lower the priority", group = "Processes", keys = {{.Down, {.Ctrl}}, {}}},
+	.Affinity         = {label = "Set affinity…", group = "Processes", keys = {{.A, {.Ctrl, .Shift}}, {}}},
+	.Go_To_Service    = {label = "Go to service", group = "Processes", keys = {{.S, {.Ctrl, .Shift}}, {}}},
+	.Dump             = {label = "Create dump file…", group = "Processes", keys = {{.D, {.Ctrl, .Shift}}, {}}},
+	.Search_Online    = {label = "Search online", group = "Processes", keys = {{.F, {.Ctrl, .Shift}}, {}}},
+	.Tree_View        = {label = "Process tree or apps", group = "Processes", keys = {{.T, {.Ctrl}}, {}}},
 	.Columns          = {label = "Columns…", group = "Processes", keys = {{.C, {.Ctrl, .Shift}}, {}}},
 
 	.Cpu_Grid         = {label = "One graph per logical processor", group = "Performance", keys = {{.G, {.Ctrl}}, {}}},
@@ -76,6 +91,8 @@ COMMANDS := [Cmd]ui.Command{
 	.Service_Disable  = {label = "Disable", group = "Services", keys = {{.D, {.Ctrl}}, {}}},
 	.Service_Open     = {label = "Open in Processes", group = "Services", keys = {{.Return, {}}, {}}},
 	.Service_Copy     = {label = "Copy name", group = "Services", keys = {{.C, {.Ctrl}}, {}}},
+	.Service_Details  = {label = "Details and journal", group = "Services", keys = {{.I, {.Ctrl}}, {}}},
+	.Service_Open_File = {label = "Open unit file", group = "Services", keys = {{.O, {.Ctrl}}, {}}},
 	.Service_Manager  = {label = "System or user services", group = "Services", keys = {{.U, {.Ctrl}}, {}}},
 
 	.Startup_Enable   = {label = "Enable", group = "Startup", keys = {{.E, {.Ctrl}}, {}}},
@@ -96,6 +113,8 @@ COMMANDS := [Cmd]ui.Command{
 	.Props_Kill           = {label = "Kill…", group = "Properties", keys = {{.Delete, {.Shift}}, {}}},
 	.Props_Raise_Priority = {label = "Raise the priority", group = "Properties", keys = {{.Up, {.Ctrl}}, {}}},
 	.Props_Lower_Priority = {label = "Lower the priority", group = "Properties", keys = {{.Down, {.Ctrl}}, {}}},
+	.Props_Affinity       = {label = "Set affinity…", group = "Properties", keys = {{.A, {.Ctrl, .Shift}}, {}}},
+	.Props_Filter         = {label = "Filter the list", group = "Properties", keys = {{.F, {.Ctrl}}, {}}},
 	.Props_Next_Tab       = {label = "Next tab", group = "Properties", keys = {{.Tab, {.Ctrl}}, {}}},
 	.Props_Previous_Tab   = {label = "Previous tab", group = "Properties", keys = {{.Tab, {.Ctrl, .Shift}}, {}}},
 	.Props_Close          = {label = "Close", group = "Properties", keys = {{.Escape, {}}, {}}},
@@ -128,7 +147,8 @@ cmd_item :: proc(app: ^App, c: Cmd, label := "") {
 // The keys the filter keeps while it has the keyboard and some text: they edit it.
 @(private = "file")
 editing_chord :: proc(ch: ui.Chord) -> bool {
-	if ch.mods - {.Shift} != {} { return ch.key == .C && ch.mods == {.Ctrl} }
+	// (Ctrl+C copies, Ctrl+A selects the text, Ctrl+Delete erases a word: the filter's while it has text)
+	if ch.mods - {.Shift} != {} { return ch.mods == {.Ctrl} && (ch.key == .C || ch.key == .A || ch.key == .Delete) }
 	#partial switch ch.key {
 	case .Delete, .Backspace, .Space, .Left, .Right, .Home, .End: return true
 	}
@@ -188,10 +208,19 @@ shortcuts_build :: proc(app: ^App) {
 cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 	p := selected_proc(app)
 	switch c {
-	case .Palette, .Shortcuts, .Filter, .Read_Again, .Light_Dark, .Setup: return true
+	case .Palette, .Shortcuts, .Filter, .Read_Again, .Light_Dark, .Setup, .Pause_Refresh, .Refresh_Speed: return true
+	case .Zoom_In:    return app.settings.font_size < FONT_SIZE_MAX
+	case .Zoom_Out:   return app.settings.font_size > FONT_SIZE_MIN
+	case .Zoom_Reset: return app.settings.font_size != FONT_SIZE_DEFAULT
 	case .Clear_Filter: return len(app.search.buf) > 0
 	case .Show_Processes, .Show_Performance, .Show_Services, .Show_Startup, .Show_Connections, .Show_Information, .Next_Section, .Previous_Section: return true
-	case .End_Task, .Kill, .Properties: return p != nil
+	case .End_Task, .Kill, .End_Tree: return p != nil || ui.list_mark_count(&app.vl) > 0
+	case .Select_All: return len(app.table.rows) > 0
+	case .Properties, .Search_Online: return p != nil
+	case .Affinity: return p != nil && selected_is_process(app)
+	case .Go_To_Service: return p != nil && selected_is_process(app) && p.unit != ""
+	case .Dump: return p != nil && selected_is_process(app)
+	case .Tree_View: return true
 	case .Suspend: return p != nil && selected_is_process(app)
 	case .Open_Location: return p != nil && p.exe != ""
 	case .Copy_Command: return p != nil && p.cmdline != ""
@@ -200,7 +229,8 @@ cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 	case .Raise_Priority, .Lower_Priority: return p != nil && selected_is_process(app)
 	case .Columns: return true
 	case .Cpu_Grid, .Next_Device, .Previous_Device: return true
-	case .Service_Start, .Service_Stop, .Service_Restart, .Service_Enable, .Service_Disable, .Service_Open, .Service_Copy: return service_can(app, c)
+	case .Service_Start, .Service_Stop, .Service_Restart, .Service_Enable, .Service_Disable, .Service_Open, .Service_Copy, .Service_Open_File: return service_can(app, c)
+	case .Service_Details: return true
 	case .Service_Manager: return true
 	case .Startup_Enable, .Startup_Disable, .Startup_Toggle, .Startup_Open, .Startup_Copy: return startup_can(app, c)
 	case .Socket_End_Task, .Socket_Kill, .Socket_Open:
@@ -210,8 +240,9 @@ cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 		_, ok := selected_socket(app)
 		return ok
 	case .Info_Copy: return true
-	case .Props_Suspend, .Props_End_Task, .Props_Kill, .Props_Raise_Priority, .Props_Lower_Priority:
+	case .Props_Suspend, .Props_End_Task, .Props_Kill, .Props_Raise_Priority, .Props_Lower_Priority, .Props_Affinity:
 		return app.props.open && find_proc(&app.sampler, app.props.pid, app.props.start) != nil
+	case .Props_Filter: return app.props.open && app.props.tab != .General
 	case .Props_Next_Tab, .Props_Previous_Tab, .Props_Close: return app.props.open
 	}
 	return false
@@ -224,6 +255,11 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Filter:           if app.search_key != 0 { ui.set_focus(app.search_key) }
 	case .Clear_Filter:     ui.field_clear(&app.search)
 	case .Read_Again:       refresh_now(app)
+	case .Pause_Refresh:    refresh_pause(app, !app.paused)
+	case .Refresh_Speed:    refresh_menu_open(app)
+	case .Zoom_In:          zoom(app, app.settings.font_size + 1)
+	case .Zoom_Out:         zoom(app, app.settings.font_size - 1)
+	case .Zoom_Reset:       zoom(app, FONT_SIZE_DEFAULT)
 	case .Light_Dark:       light_dark_switch(app)
 	case .Setup:            setup_show(app)
 	case .Show_Processes:   tab_show(app, .Processes)
@@ -236,6 +272,8 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Previous_Section: tab_show(app, Tab((int(app.tab) + len(Tab) - 1) % len(Tab)))
 	case .End_Task:         end_selected(app)
 	case .Kill:             kill_selected(app)
+	case .End_Tree:         end_tree_selected(app)
+	case .Select_All:       ui.list_mark_all(&app.vl)
 	case .Suspend:          suspend_selected(app)
 	case .Properties:       props_selected(app)
 	case .Open_Location:    if p := selected_proc(app); p != nil { open_location(app, p) }
@@ -245,6 +283,11 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Close_Group:      group_set(app, false)
 	case .Raise_Priority:   if p := selected_proc(app); p != nil { priority_step(app, p, -1) }
 	case .Lower_Priority:   if p := selected_proc(app); p != nil { priority_step(app, p, 1) }
+	case .Affinity:         if p := selected_proc(app); p != nil { affinity_open(app, p) }
+	case .Go_To_Service:    if p := selected_proc(app); p != nil { go_to_service(app, p) }
+	case .Dump:             if p := selected_proc(app); p != nil { dump_ask(app, p) }
+	case .Search_Online:    search_online(app)
+	case .Tree_View:        tree_view_switch(app)
 	case .Columns:          columns_menu_open(app)
 	case .Cpu_Grid:         cpu_grid_switch(app)
 	case .Next_Device:      device_step(app, 1)
@@ -256,6 +299,8 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Service_Disable:  service_do(app, .Disable)
 	case .Service_Open:     service_reveal(app)
 	case .Service_Copy:     service_copy(app)
+	case .Service_Details:  service_details_switch(app)
+	case .Service_Open_File: service_open_file(app)
 	case .Service_Manager:  services_switch(app, app.services.manager == .System ? .User : .System)
 	case .Startup_Enable:   startup_toggle(app, true)
 	case .Startup_Disable:  startup_toggle(app, false)
@@ -272,6 +317,8 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Props_Kill:           props_signal(app, true)
 	case .Props_Raise_Priority: if p := find_proc(&app.sampler, app.props.pid, app.props.start); p != nil { priority_step(app, p, -1) }
 	case .Props_Lower_Priority: if p := find_proc(&app.sampler, app.props.pid, app.props.start); p != nil { priority_step(app, p, 1) }
+	case .Props_Affinity:       if p := find_proc(&app.sampler, app.props.pid, app.props.start); p != nil { affinity_open(app, p) }
+	case .Props_Filter:         props_filter_focus(app)
 	case .Props_Next_Tab:       app.props.tab = Props_Tab((int(app.props.tab) + 1) % len(Props_Tab))
 	case .Props_Previous_Tab:   app.props.tab = Props_Tab((int(app.props.tab) + len(Props_Tab) - 1) % len(Props_Tab))
 	case .Props_Close:          app.props.open = false

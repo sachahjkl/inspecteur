@@ -93,3 +93,18 @@ span_text :: proc(points, period_ms: int) -> string {
 	}
 	return fmt.tprintf("%d min %d s", s / 60, s % 60)
 }
+
+// The processors a set holds, as runs: "0-3, 8, 10-15" ("none" for none).
+cpu_list_text :: proc(cpus: []bool) -> string {
+	b := strings.builder_make(context.temp_allocator)
+	for i := 0; i < len(cpus); {
+		if !cpus[i] { i += 1; continue }
+		j := i
+		for j + 1 < len(cpus) && cpus[j + 1] { j += 1 }
+		if strings.builder_len(b) > 0 { strings.write_string(&b, ", ") }
+		if j > i { fmt.sbprintf(&b, "%d-%d", i, j) } else { fmt.sbprintf(&b, "%d", i) }
+		i = j + 1
+	}
+	if strings.builder_len(b) == 0 { return "none" }
+	return strings.to_string(b)
+}

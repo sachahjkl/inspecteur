@@ -85,7 +85,9 @@ cmd_setup :: proc(args: []string) -> int {
 		if it.nix { fmt.println("inspecteur: this copy is the Nix package's: its desktop entry and icons come with it"); return 0 }
 		if why := integration_install(); why != "" { fmt.eprintfln("inspecteur: %s", why); return 1 }
 		fmt.printfln("inspecteur: in the application menu (%s), with its icon", it.entry)
-		fmt.println(TASK_MANAGER_HINT)
+		h := task_manager_hint(current_desktop())
+		fmt.printfln("To open it as the desktop's task manager%s: %s", h.desktop != "" ? fmt.tprintf(" (%s)", h.desktop) : "", h.steps)
+		if h.can_bind { fmt.println("(the welcome page, Ctrl+Shift+I, adds the shortcut itself)") }
 		return 0
 	case "--uninstall":
 		if why := integration_remove(); why != "" { fmt.eprintfln("inspecteur: %s", why); return 1 }
@@ -103,8 +105,3 @@ cmd_setup :: proc(args: []string) -> int {
 	fmt.eprintln("inspecteur setup [--uninstall | --status]")
 	return 2
 }
-
-// How a desktop is told to open inspecteur as its task manager.
-TASK_MANAGER_HINT :: `To open it as the desktop's task manager:
-  shojiwm-win7: set SHOJIWM_WIN7_TASK_MANAGER=inspecteur in the session's environment (NixOS: environment.sessionVariables)
-  another desktop: bind Ctrl+Shift+Escape to the command inspecteur in its keyboard settings`

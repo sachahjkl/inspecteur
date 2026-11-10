@@ -77,6 +77,7 @@ STARTUP_COLUMNS := [?]ui.Table_Column{
 
 startup_init :: proc(s: ^Startup, app: ^App) {
 	section_table_init(&s.rows, app, STARTUP_COLUMNS[:])
+	section_layout_load(&s.rows.table, &app.prefs, "startup")
 	s.demo = app.demo
 	ui.worker_start(&s.worker, startup_job, s, app.main.win)
 }

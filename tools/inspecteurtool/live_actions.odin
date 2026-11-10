@@ -178,7 +178,6 @@ live_setup :: proc(l: ^Live) {
 
 // Selects the row whose PID cell says `pid` (clicked: the list gets the keyboard) and checks that the row selected, as
 // the accessibility tree says, is `name`.
-@(private = "file")
 select_named :: proc(l: ^Live, pid, name: string) -> bool {
 	c := &l.c
 	time.sleep(DOUBLE_CLICK_GAP)
@@ -191,7 +190,6 @@ select_named :: proc(l: ^Live, pid, name: string) -> bool {
 }
 
 // The pid of the process whose command line holds `mark`, once there is one (0: none came).
-@(private = "file")
 wait_mark :: proc(mark: string) -> int {
 	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
 	for time.tick_diff(time.tick_now(), deadline) > 0 {
@@ -206,7 +204,6 @@ wait_mark :: proc(mark: string) -> int {
 }
 
 // Whether the process `pid` is `sleep <mark>` (its arguments exactly: a shell that starts it has the mark in its own).
-@(private = "file")
 has_mark :: proc(pid: int, mark: string) -> bool {
 	data, err := os.read_entire_file(fmt.tprintf("/proc/%d/cmdline", pid), context.temp_allocator)
 	if err != nil { return false }
@@ -215,7 +212,6 @@ has_mark :: proc(pid: int, mark: string) -> bool {
 }
 
 // The process `pid` with `mark` is gone (its pid ended, or names another process now).
-@(private = "file")
 wait_gone :: proc(pid: int, mark: string) -> bool {
 	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
 	for time.tick_diff(time.tick_now(), deadline) > 0 {

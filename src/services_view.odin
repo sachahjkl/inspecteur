@@ -6,6 +6,7 @@ package inspecteur
 // (its main process, selected there), Copy name.
 
 import "core:fmt"
+import "core:strings"
 import "core:time"
 import lucide "gt:lucide"
 import "gt:platform"
@@ -27,9 +28,113 @@ build_services :: proc(app: ^App, em: f32) {
 	if s.list != nil && s.list.manager == s.manager { empty = s.list.problem != "" ? s.list.problem : "No service." }
 	ev := section_table_build(&s.rows, empty)
 	if ev.sorted { ui.table_apply(&s.rows.table, &s.rows.data, app.query) }
+	if ev.sorted || ev.resized { section_layout_save(&s.rows.table, &app.prefs, "services") }
 	if ev.activated && cmd_can(app, .Service_Open) { service_reveal(app) }
 	if ev.menu { services_menu_open(app, ev.menu_at) }
+	// (the pane follows the selection: another service selected is read at once)
+	u, selected := selected_service(app)
+	id := selected ? name_id(u.name) : 0
+	if app.settings.details && id != s.details_for {
+		s.details_for = id
+		if selected { details_ask(app, u.name) }
+	}
+	if app.settings.details { service_details_build(app, em) }
 	services_menu(app, em)
+}
+
+// The pane under the table: the selected service's unit file, since when it is in its state, its tasks, CPU time and
+// restarts, and its journal's last lines.
+@(private = "file")
+service_details_build :: proc(app: ^App, em: f32) {
+	s := &app.services
+	u, selected := selected_service(app)
+	d := s.details
+	ui.next({width = ui.fill(), height = ui.px(em * DETAILS_EM), axis = .Y, bg = surface("well")})
+	pane := ui.build_box({.Clip, .Draw_Background, .Draw_Side_Top}, "###svc_pane")
+	if !ui.parent(pane) { return }
+	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.2))})
+	if ui.row(.Center, {}, "###svc_details_head") {
+		ui.spacer(ui.px(em * 0.8))
+		title := selected ? u.name : "No service selected"
+		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
+		ui.label(fmt.tprintf("%s###svc_details_name", ui.text_shown(title)))
+		ui.spacer(ui.px(em * 0.8))
+		if ui.tags("weak") {
+			info := ""
+			if selected && d != nil && d.name == u.name && d.manager == s.manager {
+				parts := make([dynamic]string, context.temp_allocator)
+				if d.since > 0 { append(&parts, fmt.tprintf("%s since %s", u.active, started_text(app, d.since))) }
+				if d.tasks != DETAIL_UNKNOWN { append(&parts, count_text(int(d.tasks), "task", "tasks")) }
+				if d.cpu_ns != DETAIL_UNKNOWN { append(&parts, fmt.tprintf("CPU time %s", cpu_time_text(d.cpu_ns))) }
+				if d.restarts > 0 { append(&parts, fmt.tprintf("restarted %s", count_text(int(d.restarts), "time", "times"))) }
+				if d.file != "" { append(&parts, d.file) }
+				info = strings.join(parts[:], "  ·  ", context.temp_allocator)
+			}
+			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0})
+			label_tip(fmt.tprintf("%s###svc_details_info", ui.text_shown(info)), info)
+		}
+		cmd_button(app, "svc_file", lucide.FILE_TEXT, .Service_Open_File, em)
+		tool := tool_button(app, "svc_details_close", lucide.X, fmt.tprintf("Hide the details (%s)", ui.command_shortcut(COMMANDS[.Service_Details])), true, em)
+		if tool { service_details_switch(app) }
+		ui.spacer(ui.px(em * 0.4))
+	}
+	lines: []string
+	note := ""
+	switch {
+	case !selected:                                   note = "Select a service: its journal's last lines show here."
+	case d == nil || d.name != u.name || d.manager != s.manager: note = "Reading…"
+	case len(d.journal) == 0:                         note = d.journal_problem
+	case:                                             lines = d.journal[:]
+	}
+	if note != "" {
+		if ui.tags("weak") {
+			ui.next({width = ui.fill(), height = ui.px(em * 2), text_pad = em * 0.8})
+			ui.label(fmt.tprintf("%s###svc_journal_note", ui.text_shown(note)))
+		}
+		return
+	}
+	// (the newest line last, in view: the list starts at the bottom)
+	ids := make([]u64, len(lines), context.temp_allocator)
+	for &v, i in ids { v = name_id(lines[i]) ~ u64(i) }
+	if s.journal_for != name_id(u.name) || s.journal_lines != len(lines) {
+		s.journal_for, s.journal_lines = name_id(u.name), len(lines)
+		ui.list_select(&s.journal_vl, len(lines) - 1)
+	}
+	// (an exact height: the pane's is fixed, and the table above takes the rest)
+	ui.next({width = ui.fill(), height = ui.px(em * DETAILS_EM - ui.dense(em * 2.2))})
+	rows, ok := ui.vlist("###svc_journal", &s.journal_vl, ids)
+	if !ok { return }
+	for i in rows.first ..< rows.last {
+		ui.next({height = ui.px(ui.dense(em * 1.6))})
+		row := ui.list_row(&s.journal_vl, i, "")
+		tip := ""
+		if ui.parent(row.box) {
+			ui.spacer(ui.px(em * 0.8))
+			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0, font_size = em * 0.92})
+			b := ui.build_box({.Draw_Text, .Clip}, fmt.tprintf("%s###j", ui.text_shown(lines[i])))
+			if text_cut(b, lines[i]) { tip = lines[i] }
+		}
+		ui.table_cell_tip(row, tip)
+	}
+}
+
+// The pane's height, in ems.
+DETAILS_EM :: 13
+
+// Shows or hides the pane of the details (written to services.details).
+service_details_switch :: proc(app: ^App) {
+	app.settings.details = !app.settings.details
+	pref_save(&app.prefs, "services.details", app.settings.details ? "true" : "false")
+	app.services.details_for = 0
+	tab_show(app, .Services)
+	say(app, app.settings.details ? "The selected service's details and journal" : "Details hidden")
+}
+
+// The selected service's unit file, opened (the person's text editor).
+service_open_file :: proc(app: ^App) {
+	d := app.services.details
+	if d == nil || d.file == "" { return }
+	if platform.open_path(d.file) { say(app, "Opened %s", d.file) } else { say(app, "No program opens %s", d.file) }
 }
 
 // Each period while the section is shown (refresh calls it at each sample).
@@ -39,14 +144,16 @@ services_tick :: proc(app: ^App) {
 
 // The milliseconds until the next reading of the services is due, while they are shown (the window wakes for it).
 services_due_ms :: proc(app: ^App) -> int {
-	if app.tab != .Services { return max(int) }
+	if app.tab != .Services || app.paused { return max(int) }
 	return max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), app.services.next))) + 1, 1)
 }
 
 // Whether a command of the section can act on the selected service now.
 service_can :: proc(app: ^App, c: Cmd) -> bool {
 	u, ok := selected_service(app)
-	if !ok || app.services.pending != .None { return false }
+	if !ok { return false }
+	// (what asks nothing of the manager acts while an action waits)
+	if app.services.pending != .None && c != .Service_Open && c != .Service_Copy && c != .Service_Open_File { return false }
 	running := u.active == "active" || u.active == "activating" || u.active == "reloading"
 	#partial switch c {
 	case .Service_Start:   return !running && u.load != "masked"
@@ -56,6 +163,9 @@ service_can :: proc(app: ^App, c: Cmd) -> bool {
 	case .Service_Disable: return u.file == "enabled" || u.file == "enabled-runtime" || u.file == "linked"
 	case .Service_Open:    return u.pid > 0
 	case .Service_Copy:    return true
+	case .Service_Open_File:
+		d := app.services.details
+		return d != nil && d.name == u.name && d.manager == app.services.manager && d.file != ""
 	}
 	return false
 }
@@ -71,6 +181,8 @@ services_actions :: proc(app: ^App, em: f32) {
 	vrule(em)
 	cmd_button(app, "svc_open", lucide.LAYOUT_LIST, .Service_Open, em)
 	cmd_button(app, "svc_copy", lucide.COPY, .Service_Copy, em)
+	vrule(em)
+	cmd_button(app, "svc_details", lucide.SCROLL_TEXT, .Service_Details, em)
 }
 
 // System or User, at the right of the bar.
@@ -79,8 +191,10 @@ services_manager_choice :: proc(app: ^App, em: f32) {
 	s := &app.services
 	labels := [2]string{MANAGER_LABELS[.System], MANAGER_LABELS[.User]}
 	sel := int(s.manager)
+	key := ui.command_shortcut(COMMANDS[.Service_Manager])
+	tips := [2]string{fmt.tprintf("The system's services (%s)", key), fmt.tprintf("The user's services (%s)", key)}
 	ui.next({width = ui.px(em * 10), height = ui.px(ui.dense(em * 2))})
-	if ui.segmented("svc_manager", labels[:], &sel) { services_switch(app, Manager(sel)) }
+	if ui.segmented("svc_manager", labels[:], &sel, tips[:]) { services_switch(app, Manager(sel)) }
 }
 
 services_switch :: proc(app: ^App, m: Manager) {
@@ -116,16 +230,43 @@ services_menu :: proc(app: ^App, em: f32) {
 		ui.menu_separator()
 		cmd_item(app, .Service_Open)
 		cmd_item(app, .Service_Copy)
+		cmd_item(app, .Service_Open_File)
+		ui.menu_separator()
+		cmd_item(app, .Service_Details, app.settings.details ? "Hide the details" : "Details and journal")
 	}
 }
 
-// Asks the manager to act on the selected service; the footer says it is asked, then what came of it (services_take).
+// Asks the manager to act on the selected service. Stop and Restart are asked first: they end the service's processes.
 service_do :: proc(app: ^App, action: Service_Action) {
 	u, ok := selected_service(app)
 	if !ok { return }
+	if action == .Stop || action == .Restart {
+		confirm_service(app, action, u.name, service_danger(app, u))
+		return
+	}
+	service_act_now(app, action, u.name)
+}
+
+// The manager asked to act on `unit`; the footer says it is asked, then what came of it (services_take).
+service_act_now :: proc(app: ^App, action: Service_Action, unit: string) {
+	if app.services.pending != .None { return }
 	app.services.pending = action
-	say(app, "%s %s…", SERVICE_ACTION_DOING[action], u.name)
-	services_ask(app, action, u.name)
+	say(app, "%s %s…", SERVICE_ACTION_DOING[action], unit)
+	services_ask(app, action, unit)
+}
+
+// What else ends when the service `u` stops: the desktop (its main process is the display server), or Inspecteur (its
+// main process is one Inspecteur runs under, or Inspecteur runs in that unit). "" when nothing.
+service_danger :: proc(app: ^App, u: Service) -> string {
+	if u.pid > 0 {
+		switch guard_of(app, u.pid) {
+		case .Display_Server:  return "It runs the desktop: the session ends with it."
+		case .Self, .Ancestor: return "Inspecteur runs under it: Inspecteur ends with it."
+		case .None:
+		}
+	}
+	for unit in app.own_units { if unit == u.name { return "Inspecteur runs in it: Inspecteur ends with it." } }
+	return ""
 }
 
 service_reveal :: proc(app: ^App) {

@@ -64,6 +64,36 @@ run_shots :: proc(args: []string) -> int {
 		cdp.wait_name(&c, "props_name", SESSION_WAIT, gone = true)
 	}
 
+	// the process tree (Ctrl+T), and back
+	cdp.key(&c, "ctrl+t")
+	if need(cdp.wait_for(&c, "as a tree", SESSION_WAIT), "no tree", &failed) { shot(&c, out, "processes_tree", &failed) }
+	cdp.key(&c, "ctrl+t")
+	need(cdp.wait_for(&c, "Background processes", SESSION_WAIT), "no apps after the tree", &failed)
+
+	// three background processes marked (a click, a Shift click, a Ctrl click; the apps and the group open come first), and the kill's confirmation that lists them
+	if rows := cdp.find_name(&c, "c1"); need(len(rows) > 20, "too few rows to mark", &failed) {
+		click_at :: proc(c: ^cdp.Client, index: int, mods: int) {
+			cdp.call(c, "Toolkit.click", fmt.tprintf(`{{"name":"c1","index":%d,"modifiers":%d}}`, index, mods))
+			cdp.wait_idle(c, SESSION_WAIT)
+		}
+		click_at(&c, 15, 0)
+		click_at(&c, 16, 8)
+		click_at(&c, 18, 2)
+		cdp.key(&c, "shift+Delete")
+		if need(cdp.wait_for(&c, "Kill 3 processes?", SESSION_WAIT), "no confirmation of the kill of three", &failed) { shot(&c, out, "kill_confirm", &failed) }
+		cdp.key(&c, "Escape")
+		cdp.wait_name(&c, "kill_title", SESSION_WAIT, gone = true)
+		click_at(&c, 15, 0)
+	}
+
+	// the affinity of a process
+	cdp.key(&c, "ctrl+shift+a")
+	if need(cdp.wait_name(&c, "affinity_apply", SESSION_WAIT), "no affinity dialog", &failed) {
+		shot(&c, out, "affinity", &failed)
+		cdp.key(&c, "Escape")
+		cdp.wait_name(&c, "affinity_apply", SESSION_WAIT, gone = true)
+	}
+
 	// the command palette, searching
 	cdp.key(&c, "ctrl+k")
 	if need(cdp.wait_for(&c, "Type to search", SESSION_WAIT), "no palette", &failed) {

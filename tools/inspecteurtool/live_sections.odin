@@ -85,14 +85,29 @@ live_services :: proc(l: ^Live) {
 	pid := cell_of(c, service, "c5")
 	check(l, pid != "", "its main process is shown (PID %s)", pid)
 
+	// the details' pane: the service's name and its unit's details
+	check(l, wait_named_text(c, "svc_details_name", service), "the details' pane is the service's")
+
 	if !select_unit(l, service) { return }
 	if !check(l, cdp.key(c, "ctrl+r"), "Ctrl+R: Restart") { return }
+	if !check(l, cdp.wait_for(c, fmt.tprintf("Restart %s?", service), SESSION_WAIT), "the restart is asked first") { return }
+	if !check(l, cdp.key(c, "Enter"), "Enter confirms it") { return }
 	check(l, cdp.wait_for(c, fmt.tprintf("Restarted %s", service), SESSION_WAIT), "the footer says it restarted")
 	check(l, wait_row_cell_not(c, service, "c5", pid) && wait_unit(service, "active"), "a new main process (was %s, now %s)", pid, cell_of(c, service, "c5"))
 	check(l, wait_row_cell(c, service, "c2", "active (running)"), "its row says active (running) again")
 
+	// Go to service: from its main process in Processes, back to its row here
+	main_pid := cell_of(c, service, "c5")
+	check(l, cdp.key(c, "Enter") && cdp.wait_for(c, fmt.tprintf("PID %s", main_pid), SESSION_WAIT), "Enter: its main process in Processes (PID %s)", main_pid)
+	check(l, cdp.key(c, "ctrl+shift+s") && cdp.wait_name(c, "svc_start", SESSION_WAIT), "Ctrl+Shift+S: Go to service")
+	check(l, wait_named_text(c, "svc_details_name", service), "the service is selected again")
+	// (the table's list has the keyboard since its row was clicked: Ctrl+F gives it to the filter)
+	check(l, cdp.key(c, "ctrl+f") && cdp.type_text(c, unit), "Ctrl+F, filter by its name again")
+
 	if !select_unit(l, service) { return }
 	if !check(l, cdp.key(c, "Delete"), "Delete: Stop") { return }
+	if !check(l, cdp.wait_for(c, fmt.tprintf("Stop %s?", service), SESSION_WAIT), "the stop is asked first") { return }
+	if !check(l, cdp.click_name(c, "kill_confirm"), "click Stop") { return }
 	check(l, cdp.wait_for(c, fmt.tprintf("Stopped %s", service), SESSION_WAIT), "the footer says it stopped (%q)", footer(c))
 	check(l, !wait_unit(service, "active", 2 * time.Second), "the manager says it is not active")
 	check(l, cdp.key(c, "Escape"), "Escape clears the filter")
@@ -108,7 +123,10 @@ select_unit :: proc(l: ^Live, service: string) -> bool {
 	time.sleep(DOUBLE_CLICK_GAP)
 	at := -1
 	for b, i in cdp.find_name(c, "c0") { if b.text == service { at = i } }
-	if !check(l, at >= 0, "the row of %s is in view", service) { return false }
+	if !check(l, at >= 0, "the row of %s is in view", service) {
+		cdp.shot(c, fmt.tprintf("%s/select_failed.png", l.dir))   // (what the window showed instead)
+		return false
+	}
 	_, ok := cdp.call(c, "Toolkit.click", fmt.tprintf(`{{"name":"c0","index":%d}}`, at))
 	cdp.wait_idle(c, SESSION_WAIT)
 	got := selected_row_name(c)

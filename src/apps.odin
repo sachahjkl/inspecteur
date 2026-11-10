@@ -9,9 +9,11 @@ package inspecteur
 // The app's icon is the entry's, from the person's icon theme (the toolkit's desktop.theme_icon: the theme, what it
 // inherits, hicolor, pixmaps; PNG or SVG), drawn from a texture made the first time it is shown.
 
+import "core:slice"
 import "core:strings"
 import desktop "gt:desktop"
 import "gt:render"
+import identity "identity"
 
 App_Entry :: struct {
 	id:   string,   // the desktop file's name without .desktop (org.chromium.Chromium)
@@ -39,11 +41,84 @@ catalog_add_entry :: proc(c: ^Catalog, id, name, icon, program, window_class: st
 	add(c, id, at)
 	// (the last part of a reverse-domain id: org.chromium.Chromium is also chromium)
 	if i := strings.last_index_byte(id, '.'); i >= 0 { add(c, id[i + 1:], at) }
-	base := program
-	if i := strings.last_index_byte(base, '/'); i >= 0 { base = base[i + 1:] }
-	// (a launcher that runs another program says nothing of the process: env, flatpak, sh)
-	if base != "env" && base != "flatpak" && base != "sh" && base != "bash" { add(c, base, at) }
+	// (`program` is program_of's: never a launcher or an interpreter, whose name every process of theirs has)
+	add(c, base_name(program), at)
 	add(c, window_class, at)
+}
+
+// The programs that start another one (env, sudo, flatpak, systemd-run...): an entry's Exec that begins with one of them
+// names its program further on.
+LAUNCHERS := [?]string{
+	"env", "sudo", "doas", "pkexec", "xdg-open", "gio", "gtk-launch", "systemd-run", "uwsm", "app2unit", "dbus-launch",
+	"dbus-run-session", "nix", "nix-shell", "steam-run", "bwrap", "flatpak", "flatpak-spawn", "nice", "ionice", "setsid",
+	"firejail", "gamemoderun", "prime-run", "exec",
+}
+// The words of a launcher that come before the program (`flatpak run`, `gio launch`, `uwsm app`, `nix run`).
+LAUNCHER_WORDS := [?]string{"run", "launch", "app", "open", "shell", "exec", "--"}
+// A launcher's options that take the next word as their value (`sudo -u alex`, `nice -n 5`, `systemd-run --unit x`; not
+// `--user`: systemd-run's takes none).
+LAUNCHER_VALUED := [?]string{"-u", "-g", "-n", "-p", "-c", "--unit", "--slice", "--command"}
+// The programs that run a script or a program of their own (an interpreter, a runtime, a shell): the program is the
+// first argument that is not an option. By name, or by the start of it (python3.12, electron32, wine64, nodejs).
+INTERPRETERS := [?]string{"sh", "bash", "dash", "zsh", "fish", "ksh", "mono", "dotnet", "java", "deno", "bun", "lua", "php", "tclsh", "wish", "osascript"}
+INTERPRETER_PREFIXES := [?]string{"python", "perl", "ruby", "node", "electron", "wine", "pypy", "luajit"}
+
+is_launcher :: proc(name: string) -> bool {
+	for l in LAUNCHERS { if name == l { return true } }
+	return false
+}
+
+is_interpreter :: proc(name: string) -> bool {
+	for i in INTERPRETERS { if name == i { return true } }
+	for p in INTERPRETER_PREFIXES { if strings.has_prefix(name, p) { return true } }
+	return false
+}
+
+// "/usr/bin/firefox" is "firefox"; a Nix wrapper's ".firefox-wrapped" too.
+base_name :: proc(path: string) -> string {
+	b := path
+	if i := strings.last_index_byte(b, '/'); i >= 0 { b = b[i + 1:] }
+	return unwrapped(b)
+}
+
+// The program a command line runs (its words), by its name: past the launchers (`env FOO=1 sudo -u x prog`), and for an
+// interpreter its script or program (`python3 -u /opt/app/main.py` is main.py, `sh -c "prog --x"` is prog, `python -m
+// app` is app). "" when there is none: an interpreter alone, a launcher of nothing.
+program_of :: proc(args: []string) -> string {
+	i := 0
+	for i < len(args) {
+		base := base_name(args[i])
+		switch {
+		case is_launcher(base):
+			i += 1
+			for i < len(args) {
+				w := args[i]
+				if slice.contains(LAUNCHER_VALUED[:], w) { i += 2; continue }
+				if slice.contains(LAUNCHER_WORDS[:], w) || strings.has_prefix(w, "-") || strings.contains(w, "=") || is_number(w) { i += 1; continue }
+				break
+			}
+		case is_interpreter(base):
+			i += 1
+			for i < len(args) && strings.has_prefix(args[i], "-") {
+				if (args[i] == "-c" || args[i] == "-m") && i + 1 < len(args) {
+					if args[i] == "-m" { return args[i + 1] }
+					return program_of(strings.fields(args[i + 1], context.temp_allocator))
+				}
+				i += 1
+			}
+			return i < len(args) ? base_name(args[i]) : ""
+		case:
+			return base
+		}
+	}
+	return ""
+}
+
+@(private = "file")
+is_number :: proc(w: string) -> bool {
+	if w == "" { return false }
+	for c in transmute([]u8)w { if c < '0' || c > '9' { return false } }
+	return true
 }
 
 // A name without a Nix wrapper's marks: ".firefox-wrapped" (or its cut ".firefox-wrappe") is "firefox".
@@ -65,17 +140,20 @@ catalog_destroy :: proc(c: ^Catalog) {
 	delete(c.dirs)
 }
 
-// The entry of a process: its name, its executable's name, then its systemd unit. -1: none.
-catalog_match :: proc(c: ^Catalog, name, exe, scope: string) -> int {
+// The entry of a process: its name, its executable's name, an interpreter's script (its command line), then its systemd
+// unit. -1: none.
+catalog_match :: proc(c: ^Catalog, name, exe, scope: string, cmdline := "") -> int {
 	lookup :: proc(c: ^Catalog, key: string) -> int {
 		if key == "" { return -1 }
 		if at, ok := c.keys[unwrapped(key_of(key))]; ok { return at }
 		return -1
 	}
 	if at := lookup(c, name); at >= 0 { return at }
-	base := exe
-	if i := strings.last_index_byte(base, '/'); i >= 0 { base = base[i + 1:] }
+	base := base_name(exe)
 	if at := lookup(c, base); at >= 0 { return at }
+	if is_interpreter(name) || is_interpreter(base) {
+		if at := lookup(c, program_of(strings.fields(cmdline, context.temp_allocator))); at >= 0 { return at }
+	}
 	return scope_match(c, scope)
 }
 
@@ -99,7 +177,13 @@ scope_match :: proc(c: ^Catalog, scope: string) -> int {
 ////////////////////////////////
 // Icons
 
-Icon :: struct { tex: render.Texture, ok: bool }
+// An app's icon: a texture, or (the demo's) a glyph of Lucide on a tile of its own colour.
+Icon :: struct {
+	tex:   render.Texture,
+	ok:    bool,
+	glyph: string,     // not "": the tile's glyph (no texture)
+	tint:  [4]f32,     // the tile's colour
+}
 
 // The pixels an app's icon is asked at: a row's icon is about 16 to 24 pixels; mipmaps take the larger one down.
 ICON_PX :: 32
@@ -108,6 +192,10 @@ ICON_PX :: 32
 // time it is asked; ok false when there is none (the row draws the generic icon).
 icon_of :: proc(app: ^App, name: string) -> Icon {
 	if name == "" { return {} }
+	// (Inspecteur's own row: its logo, whatever the icon theme has)
+	if name == identity.SLUG && app.logo.ok { return app.logo }
+	// (the demo's apps: icons of its own, the same on every machine; no theme is read)
+	if app.demo != nil { return demo_icon(name) }
 	if ic, done := app.app_icons[name]; done { return ic }
 	ic: Icon
 	if pic, ok := desktop.theme_icon(name, ICON_PX, context.temp_allocator); ok {

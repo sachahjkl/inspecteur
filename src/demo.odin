@@ -11,10 +11,12 @@ package inspecteur
 // drawn. The procedures that run on the readers' threads (GPUs, services, startup, sockets, information) read only
 // constants and the clock.
 
+import "core:fmt"
 import "core:math"
 import "core:mem"
 import "core:strings"
 import "core:time"
+import lucide "gt:lucide"
 import "gt:ui"
 
 // What an action of the demo answers.
@@ -103,14 +105,36 @@ DEMO_PROCS := [?]Demo_Proc{
 // The apps of the demo's menu: an id, a name, an icon of the theme, a program.
 @(private = "file")
 DEMO_APPS := [?][4]string{
-	{"org.mozilla.firefox", "Firefox", "firefox", "firefox"},
-	{"org.mozilla.Thunderbird", "Thunderbird", "thunderbird", "thunderbird"},
-	{"org.gnome.Console", "Console", "org.gnome.Console", "kgx"},
-	{"org.gimp.GIMP", "GNU Image Manipulation Program", "gimp", "gimp"},
-	{"org.gnome.Nautilus", "Files", "org.gnome.Nautilus", "nautilus"},
-	{"org.gnome.TextEditor", "Text Editor", "org.gnome.TextEditor", "gnome-text-editor"},
-	{"libreoffice-writer", "LibreOffice Writer", "libreoffice-writer", "soffice.bin"},
+	{"org.mozilla.firefox", "Firefox", "demo:browser", "firefox"},
+	{"org.mozilla.Thunderbird", "Thunderbird", "demo:mail", "thunderbird"},
+	{"org.gnome.Console", "Console", "demo:terminal", "kgx"},
+	{"org.gimp.GIMP", "GNU Image Manipulation Program", "demo:image", "gimp"},
+	{"org.gnome.Nautilus", "Files", "demo:files", "nautilus"},
+	{"org.gnome.TextEditor", "Text Editor", "demo:text", "gnome-text-editor"},
+	{"libreoffice-writer", "LibreOffice Writer", "demo:writer", "soffice.bin"},
 	{"inspecteur", "Inspecteur", "inspecteur", "inspecteur"},
+}
+
+// The demo's icons: a glyph of Lucide on a tile of its colour, drawn the same on every machine (no icon theme is read:
+// the pictures show nothing of the machine they are made on).
+@(private = "file")
+DEMO_ICONS := [?]struct { name, glyph: string, tint: [4]f32 }{
+	{"demo:browser", lucide.GLOBE, {0.85, 0.42, 0.16, 1}},
+	{"demo:mail", lucide.SEND_HORIZONTAL, {0.18, 0.47, 0.85, 1}},
+	{"demo:terminal", lucide.TERMINAL, {0.22, 0.24, 0.27, 1}},
+	{"demo:image", lucide.IMAGE, {0.45, 0.38, 0.30, 1}},
+	{"demo:files", lucide.FOLDER, {0.24, 0.55, 0.85, 1}},
+	{"demo:text", lucide.FILE_TEXT, {0.32, 0.62, 0.40, 1}},
+	{"demo:writer", lucide.PENCIL, {0.16, 0.45, 0.75, 1}},
+	{"demo:software", lucide.PACKAGE, {0.60, 0.35, 0.75, 1}},
+	{"demo:sync", lucide.REFRESH_CW, {0.10, 0.55, 0.65, 1}},
+	{"demo:alarm", lucide.BELL, {0.80, 0.55, 0.15, 1}},
+}
+
+// The demo's icon of `name` (none for a name it does not have).
+demo_icon :: proc(name: string) -> Icon {
+	for d in DEMO_ICONS { if d.name == name { return {ok = true, glyph = d.glyph, tint = d.tint} } }
+	return {}
 }
 
 demo_init :: proc(d: ^Demo) { d.start = time.now() }
@@ -315,9 +339,9 @@ demo_services_read :: proc(d: ^Demo, manager: Manager, out: ^[dynamic]Service, a
 
 demo_startup_read :: proc(d: ^Demo, out: ^[dynamic]Startup_Item, allocator: mem.Allocator) -> string {
 	append(out,
-		Startup_Item{kind = .Autostart, id = "org.gnome.Software.desktop", name = "GNOME Software", command = "gnome-software --gapplication-service", icon = "org.gnome.Software", path = "/etc/xdg/autostart/org.gnome.Software.desktop", enabled = true, status = "Enabled", can_toggle = true},
-		Startup_Item{kind = .Autostart, id = "nextcloud.desktop", name = "Nextcloud", command = "nextcloud --background", icon = "Nextcloud", path = "~/.config/autostart/nextcloud.desktop", enabled = false, status = "Disabled", can_toggle = true},
-		Startup_Item{kind = .Autostart, id = "org.gnome.Evolution-alarm-notify.desktop", name = "Evolution Alarm Notify", command = "/usr/libexec/evolution-data-server/evolution-alarm-notify", icon = "appointment-soon", path = "/etc/xdg/autostart/org.gnome.Evolution-alarm-notify.desktop", enabled = true, status = "Enabled", can_toggle = true},
+		Startup_Item{kind = .Autostart, id = "org.gnome.Software.desktop", name = "GNOME Software", command = "gnome-software --gapplication-service", icon = "demo:software", path = "/etc/xdg/autostart/org.gnome.Software.desktop", enabled = true, status = "Enabled", can_toggle = true},
+		Startup_Item{kind = .Autostart, id = "nextcloud.desktop", name = "Nextcloud", command = "nextcloud --background", icon = "demo:sync", path = "~/.config/autostart/nextcloud.desktop", enabled = false, status = "Disabled", can_toggle = true},
+		Startup_Item{kind = .Autostart, id = "org.gnome.Evolution-alarm-notify.desktop", name = "Evolution Alarm Notify", command = "/usr/libexec/evolution-data-server/evolution-alarm-notify", icon = "demo:alarm", path = "/etc/xdg/autostart/org.gnome.Evolution-alarm-notify.desktop", enabled = true, status = "Enabled", can_toggle = true},
 		Startup_Item{kind = .User_Service, id = "pipewire.service", name = "PipeWire Multimedia Service", command = "/usr/bin/pipewire", path = "/usr/lib/systemd/user/pipewire.service", enabled = true, status = "Enabled", can_toggle = true},
 		Startup_Item{kind = .User_Service, id = "syncthing.service", name = "Syncthing", command = "/usr/bin/syncthing serve --no-browser", path = "/usr/lib/systemd/user/syncthing.service", enabled = true, status = "Enabled", can_toggle = true},
 		Startup_Item{kind = .User_Service, id = "xdg-desktop-portal.service", name = "Portal service", command = "/usr/libexec/xdg-desktop-portal", path = "/usr/lib/systemd/user/xdg-desktop-portal.service", enabled = true, status = "Static", can_toggle = false},
@@ -403,4 +427,38 @@ demo_props_read :: proc(d: ^Demo, p: ^Props, a: mem.Allocator) {
 			"WAYLAND_DISPLAY=wayland-0", "XDG_CURRENT_DESKTOP=GNOME", "XDG_SESSION_TYPE=wayland")
 	}
 	_ = a
+}
+
+// (the details' thread's: constants and the clock only) A service's details and journal, made up.
+demo_unit_details :: proc(d: ^Demo, u: ^Unit_Details, a: mem.Allocator) {
+	list := u.manager == .System ? DEMO_SYSTEM_SERVICES[:] : DEMO_USER_SERVICES[:]
+	for s in list {
+		if s.name != u.name { continue }
+		u.file = strings.concatenate({u.manager == .System ? "/usr/lib/systemd/system/" : "/usr/lib/systemd/user/", s.name}, a)
+		now := time.to_unix_seconds(d.start)
+		u.since = now - DEMO_BOOT_AGO + 12
+		if s.active == "active" {
+			u.tasks = u64(max(s.mem_mb / 4, 1))
+			u.cpu_ns = s.mem_mb * 380_000_000
+		}
+		base := strings.trim_suffix(s.name, ".service")
+		stamp :: proc(t: i64, a: mem.Allocator) -> string {
+			dt, _ := time.time_to_datetime(time.unix(t, 0))
+			return fmt.aprintf("%04d-%02d-%02dT%02d:%02d:%02d+00:00", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, allocator = a)
+		}
+		lines: []string
+		switch s.active {
+		case "failed":
+			lines = {"Starting %s...", "%s: bind() to 0.0.0.0:80 failed (98: Address already in use)", "%s.service: Main process exited, code=exited, status=1/FAILURE", "%s.service: Failed with result 'exit-code'.", "Failed to start %s."}
+		case "active":
+			lines = {"Starting %s...", "Started %s.", "%s: ready to accept connections"}
+		case:
+			lines = {"%s.service: Deactivated successfully.", "Stopped %s."}
+		}
+		for l, i in lines {
+			append(&u.journal, fmt.aprintf("%s workstation %s[%d]: %s", stamp(u.since + i64(i), a), base, max(s.pid, 1), fmt.tprintf(l, base), allocator = a))
+		}
+		return
+	}
+	u.journal_problem = "No line in the journal."
 }

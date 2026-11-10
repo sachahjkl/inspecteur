@@ -17,7 +17,7 @@ PROPS_KEY_EM                   :: 11   // the General tab's labels
 
 props_build :: proc(app: ^App, em: f32) {
 	pp := &app.props
-	if pp.open && !app.menu.confirm_open && !ui.ctx_menu_any_open() { props_keys(app) }
+	if pp.open && !app.menu.confirm.open && !app.affinity.open && !ui.ctx_menu_any_open() { props_keys(app) }
 	if ui.modal_sized("properties", {em * PROPS_W_EM, em * PROPS_H_EM} * ui.scale(), &pp.size, &pp.open, {em * PROPS_MIN_W_EM, em * PROPS_MIN_H_EM} * ui.scale()) {
 		p := find_proc(&app.sampler, pp.pid, pp.start)
 		if pp.tab != pp.read_tab && p != nil { props_read(pp) }   // (a tab shown is read at once)
@@ -31,6 +31,11 @@ props_build :: proc(app: ^App, em: f32) {
 				sel := int(pp.tab)
 				nothing: []string
 				if ui.tabs("props_tab", props_slice(&labels), nothing, &sel) { pp.tab = Props_Tab(sel) }
+				// (each tab's tooltip says the keys that go from tab to tab)
+				tabs_tip := fmt.tprintf("%s (%s), %s (%s)", COMMANDS[.Props_Next_Tab].label, ui.command_shortcut(COMMANDS[.Props_Next_Tab]), COMMANDS[.Props_Previous_Tab].label, ui.command_shortcut(COMMANDS[.Props_Previous_Tab]))
+				for i in 0 ..< len(Props_Tab) { hover_tip(fmt.tprintf("props_tab_%d", i), tabs_tip) }
+				ui.spacer(ui.fill())
+				if pp.tab != .General { props_filter_field(app, em) }
 			}
 			ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
 			if ui.column(id = "###props_body") {
@@ -123,7 +128,8 @@ props_general :: proc(app: ^App, p: ^Proc, em: f32) {
 		props_line("Parent", parent, em)
 		props_line("User", p.user != "" ? p.user : "unknown", em)
 		props_line("State", state_text(p.state), em)
-		props_line("Priority", fmt.tprintf("nice %d", p.nice), em)
+		props_line("Priority", priority_text(p.nice), em)
+		props_line("Affinity", pp.cpus != "" ? fmt.tprintf("processors %s", pp.cpus) : "unknown", em)
 		props_line("Started", started_text(app, p.started), em)
 		props_line("Executable", p.exe != "" ? p.exe : "Access denied (another user's process)", em)
 		props_line("Command line", p.cmdline != "" ? p.cmdline : "none", em)
@@ -140,7 +146,7 @@ props_general :: proc(app: ^App, p: ^Proc, em: f32) {
 @(private = "file")
 props_list :: proc(app: ^App, id: string, state: Read_State, titles: []string, widths: []f32, count: int, cell: proc(app: ^App, row, col: int) -> string, em: f32) {
 	switch state {
-	case .Denied: props_note("Access denied: another user's process. Only its owner, or root, may read it.", em); return
+	case .Denied: props_note(fmt.tprintf("Access denied: another user's process. Only its owner, or %s, may read it.", ADMIN), em); return
 	case .Gone:   props_note("The process has ended.", em); return
 	case .Read:
 	}
@@ -154,8 +160,16 @@ props_list :: proc(app: ^App, id: string, state: Read_State, titles: []string, w
 			}
 		}
 	}
-	ids := make([]u64, count, context.temp_allocator)
-	for &v, i in ids { v = u64(i) + 1 }
+	// (the rows the filter keeps: a row whose cells hold its text)
+	q := strings.to_lower(ui.field_string(&app.props.filter), context.temp_allocator)
+	shown := make([dynamic]int, 0, count, context.temp_allocator)
+	for i in 0 ..< count {
+		keep := q == ""
+		for k := 0; !keep && k < len(titles); k += 1 { keep = strings.contains(strings.to_lower(cell(app, i, k), context.temp_allocator), q) }
+		if keep { append(&shown, i) }
+	}
+	ids := make([]u64, len(shown), context.temp_allocator)
+	for &v, i in ids { v = u64(shown[i]) + 1 }
 	vl := &app.props_lists[app.props.tab]
 	ui.next({width = ui.fill(), height = ui.fill()})
 	rows, ok := ui.vlist(fmt.tprintf("###%s", id), vl, ids)
@@ -168,7 +182,7 @@ props_list :: proc(app: ^App, id: string, state: Read_State, titles: []string, w
 			ui.spacer(ui.px(em * 0.6))
 			for _, k in titles {
 				if k > 0 { ui.push_tags("weak") }
-				text := cell(app, i, k)
+				text := cell(app, shown[i], k)
 				ui.next({width = widths[k] > 0 ? ui.px(em * widths[k]) : ui.fill(), height = ui.pct(1), text_pad = 0})
 				b := ui.build_box({.Draw_Text, .Clip}, fmt.tprintf("%s###c%d", ui.text_shown(text), k))
 				// (a cell too narrow for its text shows it whole when the pointer rests on its row)
@@ -178,10 +192,10 @@ props_list :: proc(app: ^App, id: string, state: Read_State, titles: []string, w
 		}
 		ui.table_cell_tip(row, tip)
 	}
-	if count == 0 {
+	if len(shown) == 0 {
 		if ui.tags("weak") {
 			ui.next({width = ui.fill(), height = ui.px(em * 3)})
-			if ui.style({text_align = .Center}) { ui.label("None###empty") }
+			if ui.style({text_align = .Center}) { ui.label(count == 0 ? "None###empty" : fmt.tprintf("Nothing matches “%s”.###empty", ui.text_shown(q))) }
 		}
 	}
 }
@@ -248,6 +262,9 @@ props_actions :: proc(app: ^App, p: ^Proc, em: f32) {
 			if !ui.ctx_menu_any_open() { pp.nice_sel = priority_index(p.nice) }
 			ui.next({width = ui.px(em * 11), height = ui.px(ui.dense(em * 2.1))})
 			if ui.dropdown("###priority", names[:], &pp.nice_sel) { set_priority(app, p, PRIORITIES[pp.nice_sel].nice) }
+			hover_tip("priority", fmt.tprintf("%s (%s), %s (%s)", COMMANDS[.Props_Raise_Priority].label, ui.command_shortcut(COMMANDS[.Props_Raise_Priority]), COMMANDS[.Props_Lower_Priority].label, ui.command_shortcut(COMMANDS[.Props_Lower_Priority])))
+			ui.spacer(ui.px(em * 0.4))
+			if props_button(app, "props_affinity", lucide.MICROCHIP, "Affinity…", .Props_Affinity, em) { cmd_run(app, .Props_Affinity) }
 			ui.spacer(ui.px(em * 0.8))
 			if ui.tags("weak") {
 				msg := ui.now_ms() < app.status_until ? app.status : ""
@@ -276,13 +293,41 @@ props_button :: proc(app: ^App, id, icon, label: string, c: Cmd, em: f32) -> boo
 	return sig.clicked
 }
 
-// The keys of the dialog (the Properties group of commands.odin).
+// The keys of the dialog (the Properties group of commands.odin). While its filter has the keyboard and some text, the
+// filter keeps its editing keys (Delete erases a character there, not the process).
 @(private = "file")
 props_keys :: proc(app: ^App) {
+	pp := &app.props
+	keeps := ui.focus_key() == pp.filter_key && pp.filter_key != 0 && len(pp.filter.buf) > 0
 	for c in Cmd {
 		if !cmd_is_props(c) || c == .Props_Close { continue }   // (Escape: the dialog's own)
+		if keeps && (c == .Props_End_Task || c == .Props_Kill) { continue }
 		if ui.command_pressed(COMMANDS[c], cmd_can(app, c)) { cmd_run(app, c) }
 	}
+}
+
+// The filter of the dialog's lists, at the right of its tabs.
+@(private = "file")
+props_filter_field :: proc(app: ^App, em: f32) {
+	pp := &app.props
+	ui.next({width = ui.px(em * 14), height = ui.px(ui.dense(em * 2))})
+	res := ui.line_edit("###props_filter", &pp.filter, "Filter the list...")
+	pp.filter_key = res.box.key
+	tip_after(res, cmd_tip(.Props_Filter))
+	ui.spacer(ui.px(em * 0.6))
+}
+
+// Ctrl+F in the dialog: its filter gets the keyboard (on the General tab, the Threads tab is shown first).
+props_filter_focus :: proc(app: ^App) {
+	pp := &app.props
+	if pp.tab == .General { pp.tab = .Threads }
+	if pp.filter_key != 0 { ui.set_focus(pp.filter_key) }
+}
+
+// A tooltip on the box `name` of the box being built (its id "###name"), while the pointer rests on it.
+hover_tip :: proc(name, text: string) {
+	key := ui.key_from_string(ui.parent_box().key, fmt.tprintf("###%s", name))
+	tip_after(ui.Signal{hovering = ui.hot_key() == key}, text)
 }
 
 // Suspend or resume, from the dialog.
