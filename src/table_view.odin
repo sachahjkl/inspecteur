@@ -4,6 +4,7 @@ package inspecteur
 // (processes.odin): only those in view are built.
 
 import "core:fmt"
+import "core:strings"
 import "gt:draw"
 import lucide "gt:lucide"
 import "core:time"
@@ -29,6 +30,16 @@ HEAT_MIN      :: 0.04
 HEAT_ALPHA    :: 0.3
 
 build_processes :: proc(app: ^App, em: f32) {
+	if app.table.query != app.query {
+		delete(app.table.query)
+		app.table.query = strings.clone(app.query)
+		// a new search starts from its first process (rows_again)
+		if app.query != "" {
+			app.vl.sel = -1
+			ui.vlist_scroll_to(&app.vl, 0)
+		}
+		rows_again(app)
+	}
 	build_bar(app, em)
 	build_header(app, em)
 	build_rows(app, em)

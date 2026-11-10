@@ -22,5 +22,10 @@ and the versions follow [semantic versioning](https://semver.org/).
 - **Properties** of a process: general, threads, open files, modules, environment; set its priority, suspend and
   resume it, end or kill it. What the user may not read says "Access denied".
 - **Light or dark**: from the title bar's menu, kept.
-- The sections Services, Startup, Connections and Information, to come.
+- **Connections**: every TCP and UDP socket, IPv4 and IPv6, with the process that holds it (its icon, name and PID),
+  its local and remote addresses and its state; sort, filter, End task, Kill, Open in Processes, Copy address. Read on a
+  thread of its own, only while the section is shown.
+- **Keys**: Ctrl+F gives the filter the keyboard, Ctrl+1 to Ctrl+6 show a section, F5 reads again now; the filter
+  filters the section shown, and Escape clears it in every section.
+- The sections Services, Startup and Information, to come.
 - Preferences: refresh period, theme, light or dark, finish, text size, window size (`docs/configuration.md`).

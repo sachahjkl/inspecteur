@@ -270,7 +270,6 @@ read_io :: proc(s: ^Sampler, pid: i32) -> (io: Io_Fields, readable, denied: bool
 }
 
 // The pids under /proc.
-@(private = "file")
 list_pids :: proc(out: ^[dynamic]i32) {
 	fd, err := linux.open("/proc", {.DIRECTORY, .CLOEXEC})
 	if err != .NONE { return }

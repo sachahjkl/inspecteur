@@ -44,6 +44,8 @@ App :: struct {
 	next_sample: time.Tick,
 
 	tab:         Tab,
+	query:       string,            // the filter, in lower case (owned): each section with a table applies it
+	connections: Connections,       // the sockets (connections.odin), read only while their section is shown
 	device:      Device,            // the Performance section's device shown (perf_view.odin)
 	cpu_grid:    bool,              // the CPU's page shows a graph per logical processor
 	columns_menu: ui.Key,           // the menu of the table's columns (table_view.odin)
@@ -100,6 +102,7 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	h.input = app_input
 	app.devtools = devtools.start_from_env(win, "inspecteur")
 	h.before_input = proc(h: ^host.Host) { app := (^App)(h.user); devtools.service(app.devtools, &h.state, &app.shared.r) }
+	connections_init(&app.connections, app)
 
 	t_window := time.tick_now()
 	platform.show_window(win)
@@ -112,6 +115,7 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	for !platform.is_closed(win) {
 		host.hosts_wait({h})
 		if time.tick_diff(app.next_sample, time.tick_now()) >= 0 { refresh(app) }
+		sections_take(app)
 		t_frame := time.tick_now()
 		host.host_frame(h)
 		app.frame_time += time.tick_since(t_frame)
@@ -123,6 +127,8 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 		fmt.printfln("costs: %d samples, %.2f ms each; %d frames, %.2f ms each", app.refreshes, mean(app.refresh_time, app.refreshes), app.frames, mean(app.frame_time, app.frames))
 	}
 	devtools.stop(app.devtools)
+	connections_destroy(&app.connections)
+	delete(app.query)
 	icons_destroy(&app.app_icons, &app.shared.r)
 	host.host_close(h)
 	ui.field_destroy(&app.search)
@@ -152,6 +158,8 @@ refresh :: proc(app: ^App) {
 	rows_again(app)
 	app.next_sample = time.tick_add(now, time.Duration(app.settings.refresh_ms) * time.Millisecond)
 	if app.props.open { props_read(&app.props) }
+	// (a section that reads on a thread of its own reads only while it is shown)
+	if app.tab == .Connections { worker_ask(&app.connections.worker) }
 	app.refresh_time += time.tick_since(now)
 	app.refreshes += 1
 	app.main.settle = max(app.main.settle, 1)
@@ -169,6 +177,25 @@ rows_again :: proc(app: ^App) {
 	if app.vl.sel < 0 && app.table.query != "" {
 		for r, i in app.table.rows { if r.kind == .Process { app.vl.sel = i; app.vl.reveal = REVEAL_BUILDS; break } }
 	}
+}
+
+// Shows a section; one that reads on a thread of its own is read now.
+tab_show :: proc(app: ^App, tab: Tab) {
+	if app.tab == tab { return }
+	app.tab = tab
+	#partial switch tab {
+	case .Connections: worker_ask(&app.connections.worker)
+	}
+}
+
+// F5: the processes and the section shown, read again now.
+refresh_now :: proc(app: ^App) {
+	refresh(app)
+}
+
+// What the sections' threads have published since the last frame becomes their rows.
+sections_take :: proc(app: ^App) {
+	connections_take(app)
 }
 
 selected_id :: proc(app: ^App) -> u64 {

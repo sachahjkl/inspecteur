@@ -25,6 +25,7 @@ import "core:fmt"
 import "core:strings"
 import "gt:draw"
 import "gt:host"
+import "gt:platform"
 import lucide "gt:lucide"
 import "gt:ui"
 
@@ -64,6 +65,7 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 					#partial switch app.tab {
 					case .Processes:   build_processes(app, em)
 					case .Performance: build_performance(app, em)
+					case .Connections: build_connections(app, em)
 					case:              build_placeholder(app, em)
 					}
 				}
@@ -78,8 +80,18 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 
 @(private = "file")
 view_keys :: proc(app: ^App) {
-	if ui.key_press(.Tab, {.Ctrl}) { app.tab = Tab((int(app.tab) + 1) % len(Tab)) }
-	if ui.key_press(.Tab, {.Ctrl, .Shift}) { app.tab = Tab((int(app.tab) + len(Tab) - 1) % len(Tab)) }
+	if ui.key_press(.Tab, {.Ctrl}) { tab_show(app, Tab((int(app.tab) + 1) % len(Tab))) }
+	if ui.key_press(.Tab, {.Ctrl, .Shift}) { tab_show(app, Tab((int(app.tab) + len(Tab) - 1) % len(Tab))) }
+	DIGITS :: [len(Tab)]platform.Key{.N1, .N2, .N3, .N4, .N5, .N6}
+	for k, i in DIGITS { if ui.key_press(k, {.Ctrl}) { tab_show(app, Tab(i)) } }
+	if ui.key_press(.F, {.Ctrl}) && app.search_key != 0 { ui.set_focus(app.search_key) }
+	if ui.key_press(.F5) { refresh_now(app) }
+	if ui.key_press(.Escape) { ui.field_clear(&app.search) }
+	// (a filter with text and the keyboard keeps Delete: it erases a character there, not a process)
+	field_keeps := ui.focus_key() == app.search_key && app.search_key != 0 && len(app.search.buf) > 0
+	#partial switch app.tab {
+	case .Connections: connections_keys(app, field_keeps)
+	}
 	if app.tab != .Processes { return }
 	if ui.key_press(.Down) { select_step(app, app.vl.sel, 1, 1) }
 	if ui.key_press(.Up) { select_step(app, app.vl.sel, -1, 1) }
@@ -87,14 +99,11 @@ view_keys :: proc(app: ^App) {
 	if ui.key_press(.Page_Up) { select_step(app, app.vl.sel, -1, PAGE_ROWS) }
 	if ui.key_press(.Home, {.Ctrl}) { select_step(app, -1, 1, 1) }
 	if ui.key_press(.End, {.Ctrl}) { select_step(app, len(app.table.rows), -1, 1) }
-	// (a filter with text and the keyboard keeps Delete: it erases a character there, not a process)
-	field_keeps := ui.focus_key() == app.search_key && app.search_key != 0 && len(app.search.buf) > 0
 	if !field_keeps {
 		if ui.key_press(.Delete) { end_selected(app) }
 		if ui.key_press(.Delete, {.Shift}) { kill_selected(app) }
 	}
 	if ui.key_press(.Menu) || ui.key_press(.F10, {.Shift}) { row_menu_open(app, {app.sel_rect.min.x + 40, app.sel_rect.max.y}, from_keyboard = true) }
-	if ui.key_press(.Escape) { ui.field_clear(&app.search) }
 	if ui.key_press(.Return, {.Alt}) { props_selected(app) }
 	r, ok := selected_row(app)
 	if !ok { return }
@@ -122,6 +131,33 @@ select_step :: proc(app: ^App, from, dir, count: int) {
 select_row :: proc(app: ^App, row: int) {
 	app.vl.sel = row
 	app.vl.reveal = REVEAL_BUILDS
+}
+
+// Shows the process (pid, start) selected in the Processes section: the filter cleared, its app's group open. False
+// when it is not in the last sample.
+processes_reveal :: proc(app: ^App, pid: i32, start: u64) -> bool {
+	p := find_proc(&app.sampler, pid, start)
+	if p == nil { return false }
+	at := -1
+	for &q, i in app.sampler.procs { if &q == p { at = i; break } }
+	ui.field_clear(&app.search)
+	query_set(app, "")
+	delete(app.table.query)
+	app.table.query = ""
+	if at >= 0 && at < len(app.table.owner) {
+		if o := app.table.owner[at]; o >= 0 { app.table.expanded[u64(app.sampler.procs[o].entry) | APP_ID_MARK] = true }
+	}
+	tab_show(app, .Processes)
+	rows_again(app)
+	key := proc_key(p^)
+	for id, i in app.table.ids { if id == key { select_row(app, i); break } }
+	return true
+}
+
+// The filter's text, in lower case (owned): each section with a table applies it when it differs from its own.
+query_set :: proc(app: ^App, q: string) {
+	delete(app.query)
+	app.query = strings.clone(q)
 }
 
 // Opens or closes an app's group; the selection stays on it.
@@ -201,7 +237,7 @@ build_sidebar :: proc(app: ^App, em: f32) {
 				ui.label(fmt.tprintf("%s###t", TAB_LABELS[tab]))
 				if !on { ui.pop_tags() }
 			}
-			if sig.clicked { app.tab = tab }
+			if sig.clicked { tab_show(app, tab) }
 		}
 		ui.spacer(ui.fill())
 		build_meters(app, em)
@@ -217,23 +253,25 @@ build_filter :: proc(app: ^App, em: f32) {
 		if ui.tags("weak") { glyph(app, lucide.SEARCH, em * 1.6) }
 		ui.next({width = ui.fill(), height = ui.pct(1)})
 		if ui.tags("bare") {
-			res := ui.line_edit("###search", &app.search, "Filter processes...")
+			res := ui.line_edit("###search", &app.search, FILTER_HINTS[tab_listed(app.tab) ? app.tab : .Processes])
 			app.search_key = res.box.key
 		}
 		ui.spacer(ui.px(em * 0.4))
 	}
-	if q := strings.to_lower(ui.field_string(&app.search), context.temp_allocator); q != app.table.query {
-		delete(app.table.query)
-		app.table.query = strings.clone(q)
-		app.tab = .Processes
-		// a new search starts from its first process (rows_again)
-		if q != "" {
-			app.vl.sel = -1
-			ui.vlist_scroll_to(&app.vl, 0)
-		}
-		rows_again(app)
+	if q := strings.to_lower(ui.field_string(&app.search), context.temp_allocator); q != app.query {
+		query_set(app, q)
+		// (a section with no table: the filter is for the processes)
+		if !tab_listed(app.tab) { tab_show(app, .Processes) }
 	}
 }
+
+FILTER_HINTS := [Tab]string{
+	.Processes = "Filter processes...", .Performance = "", .Services = "Filter services...", .Startup = "Filter startup...",
+	.Connections = "Filter connections...", .Information = "",
+}
+
+// Whether the section has a table that the filter filters.
+tab_listed :: proc(tab: Tab) -> bool { return tab != .Performance && tab != .Information }
 
 // The machine's CPU and memory: a line each, its value, a bar of how full.
 @(private = "file")
@@ -318,7 +356,7 @@ build_footer :: proc(app: ^App, em: f32) {
 			msg := app.status
 			if msg == "" || ui.now_ms() > app.status_until {
 				msg = ""
-				if r, ok := selected_row(app); ok {
+				if r, ok := selected_row(app); ok && app.tab == .Processes {
 					if p, has := row_process(app, r); has { msg = fmt.tprintf("Selected: %s, PID %d", shown_text(p.name), p.pid) }
 				}
 			}

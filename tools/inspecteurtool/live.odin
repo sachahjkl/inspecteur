@@ -81,6 +81,7 @@ live_window :: proc(l: ^Live) {
 	// a section to come, then the Performance section, the columns, the theme (live_more.odin)
 	check(l, cdp.click_text(c, "Services"), "click the Services section")
 	check(l, cdp.wait_for(c, "comes in a later version", SESSION_WAIT), "it says what it will be")
+	live_connections(l)
 	live_performance(l)
 	check(l, cdp.click_text(c, "Processes"), "the Processes section")
 	check(l, cdp.wait_for(c, "Background processes", SESSION_WAIT), "its table is there")
