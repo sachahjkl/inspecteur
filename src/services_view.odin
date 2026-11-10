@@ -49,7 +49,13 @@ service_details_build :: proc(app: ^App, em: f32) {
 	s := &app.services
 	u, selected := selected_service(app)
 	d := s.details
-	ui.next({width = ui.fill(), height = ui.px(em * DETAILS_EM), axis = .Y, bg = surface("well")})
+	// (the line above the pane, dragged, sets its height: kept when let go)
+	h := app.settings.details_em
+	ui.next({width = ui.fill()})
+	split := ui.splitter("###svc_split", .Y, &h, DETAILS_MIN_EM, DETAILS_MAX_EM, {after = true, unit = em, flush = true, line_at = .Start})
+	if split.changed { app.settings.details_em = h }
+	if split.finished { pref_save(&app.prefs, "services.details_height", fmt.tprintf("%.1f", h)) }
+	ui.next({width = ui.fill(), height = ui.px(em * app.settings.details_em), axis = .Y, bg = surface("well")})
 	pane := ui.build_box({.Clip, .Draw_Background, .Draw_Side_Top}, "###svc_pane")
 	if ui.parent(pane) { service_details_body(app, u, selected, d, em) }
 }
@@ -83,48 +89,12 @@ service_details_body :: proc(app: ^App, u: Service, selected: bool, d: ^Unit_Det
 		if tool { service_details_switch(app) }
 		ui.spacer(ui.px(em * 0.4))
 	}
-	lines: []string
-	note := ""
-	switch {
-	case !selected:                                   note = "Select a service: its journal's last lines show here."
-	case d == nil || d.name != u.name || d.manager != s.manager: note = "Reading…"
-	case len(d.journal) == 0:                         note = d.journal_problem
-	case:                                             lines = d.journal[:]
-	}
-	if note != "" {
-		if ui.tags("weak") {
-			ui.next({width = ui.fill(), height = ui.px(em * 2), text_pad = em * 0.8})
-			ui.label(fmt.tprintf("%s###svc_journal_note", ui.text_shown(note)))
-		}
-		return
-	}
-	// (the newest line last, in view: the list starts at the bottom)
-	ids := make([]u64, len(lines), context.temp_allocator)
-	for &v, i in ids { v = name_id(lines[i]) ~ u64(i) }
-	if s.journal_for != name_id(u.name) || s.journal_lines != len(lines) {
-		s.journal_for, s.journal_lines = name_id(u.name), len(lines)
-		s.journal_vl.sel = -1
-		ui.vlist_scroll_to(&s.journal_vl, max(f32))   // (the view clamps it to the end)
-	}
-	ui.next({width = ui.fill(), height = ui.fill()})
-	rows, ok := ui.vlist("###svc_journal", &s.journal_vl, ids)
-	if !ok { return }
-	for i in rows.first ..< rows.last {
-		ui.next({height = ui.px(ui.dense(em * 1.6))})
-		row := ui.list_row(&s.journal_vl, i, "")
-		tip := ""
-		if ui.parent(row.box) {
-			ui.spacer(ui.px(em * 0.8))
-			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0, font_size = em * 0.92})
-			b := ui.build_box({.Draw_Text, .Clip}, fmt.tprintf("%s###j", ui.text_shown(lines[i])))
-			if text_cut(b, lines[i]) { tip = lines[i] }
-		}
-		ui.table_cell_tip(row, tip)
-	}
+	journal_build(app, u, selected, d, em)
 }
 
-// The pane's height, in ems.
-DETAILS_EM :: 13
+// The pane's height at least and at most, in ems (services.details_height).
+DETAILS_MIN_EM :: 6
+DETAILS_MAX_EM :: 80
 
 // Shows or hides the pane of the details (written to services.details).
 service_details_switch :: proc(app: ^App) {
@@ -145,12 +115,13 @@ service_open_file :: proc(app: ^App) {
 // Each period while the section is shown (refresh calls it at each sample).
 services_tick :: proc(app: ^App) {
 	if app.tab == .Services && time.tick_diff(app.services.next, time.tick_now()) >= 0 && !ui.worker_busy(&app.services.worker) { services_ask(app) }
+	journal_follow_tick(app)
 }
 
 // The milliseconds until the next reading of the services is due, while they are shown (the window wakes for it).
 services_due_ms :: proc(app: ^App) -> int {
 	if app.tab != .Services || app.paused { return max(int) }
-	return max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), app.services.next))) + 1, 1)
+	return min(max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), app.services.next))) + 1, 1), journal_due_ms(app))
 }
 
 // Whether a command of the section can act on the selected service now.

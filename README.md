@@ -33,7 +33,9 @@ Information.
 - **Performance**: CPU (overall or per logical processor), memory, disks, network interfaces and GPUs, sixty readings
   of history each. A laptop's GPU that sleeps is not woken to be read.
 - **Services**: systemd's services, the system's or the user's: their state, whether they start by themselves, their
-  main process and memory; under the table, the selected one's unit file, tasks, CPU time and its journal's last lines
+  main process and memory; under the table, the selected one's unit file, tasks, CPU time and its journal: each entry's time, level in
+  its colour, program and message; all, warnings or errors with their counts, this boot or every boot, followed live, its
+  own search, the selected entry whole, Copy
   (Ctrl+I). Start, Stop, Restart (both asked first), Enable, Disable, over D-Bus; for a system service the manager asks
   polkit, which can ask for a password, and the footer says what it answered.
 - **Startup**: the XDG autostart entries and the user's systemd services that start with the session; turn one on or off,
@@ -53,6 +55,8 @@ Information.
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L); the text size with Ctrl+=, Ctrl+- and Ctrl+0.
 
 ![a group open and the row's menu](docs/screenshots/menu.png)
+
+![a failed service's journal: warnings and worse, an entry whole](docs/screenshots/services_journal.png)
 
 | | |
 |---|---|
@@ -87,7 +91,7 @@ The pictures show the demo's made-up machine (`inspecteur --demo`), not a real o
 | Processes | Delete End task, Shift+Delete Kill, Ctrl+Delete End process tree, Ctrl+A Select all (Ctrl and Shift clicks too), Ctrl+P Suspend or resume, Ctrl+Up and Ctrl+Down the priority, Ctrl+Shift+A Set affinity, Ctrl+Shift+S Go to service, Ctrl+Shift+F Search online, Ctrl+Shift+D Create dump file, Alt+Enter Properties, Ctrl+O Open file location, Ctrl+C Copy command line, Right and Left open and close a group, Ctrl+T the tree or the apps, Ctrl+Shift+C Columns |
 | Properties | Ctrl+Tab and Ctrl+Shift+Tab the tabs, Ctrl+F the filter of a list, Ctrl+P, Delete, Shift+Delete, Ctrl+Up, Ctrl+Down, Ctrl+Shift+A as in Processes, Escape closes |
 | Performance | Up and Down the devices, Ctrl+G one graph per logical processor |
-| Services | Ctrl+S Start, Delete Stop, Ctrl+R Restart, Ctrl+E Enable, Ctrl+D Disable, Enter Open in Processes, Ctrl+C Copy name, Ctrl+I the details and the journal, Ctrl+O Open unit file, Ctrl+U System or User |
+| Services | Ctrl+S Start, Delete Stop, Ctrl+R Restart, Ctrl+E Enable, Ctrl+D Disable, Enter Open in Processes, Ctrl+C Copy name, Ctrl+I the details and the journal, Ctrl+O Open unit file, Ctrl+U System or User; the journal: Ctrl+J search, Alt+L all, warnings, errors, Alt+B this boot or every boot, Alt+F follow, Alt+C copy the entries shown, Alt+Shift+C copy the entry |
 | Startup | Ctrl+E Enable, Ctrl+D Disable, Space toggles, Enter Open file location, Ctrl+C Copy command |
 | Connections | Delete End task, Shift+Delete Kill, Enter Open in Processes, Ctrl+C Copy address |
 | Information | Ctrl+C Copy all |

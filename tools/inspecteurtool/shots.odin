@@ -150,6 +150,26 @@ run_shots :: proc(args: []string) -> int {
 		shot(&c, out, sec.picture, &failed)
 	}
 
+	// a failed service's journal: warnings and worse, an entry selected and shown whole
+	cdp.key(&c, "ctrl+3")
+	if need(cdp.wait_for(&c, "running", SESSION_WAIT), "no Services section", &failed) {
+		cdp.type_text(&c, "nginx")
+		cdp.wait_idle(&c, SESSION_WAIT)
+		cdp.call(&c, "Toolkit.click", `{"name":"c0","index":0}`)
+		if need(cdp.wait_for(&c, "Errors 3", SESSION_WAIT), "no journal of nginx", &failed) {
+			cdp.key(&c, "alt+l")
+			cdp.wait_idle(&c, SESSION_WAIT)
+			cdp.call(&c, "Toolkit.click", `{"name":"jm","index":2}`)
+			cdp.wait_name(&c, "je_message", SESSION_WAIT)
+			shot(&c, out, "services_journal", &failed)
+			cdp.key(&c, "alt+l")
+			cdp.key(&c, "alt+l")
+		}
+		cdp.key(&c, "ctrl+f")
+		cdp.key(&c, "Escape")
+		cdp.wait_idle(&c, SESSION_WAIT)
+	}
+
 	// the settings (not the install's dialog: it shows the real folders of the machine it runs on), and the light version
 	cdp.key(&c, "ctrl+,")
 	if need(cdp.wait_for(&c, "Appearance", SESSION_WAIT), "no settings", &failed) {

@@ -27,6 +27,10 @@ PREF_DEFS := [?]config.Def{
 	{name = "services.widths", category = "services", description = "The widths of the Services table's columns that were resized, in ems (description=30). Dragging the line before a column's title changes them.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "services.sort", category = "services", description = "The column the services are sorted by (name, description, state, startup, load, pid, memory), a - before it for the largest (or Z) first. A click on a title changes it.", kind = .String, default = {s = "name"}, hidden = true},
 	{name = "services.details", category = "services", description = "Show the selected service's details and its journal's last lines under the table (Ctrl+I).", kind = .Bool, default = {b = true}},
+	{name = "services.journal_boot", category = "services", description = "The details' journal shows this boot's entries alone; off: its last entries, from any boot. Alt+B switches it.", kind = .Bool, default = {b = true}},
+	{name = "services.journal_level", category = "services", description = "The entries of the details' journal shown: all, warnings (and worse), errors (and worse). Alt+L goes through them.", kind = .String, default = {s = "all"}, choices = {"all", "warnings", "errors"}},
+	{name = "services.journal_follow", category = "services", description = "Read the details' journal again every 2 seconds while it is shown: new entries come in at the end. Alt+F switches it.", kind = .Bool, default = {b = true}},
+	{name = "services.details_height", category = "services", description = "The height of the details' pane, in ems. Dragging the line above it changes it.", kind = .Float, default = {f = 16}, min = 6, max = 80, bounded = true, hidden = true},
 	{name = "startup.widths", category = "startup", description = "The widths of the Startup table's columns that were resized, in ems (command=24).", kind = .String, default = {s = ""}, hidden = true},
 	{name = "startup.sort", category = "startup", description = "The column the startup items are sorted by (name, command, type, status, file), a - before it for Z first.", kind = .String, default = {s = "name"}, hidden = true},
 	{name = "connections.widths", category = "connections", description = "The widths of the Connections table's columns that were resized, in ems (remote_address=20).", kind = .String, default = {s = ""}, hidden = true},
@@ -62,6 +66,10 @@ Settings :: struct {
 	pinned:     string,     // owned: processes.pinned as written
 	manager:    Manager,    // services.manager
 	details:    bool,       // services.details
+	journal_boot: bool,     // services.journal_boot
+	journal_level: Journal_Level,   // services.journal_level
+	journal_follow: bool,   // services.journal_follow
+	details_em: f32,        // services.details_height
 	services_ms: int,       // services.refresh_ms
 	columns:    string,   // owned: processes.columns, .widths, .sort as written
 	widths:     string,
@@ -98,6 +106,10 @@ prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Sett
 	s.summary = config.bool_of(p, "processes.summary")
 	s.pinned = strings.clone(config.string_of(p, "processes.pinned"), allocator)
 	s.details = config.bool_of(p, "services.details")
+	s.journal_boot = config.bool_of(p, "services.journal_boot")
+	for l in Journal_Level { if JOURNAL_LEVEL_KEYS[l] == config.string_of(p, "services.journal_level") { s.journal_level = l } }
+	s.journal_follow = config.bool_of(p, "services.journal_follow")
+	s.details_em = f32(config.float_of(p, "services.details_height"))
 	s.manager = config.string_of(p, "services.manager") == "user" ? .User : .System
 	s.services_ms = int(config.int_of(p, "services.refresh_ms"))
 	s.columns = strings.clone(config.string_of(p, "processes.columns"), allocator)

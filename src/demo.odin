@@ -472,21 +472,26 @@ demo_unit_details :: proc(d: ^Demo, u: ^Unit_Details, a: mem.Allocator) {
 			u.cpu_ns = s.mem_mb * 380_000_000
 		}
 		base := strings.trim_suffix(s.name, ".service")
-		stamp :: proc(t: i64, a: mem.Allocator) -> string {
-			dt, _ := time.time_to_datetime(time.unix(t, 0))
-			return fmt.aprintf("%04d-%02d-%02dT%02d:%02d:%02d+00:00", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, allocator = a)
-		}
-		lines: []string
+		// (each line: its priority, then its text with the program's name for %s)
+		Line :: struct { priority: u8, text: string }
+		lines: []Line
 		switch s.active {
 		case "failed":
-			lines = {"Starting %s...", "%s: bind() to 0.0.0.0:80 failed (98: Address already in use)", "%s.service: Main process exited, code=exited, status=1/FAILURE", "%s.service: Failed with result 'exit-code'.", "Failed to start %s."}
+			lines = {{6, "Starting %s..."}, {5, "%s: reading /etc/%s.conf"}, {4, "%s: worker_connections exceed open file resource limit: 1024"},
+				{3, "%s: bind() to 0.0.0.0:80 failed (98: Address already in use)"}, {3, "%s.service: Main process exited, code=exited, status=1/FAILURE"},
+				{4, "%s.service: Failed with result 'exit-code'."}, {3, "Failed to start %s."}}
 		case "active":
-			lines = {"Starting %s...", "Started %s.", "%s: ready to accept connections"}
+			lines = {{6, "Starting %s..."}, {7, "%s: loaded configuration from /etc/%s.conf"}, {5, "%s: listening on 127.0.0.1"}, {6, "Started %s."},
+				{6, "%s: ready to accept connections"}, {4, "%s: slow request took 1.8 s"}, {6, "%s: client connected"}, {7, "%s: cache hit ratio 0.93"},
+				{6, "%s: client disconnected"}, {4, "%s: certificate expires in 12 days"}, {6, "%s: checkpoint complete"}, {6, "%s: client connected"}}
 		case:
-			lines = {"%s.service: Deactivated successfully.", "Stopped %s."}
+			lines = {{6, "%s.service: Deactivated successfully."}, {6, "Stopped %s."}}
 		}
 		for l, i in lines {
-			append(&u.journal, fmt.aprintf("%s workstation %s[%d]: %s", stamp(u.since + i64(i), a), base, max(s.pid, 1), fmt.tprintf(l, base), allocator = a))
+			append(&u.journal, Journal_Entry{
+				usec = (u.since + i64(i) * 47) * 1_000_000, priority = l.priority, pid = i32(max(s.pid, 1)), ident = strings.clone(base, a),
+				message = strings.clone(strings.count(l.text, "%s") == 2 ? fmt.tprintf(l.text, base, base) : fmt.tprintf(l.text, base), a),
+			})
 		}
 		return
 	}

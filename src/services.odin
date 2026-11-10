@@ -70,26 +70,57 @@ Unit_Details :: struct {
 	tasks:    u64,        // its processes and threads now (DETAIL_UNKNOWN: not counted)
 	cpu_ns:   u64,        // its CPU time (DETAIL_UNKNOWN: not counted)
 	restarts: u32,        // the manager restarted it this many times
-	journal:  [dynamic]string,   // its journal's last lines, the oldest first
+	journal:  [dynamic]Journal_Entry,   // its journal's last entries, the oldest first
 	journal_problem: string,     // why there are none ("" when they were read)
+	boot:     bool,       // the entries are of this boot alone (services.journal_boot)
+}
+
+// An entry of a service's journal: when, how grave (syslog's levels: 0 emergency .. 7 debug), from which process and
+// program, and what it says (the texts in the details' arena).
+Journal_Entry :: struct {
+	usec:     i64,      // unix microseconds
+	priority: u8,
+	pid:      i32,      // 0: not said
+	ident:    string,   // the program that wrote it (SYSLOG_IDENTIFIER, else _COMM)
+	message:  string,
+}
+
+// The journal's levels a filter keeps: every entry, warnings and worse (4 and under), errors and worse (3 and under).
+Journal_Level :: enum u8 { All, Warnings, Errors }
+JOURNAL_LEVEL_KEYS := [Journal_Level]string{.All = "all", .Warnings = "warnings", .Errors = "errors"}
+JOURNAL_LEVEL_LABELS := [Journal_Level]string{.All = "All", .Warnings = "Warnings", .Errors = "Errors"}
+
+// Whether an entry of priority `p` passes the filter `l`.
+journal_level_keeps :: proc(l: Journal_Level, p: u8) -> bool {
+	switch l {
+	case .All:      return true
+	case .Warnings: return p <= 4
+	case .Errors:   return p <= 3
+	}
+	return true
 }
 
 // A number of the details the manager does not count.
 DETAIL_UNKNOWN :: max(u64)
-// The journal's lines the pane shows, at most.
-JOURNAL_LINES :: 50
+// The journal's entries the pane reads, at most (the newest).
+JOURNAL_LINES :: 1000
+// While the pane follows the journal (services.journal_follow), it is read again this often.
+JOURNAL_FOLLOW_MS :: 2000
 
 Services :: struct {
 	details_worker: ui.Worker,
 	details_bus:  Service_Bus,       // the details' thread's own
-	details_ask:  struct { manager: Manager, name: [SERVICE_NAME_MAX]u8, name_len: int },   // under its mutex
+	details_ask:  struct { manager: Manager, name: [SERVICE_NAME_MAX]u8, name_len: int, boot: bool },   // under its mutex
+	details_next: time.Tick,         // when the followed journal is read again
 	details_shared: ^Unit_Details,   // its last reading, under its mutex
 	details:      ^Unit_Details,     // the window's
 	select_name:  string,            // owned: a service to select once a reading lists it (Go to service)
 	details_for:  u64,               // the service the pane was asked for (its name's id)
-	journal_vl:   ui.Virtual_List,   // the pane's lines
-	journal_for:  u64,               // the service and the lines the list was put at the end for
-	journal_lines: int,
+	journal_vl:   ui.Virtual_List,   // the pane's entries
+	journal_for:  u64,               // the service the list was put at the end for
+	journal_last: u64,               // the newest entry's id when the list was last built (a new one: back to the end)
+	journal_search: ui.Text_Field,   // the pane's own search (Ctrl+J)
+	journal_search_key: ui.Key,
 	worker:  ui.Worker,
 	bus:     Service_Bus,      // the thread's own (services_linux.odin)
 	demo:    ^Demo,            // not nil: the services are the demo's
@@ -131,6 +162,7 @@ services_destroy :: proc(s: ^Services) {
 	unit_details_free(s.details)
 	delete(s.select_name)
 	ui.vlist_destroy(&s.journal_vl)
+	ui.field_destroy(&s.journal_search)
 	service_list_free(s.shared)
 	service_list_free(s.list)
 	section_table_destroy(&s.rows)
@@ -196,6 +228,7 @@ details_ask :: proc(app: ^App, name: string) {
 	ui.worker_lock(&s.details_worker)
 	s.details_ask.manager = s.manager
 	s.details_ask.name_len = copy(s.details_ask.name[:], name)
+	s.details_ask.boot = app.settings.journal_boot
 	ui.worker_unlock(&s.details_worker)
 	ui.worker_ask(&s.details_worker)
 }
@@ -208,8 +241,9 @@ details_job :: proc(w: ^ui.Worker) {
 	ui.worker_unlock(w)
 	d := new(Unit_Details)
 	a := virtual.arena_allocator(&d.arena)
-	d.journal = make([dynamic]string, a)
+	d.journal = make([dynamic]Journal_Entry, a)
 	d.manager = ask.manager
+	d.boot = ask.boot
 	d.name = strings.clone(string(ask.name[:ask.name_len]), a)
 	d.tasks, d.cpu_ns = DETAIL_UNKNOWN, DETAIL_UNKNOWN
 	if s.demo != nil { demo_unit_details(s.demo, d, a) } else { unit_details_read(&s.details_bus, d, a) }

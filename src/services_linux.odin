@@ -14,7 +14,9 @@ package inspecteur
 
 import "base:runtime"
 import "core:fmt"
+import "core:encoding/json"
 import "core:os"
+import "core:strconv"
 import "core:strings"
 import "core:sys/linux"
 import "core:time"
@@ -244,8 +246,8 @@ call_failure :: proc(msg: ^dbus.Message, silent: string) -> string {
 }
 
 // The details of the service `d.name` of manager `d.manager`: its unit's properties over D-Bus (LoadUnit, then
-// FragmentPath, StateChangeTimestamp, TasksCurrent, CPUUsageNSec, NRestarts) and its journal's last lines from
-// journalctl (the journal's own program: its files' format is journald's to read). Runs on the details' thread.
+// FragmentPath, StateChangeTimestamp, TasksCurrent, CPUUsageNSec, NRestarts) and its journal's last entries from
+// journalctl -o json (of this boot alone when `d.boot`) (the journal's own program: its files' format is journald's to read). Runs on the details' thread.
 unit_details_read :: proc(b: ^Service_Bus, d: ^Unit_Details, a: runtime.Allocator) {
 	if c := service_conn(b, d.manager); c != nil {
 		w := dbus.body_writer()
@@ -265,7 +267,9 @@ unit_details_read :: proc(b: ^Service_Bus, d: ^Unit_Details, a: runtime.Allocato
 	args := make([dynamic]string, context.temp_allocator)
 	append(&args, "journalctl")
 	if d.manager == .User { append(&args, "--user") }
-	append(&args, "-u", d.name, "-n", fmt.tprintf("%d", JOURNAL_LINES), "--no-pager", "-q", "-o", "short-iso")
+	append(&args, "-u", d.name, "-n", fmt.tprintf("%d", JOURNAL_LINES), "--no-pager", "-q", "-o", "json",
+		"--output-fields=PRIORITY,MESSAGE,_PID,SYSLOG_IDENTIFIER,_COMM")
+	if d.boot { append(&args, "-b") }
 	state, stdout, stderr, err := os.process_exec({command = args[:]}, context.temp_allocator)
 	switch {
 	case err != nil:
@@ -275,9 +279,11 @@ unit_details_read :: proc(b: ^Service_Bus, d: ^Unit_Details, a: runtime.Allocato
 		d.journal_problem = strings.clone(text != "" ? text : "journalctl failed", a)
 	case:
 		rest := string(stdout)
-		for line in strings.split_lines_iterator(&rest) { if line != "" { append(&d.journal, strings.clone(line, a)) } }
+		for line in strings.split_lines_iterator(&rest) {
+			if e, ok := journal_entry_parse(line, a); ok { append(&d.journal, e) }
+		}
 		// (a user that is not in the systemd-journal group or adm reads its own units' lines alone)
-		if len(d.journal) == 0 { d.journal_problem = "No line in the journal that this user may read." }
+		if len(d.journal) == 0 { d.journal_problem = d.boot ? "No entry of this boot that this user may read." : "No entry in the journal that this user may read." }
 	}
 }
 
@@ -300,4 +306,31 @@ unit_property :: proc(c: ^dbus.Conn, path, iface, name: string) -> (v: Property,
 	case:          return
 	}
 	return v, !r.err
+}
+
+// An entry of `journalctl -o json`: one object a line, its fields strings (__REALTIME_TIMESTAMP in microseconds,
+// PRIORITY 0..7). A MESSAGE that is not UTF-8 comes as an array of bytes. The texts in `a`.
+journal_entry_parse :: proc(line: string, a: runtime.Allocator) -> (e: Journal_Entry, ok: bool) {
+	v, err := json.parse_string(line, allocator = context.temp_allocator)
+	if err != nil { return }
+	obj := v.(json.Object) or_return
+	text :: proc(obj: json.Object, key: string) -> string {
+		#partial switch x in obj[key] {
+		case json.String: return x
+		case json.Array:
+			b := make([dynamic]u8, 0, len(x), context.temp_allocator)
+			for n in x { if f, is := n.(json.Float); is { append(&b, u8(f)) } else if i, ii := n.(json.Integer); ii { append(&b, u8(i)) } }
+			return string(b[:])
+		}
+		return ""
+	}
+	e.usec = i64(strconv.parse_i64(text(obj, "__REALTIME_TIMESTAMP")) or_else 0)
+	e.priority = 6
+	if p, has := strconv.parse_uint(text(obj, "PRIORITY")); has && p <= 7 { e.priority = u8(p) }
+	if pid, has := strconv.parse_int(text(obj, "_PID")); has { e.pid = i32(pid) }
+	ident := text(obj, "SYSLOG_IDENTIFIER")
+	if ident == "" { ident = text(obj, "_COMM") }
+	e.ident = strings.clone(ident, a)
+	e.message = strings.clone(strings.trim_right_space(text(obj, "MESSAGE")), a)
+	return e, true
 }

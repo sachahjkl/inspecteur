@@ -23,6 +23,10 @@ inspecteur --pref view.mode=light --pref processes.refresh_ms=2000
 | `services.widths` | (empty) | The widths of the Services table's columns that were resized, in ems (`description=30`). Dragging the line before a column's title changes them. |
 | `services.sort` | name | The column the services are sorted by: `name`, `description`, `state`, `startup`, `load`, `pid` or `memory`; a `-` before it for the largest (or Z) first. A click on a title changes it. |
 | `services.details` | true | Show the selected service's details (its unit file, since when it is in its state, its tasks, CPU time and restarts) and its journal's last lines under the table. Ctrl+I shows or hides them. |
+| `services.journal_boot` | true | The details' journal shows this boot's entries alone; `false`: its last entries, from any boot. Alt+B switches it. |
+| `services.journal_level` | all | The entries of the details' journal shown: `all`, `warnings` (and worse) or `errors` (and worse). Alt+L goes through them. |
+| `services.journal_follow` | true | Read the details' journal again every 2 seconds while it is shown: new entries come in at the end. Alt+F switches it. |
+| `services.details_height` | 16 | The height of the details' pane, in ems (6 to 80). Dragging the line above it changes it. |
 | `startup.widths` | (empty) | The widths of the Startup table's columns that were resized, in ems (`command=24`). |
 | `startup.sort` | name | The column the startup items are sorted by: `name`, `command`, `type`, `status` or `file`; a `-` before it for Z first. |
 | `connections.widths` | (empty) | The widths of the Connections table's columns that were resized, in ems (`remote_address=20`). |

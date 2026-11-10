@@ -83,7 +83,10 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 @(private = "file")
 view_keys :: proc(app: ^App) {
 	// (a filter with text and the keyboard keeps its editing keys: Delete erases a character there, not a process)
-	field_keeps := ui.focus_key() == app.search_key && app.search_key != 0 && len(app.search.buf) > 0
+	// (the journal's search keeps them all, empty or not: Delete there is no Stop)
+	jk := app.services.journal_search_key
+	field_keeps := ui.focus_key() == app.search_key && app.search_key != 0 && len(app.search.buf) > 0 || jk != 0 && ui.focus_key() == jk
+	if journal_search_escape(app) { return }
 	commands_keys(app, field_keeps)
 	#partial switch app.tab {
 	case .Processes:   processes_keys(app, field_keeps)

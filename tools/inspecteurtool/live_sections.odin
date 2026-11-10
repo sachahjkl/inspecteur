@@ -87,6 +87,14 @@ live_services :: proc(l: ^Live) {
 
 	// the details' pane: the service's name and its unit's details
 	check(l, wait_named_text(c, "svc_details_name", service), "the details' pane is the service's")
+	// its journal: the manager's entries of it (Started), a search that keeps none, the level, the boot
+	check(l, wait_named_prefix(c, "svc_journal_count", ""), "its journal's entries are read (%s)", named_text(c, "svc_journal_count"))
+	check(l, cdp.key(c, "ctrl+j") && cdp.type_text(c, "zzqx-nothing") && wait_named_prefix(c, "svc_journal_count", "0 of "), "Ctrl+J: a search that keeps no entry (%s)", named_text(c, "svc_journal_count"))
+	check(l, cdp.key(c, "Escape") && wait_named_prefix(c, "svc_journal_count", "") && cdp.wait_for(c, "zzqx-nothing", SESSION_WAIT, gone = true) && !strings.has_prefix(named_text(c, "svc_journal_count"), "0 of"), "Escape clears it (%s)", named_text(c, "svc_journal_count"))
+	check(l, cdp.key(c, "Escape"), "Escape again leaves the search")
+	check(l, cdp.key(c, "alt+l") && file_has(prefs_path(l), "services.journal_level\twarnings"), "Alt+L: warnings and worse, kept")
+	check(l, cdp.key(c, "alt+l") && cdp.key(c, "alt+l") && file_has(prefs_path(l), "services.journal_level\tall"), "Alt+L twice: errors, then all")
+	check(l, cdp.key(c, "alt+b") && file_has(prefs_path(l), "services.journal_boot\tfalse") && cdp.key(c, "alt+b"), "Alt+B: every boot, and back")
 
 	if !select_unit(l, service) { return }
 	if !check(l, cdp.key(c, "ctrl+r"), "Ctrl+R: Restart") { return }
@@ -295,3 +303,21 @@ wait_named_text :: proc(c: ^cdp.Client, name, text: string) -> bool {
 	}
 	return false
 }
+
+// The text of the first box named `name` ("" none).
+named_text :: proc(c: ^cdp.Client, name: string) -> string {
+	for b in cdp.find_name(c, name) { return b.text }
+	return ""
+}
+
+// Waits for a box named `name` whose text starts with `prefix` (any text when "").
+wait_named_prefix :: proc(c: ^cdp.Client, name, prefix: string) -> bool {
+	deadline := time.tick_add(time.tick_now(), READER_WAIT)
+	for time.tick_diff(time.tick_now(), deadline) > 0 {
+		for b in cdp.find_name(c, name) { if strings.has_prefix(b.text, prefix) && b.text != "" { return true } }
+		time.sleep(SESSION_POLL)
+	}
+	return false
+}
+
+prefs_path :: proc(l: ^Live) -> string { return fmt.tprintf("%s/config/inspecteur/prefs", l.dir) }

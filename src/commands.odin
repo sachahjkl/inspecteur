@@ -26,7 +26,7 @@ Cmd :: enum u8 {
 	Cpu_Grid, Next_Device, Previous_Device,
 	// Services
 	Service_Start, Service_Stop, Service_Restart, Service_Enable, Service_Disable, Service_Open, Service_Copy, Service_Details,
-	Service_Open_File, Service_Manager,
+	Service_Open_File, Service_Manager, Journal_Search, Journal_Level, Journal_Boot, Journal_Follow, Journal_Copy, Journal_Copy_Entry,
 	// Startup
 	Startup_Enable, Startup_Disable, Startup_Toggle, Startup_Open, Startup_Copy,
 	// Connections
@@ -100,6 +100,12 @@ COMMANDS := [Cmd]ui.Command{
 	.Service_Details  = {label = "Details and journal", group = "Services", keys = {{.I, {.Ctrl}}, {}}},
 	.Service_Open_File = {label = "Open unit file", group = "Services", keys = {{.O, {.Ctrl}}, {}}},
 	.Service_Manager  = {label = "System or user services", group = "Services", keys = {{.U, {.Ctrl}}, {}}},
+	.Journal_Search   = {label = "Search the journal", group = "Services", keys = {{.J, {.Ctrl}}, {}}},
+	.Journal_Level    = {label = "Journal: all, warnings, errors", group = "Services", keys = {{.L, {.Alt}}, {}}},
+	.Journal_Boot     = {label = "Journal: this boot or every boot", group = "Services", keys = {{.B, {.Alt}}, {}}},
+	.Journal_Follow   = {label = "Follow the journal", group = "Services", keys = {{.F, {.Alt}}, {}}},
+	.Journal_Copy     = {label = "Copy the journal's entries shown", group = "Services", keys = {{.C, {.Alt}}, {}}},
+	.Journal_Copy_Entry = {label = "Copy the journal's entry", group = "Services", keys = {{.C, {.Alt, .Shift}}, {}}},
 
 	.Startup_Enable   = {label = "Enable", group = "Startup", keys = {{.E, {.Ctrl}}, {}}},
 	.Startup_Disable  = {label = "Disable", group = "Startup", keys = {{.D, {.Ctrl}}, {}}},
@@ -132,7 +138,7 @@ cmd_tab :: proc(c: Cmd) -> Maybe(Tab) {
 	case c <= .Previous_Section:                   return nil
 	case c <= .Pin:                                return .Processes   // (the last command of Processes)
 	case c <= .Previous_Device:                    return .Performance
-	case c <= .Service_Manager:                    return .Services
+	case c <= .Journal_Copy_Entry:                 return .Services
 	case c <= .Startup_Copy:                       return .Startup
 	case c <= .Socket_Copy:                        return .Connections
 	case c == .Info_Copy:                          return .Information
@@ -240,6 +246,7 @@ cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 	case .Service_Start, .Service_Stop, .Service_Restart, .Service_Enable, .Service_Disable, .Service_Open, .Service_Copy, .Service_Open_File: return service_can(app, c)
 	case .Service_Details: return true
 	case .Service_Manager: return true
+	case .Journal_Search, .Journal_Level, .Journal_Boot, .Journal_Follow, .Journal_Copy, .Journal_Copy_Entry: return journal_can(app, c)
 	case .Startup_Enable, .Startup_Disable, .Startup_Toggle, .Startup_Open, .Startup_Copy: return startup_can(app, c)
 	case .Socket_End_Task, .Socket_Kill, .Socket_Open:
 		s, ok := selected_socket(app)
@@ -316,6 +323,7 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Service_Details:  service_details_switch(app)
 	case .Service_Open_File: service_open_file(app)
 	case .Service_Manager:  services_switch(app, app.services.manager == .System ? .User : .System)
+	case .Journal_Search, .Journal_Level, .Journal_Boot, .Journal_Follow, .Journal_Copy, .Journal_Copy_Entry: journal_run(app, c)
 	case .Startup_Enable:   startup_toggle(app, true)
 	case .Startup_Disable:  startup_toggle(app, false)
 	case .Startup_Toggle:   if it, ok := selected_startup(app); ok { startup_toggle(app, !it.enabled) }

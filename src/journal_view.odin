@@ -1,0 +1,338 @@
+package inspecteur
+
+// The details' journal (the Services section's pane, services_view.odin): the selected service's journal entries, each
+// with its time, its level in its colour, its program and process, and its message. Over them a bar: the level kept
+// (all, warnings, errors, each with its count: Alt+L), this boot or every boot (Alt+B), following (Alt+F: read again
+// every JOURNAL_FOLLOW_MS, new entries come in at the end while the view is there), a search of its own (Ctrl+J) and
+// Copy (Alt+C: the entries shown). Under them, the selected entry whole: its date, its level, its program, its message
+// wrapped (Alt+Shift+C copies it). The line above the pane, dragged, sets its height (services.details_height).
+
+import "core:fmt"
+import "core:strings"
+import "core:time"
+import "core:time/timezone"
+import lucide "gt:lucide"
+import "gt:platform"
+import "gt:ui"
+
+// Syslog's levels, by priority: the word the pane shows and the colour's tag ("" the text's own).
+@(rodata)
+JOURNAL_LEVEL_WORDS := [8]string{"emerg", "alert", "crit", "error", "warning", "notice", "info", "debug"}
+@(rodata)
+JOURNAL_LEVEL_TAGS := [8]string{"bad", "bad", "bad", "bad", "warn", "", "", "weak"}
+
+// The widths of the entries' columns, in ems: the time (with the date: every boot), the level, the program.
+@(private = "file") TIME_EM :: 5.4
+@(private = "file") DATE_TIME_EM :: 9.4
+@(private = "file") LEVEL_EM :: 4.8
+@(private = "file") IDENT_EM :: 11
+// The selected entry's strip: its line of facts and three lines of its message.
+@(private = "file") ENTRY_EM :: 6
+
+journal_build :: proc(app: ^App, u: Service, selected: bool, d: ^Unit_Details, em: f32) {
+	s := &app.services
+	if !selected || d == nil || d.name != u.name || d.manager != s.manager {
+		journal_note(!selected ? "Select a service: its journal shows here." : "Reading…", em)
+		return
+	}
+	shown := journal_shown(app, d)
+	journal_bar(app, d, len(shown), em)
+	switch {
+	case len(d.journal) == 0: journal_note(d.journal_problem, em); return
+	case len(shown) == 0:     journal_note("No entry is shown: another level, or another search, shows some.", em); return
+	}
+	ids := make([]u64, len(shown), context.temp_allocator)
+	for &v, i in ids { v = journal_entry_id(d.journal[shown[i]]) }
+	// (the newest entry in view: at another service, and as new entries come while the view was at the end)
+	newest := ids[len(ids) - 1]
+	if s.journal_for != name_id(u.name) {
+		s.journal_for = name_id(u.name)
+		s.journal_vl.sel = -1
+		ui.vlist_scroll_to(&s.journal_vl, max(f32))
+	} else if newest != s.journal_last && journal_at_end(&s.journal_vl) {
+		ui.vlist_scroll_to(&s.journal_vl, max(f32))
+	}
+	s.journal_last = newest
+	journal_list(app, d, shown, ids, em)
+	if e, has := journal_selected(app); has { journal_entry_whole(app, d, e, em) }
+}
+
+// The entries' list. (A procedure of its own: the list is the parent until the end of the scope it is opened in)
+@(private = "file")
+journal_list :: proc(app: ^App, d: ^Unit_Details, shown: []int, ids: []u64, em: f32) {
+	ui.next({width = ui.fill(), height = ui.fill()})
+	rows, ok := ui.vlist("###svc_journal", &app.services.journal_vl, ids)
+	if !ok { return }
+	for i in rows.first ..< rows.last { journal_row(app, d, d.journal[shown[i]], i, em) }
+}
+
+@(private = "file")
+journal_note :: proc(text: string, em: f32) {
+	if ui.tags("weak") {
+		ui.next({width = ui.fill(), height = ui.px(em * 2), text_pad = em * 0.8})
+		ui.label(fmt.tprintf("%s###svc_journal_note", ui.text_shown(text)))
+	}
+}
+
+// The indices of the entries the level and the search keep, the oldest first (temporary allocator).
+journal_shown :: proc(app: ^App, d: ^Unit_Details) -> []int {
+	q := strings.to_lower(strings.trim_space(ui.field_string(&app.services.journal_search)), context.temp_allocator)
+	out := make([dynamic]int, 0, len(d.journal), context.temp_allocator)
+	for e, i in d.journal {
+		if !journal_level_keeps(app.settings.journal_level, e.priority) { continue }
+		if q != "" && !strings.contains(strings.to_lower(e.message, context.temp_allocator), q) && !strings.contains(strings.to_lower(e.ident, context.temp_allocator), q) { continue }
+		append(&out, i)
+	}
+	return out[:]
+}
+
+// An entry's identity in the list: the same entry read again keeps its row (and the selection).
+journal_entry_id :: proc(e: Journal_Entry) -> u64 { return name_id(e.message) ~ u64(e.usec) ~ (u64(u32(e.pid)) << 40) }
+
+// Whether the view shows the list's end (or the list has no box yet).
+@(private = "file")
+journal_at_end :: proc(vl: ^ui.Virtual_List) -> bool {
+	b := ui.box_from_key(vl.key)
+	if b == nil { return true }
+	return b.view_off.y >= ui.view_limit(b) - 2
+}
+
+// The bar over the entries: the level, the boot, following, the search, Copy, how many are shown.
+@(private = "file")
+journal_bar :: proc(app: ^App, d: ^Unit_Details, shown: int, em: f32) {
+	s := &app.services
+	errors, warnings := 0, 0
+	for e in d.journal {
+		if e.priority <= 3 { errors += 1 } else if e.priority == 4 { warnings += 1 }
+	}
+	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.3))})
+	if ui.row(.Center, {}, "###svc_journal_bar") {
+		ui.spacer(ui.px(em * 0.8))
+		// (in the order of Journal_Level)
+		labels := [3]string{fmt.tprintf("All %d", len(d.journal)), fmt.tprintf("Warnings %d", warnings + errors), fmt.tprintf("Errors %d", errors)}
+		key := ui.command_shortcut(COMMANDS[.Journal_Level])
+		tips := [3]string{fmt.tprintf("Every entry (%s)", key), fmt.tprintf("Warnings and worse (%s)", key), fmt.tprintf("Errors and worse (%s)", key)}
+		sel := int(app.settings.journal_level)
+		ui.next({width = ui.px(em * 21), height = ui.px(ui.dense(em * 1.9))})
+		if ui.segmented("svc_journal_level", labels[:], &sel, tips[:]) { journal_level_set(app, Journal_Level(sel)) }
+		ui.spacer(ui.px(em * 0.6))
+		boot := app.settings.journal_boot ? 0 : 1
+		bkey := ui.command_shortcut(COMMANDS[.Journal_Boot])
+		btips := [2]string{fmt.tprintf("The entries of this boot (%s)", bkey), fmt.tprintf("The last entries, from any boot (%s)", bkey)}
+		ui.next({width = ui.px(em * 12), height = ui.px(ui.dense(em * 1.9))})
+		if ui.segmented("svc_journal_boot", {"This boot", "Every boot"}, &boot, btips[:]) { journal_boot_set(app, boot == 0) }
+		ui.spacer(ui.px(em * 0.6))
+		follow := app.settings.journal_follow
+		ui.next({width = ui.px(em * 2.2), height = ui.px(ui.dense(em * 1.9)), font = app.icons})
+		sig: ui.Signal
+		if ui.tags(follow ? "accent_button" : "ghost_button") { sig = ui.button(fmt.tprintf("%s###svc_journal_follow", follow ? lucide.ARROW_DOWN : lucide.PAUSE)) }
+		if sig.clicked { journal_run(app, .Journal_Follow) }
+		tip_after(sig, follow ? fmt.tprintf("Following: new entries come in at the end (%s stops)", ui.command_shortcut(COMMANDS[.Journal_Follow])) : cmd_tip(.Journal_Follow))
+		ui.spacer(ui.px(em * 0.6))
+		ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 1.9))})
+		res := ui.line_edit("###svc_journal_search", &s.journal_search, fmt.tprintf("Search the journal (%s)", ui.command_shortcut(COMMANDS[.Journal_Search])))
+		s.journal_search_key = res.box.key
+		ui.spacer(ui.px(em * 0.4))
+		if ui.tags("weak") {
+			n := shown == len(d.journal) ? count_text(shown, "entry", "entries") : fmt.tprintf("%d of %d", shown, len(d.journal))
+			ui.next({width = ui.text_size(em * 0.4), height = ui.pct(1), text_pad = 0, font_size = em * 0.9})
+			ui.label(fmt.tprintf("%s###svc_journal_count", n))
+		}
+		cmd_button(app, "svc_journal_copy", lucide.COPY, .Journal_Copy, em)
+		ui.spacer(ui.px(em * 0.4))
+	}
+}
+
+// One entry: its time, its level in its colour, its program and process, its message (in the level's colour when it is
+// a warning or worse).
+@(private = "file")
+journal_row :: proc(app: ^App, d: ^Unit_Details, e: Journal_Entry, i: int, em: f32) {
+	s := &app.services
+	ui.next({height = ui.px(ui.dense(em * 1.6))})
+	row := ui.list_row(&s.journal_vl, i, "")
+	tip := ""
+	if ui.parent(row.box) {
+		fs := em * 0.92
+		ui.spacer(ui.px(em * 0.8))
+		if ui.tags("weak") {
+			ui.next({width = ui.px(em * (d.boot ? TIME_EM : DATE_TIME_EM)), height = ui.pct(1), text_pad = 0, font_size = fs})
+			ui.label(fmt.tprintf("%s###jt", journal_time_text(app, e.usec, !d.boot)))
+		}
+		tag := JOURNAL_LEVEL_TAGS[e.priority]
+		if tag != "" { ui.push_tags(tag) }
+		ui.next({width = ui.px(em * LEVEL_EM), height = ui.pct(1), text_pad = 0, font_size = fs})
+		ui.label(fmt.tprintf("%s###jl", JOURNAL_LEVEL_WORDS[e.priority]))
+		if tag != "" { ui.pop_tags() }
+		who := e.pid > 0 ? fmt.tprintf("%s[%d]", e.ident, e.pid) : e.ident
+		if ui.tags("weak") {
+			ui.next({width = ui.px(em * IDENT_EM), height = ui.pct(1), text_pad = 0, font_size = fs})
+			b := ui.build_box({.Draw_Text, .Clip}, fmt.tprintf("%s###jw", ui.text_shown(who)))
+			if text_cut(b, who) { tip = who }
+		}
+		if tag != "" && tag != "weak" { ui.push_tags(tag) }
+		line := journal_one_line(e.message)
+		ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0, font_size = fs})
+		b := ui.build_box({.Draw_Text, .Clip}, fmt.tprintf("%s###jm", ui.text_shown(line)))
+		if tag != "" && tag != "weak" { ui.pop_tags() }
+		if text_cut(b, line) || line != e.message { tip = e.message }
+	}
+	ui.table_cell_tip(row, tip)
+}
+
+// A message on one line: its first line, with "…" when there are more.
+@(private = "file")
+journal_one_line :: proc(m: string) -> string {
+	if i := strings.index_byte(m, '\n'); i >= 0 { return fmt.tprintf("%s …", m[:i]) }
+	return m
+}
+
+// The selected entry, when one is shown.
+journal_selected :: proc(app: ^App) -> (e: Journal_Entry, ok: bool) {
+	s := &app.services
+	d := s.details
+	if d == nil || s.journal_vl.sel < 0 { return }
+	shown := journal_shown(app, d)
+	if s.journal_vl.sel >= len(shown) { return }
+	return d.journal[shown[s.journal_vl.sel]], true
+}
+
+// The selected entry whole, under the list: its date and time, its level, its program and process; its message
+// wrapped, its text selectable.
+@(private = "file")
+journal_entry_whole :: proc(app: ^App, d: ^Unit_Details, e: Journal_Entry, em: f32) {
+	// (a height of its own: the list takes the rest. A longer message scrolls in it)
+	ui.next({width = ui.fill(), height = ui.px(em * ENTRY_EM), axis = .Y, bg = surface("bar")})
+	box := ui.build_box({.Draw_Background, .Draw_Side_Top, .Clip}, "###svc_journal_entry")
+	if ui.parent(box) {
+		ui.spacer(ui.px(em * 0.4))
+		ui.next({width = ui.fill(), height = ui.px(em * 1.6)})
+		if ui.row(.Center, {}, "###je_head") {
+			ui.spacer(ui.px(em * 0.8))
+			tag := JOURNAL_LEVEL_TAGS[e.priority]
+			if tag != "" { ui.push_tags(tag) }
+			ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
+			ui.label(fmt.tprintf("%s###je_level", JOURNAL_LEVEL_WORDS[e.priority]))
+			if tag != "" { ui.pop_tags() }
+			ui.spacer(ui.px(em * 0.8))
+			if ui.tags("weak") {
+				who := e.pid > 0 ? fmt.tprintf("%s, process %d", e.ident, e.pid) : e.ident
+				ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0})
+				ui.label(fmt.tprintf("%s  ·  %s###je_info", journal_time_text(app, e.usec, true), ui.text_shown(who)))
+			}
+			cmd_button(app, "svc_journal_copy_entry", lucide.CLIPBOARD_COPY, .Journal_Copy_Entry, em)
+			ui.spacer(ui.px(em * 0.4))
+		}
+		ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
+		body := ui.build_box({.Clip, .View_Scroll_Y, .View_Clamp_Y, .Allow_Overflow_Y}, "###je_body")
+		if ui.parent(body) {
+			ui.next({width = ui.fill(), height = ui.children_sum(), axis = .X})
+			if ui.row(id = "###je_text") {
+				ui.spacer(ui.px(em * 0.8))
+				ui.next({width = ui.fill(), font_size = em * 0.95})
+				ui.paragraph(fmt.tprintf("%s###je_message", ui.text_shown(e.message)))
+				ui.spacer(ui.px(em * 0.8))
+			}
+		}
+		ui.spacer(ui.px(em * 0.3))
+	}
+}
+
+// "14:03:07", or with its date "2026-11-10 14:03:07", in local time.
+journal_time_text :: proc(app: ^App, usec: i64, date: bool) -> string {
+	if usec <= 0 { return "" }
+	if !app.tz_tried {
+		app.tz_tried = true
+		app.tz, _ = timezone.region_load("local")
+	}
+	dt, ok := time.time_to_datetime(time.unix(usec / 1_000_000, 0))
+	if !ok { return "" }
+	if app.tz != nil { dt = timezone.datetime_to_tz(dt, app.tz) }
+	if date { return fmt.tprintf("%04d-%02d-%02d %02d:%02d:%02d", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second) }
+	return fmt.tprintf("%02d:%02d:%02d", dt.hour, dt.minute, dt.second)
+}
+
+// An entry as one line of text: its date and time, its level, its program and process, its message.
+@(private = "file")
+journal_entry_text :: proc(app: ^App, e: Journal_Entry) -> string {
+	who := e.pid > 0 ? fmt.tprintf("%s[%d]", e.ident, e.pid) : e.ident
+	return fmt.tprintf("%s %s %s: %s", journal_time_text(app, e.usec, true), JOURNAL_LEVEL_WORDS[e.priority], who, e.message)
+}
+
+journal_level_set :: proc(app: ^App, l: Journal_Level) {
+	app.settings.journal_level = l
+	pref_save(&app.prefs, "services.journal_level", JOURNAL_LEVEL_KEYS[l])
+	app.services.journal_vl.sel = -1
+	ui.vlist_scroll_to(&app.services.journal_vl, max(f32))
+	say(app, "The journal: %s", l == .All ? "every entry" : l == .Warnings ? "warnings and worse" : "errors and worse")
+}
+
+journal_boot_set :: proc(app: ^App, boot: bool) {
+	app.settings.journal_boot = boot
+	pref_save(&app.prefs, "services.journal_boot", boot ? "true" : "false")
+	app.services.journal_for = 0   // (back to the end once read)
+	if u, ok := selected_service(app); ok { details_ask(app, u.name) }
+	say(app, boot ? "The journal: this boot" : "The journal: every boot")
+}
+
+// Whether a command of the journal can act now: the pane is shown, with entries for Copy.
+journal_can :: proc(app: ^App, c: Cmd) -> bool {
+	if !app.settings.details || app.tab != .Services { return false }
+	d := app.services.details
+	#partial switch c {
+	case .Journal_Copy:       return d != nil && len(d.journal) > 0
+	case .Journal_Copy_Entry: _, ok := journal_selected(app); return ok
+	}
+	return true
+}
+
+journal_run :: proc(app: ^App, c: Cmd) {
+	s := &app.services
+	#partial switch c {
+	case .Journal_Search: if s.journal_search_key != 0 { ui.set_focus(s.journal_search_key); ui.field_select_all(&s.journal_search) }
+	case .Journal_Level:  journal_level_set(app, Journal_Level((int(app.settings.journal_level) + 1) % len(Journal_Level)))
+	case .Journal_Boot:   journal_boot_set(app, !app.settings.journal_boot)
+	case .Journal_Follow:
+		app.settings.journal_follow = !app.settings.journal_follow
+		pref_save(&app.prefs, "services.journal_follow", app.settings.journal_follow ? "true" : "false")
+		s.details_next = time.tick_now()
+		say(app, app.settings.journal_follow ? "Following the journal: new entries come in at the end" : "The journal is not read again")
+	case .Journal_Copy:
+		d := s.details
+		if d == nil { return }
+		b := strings.builder_make(context.temp_allocator)
+		shown := journal_shown(app, d)
+		for i in shown { strings.write_string(&b, journal_entry_text(app, d.journal[i])); strings.write_byte(&b, '\n') }
+		platform.set_clipboard(app.main.win, strings.to_string(b))
+		say(app, "Copied %s", count_text(len(shown), "entry", "entries"))
+	case .Journal_Copy_Entry:
+		if e, ok := journal_selected(app); ok {
+			platform.set_clipboard(app.main.win, journal_entry_text(app, e))
+			say(app, "Copied the entry")
+		}
+	}
+}
+
+// While the pane follows the journal: the selected service's read again every JOURNAL_FOLLOW_MS (services_tick).
+journal_follow_tick :: proc(app: ^App) {
+	s := &app.services
+	if app.tab != .Services || !app.settings.details || !app.settings.journal_follow || app.paused { return }
+	if time.tick_diff(s.details_next, time.tick_now()) < 0 || ui.worker_busy(&s.details_worker) { return }
+	s.details_next = time.tick_add(time.tick_now(), JOURNAL_FOLLOW_MS * time.Millisecond)
+	if u, ok := selected_service(app); ok { details_ask(app, u.name) }
+}
+
+// The milliseconds until the followed journal is read again (max(int): it is not followed).
+journal_due_ms :: proc(app: ^App) -> int {
+	s := &app.services
+	if app.tab != .Services || !app.settings.details || !app.settings.journal_follow || app.paused { return max(int) }
+	return max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), s.details_next))) + 1, 1)
+}
+
+// Escape in the journal's search: its text goes first, then the keyboard. (view_keys, before the commands' keys: the
+// window's Escape is another command's)
+journal_search_escape :: proc(app: ^App) -> bool {
+	s := &app.services
+	if s.journal_search_key == 0 || ui.focus_key() != s.journal_search_key || !ui.key_press(.Escape) { return false }
+	if len(s.journal_search.buf) > 0 { ui.field_clear(&s.journal_search) } else { ui.set_focus(0) }
+	return true
+}
