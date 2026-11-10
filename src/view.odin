@@ -87,8 +87,12 @@ view_keys :: proc(app: ^App) {
 	if ui.key_press(.Page_Up) { select_step(app, app.vl.sel, -1, PAGE_ROWS) }
 	if ui.key_press(.Home, {.Ctrl}) { select_step(app, -1, 1, 1) }
 	if ui.key_press(.End, {.Ctrl}) { select_step(app, len(app.table.rows), -1, 1) }
-	if ui.key_press(.Delete) { end_selected(app) }
-	if ui.key_press(.Delete, {.Shift}) { kill_selected(app) }
+	// (a filter with text and the keyboard keeps Delete: it erases a character there, not a process)
+	field_keeps := ui.focus_key() == app.search_key && app.search_key != 0 && len(app.search.buf) > 0
+	if !field_keeps {
+		if ui.key_press(.Delete) { end_selected(app) }
+		if ui.key_press(.Delete, {.Shift}) { kill_selected(app) }
+	}
 	if ui.key_press(.Menu) || ui.key_press(.F10, {.Shift}) { row_menu_open(app, {app.sel_rect.min.x + 40, app.sel_rect.max.y}, from_keyboard = true) }
 	if ui.key_press(.Escape) { ui.field_clear(&app.search) }
 	if ui.key_press(.Return, {.Alt}) { props_selected(app) }

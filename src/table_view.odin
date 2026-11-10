@@ -61,7 +61,6 @@ build_bar :: proc(app: ^App, em: f32) {
 }
 
 // A flat button with an icon of Lucide; its tooltip says what it does. A button that cannot act now is greyed.
-@(private = "file")
 tool_button :: proc(app: ^App, id, icon, tip: string, enabled: bool, em: f32) -> bool {
 	sig: ui.Signal
 	if ui.disabled(!enabled) {
@@ -187,7 +186,7 @@ build_rows :: proc(app: ^App, em: f32) {
 			if ui.parent(row.box) { build_section(app, r, em) }
 			continue
 		}
-		row := ui.list_row(&app.vl, i, "")
+		row := ui.list_row(&app.vl, i, row_label(app, r))
 		if ui.parent(row.box) { build_cells(app, r, em, hot) }
 		if i == app.vl.sel { app.sel_rect = row.box.rect }
 		if row.double_clicked { if r.kind == .App { group_toggle(app, r) } else { props_selected(app) } }
@@ -202,6 +201,21 @@ build_rows :: proc(app: ^App, em: f32) {
 			if ui.style({text_align = .Center}) { ui.label(fmt.tprintf("No process matches “%s”.###empty", shown_text(ui.field_string(&app.search)))) }
 		}
 	}
+}
+
+// What a screen reader says of a row (and what live reads to know which process is selected): "sleep, PID 1234",
+// "Firefox, 12 processes".
+@(private = "file")
+row_label :: proc(app: ^App, r: Row) -> string {
+	#partial switch r.kind {
+	case .Process:
+		p := app.sampler.procs[r.index]
+		return fmt.tprintf("%s, PID %d", shown_text(p.name), p.pid)
+	case .App:
+		g := app.table.groups[r.index]
+		return fmt.tprintf("%s, %s", shown_text(app.catalog.entries[g.entry].name), count_text(g.count, "process", "processes"))
+	}
+	return ""
 }
 
 @(private = "file")
@@ -257,10 +271,7 @@ build_cells :: proc(app: ^App, r: Row, em: f32, hot: ui.Color) {
 		}
 		ic := icon_of(&app.catalog, &app.app_icons, &app.shared.r, icon_name)
 		if ic.ok {
-			d := ui.frame_new(Icon_Draw)
-			d.tex = ic.tex
-			ui.next({width = ui.px(em * ICON_EM), height = ui.pct(1)})
-			ui.custom("###icon", icon_draw, d)
+			icon_box(ic, em * ICON_EM)
 		} else if ui.tags("weak") {
 			glyph(app, r.kind == .App ? lucide.APP_WINDOW : lucide.SQUARE_TERMINAL, em * ICON_EM)
 		}
@@ -339,6 +350,14 @@ started_text :: proc(app: ^App, start_ticks: u64) -> string {
 	}
 	if when_dt.date == now_dt.date { return fmt.tprintf("%02d:%02d:%02d", when_dt.hour, when_dt.minute, when_dt.second) }
 	return fmt.tprintf("%04d-%02d-%02d %02d:%02d", when_dt.year, when_dt.month, when_dt.day, when_dt.hour, when_dt.minute)
+}
+
+// An app's icon, `width` wide, the row's height.
+icon_box :: proc(ic: Icon, width: f32) {
+	d := ui.frame_new(Icon_Draw)
+	d.tex = ic.tex
+	ui.next({width = ui.px(width), height = ui.pct(1)})
+	ui.custom("###icon", icon_draw, d)
 }
 
 @(private = "file")

@@ -8,6 +8,7 @@ import "core:fmt"
 import "core:os"
 import "core:slice"
 import "core:strings"
+import "core:sys/linux"
 import "core:time"
 import cdp "gt:cdp"
 
@@ -17,20 +18,27 @@ GRAPH_DRAWN_SHARE :: 0.01
 GRAPH_COLOR_SLACK :: 12
 // The Performance section's graphs get some points first.
 PERF_POINTS_WAIT :: 4 * time.Second
+// The busy children end by themselves after this many seconds, whatever becomes of this tool.
+BUSY_SECONDS :: "30"
 
 live_performance :: proc(l: ^Live) {
 	c := &l.c
 	// A machine at rest draws its CPU graphs as a line along the bottom, which a check by pixels cannot tell from an
 	// empty graph. One busy child per logical processor, this test's own, gives every graph some area to draw.
+	// Each runs under `timeout`, so that it ends even when this tool does not live to end it; SIGTERM to `timeout` ends
+	// its loop too (SIGKILL would leave the loop running without it).
 	busy := make([dynamic]os.Process, context.temp_allocator)
 	for _ in 0 ..< logical_processors() {
-		if child, err := os.process_start({command = {"sh", "-c", "while :; do :; done"}}); err == nil {
+		if child, err := os.process_start({command = {"timeout", BUSY_SECONDS, "sh", "-c", "while :; do :; done"}}); err == nil {
 			append(&busy, child)
 		}
 	}
 	defer for child in busy {
-		_ = os.process_kill(child)
-		_, _ = os.process_wait(child, SESSION_WAIT)
+		_ = linux.kill(linux.Pid(child.pid), .SIGTERM)
+		if _, err := os.process_wait(child, SESSION_WAIT); err != nil {
+			_ = os.process_kill(child)
+			_, _ = os.process_wait(child, SESSION_WAIT)
+		}
 	}
 	check(l, len(busy) == logical_processors(), "%d busy children to draw against", len(busy))
 
@@ -171,30 +179,47 @@ live_properties :: proc(l: ^Live) {
 	pid := fmt.tprintf("%d", child.pid)
 	check(l, cdp.type_text(c, mark), "search it")
 	check(l, cdp.wait_for(c, fmt.tprintf("Selected: sleep, PID %s", pid), SESSION_WAIT), "it is selected")
+	if !select_child(l, pid) { return }
 	check(l, cdp.key(c, "alt+Enter"), "Alt+Enter")
-	check(l, cdp.wait_name(c, "props_name", SESSION_WAIT) && cdp.wait_for(c, fmt.tprintf("PID %s", pid), SESSION_WAIT), "its Properties open")
+	// (the dialog's buttons act on the process its title names: they are clicked only when it names the child)
+	cdp.wait_name(c, "props_name", SESSION_WAIT)
+	if !check(l, props_is(c, pid), "its Properties open, on sleep PID %s", pid) { return }
 	check(l, cdp.click_name(c, "props_tab_1"), "the Threads tab")
 	check(l, wait_cell(c, pid), "it lists the process's thread (TID %s)", pid)
 	check(l, cdp.click_name(c, "props_tab_2"), "the Open files tab")
 	check(l, cdp.wait_for(c, "child-output.txt", SESSION_WAIT), "it lists the file of its output")
 	check(l, cdp.click_name(c, "props_tab_3"), "the Modules tab")
 	check(l, cdp.wait_for(c, "libc", SESSION_WAIT), "it lists the C library")
-	check(l, cdp.click_name(c, "props_suspend"), "Suspend")
+	if !check(l, props_is(c, pid), "the dialog is still the child's") { return }
+	if !check(l, cdp.click_name(c, "props_suspend"), "Suspend") { return }
 	check(l, wait_state(child.pid, 'T'), "the process is stopped (T)")
 	check(l, cdp.wait_for(c, "Resume", SESSION_WAIT), "the button says Resume")
-	check(l, cdp.click_name(c, "props_suspend"), "Resume")
+	if !check(l, props_is(c, pid), "the dialog is still the child's") { return }
+	if !check(l, cdp.click_name(c, "props_suspend"), "Resume") { return }
 	check(l, wait_state(child.pid, 'S'), "the process sleeps again (S)")
 	_ = os.make_directory_all("docs/screenshots")
 	cdp.click_name(c, "props_tab_0")
 	cdp.wait_idle(c, SESSION_WAIT)
 	check(l, cdp.shot(c, "docs/screenshots/properties.png"), "a picture of the Properties")
-	check(l, cdp.click_name(c, "props_end"), "End task")
+	if !check(l, props_is(c, pid), "the dialog is still the child's") { return }
+	if !check(l, cdp.click_name(c, "props_end"), "End task") { return }
 	state, werr := os.process_wait(child, SESSION_WAIT)
 	reaped = werr == nil && state.exited
 	check(l, werr == nil && state.exited && state.exit_code == 15, "it ends by SIGTERM (code %d)", state.exit_code)
 	check(l, cdp.wait_for(c, "The process has ended", SESSION_WAIT), "the dialog says it ended")
 	check(l, cdp.key(c, "Escape") && cdp.wait_name(c, "props_name", SESSION_WAIT, gone = true), "Escape closes it")
 	check(l, cdp.key(c, "Escape"), "Escape clears the search")
+}
+
+// Whether the Properties dialog's title names sleep, PID `pid` (its boxes props_name and props_pid).
+@(private = "file")
+props_is :: proc(c: ^cdp.Client, pid: string) -> bool {
+	names := cdp.find_name(c, "props_name")
+	pids := cdp.find_name(c, "props_pid")
+	if len(names) != 1 || len(pids) != 1 || names[0].text != "sleep" { return false }
+	t := pids[0].text
+	want := fmt.tprintf("PID %s", pid)
+	return t == want || strings.has_prefix(t, fmt.tprintf("%s ", want))
 }
 
 // Clicks the last box whose text holds `text` (a menu's item comes after the header that has the same words).
@@ -229,7 +254,6 @@ wait_cell :: proc(c: ^cdp.Client, text: string) -> bool {
 }
 
 // The state letter of /proc/<pid>/stat becomes `want`.
-@(private = "file")
 wait_state :: proc(pid: int, want: u8) -> bool {
 	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
 	for time.tick_diff(time.tick_now(), deadline) > 0 {

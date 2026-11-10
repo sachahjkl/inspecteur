@@ -34,7 +34,7 @@ run_shots :: proc(args: []string) -> int {
 		if cdp.shot(c, path) { fmt.printfln("wrote %s", path) } else { failed^ = true }
 	}
 	cdp.wait_for(&c, "Background processes", SESSION_WAIT)
-	cdp.click_name(&c, "hd_3")   // the busiest first
+	click_header(&c, "CPU")   // the busiest first
 	time.sleep(1500 * time.Millisecond)   // (two samples: every row has its CPU %)
 	shot(&c, out, "processes", &failed)
 	// the first app's group, open, and its menu
