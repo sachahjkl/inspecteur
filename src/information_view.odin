@@ -34,7 +34,7 @@ info_report :: proc(app: ^App) -> []Info_Group {
 		add(&lines, "Architecture", s.arch)
 		add(&lines, "Computer name", s.hostname)
 	}
-	add(&lines, "Up for", uptime_text(m.uptime))
+	add(&lines, "Up for", duration_words(m.uptime))
 	if s != nil {
 		add(&lines, "Desktop", s.desktop)
 		add(&lines, "Session", s.display != "" ? s.display : s.session)
@@ -109,6 +109,17 @@ info_report :: proc(app: ^App) -> []Info_Group {
 	}
 	group(&groups, &lines, "Battery", lucide.PLUG)
 	return groups[:]
+}
+
+// A duration in words: "3 days, 4 h 12 min", "10 h 47 min", "5 min".
+duration_words :: proc(seconds: f64) -> string {
+	s := i64(seconds)
+	days, hours, minutes := s / 86400, (s / 3600) % 24, (s / 60) % 60
+	switch {
+	case days > 0:  return fmt.tprintf("%s, %d h %d min", count_text(int(days), "day", "days"), hours, minutes)
+	case hours > 0: return fmt.tprintf("%d h %d min", hours, minutes)
+	}
+	return fmt.tprintf("%d min", minutes)
 }
 
 // The report as plain text: a title per group, then "label: value" lines.
