@@ -25,20 +25,39 @@ odin run tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/insp
 | `build [release]` | the toolkit's text library (when its sources changed), then `build/inspecteur` |
 | `test` | the unit tests of `src` |
 | `check` | `odin check -vet` of the program and the tool, the tests, a release build |
-| `live [--keep]` | the real program in a headless sway, driven over the DevTools protocol (167 checks); writes `docs/screenshots/processes.png` and `properties.png` |
-| `shots [--out folder]` | the pictures of the README, the program's own frames |
+| `live [--keep]` | the real program in a headless sway, driven over the DevTools protocol (245 checks); its pictures stay in `build/live` |
+| `shots [--out folder]` | the pictures of the documentation, the program's own frames, of the demo's made-up machine |
 | `bench [seconds]` | a release build in a headless sway that draws on the GPU: the time to the first frame, the CPU use at rest, then with Services and with Connections shown |
+| `logo` | `assets/logo*.png` and `.project/image.png`, drawn by the toolkit's paint package |
+| `desktop_files <prefix>` | the desktop entry and the icons under `<prefix>/share`: what the Nix package installs |
 
 `GT=<folder>` builds against another checkout of gui_toolkit.
 
 The headless sway of `live` and `shots` draws on the CPU (pixman): inspecteur then draws with Mesa's software Vulkan.
 `bench` uses sway's Vulkan renderer, so that inspecteur draws on the GPU as on a desktop.
 
-The session has a runtime folder and a configuration of its own. `live` and `shots` give inspecteur the person's session
-bus, so that the Services and Startup sections reach the user's service manager: `shots` only reads it, and `live` acts
-only on a transient service it makes (`systemd-run --user --unit=inspecteur-live-<pid>`), which it stops and resets at
-the end. Without a user manager, `live` says so and skips those checks. Its autostart entry is in the session's own
-configuration folder.
+The session has a runtime folder, a configuration folder and a data folder of its own; the welcome page is off unless a
+test asks for it. `live` gives inspecteur the person's session bus, so that the Services and Startup sections reach the
+user's service manager. It acts only on what it made itself, and checks it before it presses a key that acts:
+
+- processes it started (`sleep` with a mark of its own in its command line, found by the mark and checked by its pid);
+- a transient service (`systemd-run --user --unit=inspecteur-live-<pid>`), stopped and reset at the end;
+- an app of its own: a desktop entry in the session's data folder, and two sleeps in a scope named for it
+  (`systemd-run --user --scope --unit=app-inspecteurlive<pid>-1.scope`); the group is killed only once the scope holds
+  those two and nothing else;
+- an autostart entry, the desktop entry and icons of the welcome page and of `inspecteur setup`, all in the session's
+  folders.
+
+Without a user manager, `live` says so and skips those checks.
+
+## The pictures, without the machine's data
+
+`shots` runs `inspecteur --demo`: every reading (processes, CPU, memory, disks, interfaces, GPUs, services, startup
+items, sockets, the system's details, a process's properties) comes from `src/demo.odin`, made up, in place of the
+system's, and the demo acts on nothing. So the pictures show no host or user name, no home folder, no address or MAC
+(the demo's are of the ranges kept for documentation: 192.0.2.0/24, 2001:db8::/32, 00:00:5e:00:53:xx), no service or app
+of the machine. The demo fills its graphs' last minute before its first frame. Nothing else of the session is used:
+no session bus. `live`'s own pictures (of the real machine) stay in `build/live`, which is not committed.
 
 ## Measures
 
@@ -48,12 +67,12 @@ cores, NVIDIA 595, about 200 processes):
 
 | | |
 |---|---|
-| cold start (process start to the end of the first frame) | 250 to 265 ms: `/proc` 13 ms, the window 215 ms, the first frame 20 ms |
-| at rest, the table read each second | 1.0 % of one core, 190 MB resident (most of it the GPU driver) |
-| Services shown (read every 3 s) | 1.2 % of one core |
-| Connections shown (read each second) | 2.9 % of one core, 1.7 % of it the scan of the descriptors |
-| a sample | 6 to 7 ms (`stat` about 5 ms, `io` about 1.5 ms) |
-| a frame | 1.3 ms |
+| cold start (process start to the end of the first frame) | 265 to 280 ms: `/proc` 14 ms, the window 220 ms, the first frame 30 ms |
+| at rest, the table read each second | 1.0 % of one core, 187 MB resident (most of it the GPU driver) |
+| Services shown (read every 3 s) | 1.4 % of one core |
+| Connections shown (read each second) | 3.0 % of one core, 1.6 % of it the scan of the descriptors |
+| a sample | 7 ms (`stat`, `statm` and `io` of about 200 processes) |
+| a frame | 7 ms on the mean of a bench's frames (most of them with Services or Connections shown); at rest, a frame a second |
 
 ## Drive the window
 
@@ -70,6 +89,10 @@ odin run ext/gui_toolkit/tools/tk -- cdp --port 9222 tree , shot window.png
 - Comments and commit messages are in English. Comments say why.
 - A setting is a `config.Def` in `src/settings.odin`, with its line in [configuration.md](configuration.md) (a test checks
   it).
+- An action is a command of `COMMANDS` (`src/commands.odin`): its key, its menu line and its tooltip come from there, and
+  the palette and the sheet of the keys list it. A test checks that no key does two things in one place.
+- A reading of the system goes in a `*_linux.odin` file, behind the plain structs of its model, and gets its demo's
+  counterpart in `src/demo.odin` (see [architecture.md](architecture.md), "Porting to Windows").
 - What another program could use goes in gui_toolkit, generic, with its documentation, its test and its changelog
   fragment; inspecteur then points to the toolkit's new tag.
 - Add what changed under `## [Unreleased]` in `CHANGELOG.md`.
