@@ -171,6 +171,7 @@ props_list :: proc(app: ^App, id: string, state: Read_State, titles: []string, w
 	ids := make([]u64, len(shown), context.temp_allocator)
 	for &v, i in ids { v = u64(shown[i]) + 1 }
 	vl := &app.props_lists[app.props.tab]
+	rows_look(app, vl)
 	ui.next({width = ui.fill(), height = ui.fill()})
 	rows, ok := ui.vlist(fmt.tprintf("###%s", id), vl, ids)
 	if !ok { return }

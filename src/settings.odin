@@ -33,10 +33,17 @@ PREF_DEFS := [?]config.Def{
 	{name = "view.theme", category = "appearance", description = "The window's colours: a theme of the toolkit by its name (Graphite, Midnight, Nord, Gruvbox, Tokyo Night, Catppuccin...).", kind = .String, default = {s = "Graphite"}},
 	{name = "view.mode", category = "appearance", description = "The theme's version: the system's (light or dark, followed as it changes), dark, or light.", kind = .String, default = {s = "system"}, choices = {"system", "dark", "light"}},
 	{name = "view.finish", category = "appearance", description = "How surfaces are drawn. Flat: plain surfaces and thin lines. Machined: bevelled buttons, sunken fields. Gradient: surfaces shaded top to bottom. Glass: surfaces that let the page show through.", kind = .String, default = {s = "flat"}, choices = {"flat", "machined", "gradient", "glass"}},
+	{name = "view.zebra", category = "appearance", description = "Shade every second row of the tables: a line of numbers reads across.", kind = .Bool, default = {b = true}},
+	{name = "view.rules", category = "appearance", description = "Draw a thin line under each row of the tables.", kind = .Bool, default = {b = true}},
 	{name = "view.font_size", category = "appearance", description = "The text size, in logical pixels. Ctrl+= and Ctrl+- change it, Ctrl+0 sets it back.", kind = .Float, default = {f = FONT_SIZE_DEFAULT}, min = FONT_SIZE_MIN, max = FONT_SIZE_MAX, bounded = true},
 	{name = "view.width", category = "window", description = "The window's width at start, in logical pixels.", kind = .Int, default = {i = 1100}, min = 480, max = 8000, bounded = true},
 	{name = "view.height", category = "window", description = "The window's height at start, in logical pixels.", kind = .Int, default = {i = 720}, min = 320, max = 8000, bounded = true},
 	{name = "setup.welcome", category = "setup", description = "Show the welcome page at the next start (it puts Inspecteur in the application menu). Closing the page sets it to false.", kind = .Bool, default = {b = true}},
+}
+
+// The look of a table's rows (view.zebra, view.rules): every list of the window takes it at each build.
+rows_look :: proc(app: ^App, vl: ^ui.Virtual_List) {
+	vl.zebra, vl.rules = app.settings.zebra, app.settings.rules
 }
 
 // The text size (view.font_size): its default and its bounds, in logical pixels.
@@ -59,6 +66,8 @@ Settings :: struct {
 	mode:       ui.Theme_Mode,
 	finish:     ui.Finish,
 	font_size:  f32,
+	zebra:      bool,     // view.zebra
+	rules:      bool,     // view.rules
 	size:       [2]int,
 	welcome:    bool,     // setup.welcome
 }
@@ -91,6 +100,8 @@ prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Sett
 	s.mode = ui.theme_mode_of(config.string_of(p, "view.mode"))
 	s.finish = ui.finish_of(config.string_of(p, "view.finish"))
 	s.font_size = f32(config.float_of(p, "view.font_size"))
+	s.zebra = config.bool_of(p, "view.zebra")
+	s.rules = config.bool_of(p, "view.rules")
 	s.size = {int(config.int_of(p, "view.width")), int(config.int_of(p, "view.height"))}
 	s.welcome = config.bool_of(p, "setup.welcome")
 	return

@@ -5,9 +5,13 @@ and the versions follow [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Tables in stripes, with a rule under each row** (Processes, Services, Startup, Connections, the Properties' lists):
+  `view.zebra` and `view.rules` turn them off.
+
 ### Changed
-- **Busy cells go from green through yellow to red** as the load grows, with dark or light text, whichever reads on
-  the colour (it was one orange tint).
+- **Busy cells go from green through yellow and orange to red** as the load grows, in full colours with a darker
+  outline, deeper on a dark theme, with dark or light text, whichever reads on the colour (it was one orange tint).
 
 ## [0.1.0] - 2026-11-10
 

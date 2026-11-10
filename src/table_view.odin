@@ -4,6 +4,7 @@ package inspecteur
 // (processes.odin): only those in view are built.
 
 import "core:fmt"
+import "core:math"
 import "core:strings"
 import "gt:draw"
 import "gt:font"
@@ -17,36 +18,79 @@ import "gt:ui"
 INDENT_EM  :: 1.6
 CHEVRON_EM :: 1.4
 ICON_EM    :: 1.5
-// The colour of a busy cell, from green through yellow to red as the load grows: the CPU % (of the machine) and the share
-// of the memory at which it is red, the least it shows for (a quiet cell stays plain), and its weakest and strongest
-// opacity over the page.
+// The colour of a busy cell, from green through yellow and orange to red as the load grows: the CPU % (of the machine)
+// and the share of the memory at which it is red, the least it shows for (a quiet cell stays plain).
 HEAT_CPU_FULL  :: 25.0
 HEAT_MEM_FULL  :: 0.15
 HEAT_MIN       :: 0.04
-HEAT_ALPHA_MIN :: 0.35
-HEAT_ALPHA_MAX :: 0.9
-HEAT_GREEN     :: ui.Color{0.18, 0.62, 0.30, 1}
-HEAT_YELLOW    :: ui.Color{0.93, 0.74, 0.13, 1}
-HEAT_RED       :: ui.Color{0.86, 0.20, 0.17, 1}
-// A background lighter than this (relative luminance) takes dark text, a darker one light text.
-HEAT_TEXT_LUMINANCE :: 0.45
-HEAT_TEXT_DARK      :: ui.Color{0.07, 0.07, 0.07, 1}
+// The hue (degrees: 0 red, 60 yellow, 120 green) at each step of the load, then the colour's saturation and value
+// (sRGB): a turn of the hue goes through clear colours, where a mix of green and red would go through olive.
+// Over a dark page the colours are deeper (a bright green there glares); yellow keeps a higher value at each step (a dim
+// yellow is olive).
+HEAT_HUES        := [?]f32{135, 55, 30, 2}
+HEAT_VALUES_LIGHT := [?]f32{0.88, 0.97, 0.95, 0.90}
+HEAT_VALUES_DARK  := [?]f32{0.60, 0.84, 0.80, 0.72}
+HEAT_SATURATION_LIGHT :: 0.80
+HEAT_SATURATION_DARK  :: 0.80
+// How much of the hue is mixed into the page: a light load is paler. Over a dark page a faint mix is murky: it starts
+// stronger there.
+HEAT_MIX_MIN_DARK  :: f32(0.80)
+HEAT_MIX_MIN_LIGHT :: f32(0.45)
+HEAT_MIX_MAX       :: f32(1.0)
+// A page darker than this (relative luminance) is a dark one.
+HEAT_DARK_PAGE :: 0.1
+// The outline of a busy cell: its colour this much darker (a cell stands apart from its neighbour of the same hue).
+HEAT_BORDER_SHADE :: 0.55
+// A background lighter than this (relative luminance, linear light: mid-grey) takes dark text, a darker one light text.
+HEAT_TEXT_LUMINANCE :: 0.2
+HEAT_TEXT_DARK      :: ui.Color{0.006, 0.006, 0.006, 1}
 HEAT_TEXT_LIGHT     :: ui.Color{1, 1, 1, 1}
 
-// A busy cell's background and the text that reads on it, for a load `heat` (1: red) over the page `page`.
-heat_colors :: proc(heat: f32, page: ui.Color) -> (bg, fg: ui.Color) {
+// A load's colour (0: green, 1: red), opaque, in linear light as the toolkit takes colours; `dark`: for a dark page.
+heat_hue :: proc(heat: f32, dark := false) -> ui.Color {
+	h := clamp(heat, 0, 1) * f32(len(HEAT_HUES) - 1)
+	i := min(int(h), len(HEAT_HUES) - 2)
+	f := h - f32(i)
+	angle := HEAT_HUES[i] + (HEAT_HUES[i + 1] - HEAT_HUES[i]) * f
+	values := dark ? HEAT_VALUES_DARK : HEAT_VALUES_LIGHT
+	return hsv_color(angle, dark ? HEAT_SATURATION_DARK : HEAT_SATURATION_LIGHT, values[i] + (values[i + 1] - values[i]) * f)
+}
+
+// A colour of a hue (degrees), a saturation and a value in sRGB, as a linear colour.
+hsv_color :: proc(hue, sat, value: f32) -> ui.Color {
+	h := math.mod(hue, 360) / 60
+	c := value * sat
+	x := c * (1 - abs(math.mod(h, 2) - 1))
+	r, g, b: f32
+	switch {
+	case h < 1: r, g, b = c, x, 0
+	case h < 2: r, g, b = x, c, 0
+	case h < 3: r, g, b = 0, c, x
+	case h < 4: r, g, b = 0, x, c
+	case h < 5: r, g, b = x, 0, c
+	case:       r, g, b = c, 0, x
+	}
+	m := value - c
+	return draw.srgb(r + m, g + m, b + m, 1)
+}
+
+// A busy cell's background (the hue mixed into the page, opaque), the text that reads on it and its outline, for a load
+// `heat` (1: red) over the page `page`.
+heat_colors :: proc(heat: f32, page: ui.Color) -> (bg, fg, border: ui.Color) {
 	h := clamp(heat, 0, 1)
-	hue := h < 0.5 ? lerp_color(HEAT_GREEN, HEAT_YELLOW, h * 2) : lerp_color(HEAT_YELLOW, HEAT_RED, (h - 0.5) * 2)
-	alpha := HEAT_ALPHA_MIN + (HEAT_ALPHA_MAX - HEAT_ALPHA_MIN) * h
-	bg = {hue.r, hue.g, hue.b, alpha}
-	// (what the eye sees: the tint over the page)
-	shown := lerp_color(page, hue, alpha)
-	luminance := 0.2126 * shown.r + 0.7152 * shown.g + 0.0722 * shown.b
-	fg = luminance > HEAT_TEXT_LUMINANCE ? HEAT_TEXT_DARK : HEAT_TEXT_LIGHT
+	dark := luminance(page) < HEAT_DARK_PAGE
+	hue := heat_hue(h, dark)
+	least := dark ? HEAT_MIX_MIN_DARK : HEAT_MIX_MIN_LIGHT
+	bg = lerp_color(page, hue, least + (HEAT_MIX_MAX - least) * h)
+	bg.a = 1
+	fg = luminance(bg) > HEAT_TEXT_LUMINANCE ? HEAT_TEXT_DARK : HEAT_TEXT_LIGHT
+	border = {bg.r * HEAT_BORDER_SHADE, bg.g * HEAT_BORDER_SHADE, bg.b * HEAT_BORDER_SHADE, 1}
 	return
 }
 
-@(private = "file")
+// The relative luminance of a linear colour.
+luminance :: proc(c: ui.Color) -> f32 { return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b }
+
 lerp_color :: proc(a, b: ui.Color, t: f32) -> ui.Color {
 	return {a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t, a.a + (b.a - a.a) * t}
 }
@@ -171,6 +215,7 @@ columns_menu :: proc(app: ^App, em: f32) {
 build_rows :: proc(app: ^App, em: f32) {
 	t := &app.table
 	row_h := ui.dense(em * ROW_EM)
+	rows_look(app, &app.vl)
 	ui.next({width = ui.fill(), height = ui.fill()})
 	rows, ok := ui.vlist("###rows", &app.vl, t.ids[:], nil, t.selectable[:])
 	if !ok { return }
@@ -259,11 +304,11 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 		return
 	}
 	cell :: proc(t: ^Table, c: Column, text: string, tip: ^string, weak := false, heat: f32 = 0, page: ui.Color = {}) {
-		bg, fg: Maybe(ui.Color)
-		if heat >= HEAT_MIN { bg, fg = heat_colors(heat, page) }
+		bg, fg, border: Maybe(ui.Color)
+		if heat >= HEAT_MIN { bg, fg, border = heat_colors(heat, page) }
 		if weak && fg == nil { ui.push_tags("weak") }
 		defer if weak && fg == nil { ui.pop_tags() }
-		if ui.table_cell(&t.layout, int(c), text, bg, fg) { tip^ = text }
+		if ui.table_cell(&t.layout, int(c), text, bg, fg, border) { tip^ = text }
 	}
 
 	// Name: the indent, the chevron of a group, the icon, the name

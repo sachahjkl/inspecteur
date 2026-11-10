@@ -49,6 +49,7 @@ section_row :: proc(st: ^Section_Table, id: u64, search: string, icon := Row_Ico
 section_table_build :: proc(st: ^Section_Table, empty: string) -> ui.Table_Events {
 	shown := st.table.query != "" ? fmt.tprintf("Nothing matches “%s”.", st.table.query) : empty
 	st.table.header_bg = surface("bar")
+	rows_look(st.app, &st.table.vl)
 	ui.next({width = ui.fill(), height = ui.fill()})
 	return ui.table_build("###table", &st.table, &st.data, shown)
 }
