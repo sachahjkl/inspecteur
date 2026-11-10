@@ -322,11 +322,11 @@ props_actions :: proc(app: ^App, p: ^Proc, em: f32) {
 				label_tip(fmt.tprintf("%s###props_msg", ui.text_shown(msg)), msg)
 			}
 			stopped := p.state == .Stopped
-			if props_button(app, "props_suspend", stopped ? lucide.PLAY : lucide.SQUARE, stopped ? "Resume" : "Suspend", .Props_Suspend, em) { props_suspend(app) }
+			if props_button(app, "props_suspend", stopped ? lucide.PLAY : lucide.SQUARE, stopped ? "Resume" : "Suspend", .Props_Suspend, em, "accent_button") { props_suspend(app) }
 			ui.spacer(ui.px(em * 0.4))
-			if props_button(app, "props_end", lucide.X, "End task", .Props_End_Task, em) { props_signal(app, false) }
+			if props_button(app, "props_end", lucide.X, "End task", .Props_End_Task, em, "warn_button") { props_signal(app, false) }
 			ui.spacer(ui.px(em * 0.4))
-			if props_button(app, "props_kill", lucide.ZAP, "Kill…", .Props_Kill, em) { props_signal(app, true) }
+			if props_button(app, "props_kill", lucide.ZAP, "Kill…", .Props_Kill, em, "danger_button") { props_signal(app, true) }
 		} else {
 			ui.spacer(ui.fill())
 		}
@@ -336,9 +336,12 @@ props_actions :: proc(app: ^App, p: ^Proc, em: f32) {
 
 // A button of the foot: its icon and its label; its tooltip says its key.
 @(private = "file")
-props_button :: proc(app: ^App, id, icon, label: string, c: Cmd, em: f32) -> bool {
+// `variant`: the button's colours, "" the plain one (the toolkit's accent_button, warn_button, danger_button), as strong as what it does.
+props_button :: proc(app: ^App, id, icon, label: string, c: Cmd, em: f32, variant := "") -> bool {
 	ui.next({height = ui.px(ui.dense(em * 2.1))})
+	if variant != "" { ui.push_tags(variant) }
 	sig := ui.button_icon(id, icon, label)
+	if variant != "" { ui.pop_tags() }
 	tip_after(sig, fmt.tprintf("%s (%s)", label, ui.command_shortcut(COMMANDS[c])))
 	return sig.clicked
 }

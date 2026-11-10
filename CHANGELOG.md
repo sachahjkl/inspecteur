@@ -31,6 +31,9 @@ and the versions follow [semantic versioning](https://semver.org/).
   minutes at most at the default period).
 
 ### Changed
+- **The Properties' actions in colour**: Suspend in the accent, End task in amber, Kill in red.
+- **A narrow window keeps the names readable**: the name column keeps its width and cuts what does not fit; the last
+  columns go past the edge.
 - **Busy cells go from green through yellow and orange to red** as the load grows, in full colours with a darker
   outline, deeper on a dark theme, with dark or light text, whichever reads on the colour (it was one orange tint).
 
