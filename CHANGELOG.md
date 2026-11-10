@@ -14,5 +14,13 @@ and the versions follow [semantic versioning](https://semver.org/).
 - **End task** (Delete, SIGTERM) and **Kill** (Shift+Delete, SIGKILL, after a confirmation), from the toolbar, the keys
   or the row's menu; the menu also opens the executable's folder and copies the command line.
 - The machine's CPU and memory in the sidebar and the footer.
-- The sections Performance, Services, Startup, Connections and Information, to come.
+- **Performance**: CPU (one graph, or one per logical processor), memory, each disk, each network interface and each GPU,
+  with a minute of history kept while another section is shown, and their numbers (frequency, caches, load, composition
+  of the memory, throughput, active time, addresses, VRAM).
+- **Columns**: a right click on the header shows or hides them (PPID, state, nice, start time, command line, executable
+  and more); dragging a header's rule resizes one. Both are kept, with the sort.
+- **Properties** of a process: general, threads, open files, modules, environment; set its priority, suspend and
+  resume it, end or kill it. What the user may not read says "Access denied".
+- **Light or dark**: from the title bar's menu, kept.
+- The sections Services, Startup, Connections and Information, to come.
 - Preferences: refresh period, theme, light or dark, finish, text size, window size (`docs/configuration.md`).

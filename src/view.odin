@@ -16,6 +16,7 @@ package inspecteur
 //   Right / Left, Enter       open / close an app's group (Right and Left when the filter is empty)
 //   Delete                    End task (SIGTERM)
 //   Shift+Delete              Kill (SIGKILL), after a confirmation
+//   Alt+Enter, a double click Properties (props_view.odin)
 //   a right click, Menu, Shift+F10    the row's menu (menu.odin)
 //   Ctrl+Tab, Ctrl+Shift+Tab  the next, the previous section
 //   Escape                    clear the filter
@@ -46,9 +47,9 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	app := (^App)(h.user)
 	em := ui.font_size()
 	// typing anywhere filters: a character typed gives the filter the keyboard (app_input)
-	if app.typed && !app.menu.kill_open && app.search_key != 0 { ui.set_focus(app.search_key) }
+	if app.typed && !app.menu.kill_open && !app.props.open && app.search_key != 0 { ui.set_focus(app.search_key) }
 	app.typed = false
-	if !app.menu.kill_open && !ui.ctx_menu_any_open() { view_keys(app) }
+	if !app.menu.kill_open && !app.props.open && !ui.ctx_menu_any_open() { view_keys(app) }
 	ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
 	page := ui.build_box({.Draw_Background}, "###page")
 	if ui.parent(page) {
@@ -70,7 +71,8 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 			}
 		}
 	}
-	row_menu_build(app, em)
+	props_build(app, em)
+	row_menu_build(app, em)   // (after the Properties: the kill's confirmation goes over them)
 	ui.wake_within(&app.main.state, until_sample(app))
 }
 
@@ -89,6 +91,7 @@ view_keys :: proc(app: ^App) {
 	if ui.key_press(.Delete, {.Shift}) { kill_selected(app) }
 	if ui.key_press(.Menu) || ui.key_press(.F10, {.Shift}) { row_menu_open(app, {app.sel_rect.min.x + 40, app.sel_rect.max.y}, from_keyboard = true) }
 	if ui.key_press(.Escape) { ui.field_clear(&app.search) }
+	if ui.key_press(.Return, {.Alt}) { props_selected(app) }
 	r, ok := selected_row(app)
 	if !ok { return }
 	if ui.key_press(.Return) && r.kind == .App { group_toggle(app, r) }
@@ -162,6 +165,8 @@ build_title :: proc(app: ^App, em: f32) {
 		ui.next({width = ui.text_size(em * 0.4), height = ui.pct(1)})
 		ui.label("Inspecteur###apptitle")
 		ui.spacer(ui.fill())
+		theme_button(app, em)
+		ui.spacer(ui.px(em * 0.4))
 		_, _ = ui.window_buttons()
 	}
 }
@@ -348,3 +353,38 @@ shown_text :: proc(text: string, allocator := context.temp_allocator) -> string 
 
 // "1 app", "3 apps".
 count_text :: proc(n: int, one, many: string) -> string { return fmt.tprintf("%d %s", n, n == 1 ? one : many) }
+
+////////////////////////////////
+// The theme's menu (the title bar's button)
+
+THEME_MODE_LABELS := [ui.Theme_Mode]string{.System = "As the system", .Dark = "Dark", .Light = "Light"}
+THEME_MODE_KEYS := [ui.Theme_Mode]string{.System = "system", .Dark = "dark", .Light = "light"}
+
+// The theme's version (the system's, dark, light) and the theme, chosen from a menu and written to the preferences.
+@(private = "file")
+theme_button :: proc(app: ^App, em: f32) {
+	if app.theme_menu == 0 { app.theme_menu = ui.key_from_string(0, "inspecteur_theme") }
+	ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1), font = app.icons})
+	sig: ui.Signal
+	if ui.tags("ghost_button") { sig = ui.button(fmt.tprintf("%s###theme", lucide.SUN_MOON)) }
+	if sig.clicked { ui.ctx_menu_open_rect(app.theme_menu, sig.box.rect) }
+	if ui.ctx_menu(app.theme_menu, em * 13) {
+		ui.menu_heading("Version")
+		for mode in ui.Theme_Mode {
+			if ui.menu_item(THEME_MODE_LABELS[mode], checked = app.settings.mode == mode).clicked {
+				app.settings.mode = mode
+				pref_save(&app.prefs, "view.mode", THEME_MODE_KEYS[mode])
+			}
+		}
+		ui.menu_separator()
+		if ui.menu_submenu("Theme") {
+			for t in ui.THEMES {
+				if ui.menu_item(t.name, checked = app.settings.theme == t.name).clicked {
+					delete(app.settings.theme)
+					app.settings.theme = strings.clone(t.name)
+					pref_save(&app.prefs, "view.theme", t.name)
+				}
+			}
+		}
+	}
+}

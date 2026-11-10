@@ -23,7 +23,7 @@ GRAPH_MIN_EM    :: 8      // a graph's least height
 STAT_W_EM       :: 9.5    // a number of the page's
 KEYS_W_EM       :: 26     // the page's table of details
 CPU_GRID_GAP_EM :: 0.4
-ADDRESSES_SHOWN :: 3    // an interface'"'"'s addresses of each kind shown
+ADDRESSES_SHOWN :: 3    // an interface's addresses of each kind shown
 
 // The hues of the devices (graph.odin's hue).
 HUE_CPU, HUE_MEMORY, HUE_DISK, HUE_NETWORK, HUE_GPU, HUE_SECOND :: 1, 2, 3, 4, 6, 7

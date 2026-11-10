@@ -21,6 +21,8 @@ PROC_READ_MAX :: 64 * 1024
 PF_KTHREAD :: 0x00200000
 // Bytes of a memory page (x86-64 and arm64's usual size; the stat's RSS is in pages).
 PAGE_BYTES :: 4096
+// The unit of the CPU times and start times of /proc (USER_HZ, the same on every Linux).
+CLOCK_TICKS :: 100
 // The command line kept of a process, at most.
 CMDLINE_MAX :: 4096
 
@@ -36,6 +38,7 @@ Proc :: struct {
 	ticks:      u64,      // user + system CPU time, clock ticks, at the last sample
 	cpu:        f32,      // percent of the machine since the last sample
 	rss:        u64,      // resident memory, bytes
+	gpu_mem:    u64,      // video memory, bytes (gpu.odin; 0: none, or no GPU tells it)
 	threads:    i32,
 	state:      u8,       // R running, S sleeping, D disk wait, T stopped, Z zombie...
 	nice:       i8,       // -20 (first served) to 19 (last)

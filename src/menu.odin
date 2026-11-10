@@ -7,7 +7,7 @@ package inspecteur
 //   Kill…               Shift+Delete  SIGKILL, after a confirmation: it ends at once
 //   Open file location                the executable's folder in the file manager
 //   Copy command line
-//   Properties                        (a later version)
+//   Properties          Alt+Enter     the process's details, its threads, files, modules and environment (props_view.odin)
 //
 // On an app's row they act on the app's processes (group_roots: each instance's first process); the processes under
 // them end with them, as when the app's windows are closed. A signal goes only to the processes that were chosen: each
@@ -104,7 +104,7 @@ row_menu_items :: proc(app: ^App, em: f32) {
 		if ui.menu_item("Open file location", enabled = p.exe != "").clicked { open_location(app, p) }
 		if ui.menu_item("Copy command line", enabled = p.cmdline != "").clicked { copy_command(app, p) }
 		ui.menu_separator()
-		_ = ui.menu_item("Properties", enabled = false)
+		if ui.menu_item("Properties", "Alt+Enter").clicked { props_open(&app.props, p.pid, p.start) }
 	}
 }
 
@@ -134,7 +134,6 @@ kill_selected :: proc(app: ^App) {
 	if ok { kill_ask(app, c) }
 }
 
-@(private = "file")
 kill_ask :: proc(app: ^App, c: Chosen) {
 	m := &app.menu
 	chosen_free(&m.kill)
@@ -186,7 +185,6 @@ kill_build :: proc(app: ^App, em: f32) {
 }
 
 // Sends `sig` to each process chosen that is still that process; says what came of it.
-@(private = "file")
 send_signal :: proc(app: ^App, c: ^Chosen, sig: linux.Signal) {
 	sent := 0
 	refused: linux.Errno
@@ -208,7 +206,12 @@ send_signal :: proc(app: ^App, c: ^Chosen, sig: linux.Signal) {
 	case refused != .NONE:
 		say(app, "%s cannot be ended (%v)", c.name, refused)
 	case sent > 0:
-		say(app, sig == .SIGKILL ? "Killed %s" : "Asked %s to end", c.name)
+		#partial switch sig {
+		case .SIGKILL: say(app, "Killed %s", c.name)
+		case .SIGSTOP: say(app, "Suspended %s", c.name)
+		case .SIGCONT: say(app, "Resumed %s", c.name)
+		case:          say(app, "Asked %s to end", c.name)
+		}
 	case:
 		say(app, "%s has ended already", c.name)
 	}
@@ -224,4 +227,11 @@ find_proc :: proc(s: ^Sampler, pid: i32, start: u64) -> ^Proc {
 	}
 	if lo < len(s.procs) && s.procs[lo].pid == pid && s.procs[lo].start == start { return &s.procs[lo] }
 	return nil
+}
+
+// Opens the Properties of the selected row's process (an app's: its first process).
+props_selected :: proc(app: ^App) {
+	r, ok := selected_row(app)
+	if !ok { return }
+	if p, has := row_process(app, r); has { props_open(&app.props, p.pid, p.start) }
 }

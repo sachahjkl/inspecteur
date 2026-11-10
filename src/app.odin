@@ -6,6 +6,8 @@ package inspecteur
 
 import "core:fmt"
 import "core:time"
+import "core:time/datetime"
+import "core:time/timezone"
 import config "gt:config"
 import "gt:devtools"
 import "gt:font"
@@ -44,12 +46,18 @@ App :: struct {
 	tab:         Tab,
 	device:      Device,            // the Performance section's device shown (perf_view.odin)
 	cpu_grid:    bool,              // the CPU's page shows a graph per logical processor
+	columns_menu: ui.Key,           // the menu of the table's columns (table_view.odin)
+	theme_menu:  ui.Key,            // the menu of the theme (view.odin)
+	tz:          ^datetime.TZ_Region,   // local time, for the processes' start (loaded when first needed)
+	tz_tried:    bool,
 	search:      ui.Text_Field,
 	search_key:  ui.Key,
 	typed:       bool,              // a character was typed this frame: the filter takes the keyboard (app_input)
 	vl:          ui.Virtual_List,   // the rows (vl.sel: the selected row)
 	sel_rect:    ui.Rect,           // the selected row, as last built (where the Menu key opens the menu)
 	menu:        Row_Menu,          // the row's menu, the confirmation of a kill (menu.odin)
+	props:       Props,             // the Properties dialog (props.odin, props_view.odin)
+	props_lists: [Props_Tab]ui.Virtual_List,
 	status:      string,            // a message for the status bar (owned), until status_until (ui clock, ms)
 	status_until: f64,
 	// what the samples and the frames cost (--first-frame prints it at the end: the tools measure the program)
@@ -72,7 +80,7 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	}
 	catalog_load(&app.catalog)
 	machine_init(&app.machine)
-	app.table.sort = .Name
+	table_layout_load(&app.table, app.settings)
 	refresh(app)
 
 	t_read := time.tick_now()
@@ -123,8 +131,11 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	catalog_destroy(&app.catalog)
 	sampler_destroy(&app.sampler)
 	machine_destroy(&app.machine)
+	if app.tz != nil { timezone.region_destroy(app.tz) }
 	delete(app.status)
 	row_menu_destroy(&app.menu)
+	props_destroy(&app.props)
+	for &vl in app.props_lists { ui.vlist_destroy(&vl) }
 	settings_free(&app.settings)
 	config.prefs_destroy(&app.prefs)
 	return 0
@@ -135,9 +146,12 @@ refresh :: proc(app: ^App) {
 	now := time.tick_now()
 	machine_sample(&app.machine, now._nsec, app.tab == .Performance && app.device.kind == .Cpu)
 	sample(&app.sampler, now._nsec, app.machine.d_total, &app.catalog)
+	gpu_mem := gpu_proc_mem(&app.machine)
+	for &p in app.sampler.procs { p.gpu_mem = gpu_mem[p.pid] }
 	table_group(&app.table, app.sampler.procs[:])
 	rows_again(app)
 	app.next_sample = time.tick_add(now, time.Duration(app.settings.refresh_ms) * time.Millisecond)
+	if app.props.open { props_read(&app.props) }
 	app.refresh_time += time.tick_since(now)
 	app.refreshes += 1
 	app.main.settle = max(app.main.settle, 1)

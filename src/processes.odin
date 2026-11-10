@@ -15,9 +15,33 @@ import "core:slice"
 import "core:strconv"
 import "core:strings"
 
-Column :: enum u8 { Name, PID, User, CPU, Memory, Read, Write, Threads }
+Column :: enum u8 { Name, PID, PPID, User, State, Nice, CPU, Memory, GPU_Memory, Read, Write, Threads, Started, Command, Executable }
 
-COLUMN_NAMES := [Column]string{.Name = "Name", .PID = "PID", .User = "User", .CPU = "CPU", .Memory = "Memory", .Read = "Disk read", .Write = "Disk write", .Threads = "Threads"}
+COLUMN_NAMES := [Column]string{
+	.Name = "Name", .PID = "PID", .PPID = "Parent PID", .User = "User", .State = "State", .Nice = "Nice", .CPU = "CPU",
+	.Memory = "Memory", .GPU_Memory = "GPU memory", .Read = "Disk read", .Write = "Disk write", .Threads = "Threads",
+	.Started = "Started", .Command = "Command line", .Executable = "Executable",
+}
+// The names in the preferences (processes.columns, processes.widths, processes.sort).
+COLUMN_KEYS := [Column]string{
+	.Name = "name", .PID = "pid", .PPID = "ppid", .User = "user", .State = "state", .Nice = "nice", .CPU = "cpu",
+	.Memory = "memory", .GPU_Memory = "gpu_memory", .Read = "read", .Write = "write", .Threads = "threads",
+	.Started = "started", .Command = "command", .Executable = "executable",
+}
+// The columns of text, on the left of their cells; numbers are on the right.
+COLUMN_TEXT :: bit_set[Column]{.Name, .User, .State, .Started, .Command, .Executable}
+// Each column's width when none was chosen, in ems (Name takes the room the others leave).
+COLUMN_DEFAULT_EM := [Column]f32{
+	.Name = 0, .PID = 5.5, .PPID = 6.5, .User = 6.5, .State = 7, .Nice = 4.5, .CPU = 5.5, .Memory = 6.5, .GPU_Memory = 7,
+	.Read = 7, .Write = 7, .Threads = 5.5, .Started = 9.5, .Command = 22, .Executable = 18,
+}
+COLUMN_MIN_EM :: 3
+COLUMN_MAX_EM :: 80
+
+column_of :: proc(key: string) -> (c: Column, ok: bool) {
+	for k, col in COLUMN_KEYS { if k == key { return col, true } }
+	return
+}
 
 Group :: struct {
 	root:    int,     // one of the app's processes (group_roots: all of them), in the sampler's list
@@ -26,6 +50,7 @@ Group :: struct {
 	first, count: int,   // its processes: Table.members[first:first + count]
 	cpu:     f32,
 	rss:     u64,
+	gpu_mem: u64,
 	read_rate, write_rate: f64,
 	threads: i32,
 }
@@ -49,6 +74,8 @@ Table :: struct {
 	shown_apps, shown_background: int,   // the rows each section counts (the filter's matches)
 	expanded:   map[u64]bool,    // the groups open, by key
 	sort:       Column,
+	shown:      [Column]bool,    // the columns shown (Name always)
+	width:      [Column]f32,     // their widths, in ems
 	descending: bool,
 	query:      string,          // the filter, in lower case (owned)
 }
@@ -132,6 +159,7 @@ table_group :: proc(t: ^Table, procs: []Proc) {
 		p := procs[i]
 		g.cpu += p.cpu
 		g.rss += p.rss
+		g.gpu_mem += p.gpu_mem
 		g.read_rate += p.read_rate
 		g.write_rate += p.write_rate
 		g.threads += p.threads
@@ -223,36 +251,64 @@ Sort_Item :: struct {
 
 @(private = "file")
 sort_item_proc :: proc(t: ^Table, s: ^Sampler, i: int) -> Sort_Item {
-	p := s.procs[i]
+	p := &s.procs[i]
 	it := Sort_Item{pid = p.pid, index = i}
-	switch t.sort {
-	case .Name:    it.text = p.name
-	case .PID:     it.num = f64(p.pid)
-	case .User:    it.text = user_name(s, p.uid)
-	case .CPU:     it.num = f64(p.cpu)
-	case .Memory:  it.num = f64(p.rss)
-	case .Read:    it.num = p.read_rate
-	case .Write:   it.num = p.write_rate
-	case .Threads: it.num = f64(p.threads)
+	sort_value(&it, t.sort, s, p)
+	return it
+}
+
+// A group sorts by its sums (CPU, memory, disk, threads), by its app's name, else by its first app process.
+@(private = "file")
+sort_item_group :: proc(t: ^Table, s: ^Sampler, g: Group, k: int, name: string) -> Sort_Item {
+	root := &s.procs[g.root]
+	it := Sort_Item{pid = root.pid, index = k}
+	#partial switch t.sort {
+	case .Name:       it.text = name
+	case .CPU:        it.num = f64(g.cpu)
+	case .Memory:     it.num = f64(g.rss)
+	case .GPU_Memory: it.num = f64(g.gpu_mem)
+	case .Read:       it.num = g.read_rate
+	case .Write:      it.num = g.write_rate
+	case .Threads:    it.num = f64(g.threads)
+	case:             sort_value(&it, t.sort, s, root)
 	}
 	return it
 }
 
 @(private = "file")
-sort_item_group :: proc(t: ^Table, s: ^Sampler, g: Group, k: int, name: string) -> Sort_Item {
-	root := s.procs[g.root]
-	it := Sort_Item{pid = root.pid, index = k}
-	switch t.sort {
-	case .Name:    it.text = name
-	case .PID:     it.num = f64(root.pid)
-	case .User:    it.text = user_name(s, root.uid)
-	case .CPU:     it.num = f64(g.cpu)
-	case .Memory:  it.num = f64(g.rss)
-	case .Read:    it.num = g.read_rate
-	case .Write:   it.num = g.write_rate
-	case .Threads: it.num = f64(g.threads)
+sort_value :: proc(it: ^Sort_Item, c: Column, s: ^Sampler, p: ^Proc) {
+	switch c {
+	case .Name:       it.text = p.name
+	case .PID:        it.num = f64(p.pid)
+	case .PPID:       it.num = f64(p.ppid)
+	case .User:       it.text = user_name(s, p.uid)
+	case .State:      it.text = state_text(p.state)
+	case .Nice:       it.num = f64(p.nice)
+	case .CPU:        it.num = f64(p.cpu)
+	case .Memory:     it.num = f64(p.rss)
+	case .GPU_Memory: it.num = f64(p.gpu_mem)
+	case .Read:       it.num = p.read_rate
+	case .Write:      it.num = p.write_rate
+	case .Threads:    it.num = f64(p.threads)
+	case .Started:    it.num = f64(p.start)
+	case .Command:    it.text = p.cmdline
+	case .Executable: it.text = p.exe
 	}
-	return it
+}
+
+// A process's state as words (the letter of /proc/<pid>/stat).
+state_text :: proc(state: u8) -> string {
+	switch state {
+	case 'R': return "Running"
+	case 'S': return "Sleeping"
+	case 'D': return "Disk wait"
+	case 'T': return "Suspended"
+	case 't': return "Traced"
+	case 'Z': return "Zombie"
+	case 'X': return "Dead"
+	case 'I': return "Idle"
+	}
+	return "?"
 }
 
 @(private = "file")
@@ -281,13 +337,13 @@ compare_fold :: proc(a, b: string) -> int {
 	return strings.compare(a, b)
 }
 
-// Clicks on a column's header: the first sorts by it (names A to Z, pids from the lowest, amounts largest first), the
-// next reverses it.
+// Clicks on a column's header: the first sorts by it (texts A to Z; pids and nice values from the lowest; amounts and
+// the latest start, largest first), the next reverses it.
 table_sort_by :: proc(t: ^Table, c: Column) {
 	if t.sort == c {
 		t.descending = !t.descending
 	} else {
 		t.sort = c
-		t.descending = c != .Name && c != .User && c != .PID
+		t.descending = c not_in COLUMN_TEXT && c != .PID && c != .PPID && c != .Nice
 	}
 }

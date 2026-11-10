@@ -18,7 +18,6 @@ LIVE_DIR  :: "build/live"
 LIVE_PORT :: 9371
 SCREENSHOT :: "docs/screenshots/processes.png"
 
-@(private = "file")
 Live :: struct {
 	using session: Session,
 	c:             cdp.Client,
@@ -26,7 +25,6 @@ Live :: struct {
 	checks:        int,
 }
 
-@(private = "file")
 check :: proc(l: ^Live, ok: bool, what: string, args: ..any) -> bool {
 	l.checks += 1
 	msg := fmt.tprintf(what, ..args)
@@ -79,11 +77,14 @@ live_window :: proc(l: ^Live) {
 	down := column_numbers(c, "c1")
 	check(l, turns(down, ascending = false) <= 1, "the rows go by PID, highest first (%d turns)", turns(down, false))
 
-	// the tabs
-	check(l, cdp.click_text(c, "Performance"), "click the Performance tab")
+	// a section to come, then the Performance section, the columns, the theme (live_more.odin)
+	check(l, cdp.click_text(c, "Services"), "click the Services section")
 	check(l, cdp.wait_for(c, "comes in a later version", SESSION_WAIT), "it says what it will be")
-	check(l, cdp.click_text(c, "Processes"), "back to Processes")
-	check(l, cdp.wait_for(c, "Background processes", SESSION_WAIT), "the table is back")
+	live_performance(l)
+	check(l, cdp.click_text(c, "Processes"), "the Processes section")
+	check(l, cdp.wait_for(c, "Background processes", SESSION_WAIT), "its table is there")
+	live_columns(l)
+	live_theme(l)
 
 	// a process of this test: found by the search, its menu, End task
 	child, mark, started := start_child("1")
@@ -120,6 +121,8 @@ live_window :: proc(l: ^Live) {
 	check(l, err2 == nil && state2.exited && state2.exit_code == 9, "it ends by SIGKILL (exited %v, code %d)", state2.exited, state2.exit_code)
 	if err2 != nil || !state2.exited { _ = os.process_kill(child2); _, _ = os.process_wait(child2, SESSION_WAIT) }
 
+	live_properties(l)
+
 	// the picture: every process, the busiest first
 	check(l, cdp.key(c, "Escape"), "Escape clears the search")
 	check(l, cdp.click_name(c, "hd_3"), "sort by CPU")
@@ -133,7 +136,6 @@ live_window :: proc(l: ^Live) {
 }
 
 // `sleep` with a mark in its command line that no other process has: this test's pid and `n`.
-@(private = "file")
 start_child :: proc(n: string) -> (p: os.Process, mark: string, ok: bool) {
 	mark = fmt.tprintf("300.%d%s", os.get_pid(), n)
 	child, err := os.process_start({command = {"sleep", mark}})
@@ -141,7 +143,6 @@ start_child :: proc(n: string) -> (p: os.Process, mark: string, ok: bool) {
 }
 
 // The numbers of a column's cells in view, top to bottom (the boxes named `name`).
-@(private = "file")
 column_numbers :: proc(c: ^cdp.Client, name: string) -> []int {
 	boxes := cdp.find_name(c, name)
 	out := make([dynamic]int, context.temp_allocator)

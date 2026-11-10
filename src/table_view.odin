@@ -6,17 +6,21 @@ package inspecteur
 import "core:fmt"
 import "gt:draw"
 import lucide "gt:lucide"
+import "core:time"
+import "core:time/timezone"
 import "gt:render"
 import "gt:ui"
 
-// The width of each column but Name, in ems.
-COLUMN_EM := [Column]f32{.Name = 0, .PID = 5.5, .User = 6.5, .CPU = 5.5, .Memory = 6.5, .Read = 7, .Write = 7, .Threads = 5.5}
 // The indent of a group's process, the chevron's and the icon's width, in ems.
 INDENT_EM  :: 1.6
 CHEVRON_EM :: 1.4
 ICON_EM    :: 1.5
 // Room at the right of the last column for the rows' scroll bar, which floats over them, in ems.
 SCROLLBAR_EM :: 1
+// The grip of a column's rule, in ems: where a drag takes it.
+RULE_GRIP_EM :: 0.7
+// The columns shown by default (processes.columns' default says the same).
+DEFAULT_COLUMNS :: bit_set[Column]{.Name, .PID, .User, .CPU, .Memory, .Read, .Write, .Threads}
 // The tint of a busy cell (the theme's warning hue): the CPU % (of the machine) and the share of the memory at which it is
 // strongest, the least it shows for (a quiet cell stays plain), and its strongest opacity.
 HEAT_CPU_FULL :: 25.0
@@ -73,21 +77,25 @@ tool_button :: proc(app: ^App, id, icon, tip: string, enabled: bool, em: f32) ->
 	return sig.clicked && enabled
 }
 
-// The columns' titles, a thin line between them; the sort's arrow at the right end of the sorted one.
+// The columns' titles, a rule before each (dragged: the column's width); the sort's arrow at the right end of the sorted
+// one. A click sorts; a right click opens the menu of the columns.
 @(private = "file")
 build_header :: proc(app: ^App, em: f32) {
 	t := &app.table
+	picker := false
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * HEADER_EM)), bg = surface("bar")})
-	if ui.row(.Center, {.Draw_Background, .Draw_Side_Bottom}, "###header") {
+	if ui.row(.Center, {.Draw_Background, .Draw_Side_Bottom, .Clickable}, "###header") {
+		picker = ui.signal(ui.parent_box()).right_clicked
 		for c in Column {
-			right := c != .Name && c != .User
+			if !t.shown[c] { continue }
+			right := c not_in COLUMN_TEXT
 			sorting := t.sort == c
-			width := c == .Name ? ui.fill() : ui.px(em * COLUMN_EM[c])
+			width := c == .Name ? ui.fill() : ui.px(em * t.width[c])
 			ui.next({width = width, height = ui.pct(1)})
 			sig: ui.Signal
 			if ui.row(.Center, {.Clickable, .Draw_Hot_Effects}, fmt.tprintf("###hd_%d", int(c))) {
 				sig = ui.signal(ui.parent_box())
-				if c != .Name { vrule(em) } else { ui.spacer(ui.px(em * (0.3 + CHEVRON_EM))) }
+				if c != .Name { resize_rule(app, c, em) } else { ui.spacer(ui.px(em * (0.3 + CHEVRON_EM))) }
 				if right { ui.spacer(ui.fill()) }
 				if !sorting { ui.push_tags("weak") }
 				ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
@@ -103,9 +111,59 @@ build_header :: proc(app: ^App, em: f32) {
 			if sig.clicked {
 				table_sort_by(t, c)
 				rows_again(app)
+				table_layout_save(t, &app.prefs)
 			}
+			if sig.right_clicked { picker = true }
 		}
 		ui.spacer(ui.px(em * SCROLLBAR_EM))
+	}
+	if picker {
+		if app.columns_menu == 0 { app.columns_menu = ui.key_from_string(0, "inspecteur_columns") }
+		ui.ctx_menu_open(app.columns_menu, ui.mouse_pos())
+	}
+	columns_menu(app, em)
+}
+
+// The line before a column's title: dragged left or right, the column grows or shrinks (the name's column takes what is
+// left); let go, the width is saved.
+@(private = "file")
+resize_rule :: proc(app: ^App, c: Column, em: f32) {
+	t := &app.table
+	ui.next({width = ui.px(em * RULE_GRIP_EM), height = ui.pct(1), cursor = .Resize_H})
+	grip := ui.build_box({.Clickable}, "###rule")
+	sig := ui.signal(grip)
+	if ui.parent(grip) {
+		ui.spacer(ui.fill())
+		hot := grip.hot_t > 0 || sig.dragging
+		ui.next({width = ui.px(max(1, ui.scale()) * (hot ? 2 : 1)), height = ui.px(em * 1.2), bg = hot ? ui.color("accent") : ui.color("border")})
+		ui.build_box({.Draw_Background}, "###line")
+		ui.spacer(ui.fill())
+	}
+	if sig.pressed { ui.drag_store({t.width[c], 0, 0, 0}) }
+	if sig.dragging { t.width[c] = clamp(ui.drag_load()[0] - sig.drag_delta.x / em, COLUMN_MIN_EM, COLUMN_MAX_EM) }
+	if sig.released { table_layout_save(t, &app.prefs) }
+}
+
+// The menu of the columns: each one but the name, shown or not; the defaults back.
+@(private = "file")
+columns_menu :: proc(app: ^App, em: f32) {
+	t := &app.table
+	if app.columns_menu == 0 { return }
+	if ui.ctx_menu(app.columns_menu, em * 14) {
+		ui.menu_heading("Columns")
+		for c in Column {
+			if c == .Name { continue }
+			if ui.menu_item(COLUMN_NAMES[c], checked = t.shown[c], keep_open = true).clicked {
+				t.shown[c] = !t.shown[c]
+				if !t.shown[c] && t.sort == c { t.sort, t.descending = .Name, false; rows_again(app) }
+				table_layout_save(t, &app.prefs)
+			}
+		}
+		ui.menu_separator()
+		if ui.menu_item("Default columns").clicked {
+			for col in Column { t.shown[col], t.width[col] = col in DEFAULT_COLUMNS, COLUMN_DEFAULT_EM[col] }
+			table_layout_save(t, &app.prefs)
+		}
 	}
 }
 
@@ -132,7 +190,7 @@ build_rows :: proc(app: ^App, em: f32) {
 		row := ui.list_row(&app.vl, i, "")
 		if ui.parent(row.box) { build_cells(app, r, em, hot) }
 		if i == app.vl.sel { app.sel_rect = row.box.rect }
-		if row.double_clicked && r.kind == .App { group_toggle(app, r) }
+		if row.double_clicked { if r.kind == .App { group_toggle(app, r) } else { props_selected(app) } }
 		if row.right_clicked {
 			select_row(app, i)
 			row_menu_open(app, ui.mouse_pos())
@@ -161,7 +219,7 @@ build_cells :: proc(app: ^App, r: Row, em: f32, hot: ui.Color) {
 	t := &app.table
 	p: Proc
 	cpu: f32
-	rss: u64
+	rss, gpu_mem: u64
 	read, write: f64
 	threads: i32
 	name: string
@@ -170,13 +228,13 @@ build_cells :: proc(app: ^App, r: Row, em: f32, hot: ui.Color) {
 	switch r.kind {
 	case .Process:
 		p = s.procs[r.index]
-		cpu, rss, read, write, threads, name = p.cpu, p.rss, p.read_rate, p.write_rate, p.threads, p.name
+		cpu, rss, gpu_mem, read, write, threads, name = p.cpu, p.rss, p.gpu_mem, p.read_rate, p.write_rate, p.threads, p.name
 		if p.entry >= 0 && r.depth == 0 { icon_name = app.catalog.entries[p.entry].icon }
 	case .App:
 		g := t.groups[r.index]
 		p = s.procs[g.root]
 		e := app.catalog.entries[g.entry]
-		cpu, rss, read, write, threads, name = g.cpu, g.rss, g.read_rate, g.write_rate, g.threads, e.name
+		cpu, rss, gpu_mem, read, write, threads, name = g.cpu, g.rss, g.gpu_mem, g.read_rate, g.write_rate, g.threads, e.name
 		icon_name = e.icon
 		count = g.count
 	case .Section:
@@ -218,24 +276,39 @@ build_cells :: proc(app: ^App, r: Row, em: f32, hot: ui.Color) {
 		ui.spacer(ui.fill())
 	}
 
-	weak := r.kind == .App   // (an app's pid and user are its first process's)
-	cell(.PID, fmt.tprintf("%d", p.pid), em, weak = true)
-	cell(.User, user_name(s, p.uid), em, weak = true)
-	cell(.CPU, fmt.tprintf("%.1f%%", cpu), em, heat = cpu / HEAT_CPU_FULL, hot = hot)
-	cell(.Memory, size_text(rss), em, heat = app.machine.mem.total > 0 ? f32(f64(rss) / f64(app.machine.mem.total) / HEAT_MEM_FULL) : 0, hot = hot)
-	cell(.Read, (r.kind == .Process && p.io_denied) ? "–" : rate_text(read), em, weak = p.io_denied)
-	cell(.Write, (r.kind == .Process && p.io_denied) ? "–" : rate_text(write), em, weak = p.io_denied)
-	cell(.Threads, fmt.tprintf("%d", threads), em, weak = weak)
+	weak := r.kind == .App   // (an app's pid, user and the like are its first process's)
+	io_dash := r.kind == .Process && p.io_denied
+	for c in Column {
+		if c == .Name || !t.shown[c] { continue }
+		w := t.width[c]
+		switch c {
+		case .Name:
+		case .PID:        cell(c, w, fmt.tprintf("%d", p.pid), em, weak = true)
+		case .PPID:       cell(c, w, fmt.tprintf("%d", p.ppid), em, weak = true)
+		case .User:       cell(c, w, user_name(s, p.uid), em, weak = true)
+		case .State:      cell(c, w, state_text(p.state), em, weak = p.state != 'T' && p.state != 'Z')
+		case .Nice:       cell(c, w, fmt.tprintf("%d", p.nice), em, weak = p.nice == 0)
+		case .CPU:        cell(c, w, fmt.tprintf("%.1f%%", cpu), em, heat = cpu / HEAT_CPU_FULL, hot = hot)
+		case .Memory:     cell(c, w, size_text(rss), em, heat = app.machine.mem.total > 0 ? f32(f64(rss) / f64(app.machine.mem.total) / HEAT_MEM_FULL) : 0, hot = hot)
+		case .GPU_Memory: cell(c, w, gpu_mem > 0 ? size_text(gpu_mem) : "", em)
+		case .Read:       cell(c, w, io_dash ? "–" : rate_text(read), em, weak = io_dash)
+		case .Write:      cell(c, w, io_dash ? "–" : rate_text(write), em, weak = io_dash)
+		case .Threads:    cell(c, w, fmt.tprintf("%d", threads), em, weak = weak)
+		case .Started:    cell(c, w, started_text(app, p.start), em, weak = true)
+		case .Command:    cell(c, w, shown_text(p.cmdline), em, weak = true)
+		case .Executable: cell(c, w, shown_text(p.exe), em, weak = true)
+		}
+	}
 	ui.spacer(ui.px(em * SCROLLBAR_EM))
 }
 
-// A cell of a numeric or short column, its text under its title (the header's titles start after a line of em * 0.7).
-// `heat` 0..1: how strongly its background is tinted (a busy process stands out).
+// A cell, its text under its title (the header's titles start after a rule of RULE_GRIP_EM). `heat` 0..1: how strongly
+// its background is tinted (a busy process stands out).
 @(private = "file")
-cell :: proc(c: Column, text: string, em: f32, weak := false, heat: f32 = 0, hot: ui.Color = {}) {
-	right := c != .User
+cell :: proc(c: Column, width_em: f32, text: string, em: f32, weak := false, heat: f32 = 0, hot: ui.Color = {}) {
+	right := c not_in COLUMN_TEXT
 	bg: Maybe(ui.Color)
-	flags := ui.Box_Flags{.Draw_Text}
+	flags := ui.Box_Flags{.Draw_Text, .Clip}
 	if heat >= HEAT_MIN {
 		tint := hot
 		tint.a = HEAT_ALPHA * min(heat, 1)
@@ -243,10 +316,29 @@ cell :: proc(c: Column, text: string, em: f32, weak := false, heat: f32 = 0, hot
 		flags += {.Draw_Background}
 	}
 	if weak { ui.push_tags("weak") }
-	pad := right ? em * 0.6 : em * 0.7 + max(1, ui.scale())
-	ui.next({width = ui.px(em * COLUMN_EM[c]), height = ui.pct(1), text_align = right ? .Right : .Left, text_pad = pad, bg = bg})
+	pad := right ? em * 0.6 : em * RULE_GRIP_EM * 0.5 + max(1, ui.scale())
+	ui.next({width = ui.px(em * width_em), height = ui.pct(1), text_align = right ? .Right : .Left, text_pad = pad, bg = bg})
 	ui.build_box(flags, fmt.tprintf("%s###c%d", text, int(c)))
 	if weak { ui.pop_tags() }
+}
+
+// When a process started: its time today, else its date and time (local time).
+started_text :: proc(app: ^App, start_ticks: u64) -> string {
+	if app.machine.boot_time == 0 { return "" }
+	if !app.tz_tried {
+		app.tz_tried = true
+		app.tz, _ = timezone.region_load("local")
+	}
+	at := time.unix(app.machine.boot_time + i64(start_ticks / CLOCK_TICKS), 0)
+	when_dt, ok := time.time_to_datetime(at)
+	now_dt, nok := time.time_to_datetime(time.now())
+	if !ok || !nok { return "" }
+	if app.tz != nil {
+		when_dt = timezone.datetime_to_tz(when_dt, app.tz)
+		now_dt = timezone.datetime_to_tz(now_dt, app.tz)
+	}
+	if when_dt.date == now_dt.date { return fmt.tprintf("%02d:%02d:%02d", when_dt.hour, when_dt.minute, when_dt.second) }
+	return fmt.tprintf("%04d-%02d-%02d %02d:%02d", when_dt.year, when_dt.month, when_dt.day, when_dt.hour, when_dt.minute)
 }
 
 @(private = "file")
