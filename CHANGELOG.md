@@ -30,11 +30,15 @@ and the versions follow [semantic versioning](https://semver.org/).
   (Delete), Restart (Ctrl+R), Enable (Ctrl+E), Disable (Ctrl+D), Open in Processes (Enter), Copy name (Ctrl+C). Read over
   D-Bus on a thread of its own, every `services.refresh_ms` while shown and at once after an action; the footer says
   what came of it, the manager's own words when it refuses.
+- **Startup**: what starts with the session: the XDG autostart entries (the user's and the system's, with Hidden=,
+  OnlyShowIn=, NotShowIn= and X-GNOME-Autostart-enabled=) and the user's systemd services the session's targets want;
+  their command, type, status and file. Enable (Ctrl+E), Disable (Ctrl+D), Space toggles, Open file location (Enter),
+  Copy command (Ctrl+C). A system's autostart entry is turned off by the user's copy of it with Hidden=true, as the
+  specification says; turned on again, the copy goes when nothing else changed in it.
 - **Information**: the system (name, kernel, computer, motherboard, firmware, session, uptime), the processor, the memory,
   the GPUs (with their PCI ids and driver), the disks and file systems with their free room, the network interfaces with
   their MAC and addresses, the screens (their EDID's name and mode), the batteries. **Copy all** (Ctrl+C) copies it as text.
 - A table's cell too narrow for its text shows the whole text when the pointer rests on it.
 - **Keys**: Ctrl+F gives the filter the keyboard, Ctrl+1 to Ctrl+6 show a section, F5 reads again now; the filter
   filters the section shown, and Escape clears it in every section.
-- The section Startup, to come.
 - Preferences: the services listed and how often (`services.manager`, `services.refresh_ms`), refresh period, theme, light or dark, finish, text size, window size (`docs/configuration.md`).

@@ -51,7 +51,7 @@ service_conn :: proc(b: ^Service_Bus, m: Manager) -> ^dbus.Conn {
 		c = nil
 	}
 	if c == nil {
-		c = dbus.connect_bus(m == .System ? .System : .Session)
+		c = dbus.connect_bus(m == .System ? .System : .Session, runtime.heap_allocator())
 		b.conns[m] = c
 	}
 	return c
@@ -193,6 +193,11 @@ unit_file_value :: proc(text, group, key: string) -> string {
 service_act :: proc(b: ^Service_Bus, m: Manager, action: Service_Action, name: string) -> (failure: string) {
 	c := service_conn(b, m)
 	if c == nil { return "the service manager cannot be reached" }
+	return unit_act(c, action, name)
+}
+
+// The action, asked of the manager on the connection `c`.
+unit_act :: proc(c: ^dbus.Conn, action: Service_Action, name: string) -> (failure: string) {
 	w := dbus.body_writer()
 	member, sig: string
 	switch action {

@@ -168,6 +168,75 @@ wait_row_cell_not :: proc(c: ^cdp.Client, first, name, was: string) -> bool {
 	return false
 }
 
+// An autostart entry this test writes in the session's own configuration ($XDG_CONFIG_HOME/autostart of build/live):
+// listed and on; Ctrl+D writes Hidden=true in it, Ctrl+E takes it away, each pressed only once the row selected is it.
+live_startup :: proc(l: ^Live) {
+	c := &l.c
+	name := fmt.tprintf("Inspecteur live %d", os.get_pid())
+	dir := fmt.tprintf("%s/config/autostart", l.dir)
+	path := fmt.tprintf("%s/inspecteur-live-%d.desktop", dir, os.get_pid())
+	_ = os.make_directory_all(dir)
+	entry := fmt.tprintf("[Desktop Entry]\nType=Application\nName=%s\nExec=true --inspecteur-live\n", name)
+	if !check(l, os.write_entire_file(path, entry) == nil, "an autostart entry of this test: %s", path) { return }
+	check(l, cdp.click_name(c, SIDE_STARTUP), "the Startup section")
+	check(l, cdp.type_text(c, name), "filter by its name")
+	if !check(l, wait_named_text(c, "c0", name), "its row is there") { return }
+	check(l, wait_row_cell(c, name, "c3", "Enabled") && wait_row_cell(c, name, "c2", "Autostart entry"), "an autostart entry, enabled")
+	check(l, cell_of(c, name, "c1") == "true --inspecteur-live", "its command")
+
+	if !select_row_named(l, name) { return }
+	if !check(l, cdp.key(c, "ctrl+d"), "Ctrl+D: Disable") { return }
+	check(l, file_has_text(path, "Hidden=true"), "its file says Hidden=true")
+	check(l, wait_row_cell(c, name, "c3", "Disabled"), "its row says Disabled")
+	check(l, cdp.wait_for(c, fmt.tprintf("Disabled %s", name), SESSION_WAIT), "the footer says so (%q)", footer(c))
+
+	if !select_row_named(l, name) { return }
+	if !check(l, cdp.key(c, "ctrl+e"), "Ctrl+E: Enable") { return }
+	check(l, file_lacks_text(path, "Hidden="), "its file no longer hides it")
+	check(l, wait_row_cell(c, name, "c3", "Enabled"), "its row says Enabled")
+	cdp.wait_idle(c, SESSION_WAIT)
+	check(l, cdp.key(c, "Escape"), "Escape clears the filter")
+	cdp.wait_idle(c, SESSION_WAIT)
+	check(l, cdp.shot(c, fmt.tprintf("%s/startup.png", l.dir)), "a picture of the section")
+}
+
+// Selects the row whose first cell says `first` (clicked, after a pause: not a double click) and checks that the row
+// selected, as the accessibility tree says, is it.
+@(private = "file")
+select_row_named :: proc(l: ^Live, first: string) -> bool {
+	c := &l.c
+	time.sleep(DOUBLE_CLICK_GAP)
+	at := -1
+	for b, i in cdp.find_name(c, "c0") { if b.text == first { at = i } }
+	if !check(l, at >= 0, "the row of %s is in view", first) { return false }
+	_, ok := cdp.call(c, "Toolkit.click", fmt.tprintf(`{{"name":"c0","index":%d}}`, at))
+	cdp.wait_idle(c, SESSION_WAIT)
+	got := selected_row_name(c)
+	return check(l, ok && strings.has_prefix(got, fmt.tprintf("%s, ", first)), "the row selected is %s (%q)", first, got)
+}
+
+@(private = "file")
+file_has_text :: proc(path, text: string) -> bool {
+	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
+	for time.tick_diff(time.tick_now(), deadline) > 0 {
+		data, err := os.read_entire_file(path, context.temp_allocator)
+		if err == nil && strings.contains(string(data), text) { return true }
+		time.sleep(SESSION_POLL)
+	}
+	return false
+}
+
+@(private = "file")
+file_lacks_text :: proc(path, text: string) -> bool {
+	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
+	for time.tick_diff(time.tick_now(), deadline) > 0 {
+		data, err := os.read_entire_file(path, context.temp_allocator)
+		if err == nil && !strings.contains(string(data), text) { return true }
+		time.sleep(SESSION_POLL)
+	}
+	return false
+}
+
 // The system's details: the kernel's version, as this test reads it; Copy all says what it copied.
 live_information :: proc(l: ^Live) {
 	c := &l.c

@@ -81,6 +81,7 @@ live_window :: proc(l: ^Live) {
 	// the Services, Connections and Information sections (live_sections.odin), the Performance section, the columns,
 	// the theme (live_more.odin)
 	live_services(l)
+	live_startup(l)
 	live_connections(l)
 	live_information(l)
 	live_performance(l)

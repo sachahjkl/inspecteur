@@ -128,9 +128,13 @@ grid_apply :: proc(g: ^Grid, d: ^Grid_Data, query: string) {
 	if query != g.query {
 		delete(g.query)
 		g.query = strings.clone(query)
-		g.vl.sel = -1
-		has_keep = false
-		ui.vlist_scroll_to(&g.vl, 0)
+		// a new search starts from its first row; a cleared one keeps the row selected, in view
+		if query != "" {
+			has_keep = false
+			ui.vlist_scroll_to(&g.vl, 0)
+		} else {
+			g.vl.reveal = REVEAL_BUILDS
+		}
 	}
 	clear(&g.order)
 	for i in 0 ..< len(d.ids) {

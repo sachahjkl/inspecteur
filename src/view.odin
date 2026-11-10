@@ -62,13 +62,13 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 			if ui.column(id = "###main") {
 				ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
 				if ui.column(id = "###section") {
-					#partial switch app.tab {
+					switch app.tab {
 					case .Processes:   build_processes(app, em)
 					case .Performance: build_performance(app, em)
+					case .Services:    build_services(app, em)
+					case .Startup:     build_startup(app, em)
 					case .Connections: build_connections(app, em)
 					case .Information: build_information(app, em)
-					case .Services:    build_services(app, em)
-					case:              build_placeholder(app, em)
 					}
 				}
 				build_footer(app, em)
@@ -95,6 +95,7 @@ view_keys :: proc(app: ^App) {
 	case .Connections: connections_keys(app, field_keeps)
 	case .Information: information_keys(app)
 	case .Services:    services_keys(app, field_keeps)
+	case .Startup:     startup_keys(app, field_keeps)
 	}
 	if app.tab != .Processes { return }
 	if ui.key_press(.Down) { select_step(app, app.vl.sel, 1, 1) }
@@ -333,22 +334,7 @@ meter :: proc(app: ^App, id, icon, title, value: string, used: f32, em: f32) {
 }
 
 ////////////////////////////////
-// The other sections, the footer
-
-@(private = "file")
-build_placeholder :: proc(app: ^App, em: f32) {
-	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * BAR_EM))})
-	if ui.row(.Center, {.Draw_Side_Bottom}, "###bar") {
-		ui.spacer(ui.px(em * 0.8))
-		ui.next({width = ui.text_size(), height = ui.pct(1), font_size = em * 1.08, text_pad = 0})
-		ui.label(fmt.tprintf("%s###bar_title", TAB_LABELS[app.tab]))
-	}
-	ui.spacer(ui.px(em * 4))
-	if ui.tags("weak") {
-		ui.next({width = ui.fill(), height = ui.px(em * 2)})
-		if ui.style({text_align = .Center}) { ui.label(fmt.tprintf("%s comes in a later version of Inspecteur.###placeholder", TAB_LABELS[app.tab])) }
-	}
-}
+// The footer
 
 // A message (what a command did, else the selection) at the left; the machine's counters at the right.
 @(private = "file")

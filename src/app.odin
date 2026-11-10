@@ -47,6 +47,7 @@ App :: struct {
 	query:       string,            // the filter, in lower case (owned): each section with a table applies it
 	connections: Connections,       // the sockets (connections.odin), read only while their section is shown
 	services:    Services,          // systemd's services (services.odin), read every few seconds while shown
+	startup:     Startup,           // what starts with the session (startup.odin), read when shown, on F5, after a change
 	information: Information,       // what the system is (information.odin), read when first shown and on F5
 	device:      Device,            // the Performance section's device shown (perf_view.odin)
 	cpu_grid:    bool,              // the CPU's page shows a graph per logical processor
@@ -107,6 +108,7 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	connections_init(&app.connections, app)
 	information_init(&app.information, app)
 	services_init(&app.services, app)
+	startup_init(&app.startup, app)
 
 	t_window := time.tick_now()
 	platform.show_window(win)
@@ -135,6 +137,7 @@ app_run :: proc(prefs: ^config.Prefs, first_frame := false) -> int {
 	connections_destroy(&app.connections)
 	information_destroy(&app.information)
 	services_destroy(&app.services)
+	startup_destroy(&app.startup)
 	delete(app.query)
 	icons_destroy(&app.app_icons, &app.shared.r)
 	host.host_close(h)
@@ -194,6 +197,7 @@ tab_show :: proc(app: ^App, tab: Tab) {
 	case .Connections: worker_ask(&app.connections.worker)
 	case .Information: if !app.information.asked { information_ask(&app.information) }
 	case .Services:    services_ask(app)
+	case .Startup:     startup_ask(app)
 	}
 }
 
@@ -203,6 +207,7 @@ refresh_now :: proc(app: ^App) {
 	#partial switch app.tab {
 	case .Information: information_ask(&app.information)
 	case .Services:    services_ask(app)
+	case .Startup:     startup_ask(app)
 	}
 	say(app, "Read again")
 }
@@ -212,6 +217,7 @@ sections_take :: proc(app: ^App) {
 	connections_take(app)
 	information_take(&app.information)
 	services_take(app)
+	startup_take(app)
 }
 
 selected_id :: proc(app: ^App) -> u64 {
