@@ -246,7 +246,13 @@ autostart_set_enabled :: proc(id: string, on: bool) -> (failure: string) {
 		text = desktop_entry_set(text, "Hidden", "true")
 	}
 	_ = os.make_directory_all(user_dir)   // (an error when it is there already: the write says what matters)
-	if os.write_entire_file(user_path, text) != nil { return strings.concatenate({"cannot write ", user_path}, context.temp_allocator) }
+	// (a file beside it, then renamed over it: the session never reads a half-written entry)
+	temp := strings.concatenate({user_path, ".inspecteur-new"}, context.temp_allocator)
+	if os.write_entire_file(temp, text) != nil { return strings.concatenate({"cannot write ", temp}, context.temp_allocator) }
+	if os.rename(temp, user_path) != nil {
+		_ = os.remove(temp)
+		return strings.concatenate({"cannot write ", user_path}, context.temp_allocator)
+	}
 	return ""
 }
 
