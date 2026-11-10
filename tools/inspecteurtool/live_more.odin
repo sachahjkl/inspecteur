@@ -6,17 +6,16 @@ package inspecteurtool
 
 import "core:fmt"
 import "core:os"
-import "core:slice"
 import "core:strconv"
 import "core:strings"
 import "core:sys/linux"
 import "core:time"
 import cdp "gt:cdp"
 
-// The share of a graph's pixels that are not one of its three commonest colours (its background, grid and frame), at
-// least, for it to count as drawn; how far a colour may be from them and still be one of them.
+// The share of a graph's pixels in colour (drawn_share), at least, for it to count as drawn.
 GRAPH_DRAWN_SHARE :: 0.01
-GRAPH_COLOR_SLACK :: 12
+// A pixel is in colour when its channels differ by more than this (a grey's are within a few of one another)
+GRAPH_TINT_MIN :: 24
 // The Performance section's graphs get some points first.
 PERF_POINTS_WAIT :: 8 * time.Second
 // How often a graph's pixels are read again while they are waited for (a picture of the window each time).
@@ -101,7 +100,8 @@ wait_drawn :: proc(c: ^cdp.Client, name: string) -> f64 {
 	return share
 }
 
-// The share of the box's pixels that are not its three commonest colours.
+// The share of the box's pixels in colour: a graph's line and fill are in the accent, its background, grid and labels in
+// greys. (Not "other than its commonest colours": a low memory's fill is one of them, and an empty graph's are all.)
 drawn_share :: proc(c: ^cdp.Client, name: string) -> f64 {
 	boxes := cdp.find_name(c, name)
 	if len(boxes) == 0 { return 0 }
@@ -110,28 +110,13 @@ drawn_share :: proc(c: ^cdp.Client, name: string) -> f64 {
 	if !ok { return 0 }
 	pic, dok := cdp.png_decode(png, context.temp_allocator)
 	if !dok { return 0 }
-	counts := make(map[u32]int, 256, context.temp_allocator)
 	n := pic.width * pic.height
+	tinted := 0
 	for i in 0 ..< n {
 		p := pic.pixels[i * 4:][:3]
-		counts[u32(p[0]) << 16 | u32(p[1]) << 8 | u32(p[2])] += 1
+		if int(max(p[0], p[1], p[2])) - int(min(p[0], p[1], p[2])) > GRAPH_TINT_MIN { tinted += 1 }
 	}
-	Count :: struct { color: u32, n: int }
-	list := make([dynamic]Count, 0, len(counts), context.temp_allocator)
-	for k, v in counts { append(&list, Count{k, v}) }
-	slice.sort_by(list[:], proc(a, b: Count) -> bool { return a.n > b.n })
-	common := list[:min(3, len(list))]
-	other := 0
-	for i in 0 ..< n {
-		p := pic.pixels[i * 4:][:3]
-		near := false
-		for k in common {
-			r, g, bl := int(k.color >> 16), int(k.color >> 8 & 0xff), int(k.color & 0xff)
-			if abs(int(p[0]) - r) <= GRAPH_COLOR_SLACK && abs(int(p[1]) - g) <= GRAPH_COLOR_SLACK && abs(int(p[2]) - bl) <= GRAPH_COLOR_SLACK { near = true; break }
-		}
-		if !near { other += 1 }
-	}
-	return n > 0 ? f64(other) / f64(n) : 0
+	return n > 0 ? f64(tinted) / f64(n) : 0
 }
 
 // The logical processors (the cpuN lines of /proc/stat).

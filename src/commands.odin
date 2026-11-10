@@ -256,7 +256,8 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	switch c {
 	case .Palette:          palette_open(app)
 	case .Shortcuts:        app.shortcuts_open = true
-	case .Filter:           if app.search_key != 0 { ui.set_focus(app.search_key) }
+	// (its text selected: what is typed then replaces it, as in a browser's Ctrl+F)
+	case .Filter:           if app.search_key != 0 { ui.set_focus(app.search_key); ui.field_select_all(&app.search) }
 	case .Clear_Filter:     ui.field_clear(&app.search)
 	case .Read_Again:       refresh_now(app)
 	case .Pause_Refresh:    refresh_pause(app, !app.paused)
