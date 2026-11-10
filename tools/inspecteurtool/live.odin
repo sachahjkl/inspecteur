@@ -36,7 +36,7 @@ run_live :: proc(args: []string) -> int {
 	keep := len(args) > 0 && args[0] == "--keep"
 	if run_build(nil) != 0 { return 1 }
 	l: Live
-	if why := session_start(&l.session, LIVE_DIR, LIVE_PORT, user_bus = true, welcome = true, own_cache = true, before = live_app_entry); why != "" {
+	if why := session_start(&l.session, LIVE_DIR, LIVE_PORT, user_bus = true, setup = true, own_cache = true, before = live_app_entry); why != "" {
 		fmt.eprintfln("inspecteurtool live: %s", why)
 		session_stop(&l.session)
 		return 1
@@ -63,7 +63,7 @@ run_live :: proc(args: []string) -> int {
 @(private = "file")
 live_window :: proc(l: ^Live) {
 	c := &l.c
-	live_welcome(l)
+	live_setup_offer(l)
 	check(l, cdp.wait_for(c, "Background processes", SESSION_WAIT), "the table has its sections")
 	pids := column_numbers(c, "c1")
 	check(l, len(pids) >= 10, "the table has rows (%d in view)", len(pids))
@@ -138,6 +138,7 @@ live_window :: proc(l: ^Live) {
 	live_group_kill(l)
 	live_commands(l)
 	live_setup(l)
+	live_settings(l)
 
 	// a picture of the window, for the person who runs the test (build/live, kept with --keep or a failure: it shows
 	// the machine's own processes, so it is not one of the documentation's pictures)

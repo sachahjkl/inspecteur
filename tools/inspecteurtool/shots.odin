@@ -150,12 +150,14 @@ run_shots :: proc(args: []string) -> int {
 		shot(&c, out, sec.picture, &failed)
 	}
 
-	// the welcome page, and the light version
-	cdp.key(&c, "ctrl+shift+i")
-	if need(cdp.wait_for(&c, "Welcome to Inspecteur", SESSION_WAIT), "no welcome page", &failed) {
-		shot(&c, out, "welcome", &failed)
-		cdp.click_name(&c, "setup_done")
-		cdp.wait_for(&c, "Welcome to Inspecteur", SESSION_WAIT, gone = true)
+	// the settings (not the install's dialog: it shows the real folders of the machine it runs on), and the light version
+	cdp.key(&c, "ctrl+,")
+	if need(cdp.wait_for(&c, "Appearance", SESSION_WAIT), "no settings", &failed) {
+		time.sleep(500 * time.Millisecond)   // (the themes' cards)
+		shot(&c, out, "settings", &failed)
+		cdp.key(&c, "Escape")
+		cdp.key(&c, "Escape")
+		cdp.wait_name(&c, "settings_button", SESSION_WAIT)
 	}
 	cdp.key(&c, "ctrl+1")
 	need(cdp.wait_for(&c, "Background processes", SESSION_WAIT), "no Processes section", &failed)

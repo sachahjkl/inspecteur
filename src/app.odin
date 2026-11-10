@@ -16,6 +16,10 @@ import lucide "gt:lucide"
 import "gt:platform"
 import "gt:render"
 import "gt:ui"
+import prefs_page "gt:prefs_page"
+import process "gt:process"
+import setup "gt:setup"
+import update "gt:update"
 import identity "identity"
 
 // The corners: nearly square (a table of numbers, not cards): about a pixel on a button, none to see on a row.
@@ -65,7 +69,15 @@ App :: struct {
 	palette:     ui.Key,            // the command palette (commands.odin)
 	shortcuts_open: bool,           // the sheet of the keys
 	diagnosis_open: bool,   // "Why is it slow?" (F2, diagnosis.odin)
-	setup:       Setup_Page,        // the welcome page, and the desktop integration (setup_view.odin)
+	setup:       setup.Dialog,      // the install's dialog (setup.odin)
+	setup_logo:  render.Texture,    // its logo (made when it first shows)
+	setup_logo_made: bool,
+	settings_open: bool,            // the settings' page shows in place of the sections (settings_view.odin)
+	settings_page: prefs_page.Page,
+	updater:     ^update.Updater,   // the updates (updates.odin); nil in the demo
+	update_serial: int,             // the updater's state last said
+	installed_copy: bool,           // this copy is the installed one: it updates itself (update.auto)
+	restart:     bool,              // at the end, the new program starts (an update in place)
 	tz:          ^datetime.TZ_Region,   // local time, for the processes' start (loaded when first needed)
 	tz_tried:    bool,
 	search:      ui.Text_Field,
@@ -90,6 +102,7 @@ Run_Options :: struct {
 	first_frame: bool,
 	tab:         Tab,
 	demo:        bool,
+	setup:       bool,   // --setup: the install's dialog open
 }
 
 app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
@@ -153,7 +166,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	startup_init(&app.startup, app)
 	dump_init(&app.dump, app)
 	section_first_show(app)
-	setup_offer(app)
+	if opts.setup { setup_open(app) } else { setup_offer(app) }
+	updates_start(app)
 
 	t_window := time.tick_now()
 	platform.show_window(win)
@@ -168,6 +182,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 		if !app.paused && time.tick_diff(app.next_sample, time.tick_now()) >= 0 { refresh(app) }
 		if !app.paused { services_tick(app) }
 		sections_take(app)
+		updates_follow(app)
 		t_frame := time.tick_now()
 		host.host_frame(h)
 		app.frame_time += time.tick_since(t_frame)
@@ -179,6 +194,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 		fmt.printfln("costs: %d samples, %.2f ms each; %d frames, %.2f ms each", app.refreshes, mean(app.refresh_time, app.refreshes), app.frames, mean(app.frame_time, app.frames))
 	}
 	devtools.stop(app.devtools)
+	updates_stop(app)
+	prefs_page.destroy(&app.settings_page)
 	connections_destroy(&app.connections)
 	information_destroy(&app.information)
 	services_destroy(&app.services)
@@ -187,7 +204,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	delete(app.query)
 	icons_destroy(&app.app_icons, &app.shared.r)
 	if app.logo.ok { render.destroy_texture(&app.shared.r, app.logo.tex) }
-	if app.setup.logo_made && app.setup.logo != {} { render.destroy_texture(&app.shared.r, app.setup.logo) }
+	setup_finish(app)
 	host.host_close(h)
 	ui.field_destroy(&app.search)
 	ui.vlist_destroy(&app.vl)
@@ -201,10 +218,11 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	for u in app.own_units { delete(u) }
 	delete(app.own_units)
 	props_destroy(&app.props)
-	setup_destroy(&app.setup)
 	for &vl in app.props_lists { ui.vlist_destroy(&vl) }
 	settings_free(&app.settings)
 	config.prefs_destroy(&app.prefs)
+	// (an update in place: the new program, once this one has let go of the window)
+	if app.restart && !setup.launch(process.executable_path(), nil) { fmt.eprintln("inspecteur: the new program does not start") }
 	return 0
 }
 

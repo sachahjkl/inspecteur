@@ -15,22 +15,22 @@ APP_NAME :: "inspecteur"
 PREF_COLUMNS :: 0
 
 PREF_DEFS := [?]config.Def{
-	{name = "processes.columns", category = "processes", description = "The columns of the Processes table besides the name, apart by commas: pid, ppid, user, state, nice, cpu, cpu_graph (the CPU of the last 30 seconds), memory (private memory), resident, gpu (the share of a GPU's time: NVIDIA's), gpu_memory, read, write, threads, started, command, executable. A right click on the table's header (or Ctrl+Shift+C) changes them.", kind = .String, default = {s = "pid,user,cpu,cpu_graph,memory,read,write,threads"}},
-	{name = "processes.widths", category = "processes", description = "The widths of the columns that were resized, in ems, apart by commas (pid=6,command=30). Dragging the line before a column's title changes them.", kind = .String, default = {s = ""}},
-	{name = "processes.sort", category = "processes", description = "The column the processes are sorted by (one of processes.columns, or name).", kind = .String, default = {s = "name"}},
-	{name = "processes.descending", category = "processes", description = "Sort from the largest (or from Z) down.", kind = .Bool, default = {b = false}},
+	{name = "processes.columns", category = "processes", description = "The columns of the Processes table besides the name, apart by commas: pid, ppid, user, state, nice, cpu, cpu_graph (the CPU of the last 30 seconds), memory (private memory), resident, gpu (the share of a GPU's time: NVIDIA's), gpu_memory, read, write, threads, started, command, executable. A right click on the table's header (or Ctrl+Shift+C) changes them.", kind = .String, default = {s = "pid,user,cpu,cpu_graph,memory,read,write,threads"}, hidden = true},
+	{name = "processes.widths", category = "processes", description = "The widths of the columns that were resized, in ems, apart by commas (pid=6,command=30). Dragging the line before a column's title changes them.", kind = .String, default = {s = ""}, hidden = true},
+	{name = "processes.sort", category = "processes", description = "The column the processes are sorted by (one of processes.columns, or name).", kind = .String, default = {s = "name"}, hidden = true},
+	{name = "processes.descending", category = "processes", description = "Sort from the largest (or from Z) down.", kind = .Bool, default = {b = false}, hidden = true},
 	{name = "processes.refresh_ms", category = "processes", description = "How often the processes and the machine are read again, in milliseconds: a point of the Performance section's graphs each time. The title bar's refresh menu (Ctrl+Shift+R) changes it.", kind = .Int, default = {i = 1000}, min = 250, max = 10_000, bounded = true, unit = "ms"},
 	{name = "processes.view", category = "processes", description = "How the processes are listed: apps, the apps' groups and the background processes; tree, every process under its parent. Ctrl+T switches them.", kind = .String, default = {s = "apps"}, choices = {"apps", "tree"}},
-	{name = "processes.pinned", category = "processes", description = "The apps and processes pinned over the others, by name, apart by commas. Alt+P pins or unpins the selected row.", kind = .String, default = {s = ""}},
+	{name = "processes.pinned", category = "processes", description = "The apps and processes pinned over the others, by name, apart by commas. Alt+P pins or unpins the selected row.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "processes.summary", category = "processes", description = "Show the summary of the machine over the Processes table: CPU, memory, disks, network, GPU, temperature and pressure, each with its last minute. Ctrl+B shows or hides it.", kind = .Bool, default = {b = true}},
 	{name = "services.manager", category = "services", description = "The services the Services section lists: the system's (system) or the user's (user). Its System and User buttons change it.", kind = .String, default = {s = "system"}, choices = {"system", "user"}},
-	{name = "services.widths", category = "services", description = "The widths of the Services table's columns that were resized, in ems (description=30). Dragging the line before a column's title changes them.", kind = .String, default = {s = ""}},
-	{name = "services.sort", category = "services", description = "The column the services are sorted by (name, description, state, startup, load, pid, memory), a - before it for the largest (or Z) first. A click on a title changes it.", kind = .String, default = {s = "name"}},
+	{name = "services.widths", category = "services", description = "The widths of the Services table's columns that were resized, in ems (description=30). Dragging the line before a column's title changes them.", kind = .String, default = {s = ""}, hidden = true},
+	{name = "services.sort", category = "services", description = "The column the services are sorted by (name, description, state, startup, load, pid, memory), a - before it for the largest (or Z) first. A click on a title changes it.", kind = .String, default = {s = "name"}, hidden = true},
 	{name = "services.details", category = "services", description = "Show the selected service's details and its journal's last lines under the table (Ctrl+I).", kind = .Bool, default = {b = true}},
-	{name = "startup.widths", category = "startup", description = "The widths of the Startup table's columns that were resized, in ems (command=24).", kind = .String, default = {s = ""}},
-	{name = "startup.sort", category = "startup", description = "The column the startup items are sorted by (name, command, type, status, file), a - before it for Z first.", kind = .String, default = {s = "name"}},
-	{name = "connections.widths", category = "connections", description = "The widths of the Connections table's columns that were resized, in ems (remote_address=20).", kind = .String, default = {s = ""}},
-	{name = "connections.sort", category = "connections", description = "The column the sockets are sorted by (process, pid, protocol, local_address, remote_address, state), a - before it for the largest (or Z) first.", kind = .String, default = {s = "process"}},
+	{name = "startup.widths", category = "startup", description = "The widths of the Startup table's columns that were resized, in ems (command=24).", kind = .String, default = {s = ""}, hidden = true},
+	{name = "startup.sort", category = "startup", description = "The column the startup items are sorted by (name, command, type, status, file), a - before it for Z first.", kind = .String, default = {s = "name"}, hidden = true},
+	{name = "connections.widths", category = "connections", description = "The widths of the Connections table's columns that were resized, in ems (remote_address=20).", kind = .String, default = {s = ""}, hidden = true},
+	{name = "connections.sort", category = "connections", description = "The column the sockets are sorted by (process, pid, protocol, local_address, remote_address, state), a - before it for the largest (or Z) first.", kind = .String, default = {s = "process"}, hidden = true},
 	{name = "services.refresh_ms", category = "services", description = "How often the services are read again while their section is shown, in milliseconds.", kind = .Int, default = {i = 3000}, min = 1000, max = 60_000, bounded = true, unit = "ms"},
 	{name = "view.theme", category = "appearance", description = "The window's colours: a theme of the toolkit by its name (Graphite, Midnight, Nord, Gruvbox, Tokyo Night, Catppuccin...).", kind = .String, default = {s = "Graphite"}},
 	{name = "view.mode", category = "appearance", description = "The theme's version: the system's (light or dark, followed as it changes), dark, or light.", kind = .String, default = {s = "system"}, choices = {"system", "dark", "light"}},
@@ -40,7 +40,8 @@ PREF_DEFS := [?]config.Def{
 	{name = "view.font_size", category = "appearance", description = "The text size, in logical pixels. Ctrl+= and Ctrl+- change it, Ctrl+0 sets it back.", kind = .Float, default = {f = FONT_SIZE_DEFAULT}, min = FONT_SIZE_MIN, max = FONT_SIZE_MAX, bounded = true},
 	{name = "view.width", category = "window", description = "The window's width at start, in logical pixels.", kind = .Int, default = {i = 1100}, min = 480, max = 8000, bounded = true},
 	{name = "view.height", category = "window", description = "The window's height at start, in logical pixels.", kind = .Int, default = {i = 720}, min = 320, max = 8000, bounded = true},
-	{name = "setup.welcome", category = "setup", description = "Show the welcome page at the next start (it puts Inspecteur in the application menu). Closing the page sets it to false.", kind = .Bool, default = {b = true}},
+	{name = "update.auto", category = "updates", description = "Check for a new version a while after the start and then every day, download it and put it in place: it runs at the next start. Only the installed copy updates itself (a copy of the Nix store is Nix's to update).", kind = .Bool, default = {b = true}},
+	{name = "setup.choice", category = "setup", description = "What was answered to the install's dialog: installed, standalone (this copy runs on its own: not offered again), or dismissed for a version.", kind = .String, default = {s = ""}, hidden = true},
 }
 
 // The look of a table's rows (view.zebra, view.rules): every list of the window takes it at each build.
@@ -73,7 +74,8 @@ Settings :: struct {
 	zebra:      bool,     // view.zebra
 	rules:      bool,     // view.rules
 	size:       [2]int,
-	welcome:    bool,     // setup.welcome
+	setup_choice: string, // owned: setup.choice
+	update_auto: bool,    // update.auto
 }
 
 prefs_file :: proc(allocator := context.temp_allocator) -> string {
@@ -109,7 +111,8 @@ prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Sett
 	s.zebra = config.bool_of(p, "view.zebra")
 	s.rules = config.bool_of(p, "view.rules")
 	s.size = {int(config.int_of(p, "view.width")), int(config.int_of(p, "view.height"))}
-	s.welcome = config.bool_of(p, "setup.welcome")
+	s.setup_choice = strings.clone(config.string_of(p, "setup.choice"), allocator)
+	s.update_auto = config.bool_of(p, "update.auto")
 	return
 }
 
@@ -119,6 +122,7 @@ settings_free :: proc(s: ^Settings) {
 	delete(s.widths)
 	delete(s.sort)
 	delete(s.pinned)
+	delete(s.setup_choice)
 	s^ = {}
 }
 

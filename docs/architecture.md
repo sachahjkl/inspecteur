@@ -203,14 +203,20 @@ keys are read from it, the menus' lines and the buttons' tooltips say its key, t
 commands of the window and of the section shown, and the sheet of the keys (F1) lists them all. A test checks that no
 key does two things in one place.
 
-## The desktop (integration.odin, setup_view.odin, src/identity)
+## Install, updates, settings (setup.odin, updates.odin, settings_view.odin, src/identity, src/update)
 
 `src/identity` holds what Inspecteur is to the desktop: its names, the actions of its desktop entry (one per section:
-`--section <name>`, and `StartupWMClass`, the window's class), its icons (`assets/logo_<n>.png`).
-`desktop_linux.odin` reads `$XDG_CURRENT_DESKTOP` and says how that desktop opens Inspecteur as its task manager; on
-GNOME, the welcome page's button adds the custom shortcut with `gsettings`. `inspecteur setup` and the welcome page write the entry and the
-icons for the running executable through the toolkit's `gt:desktop`; `inspecteurtool desktop_files` writes the same for
-the Nix package.
+`--section <name>`, and `StartupWMClass`, the window's class), its icons (`assets/logo_<n>.png`). `setup.odin` gives it to
+the toolkit's `gt:setup`: the install's dialog, offered at the start of a copy that is not installed (once per version,
+`setup.choice`), and `inspecteur install`, `uninstall`, `status`. On NixOS a classic install builds a profile of
+`NIXOS_LIBRARIES` and points the copy at it; a copy from the Nix store is never offered an install. `inspecteurtool
+desktop_files` writes the same entry and icons for the Nix package.
+
+`updates.odin` runs the toolkit's `gt:update`: the installed copy checks the latest release's manifest, signed with the
+key of `src/update/product.odin` (its private half is the release workflow's secret `UPDATE_SIGNING_KEY`, and
+`secrets/production.yaml` with SOPS), downloads the program and puts it in place; it runs at the next start.
+`settings_view.odin` shows the preferences' registry with the toolkit's `gt:prefs_page` (the layouts of the tables are
+`hidden`: the tables set them).
 
 ## Tests
 

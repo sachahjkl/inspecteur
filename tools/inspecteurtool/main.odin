@@ -11,6 +11,7 @@ import "core:fmt"
 import "core:os"
 import "core:strings"
 import toolbox "gt:toolbox"
+import inspecteur_update "../../src/update"
 
 EXIT_USAGE :: 2
 ROOT_MARK  :: "odin.version"
@@ -30,7 +31,8 @@ COMMANDS :: [?]Command{
 	{name = "bench", about = "[seconds]: a release build in a sway nobody sees: the time to its first frame, its CPU use at rest", run = run_bench},
 	{name = "desktop_files", about = "<prefix>: the desktop entry and the icons under <prefix>/share (the Nix package's)", run = run_desktop_files},
 	{name = "notices", about = "[--check]: THIRD-PARTY-NOTICES, the licences of the toolkit, its fonts and icons, wgpu-native and the text library's crates", run = run_notices},
-	{name = "package", about = "[version]: build/dist/inspecteur-<version>-linux-x64.tar.gz and its SHA-256", run = run_package},
+	{name = "package", about = "[version]: build/dist: the archive of a release build, its SHA-256, the program alone and (with $UPDATE_SIGNING_KEY) its signed update manifest", run = run_package},
+	{name = "update", about = "keygen <file> | pubkey | manifest <program> <version> - <out> | verify <manifest> -: inspecteur's update key and manifests", run = proc(args: []string) -> int { return toolbox.update_command(inspecteur_update.PRODUCT, args) }},
 	{name = "notes", about = "<version>: the changelog's section of that version", run = run_notes},
 	{name = "ship", about = "<version> [--dry-run]: from a clean main, the changelog and APP_VERSION, the checks, a commit, the tag, the push", run = run_ship},
 	{name = "site", about = "build <site> <out> | check [--site folder] [--shot file.png] [--browser program]: the site's pages", run = run_site},

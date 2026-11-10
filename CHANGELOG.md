@@ -6,6 +6,13 @@ and the versions follow [semantic versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+
+- **Install and updates as every program of gui_toolkit**: a copy that is not installed offers to install itself for the
+  user (the program, its menu entry with an action per section, its icons); `inspecteur install`, `uninstall`, `status`,
+  `--setup`. The installed copy checks the signed releases every day and puts a new version in place (`update.auto`).
+  On NixOS a classic install runs by itself; the Nix package is left to Nix.
+- **Settings** (Ctrl+, or the title bar's button): every preference on a page, searched, applied at once; the themes as
+  cards; Check for updates.
 - **Tables in stripes, with a rule under each row** (Processes, Services, Startup, Connections, the Properties' lists):
   `view.zebra` and `view.rules` turn them off.
 - **A CPU graph in each row** (the `cpu_graph` column, shown by default): the last 30 samples of a process's or an
@@ -31,6 +38,8 @@ and the versions follow [semantic versioning](https://semver.org/).
   minutes at most at the default period).
 
 ### Changed
+
+- **Fainter stripes**: every second row of the tables is half as far from the page (gui_toolkit 0.165.1).
 - **Machined by default** (`view.finish`): raised buttons and dialogs, sunken fields, graphs and meters. `flat` gives
   back the plain look.
 - **Ctrl+F selects the filter's text**: what is typed then replaces it.
@@ -39,6 +48,11 @@ and the versions follow [semantic versioning](https://semver.org/).
   columns go past the edge.
 - **Busy cells go from green through yellow and orange to red** as the load grows, in full colours with a darker
   outline, deeper on a dark theme, with dark or light text, whichever reads on the colour (it was one orange tint).
+
+### Removed
+
+- The welcome page, `inspecteur setup` and the steps per desktop for the task manager's key: the install's dialog and
+  `inspecteur install` replace them.
 
 ## [0.1.0] - 2026-11-10
 

@@ -11,11 +11,12 @@ package inspecteur
 import "core:fmt"
 import "core:strings"
 import "gt:ui"
+import update "gt:update"
 
 Cmd :: enum u8 {
 	// Window
 	Palette, Shortcuts, Filter, Clear_Filter, Read_Again, Pause_Refresh, Refresh_Speed, Zoom_In, Zoom_Out, Zoom_Reset,
-	Light_Dark, Setup, Diagnose,
+	Light_Dark, Setup, Settings, Check_Updates, Diagnose,
 	// Sections
 	Show_Processes, Show_Performance, Show_Services, Show_Startup, Show_Connections, Show_Information, Next_Section, Previous_Section,
 	// Processes
@@ -49,7 +50,9 @@ COMMANDS := [Cmd]ui.Command{
 	.Zoom_Out         = {label = "Smaller text", group = "Window", keys = {{.Minus, {.Ctrl}}, {.Num_Subtract, {.Ctrl}}}},
 	.Zoom_Reset       = {label = "Text size as the default", group = "Window", keys = {{.N0, {.Ctrl}}, {}}},
 	.Light_Dark       = {label = "Light or dark", group = "Window", keys = {{.L, {.Ctrl, .Shift}}, {}}},
-	.Setup            = {label = "Desktop integration…", group = "Window", keys = {{.I, {.Ctrl, .Shift}}, {}}},
+	.Setup            = {label = "Install…", group = "Window", keys = {{.I, {.Ctrl, .Shift}}, {}}},
+	.Settings         = {label = "Settings", group = "Window", keys = {{.Comma, {.Ctrl}}, {}}},
+	.Check_Updates    = {label = "Check for updates", group = "Window"},
 	.Diagnose         = {label = "Why is it slow?", group = "Window", keys = {{.F2, {}}, {}}},
 
 	.Show_Processes   = {label = "Processes", group = "Sections", keys = {{.N1, {.Ctrl}}, {}}},
@@ -211,7 +214,8 @@ shortcuts_build :: proc(app: ^App) {
 cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 	p := selected_proc(app)
 	switch c {
-	case .Palette, .Shortcuts, .Filter, .Read_Again, .Light_Dark, .Setup, .Pause_Refresh, .Refresh_Speed, .Diagnose: return true
+	case .Palette, .Shortcuts, .Filter, .Read_Again, .Light_Dark, .Setup, .Settings, .Pause_Refresh, .Refresh_Speed, .Diagnose: return true
+	case .Check_Updates: return app.updater != nil
 	case .Zoom_In:    return app.settings.font_size < FONT_SIZE_MAX
 	case .Zoom_Out:   return app.settings.font_size > FONT_SIZE_MIN
 	case .Zoom_Reset: return app.settings.font_size != FONT_SIZE_DEFAULT
@@ -266,7 +270,9 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Zoom_Out:         zoom(app, app.settings.font_size - 1)
 	case .Zoom_Reset:       zoom(app, FONT_SIZE_DEFAULT)
 	case .Light_Dark:       light_dark_switch(app)
-	case .Setup:            setup_show(app)
+	case .Setup:            setup_open(app)
+	case .Settings:         settings_toggle(app)
+	case .Check_Updates:    update.check_now(app.updater); say(app, "Checking for updates…")
 	case .Diagnose:         app.diagnosis_open = true
 	case .Show_Processes:   tab_show(app, .Processes)
 	case .Show_Performance: tab_show(app, .Performance)

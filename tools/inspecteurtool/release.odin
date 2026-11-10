@@ -18,6 +18,8 @@ import "core:strconv"
 import "core:strings"
 import "core:time"
 import toolbox "gt:toolbox"
+import update "gt:update"
+import inspecteur_update "../../src/update"
 
 CHANGELOG    :: "CHANGELOG.md"
 VERSION_FILE :: "src/main.odin"
@@ -125,9 +127,12 @@ run_notes :: proc(args: []string) -> int {
 run_package :: proc(args: []string) -> int {
 	source, _ := read_text(VERSION_FILE)
 	version := version_of(source)
+	// (a release, with its tag: the installed copies update themselves from its signed manifest, which needs the key)
+	signed := os.get_env(toolbox.UPDATE_KEY_ENV, context.temp_allocator) != ""
 	if len(args) > 0 {
 		asked := strings.trim_prefix(args[0], "v")
 		if asked != version { fmt.eprintfln("inspecteurtool: the tag says %s, APP_VERSION %s", asked, version); return 1 }
+		if !signed { fmt.eprintfln("inspecteurtool: a release signs its update manifest: set %s", toolbox.UPDATE_KEY_ENV); return 1 }
 	}
 	if !os.exists(PROGRAM) { fmt.eprintfln("inspecteurtool: %s is not built (inspecteurtool build release)", PROGRAM); return 1 }
 	name := fmt.tprintf("inspecteur-%s-linux-x64", version)
@@ -144,7 +149,17 @@ run_package :: proc(args: []string) -> int {
 	if !toolbox.run({"strip", fmt.tprintf("%s/inspecteur", stage)}) { return 1 }
 	_ = os.chmod(fmt.tprintf("%s/inspecteur", stage), {.Read_User, .Write_User, .Execute_User, .Read_Group, .Execute_Group, .Read_Other, .Execute_Other})
 	if !toolbox.run({"tar", "--owner=0", "--group=0", "--numeric-owner", "-czf", archive, name}, {dir = DIST_DIR}) { return 1 }
+	// the program alone, what an installed copy downloads to update itself, and its signed manifest
+	program, read_err := os.read_entire_file(fmt.tprintf("%s/inspecteur", stage), context.temp_allocator)
+	if read_err != nil { fmt.eprintfln("inspecteurtool: %s/inspecteur cannot be read", stage); return 1 }
 	_ = os.remove_all(stage)
+	alone := fmt.tprintf("%s/%s", DIST_DIR, update.expected_file_name(inspecteur_update.PRODUCT, version, update.PLATFORM, context.temp_allocator))
+	if os.write_entire_file(alone, program) != nil { fmt.eprintfln("inspecteurtool: %s cannot be written", alone); return 1 }
+	_ = os.chmod(alone, {.Read_User, .Write_User, .Execute_User, .Read_Group, .Execute_Group, .Read_Other, .Execute_Other})
+	if signed {
+		manifest := fmt.tprintf("%s/%s", DIST_DIR, update.manifest_name(update.PLATFORM, "", context.temp_allocator))
+		if why := toolbox.update_manifest(inspecteur_update.PRODUCT, alone, version, "", manifest); why != "" { fmt.eprintfln("inspecteurtool: %s", why); return 1 }
+	}
 	sum, ok := toolbox.sha256_file(fmt.tprintf("%s/%s", DIST_DIR, archive))
 	if !ok { return 1 }
 	sums := fmt.tprintf("%s  %s\n", sum, archive)

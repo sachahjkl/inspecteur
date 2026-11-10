@@ -40,8 +40,7 @@ The headless sway of `live` and `shots` draws on the CPU (pixman): inspecteur th
 
 The session has a runtime folder, a configuration folder and a data folder of its own (`live`: a cache too, for a dump
 file; the others keep the person's, as fontconfig's cache costs most of a second to build again), and no
-`XDG_CURRENT_DESKTOP` (the welcome page then offers nothing that writes the person's desktop settings); the welcome page
-is off unless a test asks for it. `live` gives inspecteur the person's session bus (`DBUS_SESSION_BUS_ADDRESS`, else the
+`XDG_CURRENT_DESKTOP`; the install's dialog is not offered unless a test asks for it. `live` gives inspecteur the person's session bus (`DBUS_SESSION_BUS_ADDRESS`, else the
 user manager's `$XDG_RUNTIME_DIR/bus`), so that the Services and Startup sections reach the user's service manager. It
 acts only on what it made itself, and checks it before it presses a key that acts:
 
@@ -52,8 +51,8 @@ acts only on what it made itself, and checks it before it presses a key that act
 - an app of its own: a desktop entry in the session's data folder, and two sleeps in a scope named for it
   (`systemd-run --user --scope --unit=app-inspecteurlive<pid>-1.scope`); the group is killed only once the scope holds
   those two and nothing else;
-- an autostart entry, the desktop entry and icons of the welcome page and of `inspecteur setup`, all in the session's
-  folders.
+- an autostart entry, and the install of the install's dialog and of `inspecteur install` (the program, its desktop entry
+  and icons), all in the session's folders.
 
 Without a session bus (neither address), `live` says so and skips the checks of the user's service and of the app's
 group. It never opens a web page, a file manager or a text editor: Search online, Open file location and Open unit file

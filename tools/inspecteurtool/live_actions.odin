@@ -156,48 +156,63 @@ live_commands :: proc(l: ^Live) {
 	check(l, file_has(prefs, "view.mode\tsystem"), "kept")
 }
 
-// The welcome page, at the first start: Done closes it for good.
-live_welcome :: proc(l: ^Live) {
+// The install's dialog, at the first start of a copy that is not installed: Keep standalone closes it for good.
+live_setup_offer :: proc(l: ^Live) {
 	c := &l.c
 	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
-	check(l, cdp.wait_for(c, "Welcome to Inspecteur", SESSION_WAIT), "the welcome page shows at the first start")
-	check(l, cdp.click_name(c, "setup_done") && cdp.wait_for(c, "Welcome to Inspecteur", SESSION_WAIT, gone = true), "Done closes it")
-	check(l, file_has(prefs, "setup.welcome\tfalse"), "it does not open by itself again")
+	check(l, cdp.wait_for(c, "Install Inspecteur", SESSION_WAIT), "the install's dialog shows at the first start")
+	check(l, cdp.click_name(c, "setup_standalone") && cdp.wait_for(c, "Install Inspecteur", SESSION_WAIT, gone = true), "Keep standalone closes it")
+	check(l, file_has(prefs, "setup.choice\tstandalone"), "it is not offered again")
 }
 
-// The welcome page puts Inspecteur in the application menu of the session's own data folder, and takes it away; so does
-// `inspecteur setup` in a folder of this test.
+// The install's dialog (Ctrl+Shift+I) installs Inspecteur in the session's own data folder: the program, its menu entry
+// and its icons; Uninstall takes it all away. So do `inspecteur install` and `uninstall` in a folder of this test.
 live_setup :: proc(l: ^Live) {
 	c := &l.c
-	entry := fmt.tprintf("%s/data/applications/inspecteur.desktop", l.dir)
-	icon := fmt.tprintf("%s/data/icons/hicolor/64x64/apps/inspecteur.png", l.dir)
-	check(l, cdp.key(c, "ctrl+shift+i") && cdp.wait_for(c, "Welcome to Inspecteur", SESSION_WAIT), "Ctrl+Shift+I: the welcome page")
-	check(l, cdp.wait_for(c, "Not in the application menu yet", SESSION_WAIT), "it says Inspecteur is not in the menu")
-	check(l, cdp.click_name(c, "setup_install"), "Add to the application menu")
-	check(l, file_has(entry, "Categories=System;Monitor;") && file_has(entry, "[Desktop Action services]") && file_has(entry, "--section services"), "the desktop entry, its category and its actions: %s", entry)
+	data := fmt.tprintf("%s/data", l.dir)
+	program := fmt.tprintf("%s/inspecteur/inspecteur", data)
+	entry := fmt.tprintf("%s/applications/inspecteur.desktop", data)
+	icon := fmt.tprintf("%s/icons/hicolor/64x64/apps/inspecteur.png", data)
+	check(l, cdp.key(c, "ctrl+shift+i") && cdp.wait_for(c, "Install Inspecteur", SESSION_WAIT), "Ctrl+Shift+I: the install's dialog")
+	check(l, cdp.click_name(c, "setup_install"), "Install")
+	check(l, wait_present(program, SETUP_WAIT), "the program is copied: %s", program)
+	check(l, wait_present(entry, SESSION_WAIT) && file_has(entry, "Categories=System;Monitor;") && file_has(entry, "[Desktop Action services]") && file_has(entry, "--section services"), "the menu entry, its category and its actions: %s", entry)
 	check(l, os.exists(icon), "its icon: %s", icon)
-	check(l, cdp.wait_for(c, "In the application menu, with its icon", SESSION_WAIT), "the page says so")
-	check(l, cdp.click_name(c, "setup_remove"), "Remove")
-	check(l, wait_missing(entry) && !os.exists(icon), "the entry and the icon are gone")
-	check(l, cdp.click_name(c, "setup_done") && cdp.wait_for(c, "Welcome to Inspecteur", SESSION_WAIT, gone = true), "Done closes the page")
+	check(l, cdp.wait_for(c, "Uninstall", SESSION_WAIT), "the dialog offers Uninstall")
+	check(l, cdp.click_name(c, "setup_uninstall") && cdp.wait_for(c, "Click again to uninstall", SESSION_WAIT), "Uninstall asks for a second click")
+	check(l, cdp.click_name(c, "setup_uninstall"), "the second click")
+	check(l, wait_missing(entry) && wait_missing(program) && !os.exists(icon), "the program, the entry and the icon are gone")
+	check(l, cdp.key(c, "Escape") && cdp.wait_for(c, "Install Inspecteur", SESSION_WAIT, gone = true), "Escape closes the dialog")
 
 	// the command line, in a data folder of this test
-	data := fmt.tprintf("%s/data-cli", l.dir)
-	env := toolbox.env_with({"XDG_DATA_HOME"}, fmt.tprintf("XDG_DATA_HOME=%s", data))
+	cli := fmt.tprintf("%s/data-cli", l.dir)
+	env := toolbox.env_with({"XDG_DATA_HOME"}, fmt.tprintf("XDG_DATA_HOME=%s", cli))
 	run :: proc(args: []string, env: []string) -> int {
 		cmd := make([dynamic]string, context.temp_allocator)
 		append(&cmd, PROGRAM)
 		append(&cmd, ..args)
 		p, err := os.process_start({command = cmd[:], env = env})
 		if err != nil { return -1 }
-		st, werr := os.process_wait(p, SESSION_WAIT)
+		st, werr := os.process_wait(p, SETUP_WAIT)
 		return werr == nil && st.exited ? st.exit_code : -1
 	}
-	cli_entry := fmt.tprintf("%s/applications/inspecteur.desktop", data)
-	check(l, run({"setup", "--status"}, env) == 1, "inspecteur setup --status: not installed (1)")
-	check(l, run({"setup"}, env) == 0 && os.exists(cli_entry), "inspecteur setup writes %s", cli_entry)
-	check(l, run({"setup", "--status"}, env) == 0, "--status: installed (0)")
-	check(l, run({"setup", "--uninstall"}, env) == 0 && !os.exists(cli_entry), "--uninstall takes it away")
+	cli_entry := fmt.tprintf("%s/applications/inspecteur.desktop", cli)
+	check(l, run({"status"}, env) == 1, "inspecteur status: not installed (1)")
+	check(l, run({"install"}, env) == 0 && os.exists(cli_entry) && os.exists(fmt.tprintf("%s/inspecteur/inspecteur", cli)), "inspecteur install copies it and writes %s", cli_entry)
+	check(l, run({"status"}, env) == 0, "status: installed (0)")
+	check(l, run({"uninstall"}, env) == 0 && !os.exists(cli_entry), "inspecteur uninstall takes it away")
+}
+
+// The settings (Ctrl+,): the preferences' page in place of the sections; a switch there changes a preference, kept;
+// Escape goes back.
+live_settings :: proc(l: ^Live) {
+	c := &l.c
+	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
+	check(l, cdp.key(c, "ctrl+,") && cdp.wait_for(c, "Appearance", SESSION_WAIT) && cdp.wait_for(c, "Updates", SESSION_WAIT), "Ctrl+,: the settings, their pages")
+	check(l, cdp.type_text(c, "rules") && cdp.wait_for(c, "Draw a thin line under each row of the tables.", SESSION_WAIT), "a search finds a preference")
+	check(l, cdp.click_name(c, "sw") && file_has(prefs, "view.rules\tfalse"), "its switch changes it, kept")
+	check(l, cdp.click_name(c, "sw") && file_has(prefs, "view.rules\ttrue"), "and back")
+	check(l, cdp.key(c, "Escape") && cdp.key(c, "Escape") && cdp.wait_name(c, "settings_button", SESSION_WAIT) && cdp.wait_for(c, "Draw a thin line", SESSION_WAIT, gone = true), "Escape goes back to the sections")
 }
 
 // Selects the row whose PID cell says `pid` (clicked: the list gets the keyboard) and checks that the row selected, as
@@ -240,6 +255,19 @@ wait_gone :: proc(pid: int, mark: string) -> bool {
 	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
 	for time.tick_diff(time.tick_now(), deadline) > 0 {
 		if !has_mark(pid, mark) { return true }
+		time.sleep(SESSION_POLL)
+	}
+	return false
+}
+
+// A setup's install copies the program and, on NixOS, builds the profile of its libraries (nix-build).
+SETUP_WAIT :: 120 * time.Second
+
+@(private = "file")
+wait_present :: proc(path: string, limit: time.Duration) -> bool {
+	deadline := time.tick_add(time.tick_now(), limit)
+	for time.tick_diff(time.tick_now(), deadline) > 0 {
+		if os.exists(path) { return true }
 		time.sleep(SESSION_POLL)
 	}
 	return false

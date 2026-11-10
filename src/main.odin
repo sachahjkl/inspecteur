@@ -21,7 +21,10 @@ USAGE :: `inspecteur: what runs on this computer
                               time went, then at the end what a sample and a frame cost (for inspecteurtool bench)
   inspecteur --demo           the window, with made-up processes, devices, services and sockets in place of the
                               system's (the pictures of the documentation: inspecteurtool shots); it acts on nothing
-  inspecteur setup            the desktop entry and the icon, for this executable (--uninstall, --status)
+  inspecteur --setup          the window, the install's dialog open
+  inspecteur install          installs this copy for the user: the program, its menu entry and icons
+  inspecteur uninstall        takes the install away (the preferences stay)
+  inspecteur status           the install's state (exit 0 installed or a Nix package, 2 to repair, 1 not installed)
   inspecteur prefs            every preference, its value and what it does
   inspecteur version
   --pref name=value           a preference for this run only
@@ -44,12 +47,13 @@ run :: proc(all_args: []string) -> int {
 	for p in problems { fmt.eprintfln("inspecteur: %s", p) }
 	verb := len(args) > 0 ? args[0] : ""
 	switch verb {
-	case "", "--first-frame", "--section", "--demo":
+	case "", "--first-frame", "--section", "--demo", "--setup":
 		opts: Run_Options
 		for i := 0; i < len(args); i += 1 {
 			switch args[i] {
 			case "--first-frame": opts.first_frame = true
 			case "--demo":        opts.demo = true
+			case "--setup":       opts.setup = true
 			case "--section":
 				if i + 1 >= len(args) { fmt.eprint(USAGE); return 2 }
 				i += 1
@@ -62,8 +66,9 @@ run :: proc(all_args: []string) -> int {
 			}
 		}
 		return app_run(&prefs, opts)
-	case "setup":
-		return cmd_setup(args[1:])
+	case "install":   return cmd_install()
+	case "uninstall": return cmd_uninstall()
+	case "status":    return cmd_status()
 	case "prefs":
 		for name in config.sorted_names(&prefs) {
 			r := config.ref_of(&prefs, name)

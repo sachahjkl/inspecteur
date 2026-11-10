@@ -37,15 +37,21 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	app := (^App)(h.user)
 	em := ui.font_size()
 	free_keys := !app.menu.confirm.open && !app.props.open && !app.affinity.open && !app.shortcuts_open && !app.setup.open && !app.diagnosis_open && !ui.ctx_menu_any_open()
-	// typing anywhere filters: a character typed gives the filter the keyboard (an open menu searches its own items)
-	if free_keys { ui.type_to_field(app.search_key) }
-	if free_keys { view_keys(app) }
+	if free_keys && app.settings_open {
+		settings_keys(app)   // (the page's own: its search takes what is typed)
+	} else if free_keys {
+		// typing anywhere filters: a character typed gives the filter the keyboard (an open menu searches its own items)
+		ui.type_to_field(app.search_key)
+		view_keys(app)
+	}
 	ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
 	page := ui.build_box({.Draw_Background}, "###page")
 	if ui.parent(page) {
 		build_title(app, em)
 		ui.next({width = ui.fill(), height = ui.fill()})
-		if ui.row(id = "###body") {
+		if app.settings_open {
+			settings_build(app)
+		} else if ui.row(id = "###body") {
 			build_sidebar(app, em)
 			ui.next({width = ui.fill(), height = ui.pct(1), axis = .Y})
 			if ui.column(id = "###main") {
@@ -271,6 +277,10 @@ build_title :: proc(app: ^App, em: f32) {
 		if sig.clicked { app.shortcuts_open = true }
 		tip_after(sig, cmd_tip(.Shortcuts))
 		theme_button(app, em)
+		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1), font = app.icons})
+		if ui.tags(app.settings_open ? "accent_button" : "ghost_button") { sig = ui.button(fmt.tprintf("%s###settings_button", lucide.SLIDERS_HORIZONTAL)) }
+		if sig.clicked { settings_toggle(app) }
+		tip_after(sig, cmd_tip(.Settings))
 		ui.spacer(ui.px(em * 0.4))
 		_, _ = ui.window_buttons()
 	}

@@ -1,7 +1,8 @@
 name: Release
 
 # A version tag vX.Y.Z (inspecteurtool ship makes it) builds inspecteur and publishes it: the Linux archive with its SHA-256,
-# on a GitHub release whose notes are the changelog's section of that version. The tag must be APP_VERSION's
+# the program alone and its update manifest signed by the secret UPDATE_SIGNING_KEY (what installed copies update
+# themselves from), on a GitHub release whose notes are the changelog's section of that version. The tag must be APP_VERSION's
 # (inspecteurtool package checks).
 on:
   push:
@@ -27,6 +28,8 @@ jobs:
           build/inspecteurtool check
 
       - name: Package
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
         run: build/inspecteurtool package ${{ github.ref_name }}
 
       - name: Publish

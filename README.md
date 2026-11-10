@@ -46,8 +46,10 @@ Information.
 - **Sort** by any column: click its title; click again to reverse. **Filter as you type**, wherever the keyboard is: the
   filter filters the section shown. The tables keep their widths and sort. A text too narrow for its place shows it
   whole when the pointer rests on it.
-- **The application menu**: the welcome page (and `inspecteur setup`) puts Inspecteur in the menu with its icon, and an
-  action per section on its launcher's right click.
+- **Install and updates**: a downloaded copy installs itself for the user (the program, its menu entry with an action
+  per section, its icons); the installed copy updates itself from the signed releases. On NixOS a classic install runs
+  by itself; the Nix package is installed and updated by Nix.
+- **Settings** (Ctrl+, or the title bar's button): every preference on a page, searched as you type, applied at once.
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L); the text size with Ctrl+=, Ctrl+- and Ctrl+0.
 
 ![a group open and the row's menu](docs/screenshots/menu.png)
@@ -77,7 +79,8 @@ The pictures show the demo's made-up machine (`inspecteur --demo`), not a real o
 | Menu, Shift+F10, a right click | the row's menu |
 | Enter, a double click | the row's default action: open an app's group or a process's Properties, Open in Processes, Open file location |
 | Ctrl+Shift+L | light or dark |
-| Ctrl+Shift+I | the welcome page: the application menu, the desktop's task manager |
+| Ctrl+, | the settings |
+| Ctrl+Shift+I | the install: install, repair, uninstall |
 
 | Section | Keys |
 |---|---|
@@ -93,27 +96,27 @@ CPU % is a share of the whole machine: 100 % is every core busy. Preferences: [d
 
 ## Install
 
-- **The archive** of a release: `inspecteur-<version>-linux-x64.tar.gz`, one program; `./inspecteur setup` puts it in the
-  application menu. It needs a Wayland desktop, Vulkan and fontconfig.
+- **The archive** of a release: `inspecteur-<version>-linux-x64.tar.gz`, one program. At its first start it offers to
+  install itself for the user (or `./inspecteur install`): the program in `~/.local/share/inspecteur`, its menu entry and
+  its icons. The installed copy updates itself from the signed releases (`update.auto`). It needs a Wayland desktop,
+  Vulkan and fontconfig. On NixOS the install builds the libraries it needs with `nix-build` and points the copy at them.
 - **Nix**: `nix run git+https://github.com/sachahjkl/inspecteur` (Nix 2.27 or later: the flake asks for its submodule,
   `inputs.self.submodules`; with an older Nix, add `?submodules=1`). A `github:` URL does not bring the submodule: use
   the `git+https` one. The package brings its desktop entry and icons. On a Linux other than NixOS, a program from Nix
   finds no Vulkan driver of the system: start it through [nixGL](https://github.com/nix-community/nixGL)
   (`nix run --impure github:nix-community/nixGL -- inspecteur`).
 
-## The desktop's task manager
+## Install
 
-`inspecteur setup` (or the welcome page) puts Inspecteur in the application menu, with its icon; `inspecteur setup
---uninstall` takes it away. To open Inspecteur from the desktop's own "task manager" key, the welcome page (Ctrl+Shift+I)
-says what the desktop shown wants:
+| | |
+|---|---|
+| `inspecteur --setup`, Ctrl+Shift+I | the install's dialog: Install, Repair, Upgrade, Uninstall, Open the installed copy |
+| `inspecteur install` | installs this copy for the user |
+| `inspecteur uninstall` | takes the install away; the preferences stay |
+| `inspecteur status` | the install's state: exit 0 installed (or a Nix package), 2 to repair, 1 not installed |
 
-- **GNOME**: its button adds the shortcut Ctrl+Shift+Escape that runs `inspecteur` to the custom shortcuts (as Settings >
-  Keyboard > View and Customize Shortcuts > Custom Shortcuts does).
-- **KDE Plasma**: System Settings > Keyboard > Shortcuts > Add New > Command or Script: `inspecteur`, then Ctrl+Shift+Escape
-  (Ctrl+Esc stays Plasma's System Monitor).
-- **shojiwm-win7** opens the program that `SHOJIWM_WIN7_TASK_MANAGER` names: set it to `inspecteur` in the session's
-  environment (on NixOS, `environment.sessionVariables.SHOJIWM_WIN7_TASK_MANAGER = "inspecteur";`).
-- **Another desktop**: bind Ctrl+Shift+Escape to the command `inspecteur` in its keyboard settings.
+A copy that runs from the Nix store is the Nix package's: Nix installs and updates it, and nothing is offered. To open
+Inspecteur with Ctrl+Shift+Escape, bind that key to `inspecteur` in the desktop's keyboard settings.
 
 ## Build
 

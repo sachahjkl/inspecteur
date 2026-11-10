@@ -1,7 +1,9 @@
 # Configuration
 
 Inspecteur reads its preferences from `$XDG_CONFIG_HOME/inspecteur/prefs` (a line `name<TAB>value` each, after the
-first line). `inspecteur prefs` lists them with their values. `--pref name=value` sets one for a single run:
+first line). The settings (Ctrl+, or the title bar's button) show them on a page, searched as you type, each change
+applied at once; the layouts of the tables are not there (the tables set them). `inspecteur prefs` lists them all with their
+values. `--pref name=value` sets one for a single run:
 
 ```sh
 inspecteur --pref view.mode=light --pref processes.refresh_ms=2000
@@ -34,4 +36,5 @@ inspecteur --pref view.mode=light --pref processes.refresh_ms=2000
 | `view.font_size` | 13 | The text size, in logical pixels (8 to 40). Ctrl+= and Ctrl+- change it, Ctrl+0 sets it back to 13. |
 | `view.width` | 1100 | The window's width at start, in logical pixels. |
 | `view.height` | 720 | The window's height at start, in logical pixels. |
-| `setup.welcome` | true | Show the welcome page at the next start: it puts Inspecteur in the application menu and says how a desktop opens it as its task manager. Closing the page sets it to `false`; Ctrl+Shift+I shows the page again. |
+| `update.auto` | true | Check for a new version a while after the start and then every day, download it and put it in place: it runs at the next start. Only the installed copy updates itself; a copy of the Nix store is Nix's to update. |
+| `setup.choice` | (empty) | What was answered to the install's dialog: `installed`, `standalone` (this copy runs on its own: not offered again), or dismissed for a version. |
