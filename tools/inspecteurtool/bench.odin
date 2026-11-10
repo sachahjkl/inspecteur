@@ -10,7 +10,8 @@ package inspecteurtool
 //   when), its processes read and shown. Three starts, each in a new sway.
 // - At rest: the window shown, nobody touching it, the table read again each second: the CPU time of the process over
 //   `seconds`, as a share of one core, its builds, its resident memory at the end, the threads that used the CPU, and
-//   what it measured of itself (a sample, a frame).
+//   what it measured of itself (a sample, a frame). Then the same with the Services and the Connections sections
+//   shown: they read on threads of their own while they are on the screen.
 
 import "core:encoding/json"
 import "core:fmt"
@@ -48,7 +49,13 @@ run_bench :: proc(args: []string) -> int {
 		starts[k] = ms
 		fmt.printfln("start %d: first frame after %.1f ms (in the process, ms: %s)", k + 1, ms, detail)
 		output := strings.clone(s.output, context.temp_allocator)
-		if k == BENCH_STARTS - 1 { rest(&s, seconds) }
+		if k == BENCH_STARTS - 1 {
+			rest(&s, seconds, "at rest")
+			// (the sections that read on threads of their own, shown: what they cost while they are on the screen)
+			for section in ([]struct { key, name: string }{{"ctrl+3", "Services"}, {"ctrl+5", "Connections"}}) {
+				if show(&s, section.key) { rest(&s, seconds, fmt.tprintf("%s shown", section.name)) }
+			}
+		}
 		session_stop(&s)
 		if k == BENCH_STARTS - 1 {
 			// (what the program measured of itself, written as it ended)
@@ -85,9 +92,18 @@ first_frame_ms :: proc(s: ^Session) -> (ms: f64, detail: string, ok: bool) {
 	return
 }
 
-// The CPU use of the window at rest over `seconds`, and its memory.
+// Presses `key` in the window (a section's shortcut).
 @(private = "file")
-rest :: proc(s: ^Session, seconds: int) {
+show :: proc(s: ^Session, key: string) -> bool {
+	c, ok := window_connect(s)
+	if !ok { return false }
+	defer cdp.close(&c)
+	return cdp.key(&c, key)
+}
+
+// The CPU use of the window over `seconds`, nobody touching it, and its memory. `what`: what the window shows.
+@(private = "file")
+rest :: proc(s: ^Session, seconds: int, what: string) {
 	time.sleep(BENCH_SETTLE)
 	pid := s.program.pid
 	b0 := builds(s)
@@ -98,7 +114,7 @@ rest :: proc(s: ^Session, seconds: int) {
 	threads1 := thread_ticks(pid)
 	b1 := builds(s)
 	share := 100 * f64(t1 - t0) / CLOCK_TICKS / f64(seconds)
-	fmt.printfln("at rest: %.2f%% of one core over %d s (%d ticks), %d builds, %.1f MB resident", share, seconds, t1 - t0, b1 - b0 - 1, f64(rss) / (1024 * 1024))
+	fmt.printfln("%s: %.2f%% of one core over %d s (%d ticks), %d builds, %.1f MB resident", what, share, seconds, t1 - t0, b1 - b0 - 1, f64(rss) / (1024 * 1024))
 	// where it went: each thread that used some
 	for tid, after in threads1 {
 		d := after.ticks - (threads0[tid].ticks if tid in threads0 else 0)

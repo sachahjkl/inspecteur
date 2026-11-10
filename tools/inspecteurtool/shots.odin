@@ -1,7 +1,7 @@
 package inspecteurtool
 
-// shots: the pictures of the README, the program's own frames (over the DevTools protocol, session.odin). The processes
-// are the machine's: what runs there when the pictures are made.
+// shots: the pictures of the README, the program's own frames (over the DevTools protocol, session.odin). The processes,
+// services, sockets and details are the machine's: what is there when the pictures are made.
 //
 //   inspecteurtool shots [--out folder]      (default: docs/screenshots)
 
@@ -22,7 +22,8 @@ run_shots :: proc(args: []string) -> int {
 	if run_build({"release"}) != 0 { return 1 }
 	s: Session
 	defer session_stop(&s)
-	if why := session_start(&s, SHOTS_DIR, SHOTS_PORT, {"--pref", "view.mode=dark"}); why != "" { fmt.eprintfln("inspecteurtool shots: %s", why); return 1 }
+	// (the person's session bus: the Services and Startup sections read the user's service manager, nothing more)
+	if why := session_start(&s, SHOTS_DIR, SHOTS_PORT, {"--pref", "view.mode=dark"}, user_bus = true); why != "" { fmt.eprintfln("inspecteurtool shots: %s", why); return 1 }
 	c, ok := window_connect(&s)
 	if !ok { fmt.eprintln("inspecteurtool shots: the window does not answer"); return 1 }
 	defer cdp.close(&c)
@@ -62,6 +63,20 @@ run_shots :: proc(args: []string) -> int {
 		if !cdp.click_name(&c, name) { continue }
 		cdp.wait_idle(&c, SESSION_WAIT)
 		shot(&c, out, pictures[kind], &failed)
+	}
+
+	// the sections that read on threads of their own: each once its reading is shown
+	sections := []struct { key, ready, picture: string }{
+		{"ctrl+3", "running", "services"},
+		{"ctrl+4", " on", "startup"},
+		{"ctrl+5", "listening or open", "connections"},
+		{"ctrl+6", "Operating system", "information"},
+	}
+	for sec in sections {
+		cdp.key(&c, sec.key)
+		if !cdp.wait_for(&c, sec.ready, SESSION_WAIT) { failed = true; continue }
+		time.sleep(500 * time.Millisecond)   // (the icons of the rows, loaded at their first frame)
+		shot(&c, out, sec.picture, &failed)
 	}
 	return failed ? 1 : 0
 }
