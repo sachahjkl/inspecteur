@@ -76,12 +76,12 @@ cores, NVIDIA 595, about 200 processes):
 
 | | |
 |---|---|
-| cold start (process start to the end of the first frame) | about 280 ms (268 to 297, median 276): `/proc` 14 ms, the window 220 to 250 ms, the first frame 30 ms |
-| at rest, the table read each second | 1.0 % of one core, 187 MB resident (most of it the GPU driver) |
+| cold start (process start to the end of the first frame) | about 270 ms (261 to 279, median 270): `/proc` 14 ms, the window 215 to 230 ms, the first frame 30 ms |
+| at rest, the table read each second | 1.0 to 1.1 % of one core, 187 MB resident (most of it the GPU driver) |
 | Services shown (read every 3 s, the selected one's details and journal with them) | 1.6 % of one core |
-| Connections shown (read each second) | 1.9 % of one core |
-| a sample | 7 ms (`stat`, `statm` and `io` of about 200 processes) |
-| a frame | 7.8 ms on the mean of a bench's frames (most of them with Services or Connections shown); at rest, a frame a second |
+| Connections shown (read each second) | 2.0 % of one core |
+| a sample | 7.2 ms (`stat`, `statm` and `io` of about 200 processes) |
+| a frame | 7.7 ms on the mean of a bench's frames (most of them with Services or Connections shown); at rest, a frame a second |
 
 ## Drive the window
 

@@ -4,7 +4,7 @@
 
 Inspecteur is a system monitor and task manager: what runs, what it uses, which services and sockets it has, what starts
 with the session, and a way to end it. It is one small native program, written in [Odin](https://odin-lang.org) on
-[gui_toolkit](https://github.com/sachahjkl/gui_toolkit). Its window comes up in about 280 ms, and it uses about 1 % of one
+[gui_toolkit](https://github.com/sachahjkl/gui_toolkit). Its window comes up in about 270 ms, and it uses about 1 % of one
 core while it refreshes its table each second.
 
 Inspecteur is not a port, but it is strongly inspired by [TaskSlinger](http://taskslinger.net): a task manager of that
