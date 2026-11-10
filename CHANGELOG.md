@@ -5,6 +5,8 @@ and the versions follow [semantic versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-10
+
 ### Added
 
 - **Install and updates as every program of gui_toolkit**: a copy that is not installed offers to install itself for the
@@ -103,3 +105,4 @@ and the versions follow [semantic versioning](https://semver.org/).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
 [0.1.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.1.0
+[0.2.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.2.0

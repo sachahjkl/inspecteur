@@ -10,7 +10,7 @@ import "core:os"
 import ascii "gt:ascii"
 import config "gt:config"
 
-APP_VERSION :: "0.1.0"
+APP_VERSION :: "0.2.0"
 
 USAGE :: `inspecteur: what runs on this computer
 
