@@ -34,7 +34,7 @@ COMMANDS :: [?]Command{
 	{name = "package", about = "[version]: build/dist: the archive of a release build, its SHA-256, the program alone and (with $UPDATE_SIGNING_KEY) its signed update manifest", run = run_package},
 	{name = "update", about = "keygen <file> | pubkey | manifest <program> <version> - <out> | verify <manifest> -: inspecteur's update key and manifests", run = proc(args: []string) -> int { return toolbox.update_command(inspecteur_update.PRODUCT, args) }},
 	{name = "notes", about = "<version>: the changelog's section of that version", run = run_notes},
-	{name = "ship", about = "<version> [--dry-run]: from a clean master, the fragments into the changelog, APP_VERSION, the checks, a commit, the tag, the push", run = run_ship},
+	{name = "ship", about = "<version> [--dry-run]: from a clean master, the fragments into the changelog, APP_VERSION, a commit, the tag, the push (the release workflow checks the tag)", run = run_ship},
 	{name = "changelog", about = "new <type> <subject> <text> | check | preview: the fragments of changelog.d/, one per change a user can see", run = run_changelog},
 	{name = "site", about = "build <site> <out> | check [--site folder] [--shot file.png] [--browser program]: the site's pages", run = run_site},
 }

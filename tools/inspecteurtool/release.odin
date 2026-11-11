@@ -8,8 +8,8 @@ package inspecteurtool
 //   notes <version>         the changelog's section of that version (the notes of its GitHub release)
 //   ship <version> [--dry-run]
 //                           from a clean master: the fragments of changelog.d/ assembled into [<version>] with today's date,
-//                           APP_VERSION set, the checks, a commit, the tag v<version>, the push. The release workflow
-//                           builds the archive and publishes it; the site follows.
+//                           APP_VERSION set, a commit, the tag v<version>, the push. The release workflow checks the
+//                           tag (inspecteurtool check), builds the archive and publishes it; the site follows.
 //   changelog new <type> <subject> <text> | check | preview
 //                           a change a user can see is a fragment of changelog.d/ (docs/development.md), never an edit
 //                           of CHANGELOG.md
@@ -32,7 +32,8 @@ DIST_FILES := [?][2]string{{"README.md", "README.md"}, {"LICENSE", "LICENSE"}, {
 release_config :: proc() -> release.Config {
 	return {
 		name = "inspecteur", repository = REPOSITORY, changelog = CHANGELOG, version_file = VERSION_FILE, version_line = VERSION_LINE,
-		program = PROGRAM, dist = "build/dist", files = DIST_FILES[:], check = proc() -> int { return run_check(nil) },
+		// (no check of its own before the tag: the release workflow runs inspecteurtool check on the tag, then builds)
+		program = PROGRAM, dist = "build/dist", files = DIST_FILES[:],
 		update = inspecteur_update.PRODUCT,
 	}
 }
