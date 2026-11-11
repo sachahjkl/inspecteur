@@ -16,7 +16,7 @@ VERSION_MARK :: "{{version}}"
 
 // Where the site is published, what it is: the one place that says it.
 SITE_META :: tk_site.Meta{
-	url         = "https://inspecteur.sacha.house/",
+	url         = "https://inspecteur.froment.software/",
 	name        = "inspecteur",
 	repository  = REPOSITORY,
 	tagline     = "A fast native task manager for Linux",
