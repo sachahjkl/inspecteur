@@ -6,6 +6,8 @@ and the versions follow [semantic versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Ctrl held pauses the refresh**, as in Windows' Task Manager: the rows stand still under the pointer, and the footer
+  says "Paused while Ctrl is held" until it is let go (gui_toolkit 0.189.0, `ui.key_held`).
 - **Columns moved by their titles**: a title dragged sideways moves its column, in Processes, Services, Startup and
   Connections; the order is kept (`processes.order`, `services.order`, `startup.order`, `connections.order`).
 - **A third click on a title leaves the rows unsorted**: as they are read (the processes by PID); kept as

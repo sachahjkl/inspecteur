@@ -54,6 +54,7 @@ App :: struct {
 	table:       Table,
 	next_sample: time.Tick,
 	paused:      bool,              // the refresh is paused (Ctrl+Space): nothing is read but on F5
+	held:        bool,              // Ctrl is held: the refresh waits for its release, as in Windows' Task Manager (view_build)
 	refresh_menu: ui.Key,           // the menu of the refresh's speed (view.odin)
 	refresh_rect: ui.Rect,          // its button in the title bar, as last laid out (the menu opens under it)
 
@@ -196,8 +197,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	}
 	for !platform.is_closed(win) {
 		journal_windows_wait(app)
-		if !app.paused && time.tick_diff(app.next_sample, time.tick_now()) >= 0 { refresh(app) }
-		if !app.paused { services_tick(app) }
+		if !app.paused && !app.held && time.tick_diff(app.next_sample, time.tick_now()) >= 0 { refresh(app) }
+		if !app.paused && !app.held { services_tick(app) }
 		sections_take(app)
 		updates_follow(app)
 		t_frame := time.tick_now()
@@ -359,9 +360,9 @@ row_process :: proc(app: ^App, r: Row) -> (p: ^Proc, ok: bool) {
 	return
 }
 
-// The milliseconds until the next sample (at least 1; max(int) while the refresh is paused).
+// The milliseconds until the next sample (at least 1; max(int) while the refresh is paused or Ctrl is held).
 until_sample :: proc(app: ^App) -> int {
-	if app.paused { return max(int) }
+	if app.paused || app.held { return max(int) }   // (Ctrl's release wakes the window)
 	return max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), app.next_sample))) + 1, 1)
 }
 

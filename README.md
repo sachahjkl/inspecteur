@@ -53,10 +53,10 @@ Information.
 - **Every action has its key**, said in its menu line and its button's tooltip. The **command palette** (Ctrl+K,
   Ctrl+Shift+P) finds any action or section by its words; **F1** lists every key.
 - **Sort** by any column: click its title; click again to reverse, a third time for the rows as they are read. **Move a
-  column** by dragging its title sideways. **Filter as you type**, wherever the keyboard is: the filter filters the
-  section shown. The tables keep their widths, the order of their columns and their sort; the window opens on the
-  section shown last, the CPU's page as it was left. A text too narrow for its place shows it whole when the pointer
-  rests on it.
+  column** by dragging its title sideways. Hold **Ctrl** to stop the refresh while you look (the footer says so).
+  **Filter as you type**, wherever the keyboard is: the filter filters the section shown. The tables keep their widths,
+  the order of their columns and their sort; the window opens on the section shown last, the CPU's page as it was left.
+  A text too narrow for its place shows it whole when the pointer rests on it.
 - **Install and updates**: a downloaded copy installs itself for the user (the program, its menu entry with an action
   per section, its icons); the installed copy updates itself from the signed releases. On NixOS a classic install runs
   by itself; the Nix package is installed and updated by Nix.

@@ -339,8 +339,10 @@ live_restart :: proc(l: ^Live) {
 	// three clicks on PID's title: lowest first, highest first, none
 	for _ in 0 ..< 3 { cdp.click_name(c, "hd_1"); cdp.wait_idle(c, SESSION_WAIT) }
 	check(l, file_has(prefs, "processes.sort\tnone"), "a third click: unsorted, kept")
+	// (each part of the table goes by PID: the pinned rows (live_pin), the apps, the background processes; at most one
+	// turn between two parts)
 	up := column_numbers(c, "c1")
-	check(l, turns(up, ascending = true) <= 1, "unsorted, the rows go by PID (%d turns)", turns(up, true))
+	check(l, turns(up, ascending = true) <= 2, "unsorted, the rows go by PID (%d turns)", turns(up, true))
 	pid_before := cdp.find_name(c, "hd_1")
 	name_before := cdp.find_name(c, "hd_0")
 	check(l, cdp.key(c, "ctrl+3") && cdp.key(c, "ctrl+g") && cdp.wait_name(c, "core_box0", SESSION_WAIT), "Performance, a graph per logical processor")
@@ -355,7 +357,12 @@ live_restart :: proc(l: ^Live) {
 	check(l, len(name_after) == 1 && abs(name_after[0].w - name_before[0].w) < 2, "the Name column keeps its width (%.0f px, then %.0f)", name_before[0].w, len(name_after) == 1 ? name_after[0].w : 0)
 	check(l, len(cpu_after) == 1 && len(pid_after) == 1 && cpu_after[0].x < pid_after[0].x, "CPU's column is still before PID's")
 	again := column_numbers(c, "c1")
-	check(l, turns(again, ascending = true) <= 1, "still unsorted, by PID (%d turns)", turns(again, true))
+	check(l, turns(again, ascending = true) <= 2, "still unsorted, by PID (%d turns)", turns(again, true))
+	// Ctrl held: the refresh waits, and the footer says so; released, it goes on
+	_, down := cdp.call(c, "Input.dispatchKeyEvent", `{"type":"keyDown","key":"Control","modifiers":2}`)
+	check(l, down && cdp.wait_for(c, "Paused while Ctrl is held", SESSION_WAIT), "Ctrl held: the footer says the refresh waits")
+	_, released := cdp.call(c, "Input.dispatchKeyEvent", `{"type":"keyUp","key":"Control","modifiers":0}`)
+	check(l, released && cdp.wait_for(c, "Paused while Ctrl is held", SESSION_WAIT, gone = true), "Ctrl let go: the refresh goes on")
 }
 
 // A mouse event of the left button at x, y (the window's pixels).

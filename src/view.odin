@@ -36,6 +36,9 @@ METER_FULL :: 0.9
 view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	app := (^App)(h.user)
 	em := ui.font_size()
+	// Ctrl held: the rows stand still under the pointer (a key pressed before the window had the keyboard is not held:
+	// the compositor's Ctrl+Shift+Escape that opened it)
+	app.held = ui.key_held(.Ctrl)
 	free_keys := !app.menu.confirm.open && !app.props.open && !app.affinity.open && !app.shortcuts_open && !app.setup.open && !app.diagnosis_open && !app.palette.open && !ui.ctx_menu_any_open()
 	if free_keys && app.settings_open {
 		settings_keys(app)   // (the page's own: its search takes what is typed)
@@ -428,7 +431,7 @@ build_footer :: proc(app: ^App, em: f32) {
 			counter(app, "f_cpu", lucide.CPU, fmt.tprintf("%.0f%%", app.machine.cpu), em)
 			counter(app, "f_mem", lucide.LAYERS_2, fmt.tprintf("%.0f%%", app.machine.mem.total > 0 ? 100 * f64(mem_used(&app.machine)) / f64(app.machine.mem.total) : 0), em)
 			counter(app, "f_procs", lucide.LAYOUT_LIST, fmt.tprintf("%d", len(app.sampler.procs)), em)
-			counter(app, "f_refresh", app.paused ? lucide.PAUSE : lucide.REFRESH_CW, refresh_text(app), em)
+			counter(app, "f_refresh", app.paused || app.held ? lucide.PAUSE : lucide.REFRESH_CW, refresh_text(app), em)
 		}
 		ui.spacer(ui.px(em * 0.6))
 	}
@@ -506,6 +509,7 @@ REFRESH_SPEEDS := [?]struct { name: string, ms: int }{{"High: 0.5 s", 500}, {"No
 // "1 s", "0.5 s", "Paused": the footer's.
 refresh_text :: proc(app: ^App) -> string {
 	if app.paused { return "Paused" }
+	if app.held { return "Paused while Ctrl is held" }
 	return app.settings.refresh_ms % 1000 == 0 ? fmt.tprintf("%d s", app.settings.refresh_ms / 1000) : fmt.tprintf("%.1f s", f64(app.settings.refresh_ms) / 1000)
 }
 
