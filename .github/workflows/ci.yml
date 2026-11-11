@@ -18,42 +18,35 @@ permissions:
 
 jobs:
   linux:
+    # the flake's development shell (nix develop), as on a developer's machine: Odin, cargo, sway, Mesa's lavapipe, from the
+    # NixOS cache, no distribution's package mirror in the way. On the runner itself, not in a container: the live test reads
+    # the system's processes and its systemd services, and sway will not start as root.
     name: Linux x64
     runs-on: ubuntu-24.04
-    container: debian:bookworm
     timeout-minutes: 40
     steps:
-      # Debian 12 (bookworm): its packages from deb.debian.org, not from the runner's Ubuntu mirrors (their DNS failed for hours),
-      # and its glibc 2.36: the oldest a Linux build then needs. First: checkout needs git for the submodules.
-      - name: Debian's packages
-        run: apt-get update -qq && apt-get install -y -qq --no-install-recommends git ca-certificates curl jq xz-utils zstd unzip clang lld libfontconfig-dev sway mesa-vulkan-drivers libvulkan1 libxkbcommon0 >/dev/null
-
       - uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - uses: ./.github/actions/setup-odin-linux
+      - uses: DeterminateSystems/nix-installer-action@v16
+      - uses: DeterminateSystems/magic-nix-cache-action@v8
 
       # (the toolkit's text library: cargo's target directory, keyed by its sources)
       - uses: actions/cache@v4
         with:
-          path: |
-            ext/gui_toolkit/build/text
-            ~/.cargo/registry
-          key: text-linux-${{ hashFiles('ext/gui_toolkit/native/text/**') }}
+          path: ext/gui_toolkit/build/text
+          key: text-linux-nix-${{ hashFiles('ext/gui_toolkit/native/text/**', 'flake.lock') }}
 
-      - name: inspecteurtool check
+      - name: inspecteurtool check, live
         run: |
-          odin build tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/inspecteurtool -vet
-          build/inspecteurtool check
-
-
-      - name: inspecteurtool live
-        # (sway will not start as root, the container's user: a user of its own runs it, the tree its own)
-        run: |
-          useradd -m live
-          chown -R live: .
-          runuser -u live -- build/inspecteurtool live --keep
+          nix develop --command sh -c '
+            set -e
+            mkdir -p build
+            odin build tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/inspecteurtool -vet
+            build/inspecteurtool check
+            build/inspecteurtool live --keep
+          '
 
       - uses: actions/upload-artifact@v4
         if: always()

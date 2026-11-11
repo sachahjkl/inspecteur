@@ -155,7 +155,8 @@
 
     devShells.${system}.default = pkgs.mkShell {
       # (sway: inspecteurtool live and bench)
-      packages = [odin] ++ (with pkgs; [cargo rustc sway]) ++ preCommitCheck.enabledPackages;
+      # (dbus: sway starts its session bus with dbus-run-session; the one of the system would load the shell's libdbus)
+      packages = [odin] ++ (with pkgs; [cargo rustc sway dbus]) ++ preCommitCheck.enabledPackages;
       buildInputs = [pkgs.fontconfig];
       shellHook =
         preCommitCheck.shellHook
