@@ -1,11 +1,11 @@
 name: CI
 
-# Every push to main and every pull request: inspecteurtool check (odin check -vet of the program and the tool, the unit tests,
+# Every push to master and every pull request: inspecteurtool check (odin check -vet of the program and the tool, the unit tests,
 # a release build), then inspecteurtool live (the real program in a headless sway: the window
 # over the DevTools protocol, rendered by Mesa's lavapipe). The program is kept as an artifact.
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
   workflow_dispatch:
 
