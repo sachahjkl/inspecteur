@@ -9,7 +9,9 @@ and the versions follow [semantic versioning](https://semver.org/).
 
 - **Mission Control** (Ctrl+1; the other sections Ctrl+2 to Ctrl+7): the whole machine on one page, in panels of
   gui_toolkit's dock that the user moves, stacks, resizes, floats, closes and brings back; the layout as at first; the
-  layout kept (`mission.layout`). A click on a line goes to its section.
+  layout kept (`mission.layout`). A click on a line goes to its section. Its Health panel: the state in a word and its
+  colour, a trace as a heart monitor's (a beat per sample, as high as the CPU was busy), an (i) whose tooltip says each
+  finding.
 - **A horizontal scroll bar** under the tables wider than their room.
 - **One Inspecteur at a time**: a second start (Ctrl+Shift+Escape again, a launcher, `--section`) shows its section in
   the one that runs, which comes to the front.

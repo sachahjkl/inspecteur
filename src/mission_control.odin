@@ -12,6 +12,7 @@ package inspecteur
 import "core:fmt"
 import "core:slice"
 import "core:strings"
+import "gt:draw"
 import lucide "gt:lucide"
 import "gt:ui"
 
@@ -184,28 +185,110 @@ mission_machine :: proc(app: ^App, em: f32) {
 	ui.spacer(ui.px(em * 0.4))
 }
 
-// What the diagnosis says, the worst first (F2 shows it whole).
+// The machine's pulse: a word for the state the diagnosis finds, in its colour; the (i) whose tooltip says each finding;
+// a trace as a heart monitor's, a beat per sample of the CPU, as high as the processors were busy, the newest at the
+// right. It moves with the samples: no frame between two.
 @(private = "file")
 mission_health :: proc(app: ^App, em: f32) {
-	for f, i in diagnose(app) {
-		icon := f.level == .Bad ? lucide.ALERT_CIRCLE : f.level == .Warn ? lucide.TRIANGLE_ALERT : lucide.CHECK
-		tag := f.level == .Bad ? "bad" : f.level == .Warn ? "warn" : "good"
-		ui.next({width = ui.fill(), height = ui.children_sum(), axis = .X})
-		if ui.row(.Start, {}, fmt.tprintf("###mc_f%d", i)) {
-			ui.spacer(ui.px(em * 0.8))
-			if ui.tags(tag) {
-				// (a height of its own: a glyph of the row's height would be of a far ancestor's, in a row sized by its text)
-				ui.next({width = ui.px(em * 1.6), height = ui.px(em * 1.6), font = app.icons, font_size = em * 1.05, text_align = .Center, text_pad = 0})
-				ui.build_box({.Draw_Text, .No_Text_Trunc}, fmt.tprintf("%s###i", icon))
-			}
-			ui.spacer(ui.px(em * 0.3))
-			ui.next({width = ui.fill(), font_size = em * 0.95})
-			if ui.style({text_pad = em * 0.2}) { ui.paragraph(fmt.tprintf("%s###t", ui.text_shown(f.text))) }
-			ui.spacer(ui.px(em * 0.8))
+	findings := diagnose(app)
+	worst := Finding_Level.Fine
+	for f in findings { worst = max(worst, f.level) }
+	tag := worst == .Bad ? "bad" : worst == .Warn ? "warn" : "good"
+	word := worst == .Bad ? "Struggling" : worst == .Warn ? "Under strain" : "Healthy"
+	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.2)), axis = .X, cross = .Center})
+	if ui.row(.Center, {}, "###mc_health_head") {
+		ui.spacer(ui.px(em * 0.8))
+		if ui.tags(tag) {
+			ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0, font_size = em * 1.25})
+			ui.label(fmt.tprintf("%s###mc_health_word", word))
 		}
-		ui.spacer(ui.px(em * 0.3))
+		ui.spacer(ui.px(em * 0.6))
+		if ui.tags("weak") {
+			ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
+			ui.label(fmt.tprintf("CPU %.0f%%###mc_health_cpu", app.machine.cpu))
+		}
+		ui.spacer(ui.fill())
+		// (i): every finding, in its words
+		ui.next({width = ui.px(em * 1.8), height = ui.px(em * 1.8), font = app.icons, font_size = em, text_align = .Center, text_pad = 0, cursor = .Help})
+		info: ui.Signal
+		if ui.tags("weak") { info = ui.signal(ui.build_box({.Clickable, .Draw_Text, .No_Text_Trunc, .Draw_Hot_Effects}, fmt.tprintf("%s###mc_health_info", lucide.INFO))) }
+		if info.clicked { app.diagnosis_open = true }
+		if ui.hovered_for(info, TIP_DELAY_S) {
+			if ui.tooltip() {
+				ui.next({width = ui.px(em * 24), height = ui.children_sum(), axis = .Y})
+				if ui.column(id = "###mc_health_tip") {
+					for f, k in findings {
+						ui.next({width = ui.fill()})
+						if ui.style({text_pad = em * 0.3}) { ui.paragraph(fmt.tprintf("%s %s###f%d", f.level == .Bad ? "●" : f.level == .Warn ? "▲" : "✓", ui.text_shown(f.text), k)) }
+					}
+					if ui.tags("weak") {
+						ui.next({width = ui.fill()})
+						if ui.style({text_pad = em * 0.3}) { ui.paragraph(fmt.tprintf("A click, or %s: why it is slow, in full.###more", ui.command_shortcut(COMMANDS[.Diagnose]))) }
+					}
+				}
+			}
+		}
+		ui.spacer(ui.px(em * 0.4))
 	}
-	if mission_more(app, "mc_health_more", cmd_tip(.Diagnose), em) { app.diagnosis_open = true }
+	d := ui.frame_new(Pulse_Draw)
+	d.values = ui.value_history_values(&app.machine.cpu_hist, ui.frame_allocator())
+	if ui.tags(tag) { d.color = ui.color("text") }
+	d.grid = ui.color("border")
+	d.scale, d.em = ui.scale(), em
+	ui.next({width = ui.fill(), height = ui.fill()})
+	ui.custom("###mc_pulse", pulse_draw, d)
+}
+
+@(private = "file")
+Pulse_Draw :: struct { values: []f32, color, grid: ui.Color, scale, em: f32 }
+
+// One beat, as a heart monitor draws it: x along the beat (0..1), y as a share of the spike's height (up is positive).
+@(private = "file", rodata)
+PULSE_BEAT := [?][2]f32{{0, 0}, {0.28, 0}, {0.33, 0.09}, {0.38, 0}, {0.42, -0.10}, {0.46, 1}, {0.50, -0.30}, {0.55, 0}, {0.66, 0.16}, {0.75, 0}, {1, 0}}
+
+// A beat's width, in ems: the trace shows as many as fit.
+@(private = "file") PULSE_BEAT_EM :: 3.6
+
+@(private = "file")
+pulse_draw :: proc(b: ^ui.Box, user: rawptr, dc: ^draw.Context) {
+	d := (^Pulse_Draw)(user)
+	r := b.rect
+	w, h := r.max.x - r.min.x, r.max.y - r.min.y
+	if w < 4 || h < 4 { return }
+	p := max(1, d.scale)
+	// (a faint grid, as on the monitor's glass)
+	g := d.grid
+	g.a *= 0.35
+	for k in 1 ..< 4 { draw.rect(dc, {{r.min.x, r.min.y + h * f32(k) / 4}, {r.max.x, r.min.y + h * f32(k) / 4 + p}}, g) }
+	beat := d.em * PULSE_BEAT_EM
+	n := min(len(d.values), int(w / beat) + 1)
+	if n == 0 { return }
+	values := d.values[len(d.values) - n:]
+	base := r.min.y + h * 0.68
+	room := h * 0.6
+	pts := make([dynamic]draw.Vec2, 0, n * len(PULSE_BEAT), context.temp_allocator)
+	for v, i in values {
+		x0 := r.max.x - f32(n - i) * beat
+		amp := room * (0.18 + 0.82 * clamp(v / 100, 0, 1))
+		for q in PULSE_BEAT { append(&pts, draw.Vec2{x0 + q[0] * beat, base - q[1] * amp}) }
+	}
+	// (the older beats fade: the trace is drawn in pieces, the newest brightest; a soft glow under the line)
+	pieces :: 4
+	per := max(len(pts) / pieces, 2)
+	for k in 0 ..< pieces {
+		lo := k * per
+		hi := k == pieces - 1 ? len(pts) : min((k + 1) * per + 1, len(pts))
+		if hi - lo < 2 { continue }
+		c := d.color
+		c.a *= 0.35 + 0.65 * f32(k + 1) / pieces
+		glow := c
+		glow.a *= 0.25
+		draw.polyline(dc, pts[lo:hi], 3.5 * p, glow)
+		draw.polyline(dc, pts[lo:hi], 1.8 * p, c)
+	}
+	// the newest point: a bright dot, where the trace is written
+	last := pts[len(pts) - 1]
+	draw.rect(dc, {last - 3 * p, last + 3 * p}, d.color, 3 * p)
 }
 
 // The processes that use the most CPU (or private memory), each with its share as a bar; a click shows it in Processes.
