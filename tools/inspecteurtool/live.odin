@@ -214,9 +214,12 @@ select_child :: proc(l: ^Live, pid: string) -> bool {
 
 // The index, among the cells named c1 (the PID column), of the one that says `pid`; -1 when none does. (By the cells'
 // name and place: the pid's text could be inside the mark of the command line.)
+// The last row whose PID cell says `pid`: the process's own (an app's group shows its first process's PID too, above
+// it: another Inspecteur of the session makes Inspecteur a group).
 pid_cell :: proc(c: ^cdp.Client, pid: string) -> int {
-	for b, i in cdp.find_name(c, "c1") { if b.text == pid { return i } }
-	return -1
+	at := -1
+	for b, i in cdp.find_name(c, "c1") { if b.text == pid { at = i } }
+	return at
 }
 
 // The accessible name of the list's selected row ("" when none is selected), from the accessibility tree.

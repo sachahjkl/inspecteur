@@ -364,7 +364,8 @@ mission_network :: proc(app: ^App, em: f32) {
 	most := len(list) > 0 ? f32(list[0].n) : 1
 	for h, k in list[:min(len(list), MISSION_TOP)] {
 		name := fmt.tprintf("PID %d", h.pid)
-		if p := find_proc(&app.sampler, h.pid, h.start); p != nil { name = p.name }
+		// (by its pid alone: a socket's process often comes with no start time)
+		for &q in app.sampler.procs { if q.pid == h.pid && !q.ended { name = q.name; break } }
 		if mission_line(app, fmt.tprintf("mc_net_%d", k), name, fmt.tprintf("PID %d", h.pid), count_text(h.n, "socket", "sockets"), f32(h.n) / most, "", em) {
 			tab_show(app, .Connections)
 		}
@@ -432,6 +433,11 @@ mission_system :: proc(app: ^App, em: f32) {
 
 // A line of a list panel: its name, a faint detail, its value at the right, a bar of its share (-1: none), in the
 // colour of `tag`. True when clicked.
+// The panel's width, from which a line keeps less: under MISSION_FULL_EM no detail, under MISSION_BAR_EM no bar either.
+// The value is never cut; the name is, with an ellipsis, and its tooltip says it whole.
+@(private = "file") MISSION_FULL_EM :: 26
+@(private = "file") MISSION_BAR_EM :: 17
+
 @(private = "file")
 mission_line :: proc(app: ^App, id, name, detail, value: string, share: f32, tag: string, em: f32) -> bool {
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 1.9)), axis = .X, cross = .Center})
@@ -440,24 +446,30 @@ mission_line :: proc(app: ^App, id, name, detail, value: string, share: f32, tag
 	ui.pop_tags()
 	b.cursor = .Hand
 	sig := ui.signal(b)
+	// (the row's width at the last layout: 0 at its first build, shown whole then)
+	wide := b.size.x <= 0 || b.size.x >= em * MISSION_FULL_EM
+	bar := b.size.x <= 0 || b.size.x >= em * MISSION_BAR_EM
 	if ui.parent(b) {
 		ui.spacer(ui.px(em * 0.8))
 		if tag != "" { ui.push_tags(tag) }
 		ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0})
-		label_tip(fmt.tprintf("%s###n", ui.text_shown(name)), name)
+		label_tip(fmt.tprintf("%s###n", ui.text_shown(name)), wide || detail == "" ? name : fmt.tprintf("%s, %s", name, detail))
 		if tag != "" { ui.pop_tags() }
-		if detail != "" {
+		if detail != "" && wide {
 			if ui.tags("weak") {
-				ui.next({width = ui.px(em * 6.5), height = ui.pct(1), text_pad = 0, font_size = em * 0.9})
+				ui.spacer(ui.px(em * 0.5))
+				ui.next({width = ui.px(em * 6), height = ui.pct(1), text_pad = 0, font_size = em * 0.9})
 				label_tip(fmt.tprintf("%s###d", ui.text_shown(detail)), detail)
 			}
 		}
-		if share >= 0 {
-			ui.next({width = ui.px(em * 5), height = ui.px(em * 0.5)})
+		if share >= 0 && bar {
+			ui.spacer(ui.px(em * 0.5))
+			ui.next({width = ui.px(em * 4.5), height = ui.px(em * 0.5)})
 			ui.meter_bar("###bar", clamp(share, 0, 1))
-			ui.spacer(ui.px(em * 0.6))
 		}
-		ui.next({width = ui.px(em * 6), height = ui.pct(1), text_pad = 0, text_align = .Right})
+		// (the value as wide as its text: never cut)
+		ui.spacer(ui.px(em * 0.6))
+		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
 		ui.label(fmt.tprintf("%s###v", value))
 		ui.spacer(ui.px(em * 0.8))
 	}
@@ -467,7 +479,8 @@ mission_line :: proc(app: ^App, id, name, detail, value: string, share: f32, tag
 @(private = "file")
 mission_note :: proc(text: string, em: f32) {
 	if ui.tags("weak") {
-		ui.next({width = ui.fill(), height = ui.children_sum(), text_pad = em * 0.8})
+		// (its height: its lines'; a paragraph has no children to sum)
+		ui.next({width = ui.fill(), text_pad = em * 0.8})
 		ui.paragraph(fmt.tprintf("%s###mc_note_%s", ui.text_shown(text), ui.text_shown(text)))
 	}
 }
