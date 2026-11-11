@@ -51,12 +51,10 @@ build_performance :: proc(app: ^App, em: f32) {
 			ui.next({width = ui.px(em * 21), height = ui.px(ui.dense(em * 1.9))})
 			labels := []string{"Overall", "Logical processors"}
 			sel := app.cpu_grid ? 1 : 0
-			if ui.segmented("###cpu_view", labels, &sel) { app.cpu_grid = sel == 1 }
-			ui.spacer(ui.px(em * 0.4))
-			if ui.tags("weak") {
-				ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0, font_size = em * 0.85})
-				ui.label(fmt.tprintf("%s###cpu_view_key", ui.command_shortcut(COMMANDS[.Cpu_Grid])))
-			}
+			// (the key that switches them, in each segment's tooltip)
+			key := ui.command_shortcut(COMMANDS[.Cpu_Grid])
+			tips := []string{fmt.tprintf("One graph for all the processors (%s)", key), fmt.tprintf("One graph per logical processor (%s)", key)}
+			if ui.segmented("###cpu_view", labels, &sel, tips) { app.cpu_grid = sel == 1 }
 		}
 		ui.spacer(ui.px(em * 0.6))
 	}

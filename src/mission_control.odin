@@ -5,7 +5,9 @@ package inspecteur
 // failed ones first), the network's sockets, what starts with the session, the system. Each panel is a tab that can be
 // dragged into another stack, beside one, to an edge, or out to float; the line between two stacks resizes them; a
 // panel can be closed and brought back from the panels' menu; Mission Control: the layout as at first (the palette, the
-// bar's button) sets it back. The layout is kept (mission.layout). A click on a line goes to its section.
+// bar's button) sets it back. The layout is kept (mission.layout). A click on a line goes to its section; a right click
+// opens its menu: its section, and what is related to it (a process's properties, service and connections; a service's
+// process, details and journal).
 //
 // It reads nothing of its own: each section's reading (Mission Control asks every section to read while it is shown).
 
@@ -38,8 +40,20 @@ MISSION_DEFAULT :: "dock1 y0.320([*machine] y0.500(x0.340([*health] x0.500([*cpu
 @(private = "file") MISSION_TOP :: 8
 
 Mission_Control :: struct {
-	dock: ui.Dock,
-	menu: ui.Key,   // the panels' menu
+	dock:      ui.Dock,
+	menu:      ui.Key,   // the panels' menu
+	line_menu: ui.Key,   // a line's menu (a right click)
+	line:      Mission_Line,
+}
+
+// What a line shows, for its menu: a process, a service or a startup item.
+Mission_Line_Kind :: enum u8 { None, Process, Service, Startup }
+
+Mission_Line :: struct {
+	kind:  Mission_Line_Kind,
+	pid:   i32,      // Process
+	start: u64,      // Process: its identity with the pid
+	name:  string,   // owned: Service, Startup
 }
 
 mission_init :: proc(app: ^App) {
@@ -49,7 +63,10 @@ mission_init :: proc(app: ^App) {
 	}
 }
 
-mission_destroy :: proc(app: ^App) { ui.dock_destroy(&app.mission.dock) }
+mission_destroy :: proc(app: ^App) {
+	ui.dock_destroy(&app.mission.dock)
+	delete(app.mission.line.name)
+}
 
 @(private = "file")
 mission_id_of :: proc(user: rawptr, name: string) -> (u32, bool) {
@@ -102,6 +119,7 @@ build_mission :: proc(app: ^App, em: f32) {
 	res := ui.dock_end(d)
 	if res.closed != ui.DOCK_NO_PANEL { say(app, "%s closed: the panels' menu brings it back", MISSION_TITLES[Mission_Panel(res.closed)]) }
 	mission_menu(app, em)
+	mission_line_menu(app, em)
 }
 
 // The bar's right: the panels' menu, the layout as at first.
@@ -309,7 +327,7 @@ mission_busiest :: proc(app: ^App, em: f32, memory: bool) {
 		p := procs[i]
 		value := memory ? size_text(p.private) : fmt.tprintf("%.1f%%", p.cpu)
 		share := memory ? f32(p.private) / most : p.cpu / most
-		if mission_line(app, fmt.tprintf("mc_%s_%d", memory ? "mem" : "cpu", k), p.name, fmt.tprintf("PID %d", p.pid), value, share, "", em) {
+		if mission_line(app, fmt.tprintf("mc_%s_%d", memory ? "mem" : "cpu", k), p.name, fmt.tprintf("PID %d", p.pid), value, share, "", em, {kind = .Process, pid = p.pid, start = p.start}) {
 			processes_reveal(app, p.pid, p.start)
 		}
 	}
@@ -330,10 +348,8 @@ mission_services :: proc(app: ^App, em: f32) {
 	k := 0
 	for u in s.list.units {
 		if u.active != "failed" { continue }
-		if mission_line(app, fmt.tprintf("mc_svc_%d", k), u.name, u.description, "failed", -1, "bad", em) {
-			delete(s.select_name)
-			s.select_name = strings.clone(u.name)
-			tab_show(app, .Services)
+		if mission_line(app, fmt.tprintf("mc_svc_%d", k), u.name, u.description, "failed", -1, "bad", em, {kind = .Service, name = u.name}) {
+			mission_show_service(app, u.name)
 		}
 		k += 1
 		if k >= MISSION_TOP { break }
@@ -365,9 +381,10 @@ mission_network :: proc(app: ^App, em: f32) {
 	for h, k in list[:min(len(list), MISSION_TOP)] {
 		name := fmt.tprintf("PID %d", h.pid)
 		// (by its pid alone: a socket's process often comes with no start time)
-		for &q in app.sampler.procs { if q.pid == h.pid && !q.ended { name = q.name; break } }
-		if mission_line(app, fmt.tprintf("mc_net_%d", k), name, fmt.tprintf("PID %d", h.pid), count_text(h.n, "socket", "sockets"), f32(h.n) / most, "", em) {
-			tab_show(app, .Connections)
+		start := h.start
+		for &q in app.sampler.procs { if q.pid == h.pid && !q.ended { name, start = q.name, q.start; break } }
+		if mission_line(app, fmt.tprintf("mc_net_%d", k), name, fmt.tprintf("PID %d", h.pid), count_text(h.n, "socket", "sockets"), f32(h.n) / most, "", em, {kind = .Process, pid = h.pid, start = start}) {
+			mission_show_connections(app, h.pid)
 		}
 	}
 }
@@ -383,7 +400,7 @@ mission_startup :: proc(app: ^App, em: f32) {
 	k := 0
 	for it in s.list.items {
 		if !it.enabled { continue }
-		if mission_line(app, fmt.tprintf("mc_start_%d", k), it.name, it.command, it.status, -1, "", em) { tab_show(app, .Startup) }
+		if mission_line(app, fmt.tprintf("mc_start_%d", k), it.name, it.command, it.status, -1, "", em, {kind = .Startup, name = it.name}) { tab_show(app, .Startup) }
 		k += 1
 		if k >= MISSION_TOP { break }
 	}
@@ -432,14 +449,15 @@ mission_system :: proc(app: ^App, em: f32) {
 }
 
 // A line of a list panel: its name, a faint detail, its value at the right, a bar of its share (-1: none), in the
-// colour of `tag`. True when clicked.
+// colour of `tag`. True when clicked anywhere on it; a right click opens the menu of what it shows (`line`, its name
+// not kept: it is cloned when the menu opens). Its texts are plain labels: a clickable label would take the click.
 // The panel's width, from which a line keeps less: under MISSION_FULL_EM no detail, under MISSION_BAR_EM no bar either.
 // The value is never cut; the name is, with an ellipsis, and its tooltip says it whole.
 @(private = "file") MISSION_FULL_EM :: 26
 @(private = "file") MISSION_BAR_EM :: 17
 
 @(private = "file")
-mission_line :: proc(app: ^App, id, name, detail, value: string, share: f32, tag: string, em: f32) -> bool {
+mission_line :: proc(app: ^App, id, name, detail, value: string, share: f32, tag: string, em: f32, line: Mission_Line) -> bool {
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 1.9)), axis = .X, cross = .Center})
 	ui.push_tags("list_row")
 	b := ui.build_box({.Clickable, .Draw_Hot_Effects, .Hot_Within}, fmt.tprintf("###%s", id))
@@ -449,18 +467,24 @@ mission_line :: proc(app: ^App, id, name, detail, value: string, share: f32, tag
 	// (the row's width at the last layout: 0 at its first build, shown whole then)
 	wide := b.size.x <= 0 || b.size.x >= em * MISSION_FULL_EM
 	bar := b.size.x <= 0 || b.size.x >= em * MISSION_BAR_EM
+	if sig.right_clicked { mission_line_menu_open(app, line, ui.mouse_pos()) }
 	if ui.parent(b) {
 		ui.spacer(ui.px(em * 0.8))
 		if tag != "" { ui.push_tags(tag) }
 		ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0})
-		label_tip(fmt.tprintf("%s###n", ui.text_shown(name)), wide || detail == "" ? name : fmt.tprintf("%s, %s", name, detail))
+		n := ui.label(fmt.tprintf("%s###n", ui.text_shown(name)))
 		if tag != "" { ui.pop_tags() }
+		d: ui.Signal
 		if detail != "" && wide {
 			if ui.tags("weak") {
 				ui.spacer(ui.px(em * 0.5))
 				ui.next({width = ui.px(em * 6), height = ui.pct(1), text_pad = 0, font_size = em * 0.9})
-				label_tip(fmt.tprintf("%s###d", ui.text_shown(detail)), detail)
+				d = ui.label(fmt.tprintf("%s###d", ui.text_shown(detail)))
 			}
+		}
+		// the row's tooltip: what its line cuts, whole
+		if text_cut(n.box, name) || d.box != nil && text_cut(d.box, detail) || !wide && detail != "" {
+			tip_after(sig, detail == "" ? name : fmt.tprintf("%s, %s", name, detail))
 		}
 		if share >= 0 && bar {
 			ui.spacer(ui.px(em * 0.5))
@@ -474,6 +498,81 @@ mission_line :: proc(app: ^App, id, name, detail, value: string, share: f32, tag
 		ui.spacer(ui.px(em * 0.8))
 	}
 	return sig.clicked
+}
+
+// A line's menu, opened at `pos` on what it shows.
+@(private = "file")
+mission_line_menu_open :: proc(app: ^App, line: Mission_Line, pos: ui.Vec2) {
+	mc := &app.mission
+	delete(mc.line.name)
+	mc.line = line
+	mc.line.name = strings.clone(line.name)
+	if mc.line_menu == 0 { mc.line_menu = ui.key_from_string(0, "inspecteur_mission_line") }
+	ui.ctx_menu_open(mc.line_menu, pos)
+}
+
+// The menu of a line: its section first, then what is related to it. The process is found again by its pid and start
+// time (gone: the menu closes); the service and the startup item by their names in their sections.
+@(private = "file")
+mission_line_menu :: proc(app: ^App, em: f32) {
+	mc := &app.mission
+	if mc.line_menu == 0 { return }
+	if ui.ctx_menu(mc.line_menu, em * 16) {
+		line := mc.line
+		switch line.kind {
+		case .None:
+			ui.ctx_menu_close()
+		case .Process:
+			p := find_proc(&app.sampler, line.pid, line.start)
+			if p == nil { ui.ctx_menu_close(); return }
+			if ui.menu_item("Show in Processes", icon = lucide.LAYOUT_LIST, icon_font = app.icons).clicked { processes_reveal(app, p.pid, p.start) }
+			if ui.menu_item(COMMANDS[.Properties].label, icon = COMMANDS[.Properties].icon, icon_font = app.icons).clicked {
+				app.props.demo = app.demo
+				props_open(&app.props, p.pid, p.start)
+			}
+			ui.menu_separator()
+			if ui.menu_item(COMMANDS[.Go_To_Service].label, icon = COMMANDS[.Go_To_Service].icon, enabled = p.unit != "", icon_font = app.icons).clicked { go_to_service(app, p) }
+			if ui.menu_item("Show its connections", icon = lucide.GLOBE, icon_font = app.icons).clicked { mission_show_connections(app, p.pid) }
+			ui.menu_separator()
+			if ui.menu_item(COMMANDS[.Open_Location].label, icon = COMMANDS[.Open_Location].icon, enabled = p.exe != "", icon_font = app.icons).clicked { open_location(app, p) }
+			if ui.menu_item(COMMANDS[.Copy_Command].label, icon = COMMANDS[.Copy_Command].icon, enabled = p.cmdline != "", icon_font = app.icons).clicked { copy_command(app, p) }
+		case .Service:
+			u, found := mission_service(app, line.name)
+			if !found { ui.ctx_menu_close(); return }
+			if ui.menu_item("Show in Services", icon = lucide.SETTINGS, icon_font = app.icons).clicked { mission_show_service(app, line.name) }
+			q := u.pid > 0 ? find_pid(&app.sampler, u.pid) : nil
+			if ui.menu_item("Show its process", icon = lucide.LAYOUT_LIST, enabled = q != nil, icon_font = app.icons).clicked { processes_reveal(app, q.pid, q.start) }
+			if ui.menu_item(COMMANDS[.Service_Details].label, icon = COMMANDS[.Service_Details].icon, icon_font = app.icons).clicked {
+				mission_show_service(app, line.name)
+				if !app.settings.details { service_details_switch(app) }
+			}
+		case .Startup:
+			if ui.menu_item("Show in Startup", icon = lucide.POWER, icon_font = app.icons).clicked { tab_show(app, .Startup) }
+		}
+	}
+}
+
+// A service of the list shown, by its name.
+@(private = "file")
+mission_service :: proc(app: ^App, name: string) -> (Service, bool) {
+	s := &app.services
+	if s.list == nil { return {}, false }
+	for u in s.list.units { if u.name == name { return u, true } }
+	return {}, false
+}
+
+// Services, the service selected (once a reading lists it).
+@(private = "file")
+mission_show_service :: proc(app: ^App, name: string) {
+	tab_show(app, .Services)
+	service_select(app, name)
+}
+
+// Connections, filtered on the process's pid.
+@(private = "file")
+mission_show_connections :: proc(app: ^App, pid: i32) {
+	tab_show(app, .Connections)
+	ui.field_set(&app.search, fmt.tprintf("%d", pid))
 }
 
 @(private = "file")

@@ -6,6 +6,9 @@ and the versions follow [semantic versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Mission Control: a menu on each line** (a right click): its section, and what is related to it. A process: its
+  properties, its service, its connections, its folder, its command line. A failed service: its process, its details and
+  journal.
 - **The settings in the command palette** (Ctrl+K): each preference is a line under "Settings · <page>"; chosen, the
   settings open on it alone.
 - **Commands and settings found by other words**: "kill" finds End task, "dark" the theme's version, "slow" Why is it
@@ -13,9 +16,6 @@ and the versions follow [semantic versioning](https://semver.org/).
 - **The edged finish** (`view.finish = edged`, the Console theme's): the machined reliefs crisp, nothing blurred.
 - **The system's title bar, by choice** (`view.system_title`), where the desktop draws one.
 - The settings' pages say Inspecteur's version at their bottom.
-
-### Added
-
 - **Mission Control** (Ctrl+1; the other sections Ctrl+2 to Ctrl+7): the whole machine on one page, in panels of
   gui_toolkit's dock that the user moves, stacks, resizes, floats, closes and brings back; the layout as at first; the
   layout kept (`mission.layout`). A click on a line goes to its section. Its Health panel: the state in a word and its
@@ -38,6 +38,9 @@ and the versions follow [semantic versioning](https://semver.org/).
   pane follows the selection, with the same keys; several at once, one per service; Ctrl+W closes it.
 
 ### Fixed
+- Mission Control: a click anywhere on a line goes to its section; its name took the click before, only its right part
+  answered.
+- Performance: the key that switches the CPU's view (Ctrl+G) is in its segments' tooltips, not beside them.
 
 - **Resizing a column** resizes the column at the left of the line, as in a file manager: the columns after it move,
   none before. **A third click on a title** comes back to the table's own sort.

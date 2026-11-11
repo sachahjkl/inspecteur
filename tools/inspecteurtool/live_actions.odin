@@ -232,6 +232,11 @@ live_mission :: proc(l: ^Live) {
 	_, menu_ok := cdp.call(c, "Toolkit.click", `{"text":"Busiest: memory","index":1}`)
 	check(l, menu_ok && cdp.wait_name(c, "mc_memory", SESSION_WAIT, gone = true) && file_has(prefs, "mission.layout"), "a panel closed, the layout kept")
 	check(l, cdp.click_name(c, "mission_reset") && cdp.wait_name(c, "mc_memory", SESSION_WAIT), "the layout as at first brings it back")
+	// a line's menu (a right click), its first item: the process in Processes; then a click on the line's middle (its name)
+	_, right_ok := cdp.call(c, "Toolkit.click", `{"name":"mc_cpu_0","index":0,"count":1,"button":"right"}`)
+	check(l, right_ok && cdp.wait_for(c, "Show in Processes", SESSION_WAIT) && cdp.wait_for(c, "Show its connections", SESSION_WAIT), "a line's right click: its menu")
+	check(l, cdp.click_text(c, "Show in Processes") && cdp.wait_for(c, "Background processes", SESSION_WAIT), "the menu shows the process in Processes")
+	check(l, cdp.key(c, "ctrl+1") && cdp.wait_name(c, "mc_cpu_0", SESSION_WAIT) && cdp.click_name(c, "mc_cpu_0") && cdp.wait_for(c, "Background processes", SESSION_WAIT), "a click on a line's name goes to its section")
 	check(l, cdp.key(c, "ctrl+2") && cdp.wait_for(c, "Background processes", SESSION_WAIT), "Ctrl+2: Processes")
 }
 
