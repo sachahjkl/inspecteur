@@ -23,7 +23,8 @@ Every step is a command of `tools/inspecteurtool` (`help` lists them):
 - What more than one program needs goes in gui_toolkit, generic, with its docs, test and changelog fragment; inspecteur
   then points to the toolkit's new tag.
 - A preference is a `config.Def` in `src/settings.odin` with its line in `docs/configuration.md` (a test checks it).
-- What changed goes under `## [Unreleased]` in `CHANGELOG.md`.
+- A change a user can see is a fragment of `changelog.d/` (`inspecteurtool changelog new`, its README), in the same
+  commit; `CHANGELOG.md` is never edited by hand: `ship` assembles the fragments.
 - Tests never touch the person's desktop: `live`, `shots` and `bench` run in a sway of their own. A test sends a signal
   only to a process it started itself, found by a mark in its command line and checked by its pid; it acts on a service,
   an autostart entry, an app's group or a desktop entry only when it made it itself (an app's group: a scope it made,

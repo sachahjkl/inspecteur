@@ -3,64 +3,6 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
-## [Unreleased]
-
-### Added
-- **Ctrl held pauses the refresh**, as in Windows' Task Manager: the rows stand still under the pointer, and the footer
-  says "Paused while Ctrl is held" until it is let go (gui_toolkit 0.189.0, `ui.key_held`).
-- **Columns moved by their titles**: a title dragged sideways moves its column, in Processes, Services, Startup and
-  Connections; the order is kept (`processes.order`, `services.order`, `startup.order`, `connections.order`).
-- **A third click on a title leaves the rows unsorted**: as they are read (the processes by PID); kept as
-  `processes.sort = none` (gui_toolkit 0.188.0).
-- **The window opens as it was left**: on the section shown last (`view.section`; `--section` shows another), the CPU's
-  page overall or per logical processor (`performance.cpu_view`).
-- **Each core's temperature**, in the logical processors' view (Ctrl+G) and, coolest to hottest, in the CPU's
-  details: from coretemp's "Core N" sensors (Intel), else from the SMU's power table of the ryzen_smu driver (AMD, Zen
-  to Zen 3; NixOS: `hardware.cpu.amd.ryzen-smu.enable`). Without either, nothing is shown.
-- **Mission Control: a menu on each line** (a right click): its section, and what is related to it. A process: its
-  properties, its service, its connections, its folder, its command line. A failed service: its process, its details and
-  journal.
-- **The settings in the command palette** (Ctrl+K): each preference is a line under "Settings · <page>"; chosen, the
-  settings open on it alone.
-- **Commands and settings found by other words**: "kill" finds End task, "dark" the theme's version, "slow" Why is it
-  slow?; the matched letters are lit.
-- **The edged finish** (`view.finish = edged`, the Console theme's): the machined reliefs crisp, nothing blurred.
-- **The system's title bar, by choice** (`view.system_title`), where the desktop draws one.
-- The settings' pages say Inspecteur's version at their bottom.
-- **Mission Control** (Ctrl+1; the other sections Ctrl+2 to Ctrl+7): the whole machine on one page, in panels of
-  gui_toolkit's dock that the user moves, stacks, resizes, floats, closes and brings back; the layout as at first; the
-  layout kept (`mission.layout`). A click on a line goes to its section. Its Health panel: the state in a word and its
-  colour, a trace as a heart monitor's (a beat per sample, as high as the CPU was busy), an (i) whose tooltip says each
-  finding.
-- **A horizontal scroll bar** under the tables wider than their room.
-- **One Inspecteur at a time**: a second start (Ctrl+Shift+Escape again, a launcher, `--section`) shows its section in
-  the one that runs, which comes to the front.
-- **Zoom** as every program of gui_toolkit: Ctrl+wheel, Ctrl+=, Ctrl+-, Ctrl+0 (`view.zoom`, kept).
-- **The palette resizable** from its edges and its corner, its size kept (`view.palette_size`); each command with its
-  icon.
-- **The tables scroll sideways** when the window is narrower than their columns (Shift+wheel, a touchpad); the titles
-  follow.
-- The refresh's sliders in the settings apply as they move; Ctrl+F gives the settings' search the keyboard.
-- **The services' journal, in depth**: each entry's time, level in its colour, program and process, message; all,
-  warnings or errors with their counts (Alt+L); this boot or every boot (Alt+B); followed live, new entries at the end
-  (Alt+F); a search of its own (Ctrl+J); the selected entry whole, its message wrapped; Copy the entries shown (Alt+C) or
-  the entry (Alt+Shift+C); the pane's height dragged from the line above it. Up to 1000 entries.
-- **A service's journal in a window of its own** (Ctrl+Shift+J, or the pane's button): it keeps its service while the
-  pane follows the selection, with the same keys; several at once, one per service; Ctrl+W closes it.
-
-### Fixed
-- Mission Control: a click anywhere on a line goes to its section; its name took the click before, only its right part
-  answered.
-- Performance: the key that switches the CPU's view (Ctrl+G) is in its segments' tooltips, not beside them.
-
-- **Resizing a column** resizes the column at the left of the line, as in a file manager: the columns after it move,
-  none before. **A third click on a title** comes back to the table's own sort.
-- **The palette's field** is flush with its edges; the keys stay clear of its scroll bar.
-- **The palette no longer crashes on a search that keeps nothing** (gui_toolkit 0.176.1).
-- **Resizing a column moves no other column a frame late** (gui_toolkit 0.169.0: the fill column is resolved in the same
-  build); the stripes of the tables are fainter.
-
-
 ## [0.2.0] - 2026-11-10
 
 ### Added

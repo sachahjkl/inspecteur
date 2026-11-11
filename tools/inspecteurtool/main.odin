@@ -24,7 +24,7 @@ Command :: struct {
 COMMANDS :: [?]Command{
 	{name = "build", about = "[release]: the toolkit's text library when its sources changed, then build/inspecteur", run = run_build},
 	{name = "test", about = "the unit tests of the program", run = run_test},
-	{name = "check", about = "odin check of the program and of this tool (-vet), the tests, THIRD-PARTY-NOTICES up to date, then a release build", run = run_check},
+	{name = "check", about = "odin check of the program and of this tool (-vet), the tests, the changelog's fragments, THIRD-PARTY-NOTICES up to date, then a release build", run = run_check},
 	{name = "live", about = "[--keep]: the real program in a sway nobody sees, driven as a person would; it acts only on what it made", run = run_live},
 	{name = "logo", about = "assets/logo*.png and .project/image.png, drawn by the toolkit's paint package", run = run_logo},
 	{name = "shots", about = "[--out folder]: the pictures of the documentation, of the demo's made-up machine, in a sway nobody sees", run = run_shots},
@@ -34,7 +34,8 @@ COMMANDS :: [?]Command{
 	{name = "package", about = "[version]: build/dist: the archive of a release build, its SHA-256, the program alone and (with $UPDATE_SIGNING_KEY) its signed update manifest", run = run_package},
 	{name = "update", about = "keygen <file> | pubkey | manifest <program> <version> - <out> | verify <manifest> -: inspecteur's update key and manifests", run = proc(args: []string) -> int { return toolbox.update_command(inspecteur_update.PRODUCT, args) }},
 	{name = "notes", about = "<version>: the changelog's section of that version", run = run_notes},
-	{name = "ship", about = "<version> [--dry-run]: from a clean main, the changelog and APP_VERSION, the checks, a commit, the tag, the push", run = run_ship},
+	{name = "ship", about = "<version> [--dry-run]: from a clean main, the fragments into the changelog, APP_VERSION, the checks, a commit, the tag, the push", run = run_ship},
+	{name = "changelog", about = "new <type> <subject> <text> | check | preview: the fragments of changelog.d/, one per change a user can see", run = run_changelog},
 	{name = "site", about = "build <site> <out> | check [--site folder] [--shot file.png] [--browser program]: the site's pages", run = run_site},
 }
 

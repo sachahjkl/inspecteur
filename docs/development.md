@@ -31,7 +31,8 @@ odin run tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/insp
 | `logo` | `assets/logo*.png` and `.project/image.png`, drawn by the toolkit's paint package |
 | `desktop_files <prefix>` | the desktop entry and the icons under `<prefix>/share`: what the Nix package installs |
 | `notices [--check]` | THIRD-PARTY-NOTICES: the licences of what the program embeds and links (gui_toolkit and its attributions, Roboto, Inconsolata, Lucide, wgpu-native, the text library's crates from `cargo metadata`, procedural macros left out); `--check` fails when it is not up to date |
-| `package [version]`, `notes <version>`, `ship <version>` | the release's archive (the program, LICENSE, THIRD-PARTY-NOTICES, README, CHANGELOG) and its SHA-256; the changelog's section; the release itself |
+| `package [version]`, `notes <version>`, `ship <version>` | the release's archive (the program, LICENSE, THIRD-PARTY-NOTICES, README, CHANGELOG) and its SHA-256; the changelog's section; the release itself, the fragments assembled (gui_toolkit's `gt:release` and `gt:changelog`) |
+| `changelog new <type> <subject> <text>`, `check`, `preview` | a fragment of `changelog.d/`; all of them well formed (`check` runs it); what the next version brings |
 
 `GT=<folder>` builds against another checkout of gui_toolkit.
 
@@ -103,4 +104,5 @@ odin run ext/gui_toolkit/tools/tk -- cdp --port 9222 tree , shot window.png
   counterpart in `src/demo.odin` (see [architecture.md](architecture.md), "Porting to Windows").
 - What another program could use goes in gui_toolkit, generic, with its documentation, its test and its changelog
   fragment; inspecteur then points to the toolkit's new tag.
-- Add what changed under `## [Unreleased]` in `CHANGELOG.md`.
+- Write what a user sees changed as a fragment of `changelog.d/` (`inspecteurtool changelog new <type> <subject> <text>`;
+  `changelog.d/README.md`). Never edit `CHANGELOG.md`: `ship` assembles the fragments into the version's section.

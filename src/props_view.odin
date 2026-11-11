@@ -17,8 +17,9 @@ PROPS_KEY_EM                   :: 11   // the General tab's labels
 
 props_build :: proc(app: ^App, em: f32) {
 	pp := &app.props
-	if pp.open && !app.menu.confirm.open && !app.affinity.open && !ui.ctx_menu_any_open() { props_keys(app) }
 	if ui.modal_sized("properties", {em * PROPS_W_EM, em * PROPS_H_EM} * ui.scale(), &pp.size, &pp.open, {em * PROPS_MIN_W_EM, em * PROPS_MIN_H_EM} * ui.scale()) {
+		// (its keys inside it: an open dialog holds the keys, the code built outside it gets none)
+		if !app.menu.confirm.open && !app.affinity.open && !ui.ctx_menu_any_open() { props_keys(app) }
 		p := find_proc(&app.sampler, pp.pid, pp.start)
 		if pp.tab != pp.read_tab && p != nil { props_read(pp) }   // (a tab shown is read at once)
 		ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})

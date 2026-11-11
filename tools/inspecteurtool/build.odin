@@ -54,6 +54,7 @@ run_check :: proc(args: []string) -> int {
 	if !toolbox.run(odin_cmd("check", nil), {echo = true}) { return 1 }
 	if !toolbox.run({"odin", "check", "tools/inspecteurtool", collection(), "-vet"}, {echo = true}) { return 1 }
 	if run_test(nil) != 0 { return 1 }
+	if run_changelog({"check"}) != 0 { return 1 }
 	if run_notices({"--check"}) != 0 { return 1 }
 	return run_build({"release"})
 }
