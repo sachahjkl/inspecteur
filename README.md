@@ -36,8 +36,9 @@ Information.
   service** (Ctrl+Shift+S), **Search online** (Ctrl+Shift+F), **Create dump file** (Ctrl+Shift+D, with gdb's gcore).
   **Properties** (Alt+Enter, Enter): its threads, open files, modules and environment, each with a filter (Ctrl+F).
   Inspecteur does not suspend itself, what it runs under, or the desktop's compositor.
-- **Performance**: CPU (overall or per logical processor), memory, disks, network interfaces and GPUs, sixty readings
-  of history each. A laptop's GPU that sleeps is not woken to be read.
+- **Performance**: CPU (overall or per logical processor, each with its core's temperature where the machine tells
+  it), memory, disks, network interfaces and GPUs, sixty readings of history each. A laptop's GPU that sleeps is not
+  woken to be read.
 - **Services**: systemd's services, the system's or the user's: their state, whether they start by themselves, their
   main process and memory; under the table, the selected one's unit file, tasks, CPU time and its journal: each entry's time, level in
   its colour, program and message; all, warnings or errors with their counts, this boot or every boot, followed live, its

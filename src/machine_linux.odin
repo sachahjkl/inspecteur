@@ -29,15 +29,52 @@ Machine_Reader :: struct {
 	temps_listed: bool,
 	temp_files: [TEMPS_MAX]Temp_File,   // the package's first
 	temp_n: int,
+	// the cores' temperatures, by core_id: coretemp's "Core <id>" files (Intel), else ryzen_smu's power table (AMD)
+	core_files: [CORES_TOLD_MAX]Temp_File,   // path_len 0: none for that core
+	core_file_n: int,
+	pm: Pm_Table,                            // cores 0: no table read
+	pm_failures: int,                        // reads of the table that failed in a row
+	core_of: [dynamic]i32,                   // each logical processor's core_id (-1: not told)
 	no_throttle, no_pressure: bool,     // the files are not there: not looked for again
 }
+
+// The core_ids a temperature is kept for.
+CORES_TOLD_MAX :: 64
+
+// ryzen_smu (github.com/amkillam/ryzen_smu, a driver of its own): the SMU's power table of AMD's processors, the
+// temperature of each core in it. Without the driver, or with a version of the table not known here, no core has one.
+RYZEN_SMU :: "/sys/kernel/ryzen_smu_drv"
+
+// Where a version of the power table holds its cores' temperatures: the index of the first (32-bit floats, one per
+// core in a row) and how many cores it has room for. From ryzen_monitor_ng (src/pm_tables.c).
+Pm_Table :: struct { version: u32, first, cores: int }
+
+@(rodata)
+PM_TABLES := [?]Pm_Table{
+	{0x1E0004, 108, 4},    // Zen (Raven Ridge)
+	{0x240803, 179, 16},   // Zen 2 (Matisse, two CCDs)
+	{0x240903, 163, 8},    // Zen 2 (Matisse)
+	{0x370003, 208, 8},    // Zen 2 (Renoir)
+	{0x370005, 208, 8},
+	{0x380804, 201, 16},   // Zen 3 (Vermeer)
+	{0x380805, 204, 16},
+	{0x380904, 185, 8},
+	{0x380905, 188, 8},
+	{0x400005, 216, 8},    // Zen 3 (Cezanne)
+}
+
+// After so many failed reads in a row, the table is not read again (the driver loaded, its SMU not answering).
+@(private = "file") PM_FAILURES_MAX :: 5
 
 // A temperature's file (temp<n>_input, millidegrees) and its label.
 @(private = "file")
 Temp_File :: struct { path: [64]u8, path_len: int, label: [24]u8, label_len: int }
 
 machine_reader_init :: proc(r: ^Machine_Reader) { r.buf = make([]u8, PROC_READ_MAX) }
-machine_reader_destroy :: proc(r: ^Machine_Reader) { delete(r.buf) }
+machine_reader_destroy :: proc(r: ^Machine_Reader) {
+	delete(r.buf)
+	delete(r.core_of)
+}
 
 machine_read :: proc(r: ^Machine_Reader, c: ^Machine_Counters) {
 	c.core_total_ns = make([dynamic]u64, context.temp_allocator)
@@ -78,6 +115,7 @@ sensors_read :: proc(r: ^Machine_Reader, c: ^Machine_Counters) {
 		t.celsius = f32(v / 1000)
 		c.temp_count += 1
 	}
+	core_temps_read(r, c)
 	if !r.no_pressure {
 		names := [Pressure_Kind]string{.Cpu = "/proc/pressure/cpu", .Memory = "/proc/pressure/memory", .Io = "/proc/pressure/io"}
 		for path, k in names {
@@ -110,12 +148,21 @@ temps_list :: proc(r: ^Machine_Reader) {
 			if !os.exists(input) { continue }
 			label := read_text(fmt.tprintf("%s/temp%d_label", base, i))
 			if label == "" { label = fmt.tprintf("%s %d", name, i) }
+			// (a core's: by its core_id, shown with its logical processors, not in the list)
+			if id, is_core := core_label_id(label); is_core {
+				if id < CORES_TOLD_MAX && r.core_files[id].path_len == 0 {
+					r.core_files[id].path_len = copy(r.core_files[id].path[:], input)
+					r.core_file_n += 1
+				}
+				continue
+			}
 			f := &r.temp_files[r.temp_n]
 			f.path_len = copy(f.path[:], input)
 			f.label_len = copy(f.label[:], label)
 			r.temp_n += 1
 		}
 	}
+	if r.core_file_n == 0 { pm_table_find(r) }
 	// the package's first: the first of PACKAGE_LABELS found
 	for want in PACKAGE_LABELS {
 		for i in 0 ..< r.temp_n {
@@ -124,6 +171,68 @@ temps_list :: proc(r: ^Machine_Reader) {
 			return
 		}
 	}
+}
+
+// "Core 3" (coretemp's label of a core): 3.
+core_label_id :: proc(label: string) -> (int, bool) {
+	if !strings.has_prefix(label, "Core ") { return 0, false }
+	id, ok := strconv.parse_int(label[len("Core "):], 10)
+	return id, ok && id >= 0
+}
+
+// Each logical processor's core's temperature, when a source tells them; else none (no message: most machines have
+// no such sensor). The sources are looked for once, with the package's sensors.
+@(private = "file")
+core_temps_read :: proc(r: ^Machine_Reader, c: ^Machine_Counters) {
+	n := len(c.core_total_ns)
+	if r.core_file_n == 0 && r.pm.cores == 0 { return }
+	if len(r.core_of) != n { core_ids_list(r, n) }
+	celsius: [CORES_TOLD_MAX]f32
+	if r.core_file_n > 0 {
+		for &f, id in r.core_files {
+			if f.path_len == 0 { continue }
+			if v, ok := strconv.parse_f64(read_text(string(f.path[:f.path_len]))); ok { celsius[id] = f32(v / 1000) }
+		}
+	} else {
+		data, _, ok := read_file(r.buf, linux.AT_FDCWD, RYZEN_SMU + "/pm_table")
+		if !ok || len(data) < (r.pm.first + r.pm.cores) * 4 {
+			r.pm_failures += 1
+			if r.pm_failures >= PM_FAILURES_MAX { r.pm = {} }
+			return
+		}
+		r.pm_failures = 0
+		for k in 0 ..< min(r.pm.cores, CORES_TOLD_MAX) {
+			o := (r.pm.first + k) * 4
+			celsius[k] = transmute(f32)(u32(data[o]) | u32(data[o + 1]) << 8 | u32(data[o + 2]) << 16 | u32(data[o + 3]) << 24)
+		}
+	}
+	c.core_celsius = make([dynamic]f32, n, context.temp_allocator)
+	for id, i in r.core_of {
+		if id < 0 || id >= CORES_TOLD_MAX { continue }
+		v := celsius[id]
+		// (a core switched off, or a slot of the table no core fills: nothing, or a value no core reaches)
+		if v > 1 && v < 150 { c.core_celsius[i] = v }
+	}
+}
+
+// Each logical processor's core_id (the topology's), -1 where it is not told.
+@(private = "file")
+core_ids_list :: proc(r: ^Machine_Reader, n: int) {
+	resize(&r.core_of, n)
+	for i in 0 ..< n {
+		id, ok := strconv.parse_int(read_text(fmt.tprintf("/sys/devices/system/cpu/cpu%d/topology/core_id", i)), 10)
+		r.core_of[i] = ok ? i32(id) : -1
+	}
+}
+
+// The power table of ryzen_smu, when the driver is there and its version is known here.
+@(private = "file")
+pm_table_find :: proc(r: ^Machine_Reader) {
+	buf: [8]u8
+	data, _, ok := read_file(buf[:], linux.AT_FDCWD, RYZEN_SMU + "/pm_table_version")
+	if !ok || len(data) < 4 { return }
+	version := u32(data[0]) | u32(data[1]) << 8 | u32(data[2]) << 16 | u32(data[3]) << 24
+	for t in PM_TABLES { if t.version == version { r.pm = t; return } }
 }
 
 @(private = "file")

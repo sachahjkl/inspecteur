@@ -47,6 +47,7 @@ Machine_Counters :: struct {
 	nets:      [dynamic]Net_Counters,
 	temps:     [TEMPS_MAX]Temp,                  // the processor's sensors, the package's first
 	temp_count: int,
+	core_celsius: [dynamic]f32,                  // each logical processor's core's temperature (0: not told)
 	pressure:  [Pressure_Kind]Pressure,
 	has_pressure: bool,                          // the kernel tells it (PSI)
 	throttled: u64,                              // the times the processor slowed down for its heat, since boot (0: not told)
@@ -64,6 +65,16 @@ Temp :: struct {
 }
 
 temp_label :: proc(t: ^Temp) -> string { return string(t.label[:t.label_len]) }
+
+// The coolest and the hottest of the cores' temperatures told (ok: at least one).
+core_celsius_range :: proc(m: ^Machine) -> (low, high: f32, ok: bool) {
+	for v in m.core_celsius {
+		if v <= 0 { continue }
+		if !ok { low, high, ok = v, v, true; continue }
+		low, high = min(low, v), max(high, v)
+	}
+	return
+}
 
 // What waits on a resource (pressure stall information): the share of the time some task (`some`), or every task
 // (`full`), waited on it, over the last 10 and 60 seconds, in percent. The CPU's `full` is not told by every kernel.
@@ -131,6 +142,7 @@ Machine :: struct {
 	temps:      [TEMPS_MAX]Temp,   // the processor's temperatures, the package's first
 	temp_count: int,
 	temp_hist:  History,           // the package's
+	core_celsius: [dynamic]f32,    // each logical processor's core's temperature (0: not told; empty: none told)
 	pressure:   [Pressure_Kind]Pressure,
 	pressure_hist: [Pressure_Kind]History,   // `some` over 10 s
 	has_pressure: bool,
@@ -168,6 +180,7 @@ machine_destroy :: proc(m: ^Machine) {
 	delete(m.core_cpu)
 	delete(m.core_hist)
 	delete(m.core_mhz)
+	delete(m.core_celsius)
 	delete(m.info.model)
 	for &d in m.disks { disk_free(&d) }
 	delete(m.disks)
@@ -240,6 +253,8 @@ machine_take :: proc(m: ^Machine, c: Machine_Counters, dt: f64, history: bool) {
 	m.boot_time, m.load, m.uptime, m.handles, m.mem = c.boot_time, c.load, c.uptime, c.handles, c.mem
 	if history { ui.value_history_push(&m.mem_hist, m.mem.total > 0 ? 100 * f32(f64(mem_used(m)) / f64(m.mem.total)) : 0) }
 	m.temps, m.temp_count = c.temps, c.temp_count
+	resize(&m.core_celsius, len(c.core_celsius))
+	copy(m.core_celsius[:], c.core_celsius[:])
 	if history && m.temp_count > 0 { ui.value_history_push(&m.temp_hist, m.temps[0].celsius) }
 	m.pressure, m.has_pressure = c.pressure, c.has_pressure
 	if history && m.has_pressure { for k in Pressure_Kind { ui.value_history_push(&m.pressure_hist[k], m.pressure[k].some10) } }

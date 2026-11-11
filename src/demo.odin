@@ -256,6 +256,12 @@ demo_machine_read :: proc(d: ^Demo, now_ns: i64, c: ^Machine_Counters) {
 		tc.celsius = f32(61 + 7 * math.sin(t / 17) + 4 * math.sin(t / 5.3) - f64(k) * 4)
 	}
 	c.temp_count = len(labels)
+	// each core's, the two logical processors of a core (i and i + 8) the same; the compilers' cores warmer
+	c.core_celsius = make([dynamic]f32, DEMO_LOGICAL, context.temp_allocator)
+	for i in 0 ..< DEMO_LOGICAL {
+		core := i % (DEMO_LOGICAL / 2)
+		c.core_celsius[i] = f32(52 + 9 * swing(t, 13 + f64(core), f64(core) * 0.7, 0.9) + (core < 3 ? 9 : 0))
+	}
 	c.has_pressure = true
 	c.pressure[.Cpu] = {some10 = f32(6 + 4 * swing(t, 23, 0.4, 0.8)), some60 = 6.8, full10 = 0, full60 = 0}
 	c.pressure[.Memory] = {some10 = f32(0.4 * swing(t, 31, 1.1)), some60 = 0.3, full10 = 0.1, full60 = 0.05}

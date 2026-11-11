@@ -49,3 +49,13 @@ pressure_is_read :: proc(t: ^testing.T) {
 	q := parse_pressure("some avg10=0.23 avg60=1.59 avg300=1.89 total=2463812561\n")
 	testing.expect(t, q.some60 == 1.59 && q.full10 == 0, "some alone")
 }
+
+@(test)
+core_labels_give_their_core :: proc(t: ^testing.T) {
+	id, ok := core_label_id("Core 12")
+	testing.expect(t, ok && id == 12)
+	_, ok = core_label_id("Package id 0")
+	testing.expect(t, !ok)
+	_, ok = core_label_id("Core x")
+	testing.expect(t, !ok)
+}

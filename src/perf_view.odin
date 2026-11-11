@@ -338,7 +338,8 @@ cpu_page :: proc(app: ^App, em: f32) {
 							if ui.tags("weak") {
 								mhz := i < len(m.core_mhz) ? m.core_mhz[i] : 0
 								ui.next({width = ui.fill(), height = ui.px(em * 1.3), font_size = em * 0.8, text_pad = 0})
-								ui.label(fmt.tprintf("CPU %d%s###core_label", i, mhz > 0 ? fmt.tprintf("  %s", mhz_text(mhz)) : ""))
+								celsius := i < len(m.core_celsius) ? m.core_celsius[i] : 0
+								ui.label(fmt.tprintf("CPU %d%s%s###core_label", i, mhz > 0 ? fmt.tprintf("  %s", mhz_text(mhz)) : "", celsius > 0 ? fmt.tprintf("  %.0f °C", celsius) : ""))
 							}
 							ui.next({width = ui.fill(), height = ui.fill()})
 							ui.line_graph(fmt.tprintf("###core_%d", i), line_series({{&m.core_hist[i], c, ""}}), {top = 100, points = HISTORY_POINTS, grid = true})
@@ -368,6 +369,8 @@ cpu_page :: proc(app: ^App, em: f32) {
 	append(&details, Stat{"Load average", fmt.tprintf("%.2f  %.2f  %.2f", m.load[0], m.load[1], m.load[2])})
 	// (the first sensor is the big Temperature; a machine with none, a CI runner's, has no others)
 	if m.temp_count > 1 { for &t in m.temps[1:m.temp_count] { append(&details, Stat{temp_label(&t), fmt.tprintf("%.0f °C", t.celsius)}) } }
+	// (each core's is in the logical processors' view)
+	if low, high, ok := core_celsius_range(m); ok { append(&details, Stat{"Core temperatures", fmt.tprintf("%.0f to %.0f °C", low, high)}) }
 	if m.throttled > m.throttled_before { append(&details, Stat{"Slowed for its heat", fmt.tprintf("%d times since Inspecteur started", m.throttled - m.throttled_before)}) }
 	big := make([dynamic]Stat, context.temp_allocator)
 	append(&big, Stat{"Utilization", fmt.tprintf("%.0f%%", m.cpu)}, Stat{"Speed", mhz_text(m.mhz)})
