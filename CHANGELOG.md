@@ -24,6 +24,7 @@ and the versions follow [semantic versioning](https://semver.org/).
 
 ### Fixed
 
+- **The palette no longer crashes on a search that keeps nothing** (gui_toolkit 0.176.1).
 - **Resizing a column moves no other column a frame late** (gui_toolkit 0.169.0: the fill column is resolved in the same
   build); the stripes of the tables are fainter.
 

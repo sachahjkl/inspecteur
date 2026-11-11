@@ -136,6 +136,7 @@ live_commands :: proc(l: ^Live) {
 	check(l, cdp.type_text(c, "performance") && cdp.wait_for(c, "Performance  ·  Sections", SESSION_WAIT), "typing finds the Performance section")
 	check(l, cdp.key(c, "Enter") && cdp.wait_name(c, "cpu_graph", SESSION_WAIT), "Enter shows it")
 	check(l, cdp.key(c, "ctrl+shift+p") && cdp.wait_name(c, "palette_field", SESSION_WAIT), "Ctrl+Shift+P opens it too")
+	check(l, cdp.type_text(c, "zzqx") && cdp.wait_for(c, "Nothing matches", SESSION_WAIT), "a search that keeps nothing says so (no crash)")
 	check(l, cdp.key(c, "Escape") && cdp.wait_name(c, "palette_field", SESSION_WAIT, gone = true), "Escape closes it")
 	check(l, cdp.key(c, "F1") && cdp.wait_for(c, "Keyboard shortcuts", SESSION_WAIT), "F1 shows the keys")
 	check(l, cdp.wait_for(c, "Suspend or resume", SESSION_WAIT) && cdp.wait_for(c, "Ctrl+K, Ctrl+Shift+P", SESSION_WAIT), "with every command's keys")
