@@ -3,6 +3,54 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.3.0] - 2026-11-11
+
+### Added
+- **The command palette forgives a slip**: a word typed with a letter missing, one too many or two swapped still finds its command or setting, after the exact matches (gui_toolkit 0.193.0).
+- **The filter lit in the tables**: what it finds is highlighted in the processes' names and cells, and in the Services, Startup and Connections tables.
+- **A menu on every table's header** (a right click): reset the column under the pointer (its width, its sort), unsorted, the columns shown, the default columns. Services, Startup and Connections have it too.
+- **Icons in the menus**: each command of a right click menu has its icon, as in the command palette.
+- **The window opens as it was left**: its size and whether it was maximized (`view.placement`, written when it closes). `view.width` and `view.height` are gone.
+- **A Mission Control panel in a window of its own**: its tab's menu, *Open in a window*, for a second screen or to keep it in view while another section is shown. A click on one of its lines shows that section in the main window. Closed, the panel goes back to Mission Control; the windows open come back at the next start.
+- **Ctrl held pauses the refresh**, as in Windows' Task Manager: the rows stand still under the pointer, and the footer says "Paused while Ctrl is held" until it is let go (gui_toolkit 0.189.0, `ui.key_held`).
+- **Columns moved by their titles**: a title dragged sideways moves its column, in Processes, Services, Startup and Connections; the order is kept (`processes.order`, `services.order`, `startup.order`, `connections.order`).
+- **A third click on a title leaves the rows unsorted**: as they are read (the processes by PID); kept as `processes.sort = none` (gui_toolkit 0.188.0).
+- **The window opens as it was left**: on the section shown last (`view.section`; `--section` shows another), the CPU's page overall or per logical processor (`performance.cpu_view`).
+- **Each core's temperature**, in the logical processors' view (Ctrl+G) and, coolest to hottest, in the CPU's details: from coretemp's "Core N" sensors (Intel), else from the SMU's power table of the ryzen_smu driver (AMD, Zen to Zen 3; NixOS: `hardware.cpu.amd.ryzen-smu.enable`). Without either, nothing is shown.
+- **Mission Control: a menu on each line** (a right click): its section, and what is related to it. A process: its properties, its service, its connections, its folder, its command line. A failed service: its process, its details and journal.
+- **The settings in the command palette** (Ctrl+K): each preference is a line under "Settings · <page>"; chosen, the settings open on it alone.
+- **Commands and settings found by other words**: "kill" finds End task, "dark" the theme's version, "slow" Why is it slow?; the matched letters are lit.
+- **The edged finish** (`view.finish = edged`, the Console theme's): the machined reliefs crisp, nothing blurred.
+- **The system's title bar, by choice** (`view.system_title`), where the desktop draws one.
+- **The version on the settings' pages**: Inspecteur's version at their bottom.
+- **Mission Control** (Ctrl+1; the other sections Ctrl+2 to Ctrl+7): the whole machine on one page, in panels of gui_toolkit's dock that the user moves, stacks, resizes, floats, closes and brings back; the layout as at first; the layout kept (`mission.layout`). A click on a line goes to its section. Its Health panel: the state in a word and its colour, a trace as a heart monitor's (a beat per sample, as high as the CPU was busy), an (i) whose tooltip says each finding.
+- **A horizontal scroll bar** under the tables wider than their room.
+- **One Inspecteur at a time**: a second start (Ctrl+Shift+Escape again, a launcher, `--section`) shows its section in the one that runs, which comes to the front.
+- **Zoom** as every program of gui_toolkit: Ctrl+wheel, Ctrl+=, Ctrl+-, Ctrl+0 (`view.zoom`, kept).
+- **The palette resizable** from its edges and its corner, its size kept (`view.palette_size`); each command with its icon.
+- **The tables scroll sideways** when the window is narrower than their columns (Shift+wheel, a touchpad); the titles follow.
+- **The settings apply as their sliders move**: the refresh's sliders act at once; Ctrl+F gives the settings' search the keyboard.
+- **The services' journal, in depth**: each entry's time, level in its colour, program and process, message; all, warnings or errors with their counts (Alt+L); this boot or every boot (Alt+B); followed live, new entries at the end (Alt+F); a search of its own (Ctrl+J); the selected entry whole, its message wrapped; Copy the entries shown (Alt+C) or the entry (Alt+Shift+C); the pane's height dragged from the line above it. Up to 1000 entries.
+- **A service's journal in a window of its own** (Ctrl+Shift+J, or the pane's button): it keeps its service while the pane follows the selection, with the same keys; several at once, one per service; Ctrl+W closes it.
+
+### Changed
+- **The sockets are read on their own period** (`connections.refresh_ms`, 3 s by default, in the settings' Connections page), not at each refresh of the processes: a reading goes through every process's open files, and Connections or Mission Control shown cost a core's share each second.
+- **The Properties dialog's title on a darker bar**: the process's name and facts on the bars' surface, a line under them, apart from the tabs.
+- **Square rows**: a selected row of a list, a table or a menu fills its whole width with square corners, and a table's tinted cell is square too. The Console theme is named Kernel (gui_toolkit 0.191.1).
+
+### Fixed
+- **The command palette's field has the dialog's corners**: no second, rounder corner inside the dialog's own (gui_toolkit 0.196.2).
+- **Inspecteur no longer freezes when another of its windows covers it**: a journal's or a panel's window over the main window whole stopped it answering (gui_toolkit 0.196.0).
+- **Inspecteur at rest no longer draws without a pause**: a process that came or went faded at the screen's rate, and a busy machine always has one, so Processes drew about ten frames a second; the fade now steps with the samples.
+- **The panels' menu of Mission Control shows its last line whole**, and the command palette's field, flush with its edges, is on a darker field's background (gui_toolkit 0.192.1).
+- **Connections scrolls up**: each new reading brought the selected socket back into view, so the list jumped back down every second.
+- **Mission Control: a click anywhere on a line** goes to its section; its name took the click before, only its right part answered.
+- **Performance: Ctrl+G in the tooltips**: the key that switches the CPU's view is in its segments' tooltips, not beside them.
+- **Resizing a column** resizes the column at the left of the line, as in a file manager: the columns after it move, none before.
+- **The palette's field** is flush with its edges; the keys stay clear of its scroll bar.
+- **The palette no longer crashes on a search that keeps nothing** (gui_toolkit 0.176.1).
+- **Resizing a column moves no other column a frame late** (gui_toolkit 0.169.0: the fill column is resolved in the same build); the stripes of the tables are fainter.
+
 ## [0.2.0] - 2026-11-10
 
 ### Added
@@ -102,5 +150,6 @@ and the versions follow [semantic versioning](https://semver.org/).
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.3.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.3.0
 [0.1.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.1.0
 [0.2.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.2.0
