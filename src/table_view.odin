@@ -134,8 +134,10 @@ build_processes :: proc(app: ^App, em: f32) {
 	}
 	if app.settings.summary { summary_build(app, em) }
 	build_bar(app, em)
-	build_header(app, em)
+	header := build_header(app, em)
 	build_rows(app, em)
+	// (the titles scroll sideways with the rows, in the same build)
+	ui.table_scroll_sync(&app.table.layout, header, &app.vl)
 }
 
 // The tab's bar: the actions on the selection, flat icons with their tooltips, then the tab's name and what the filter
@@ -191,10 +193,11 @@ cmd_button :: proc(app: ^App, id, icon: string, c: Cmd, em: f32) {
 // The columns' titles (the toolkit's header: a click sorts, again reverses; the rule before a title, dragged, resizes
 // its column; a right click opens the menu of the columns).
 @(private = "file")
-build_header :: proc(app: ^App, em: f32) {
+build_header :: proc(app: ^App, em: f32) -> (view: ui.Key) {
 	t := &app.table
 	ui.next({bg = surface("bar")})
 	ev := ui.table_header("###header", &t.layout, 0.3 + CHEVRON_EM)
+	view = ev.view
 	if ev.sorted {
 		rows_again(app)
 		table_layout_save(t, &app.prefs)
@@ -205,6 +208,7 @@ build_header :: proc(app: ^App, em: f32) {
 		ui.ctx_menu_open(app.columns_menu, ui.mouse_pos())
 	}
 	columns_menu(app, em)
+	return
 }
 
 // Opens the menu of the columns under the table's header (Ctrl+Shift+C).
@@ -243,7 +247,9 @@ build_rows :: proc(app: ^App, em: f32) {
 	t := &app.table
 	row_h := ui.dense(em * ROW_EM)
 	rows_look(app, &app.vl)
-	ui.next({width = ui.fill(), height = ui.fill()})
+	// (narrower than the columns, the rows scroll sideways: Shift+wheel, a touchpad)
+	least := ui.table_min_width(&t.layout)
+	ui.next({width = ui.fill(), height = ui.fill(), flags = {.View_Scroll_X, .Allow_Overflow_X}})
 	rows, ok := ui.vlist("###rows", &app.vl, t.ids[:], nil, t.selectable[:])
 	if !ok { return }
 	// (the search has the keyboard, yet the selection is the window's: it shows as strong as a focused list's)
@@ -255,7 +261,7 @@ build_rows :: proc(app: ^App, em: f32) {
 	defer if flashing { ui.keep_animating() }
 	for i in rows.first ..< rows.last {
 		r := t.rows[i]
-		ui.next({height = ui.px(row_h)})
+		ui.next({width = ui.fill_least(least), height = ui.px(row_h)})
 		if r.kind == .Section {
 			row := ui.list_row(&app.vl, i, "", selectable = false)
 			if ui.parent(row.box) { build_section(app, r, em) }

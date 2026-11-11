@@ -10,6 +10,7 @@ package inspecteur
 
 import "core:fmt"
 import "core:strings"
+import lucide "gt:lucide"
 import "gt:ui"
 import update "gt:update"
 
@@ -26,7 +27,7 @@ Cmd :: enum u8 {
 	Cpu_Grid, Next_Device, Previous_Device,
 	// Services
 	Service_Start, Service_Stop, Service_Restart, Service_Enable, Service_Disable, Service_Open, Service_Copy, Service_Details,
-	Service_Open_File, Service_Manager, Journal_Search, Journal_Level, Journal_Boot, Journal_Follow, Journal_Copy, Journal_Copy_Entry,
+	Service_Open_File, Service_Manager, Journal_Search, Journal_Level, Journal_Boot, Journal_Follow, Journal_Copy, Journal_Copy_Entry, Journal_Window,
 	// Startup
 	Startup_Enable, Startup_Disable, Startup_Toggle, Startup_Open, Startup_Copy,
 	// Connections
@@ -39,97 +40,98 @@ Cmd :: enum u8 {
 }
 
 COMMANDS := [Cmd]ui.Command{
-	.Palette          = {label = "Command palette", group = "Window", keys = {{.K, {.Ctrl}}, {.P, {.Ctrl, .Shift}}}},
-	.Shortcuts        = {label = "Keyboard shortcuts", group = "Window", keys = {{.F1, {}}, {}}},
-	.Filter           = {label = "Filter", group = "Window", keys = {{.F, {.Ctrl}}, {}}},
-	.Clear_Filter     = {label = "Clear the filter", group = "Window", keys = {{.Escape, {}}, {}}},
-	.Read_Again       = {label = "Read again", group = "Window", keys = {{.F5, {}}, {}}},
-	.Pause_Refresh    = {label = "Pause or resume the refresh", group = "Window", keys = {{.Space, {.Ctrl}}, {}}},
-	.Refresh_Speed    = {label = "Refresh speed…", group = "Window", keys = {{.R, {.Ctrl, .Shift}}, {}}},
-	.Zoom_In          = {label = "Larger text", group = "Window", keys = {{.Equal, {.Ctrl}}, {.Num_Add, {.Ctrl}}}},
-	.Zoom_Out         = {label = "Smaller text", group = "Window", keys = {{.Minus, {.Ctrl}}, {.Num_Subtract, {.Ctrl}}}},
-	.Zoom_Reset       = {label = "Text size as the default", group = "Window", keys = {{.N0, {.Ctrl}}, {}}},
-	.Light_Dark       = {label = "Light or dark", group = "Window", keys = {{.L, {.Ctrl, .Shift}}, {}}},
-	.Setup            = {label = "Install…", group = "Window", keys = {{.I, {.Ctrl, .Shift}}, {}}},
-	.Settings         = {label = "Settings", group = "Window", keys = {{.Comma, {.Ctrl}}, {}}},
-	.Check_Updates    = {label = "Check for updates", group = "Window"},
-	.Diagnose         = {label = "Why is it slow?", group = "Window", keys = {{.F2, {}}, {}}},
+	.Palette          = {icon = lucide.COMMAND, label = "Command palette", group = "Window", keys = {{.K, {.Ctrl}}, {.P, {.Ctrl, .Shift}}}},
+	.Shortcuts        = {icon = lucide.KEYBOARD, label = "Keyboard shortcuts", group = "Window", keys = {{.F1, {}}, {}}},
+	.Filter           = {icon = lucide.FILTER, label = "Filter", group = "Window", keys = {{.F, {.Ctrl}}, {}}},
+	.Clear_Filter     = {icon = lucide.X, label = "Clear the filter", group = "Window", keys = {{.Escape, {}}, {}}},
+	.Read_Again       = {icon = lucide.REFRESH_CW, label = "Read again", group = "Window", keys = {{.F5, {}}, {}}},
+	.Pause_Refresh    = {icon = lucide.PAUSE, label = "Pause or resume the refresh", group = "Window", keys = {{.Space, {.Ctrl}}, {}}},
+	.Refresh_Speed    = {icon = lucide.GAUGE, label = "Refresh speed…", group = "Window", keys = {{.R, {.Ctrl, .Shift}}, {}}},
+	.Zoom_In          = {icon = lucide.ZOOM_IN, label = "Zoom in", group = "Window", keys = {{.Equal, {.Ctrl}}, {.Num_Add, {.Ctrl}}}},
+	.Zoom_Out         = {icon = lucide.ZOOM_OUT, label = "Zoom out", group = "Window", keys = {{.Minus, {.Ctrl}}, {.Num_Subtract, {.Ctrl}}}},
+	.Zoom_Reset       = {icon = lucide.SEARCH, label = "Zoom: 100 %", group = "Window", keys = {{.N0, {.Ctrl}}, {}}},
+	.Light_Dark       = {icon = lucide.SUN_MOON, label = "Light or dark", group = "Window", keys = {{.L, {.Ctrl, .Shift}}, {}}},
+	.Setup            = {icon = lucide.DOWNLOAD, label = "Install…", group = "Window", keys = {{.I, {.Ctrl, .Shift}}, {}}},
+	.Settings         = {icon = lucide.SLIDERS_HORIZONTAL, label = "Settings", group = "Window", keys = {{.Comma, {.Ctrl}}, {}}},
+	.Check_Updates    = {icon = lucide.HARD_DRIVE_DOWNLOAD, label = "Check for updates", group = "Window"},
+	.Diagnose         = {icon = lucide.LIGHTBULB, label = "Why is it slow?", group = "Window", keys = {{.F2, {}}, {}}},
 
-	.Show_Processes   = {label = "Processes", group = "Sections", keys = {{.N1, {.Ctrl}}, {}}},
-	.Show_Performance = {label = "Performance", group = "Sections", keys = {{.N2, {.Ctrl}}, {}}},
-	.Show_Services    = {label = "Services", group = "Sections", keys = {{.N3, {.Ctrl}}, {}}},
-	.Show_Startup     = {label = "Startup", group = "Sections", keys = {{.N4, {.Ctrl}}, {}}},
-	.Show_Connections = {label = "Connections", group = "Sections", keys = {{.N5, {.Ctrl}}, {}}},
-	.Show_Information = {label = "Information", group = "Sections", keys = {{.N6, {.Ctrl}}, {}}},
-	.Next_Section     = {label = "Next section", group = "Sections", keys = {{.Tab, {.Ctrl}}, {}}},
-	.Previous_Section = {label = "Previous section", group = "Sections", keys = {{.Tab, {.Ctrl, .Shift}}, {}}},
+	.Show_Processes   = {icon = lucide.LAYOUT_LIST, label = "Processes", group = "Sections", keys = {{.N1, {.Ctrl}}, {}}},
+	.Show_Performance = {icon = lucide.GAUGE, label = "Performance", group = "Sections", keys = {{.N2, {.Ctrl}}, {}}},
+	.Show_Services    = {icon = lucide.SETTINGS, label = "Services", group = "Sections", keys = {{.N3, {.Ctrl}}, {}}},
+	.Show_Startup     = {icon = lucide.POWER, label = "Startup", group = "Sections", keys = {{.N4, {.Ctrl}}, {}}},
+	.Show_Connections = {icon = lucide.GLOBE, label = "Connections", group = "Sections", keys = {{.N5, {.Ctrl}}, {}}},
+	.Show_Information = {icon = lucide.INFO, label = "Information", group = "Sections", keys = {{.N6, {.Ctrl}}, {}}},
+	.Next_Section     = {icon = lucide.ARROW_RIGHT, label = "Next section", group = "Sections", keys = {{.Tab, {.Ctrl}}, {}}},
+	.Previous_Section = {icon = lucide.ARROW_LEFT, label = "Previous section", group = "Sections", keys = {{.Tab, {.Ctrl, .Shift}}, {}}},
 
-	.End_Task         = {label = "End task", group = "Processes", keys = {{.Delete, {}}, {}}},
-	.Kill             = {label = "Kill…", group = "Processes", keys = {{.Delete, {.Shift}}, {}}},
-	.End_Tree         = {label = "End process tree…", group = "Processes", keys = {{.Delete, {.Ctrl}}, {}}},
-	.Select_All       = {label = "Select all", group = "Processes", keys = {{.A, {.Ctrl}}, {}}},
-	.Suspend          = {label = "Suspend or resume", group = "Processes", keys = {{.P, {.Ctrl}}, {}}},
-	.Properties       = {label = "Properties", group = "Processes", keys = {{.Return, {.Alt}}, {}}},
-	.Open_Location    = {label = "Open file location", group = "Processes", keys = {{.O, {.Ctrl}}, {}}},
-	.Copy_Command     = {label = "Copy command line", group = "Processes", keys = {{.C, {.Ctrl}}, {}}},
-	.Default_Action   = {label = "Open the group, or Properties", group = "Processes", keys = {{.Return, {}}, {}}},
-	.Open_Group       = {label = "Open the group", group = "Processes", keys = {{.Right, {}}, {}}},
-	.Close_Group      = {label = "Close the group", group = "Processes", keys = {{.Left, {}}, {}}},
-	.Raise_Priority   = {label = "Raise the priority", group = "Processes", keys = {{.Up, {.Ctrl}}, {}}},
-	.Lower_Priority   = {label = "Lower the priority", group = "Processes", keys = {{.Down, {.Ctrl}}, {}}},
-	.Affinity         = {label = "Set affinity…", group = "Processes", keys = {{.A, {.Ctrl, .Shift}}, {}}},
-	.Go_To_Service    = {label = "Go to service", group = "Processes", keys = {{.S, {.Ctrl, .Shift}}, {}}},
-	.Dump             = {label = "Create dump file…", group = "Processes", keys = {{.D, {.Ctrl, .Shift}}, {}}},
-	.Search_Online    = {label = "Search online", group = "Processes", keys = {{.F, {.Ctrl, .Shift}}, {}}},
-	.Tree_View        = {label = "Process tree or apps", group = "Processes", keys = {{.T, {.Ctrl}}, {}}},
-	.Columns          = {label = "Columns…", group = "Processes", keys = {{.C, {.Ctrl, .Shift}}, {}}},
-	.Summary          = {label = "Show or hide the summary of the machine", group = "Processes", keys = {{.B, {.Ctrl}}, {}}},
-	.Pin              = {label = "Pin or unpin", group = "Processes", keys = {{.P, {.Alt}}, {}}},
+	.End_Task         = {icon = lucide.X, label = "End task", group = "Processes", keys = {{.Delete, {}}, {}}},
+	.Kill             = {icon = lucide.ZAP, label = "Kill…", group = "Processes", keys = {{.Delete, {.Shift}}, {}}},
+	.End_Tree         = {icon = lucide.LIST_TREE, label = "End process tree…", group = "Processes", keys = {{.Delete, {.Ctrl}}, {}}},
+	.Select_All       = {icon = lucide.LIST_CHECKS, label = "Select all", group = "Processes", keys = {{.A, {.Ctrl}}, {}}},
+	.Suspend          = {icon = lucide.PAUSE, label = "Suspend or resume", group = "Processes", keys = {{.P, {.Ctrl}}, {}}},
+	.Properties       = {icon = lucide.INFO, label = "Properties", group = "Processes", keys = {{.Return, {.Alt}}, {}}},
+	.Open_Location    = {icon = lucide.FOLDER_OPEN, label = "Open file location", group = "Processes", keys = {{.O, {.Ctrl}}, {}}},
+	.Copy_Command     = {icon = lucide.COPY, label = "Copy command line", group = "Processes", keys = {{.C, {.Ctrl}}, {}}},
+	.Default_Action   = {icon = lucide.PLAY, label = "Open the group, or Properties", group = "Processes", keys = {{.Return, {}}, {}}},
+	.Open_Group       = {icon = lucide.CHEVRON_DOWN, label = "Open the group", group = "Processes", keys = {{.Right, {}}, {}}},
+	.Close_Group      = {icon = lucide.CHEVRON_UP, label = "Close the group", group = "Processes", keys = {{.Left, {}}, {}}},
+	.Raise_Priority   = {icon = lucide.ARROW_UP, label = "Raise the priority", group = "Processes", keys = {{.Up, {.Ctrl}}, {}}},
+	.Lower_Priority   = {icon = lucide.ARROW_DOWN, label = "Lower the priority", group = "Processes", keys = {{.Down, {.Ctrl}}, {}}},
+	.Affinity         = {icon = lucide.MICROCHIP, label = "Set affinity…", group = "Processes", keys = {{.A, {.Ctrl, .Shift}}, {}}},
+	.Go_To_Service    = {icon = lucide.SERVER, label = "Go to service", group = "Processes", keys = {{.S, {.Ctrl, .Shift}}, {}}},
+	.Dump             = {icon = lucide.SAVE, label = "Create dump file…", group = "Processes", keys = {{.D, {.Ctrl, .Shift}}, {}}},
+	.Search_Online    = {icon = lucide.SEARCH, label = "Search online", group = "Processes", keys = {{.F, {.Ctrl, .Shift}}, {}}},
+	.Tree_View        = {icon = lucide.FOLDER_TREE, label = "Process tree or apps", group = "Processes", keys = {{.T, {.Ctrl}}, {}}},
+	.Columns          = {icon = lucide.COLUMNS_2, label = "Columns…", group = "Processes", keys = {{.C, {.Ctrl, .Shift}}, {}}},
+	.Summary          = {icon = lucide.LAYOUT_GRID, label = "Show or hide the summary of the machine", group = "Processes", keys = {{.B, {.Ctrl}}, {}}},
+	.Pin              = {icon = lucide.PIN, label = "Pin or unpin", group = "Processes", keys = {{.P, {.Alt}}, {}}},
 
-	.Cpu_Grid         = {label = "One graph per logical processor", group = "Performance", keys = {{.G, {.Ctrl}}, {}}},
-	.Next_Device      = {label = "Next device", group = "Performance", keys = {{.Down, {}}, {}}},
-	.Previous_Device  = {label = "Previous device", group = "Performance", keys = {{.Up, {}}, {}}},
+	.Cpu_Grid         = {icon = lucide.LAYOUT_GRID, label = "One graph per logical processor", group = "Performance", keys = {{.G, {.Ctrl}}, {}}},
+	.Next_Device      = {icon = lucide.ARROW_DOWN, label = "Next device", group = "Performance", keys = {{.Down, {}}, {}}},
+	.Previous_Device  = {icon = lucide.ARROW_UP, label = "Previous device", group = "Performance", keys = {{.Up, {}}, {}}},
 
-	.Service_Start    = {label = "Start", group = "Services", keys = {{.S, {.Ctrl}}, {}}},
-	.Service_Stop     = {label = "Stop", group = "Services", keys = {{.Delete, {}}, {}}},
-	.Service_Restart  = {label = "Restart", group = "Services", keys = {{.R, {.Ctrl}}, {}}},
-	.Service_Enable   = {label = "Enable", group = "Services", keys = {{.E, {.Ctrl}}, {}}},
-	.Service_Disable  = {label = "Disable", group = "Services", keys = {{.D, {.Ctrl}}, {}}},
-	.Service_Open     = {label = "Open in Processes", group = "Services", keys = {{.Return, {}}, {}}},
-	.Service_Copy     = {label = "Copy name", group = "Services", keys = {{.C, {.Ctrl}}, {}}},
-	.Service_Details  = {label = "Details and journal", group = "Services", keys = {{.I, {.Ctrl}}, {}}},
-	.Service_Open_File = {label = "Open unit file", group = "Services", keys = {{.O, {.Ctrl}}, {}}},
-	.Service_Manager  = {label = "System or user services", group = "Services", keys = {{.U, {.Ctrl}}, {}}},
-	.Journal_Search   = {label = "Search the journal", group = "Services", keys = {{.J, {.Ctrl}}, {}}},
-	.Journal_Level    = {label = "Journal: all, warnings, errors", group = "Services", keys = {{.L, {.Alt}}, {}}},
-	.Journal_Boot     = {label = "Journal: this boot or every boot", group = "Services", keys = {{.B, {.Alt}}, {}}},
-	.Journal_Follow   = {label = "Follow the journal", group = "Services", keys = {{.F, {.Alt}}, {}}},
-	.Journal_Copy     = {label = "Copy the journal's entries shown", group = "Services", keys = {{.C, {.Alt}}, {}}},
-	.Journal_Copy_Entry = {label = "Copy the journal's entry", group = "Services", keys = {{.C, {.Alt, .Shift}}, {}}},
+	.Service_Start    = {icon = lucide.PLAY, label = "Start", group = "Services", keys = {{.S, {.Ctrl}}, {}}},
+	.Service_Stop     = {icon = lucide.SQUARE, label = "Stop", group = "Services", keys = {{.Delete, {}}, {}}},
+	.Service_Restart  = {icon = lucide.ROTATE_CCW, label = "Restart", group = "Services", keys = {{.R, {.Ctrl}}, {}}},
+	.Service_Enable   = {icon = lucide.CHECK, label = "Enable", group = "Services", keys = {{.E, {.Ctrl}}, {}}},
+	.Service_Disable  = {icon = lucide.X, label = "Disable", group = "Services", keys = {{.D, {.Ctrl}}, {}}},
+	.Service_Open     = {icon = lucide.LAYOUT_LIST, label = "Open in Processes", group = "Services", keys = {{.Return, {}}, {}}},
+	.Service_Copy     = {icon = lucide.COPY, label = "Copy name", group = "Services", keys = {{.C, {.Ctrl}}, {}}},
+	.Service_Details  = {icon = lucide.PANEL_BOTTOM, label = "Details and journal", group = "Services", keys = {{.I, {.Ctrl}}, {}}},
+	.Service_Open_File = {icon = lucide.FILE_TEXT, label = "Open unit file", group = "Services", keys = {{.O, {.Ctrl}}, {}}},
+	.Service_Manager  = {icon = lucide.USER, label = "System or user services", group = "Services", keys = {{.U, {.Ctrl}}, {}}},
+	.Journal_Search   = {icon = lucide.SEARCH, label = "Search the journal", group = "Services", keys = {{.J, {.Ctrl}}, {}}},
+	.Journal_Level    = {icon = lucide.FILTER, label = "Journal: all, warnings, errors", group = "Services", keys = {{.L, {.Alt}}, {}}},
+	.Journal_Boot     = {icon = lucide.POWER, label = "Journal: this boot or every boot", group = "Services", keys = {{.B, {.Alt}}, {}}},
+	.Journal_Follow   = {icon = lucide.ARROW_DOWN, label = "Follow the journal", group = "Services", keys = {{.F, {.Alt}}, {}}},
+	.Journal_Copy     = {icon = lucide.COPY, label = "Copy the journal's entries shown", group = "Services", keys = {{.C, {.Alt}}, {}}},
+	.Journal_Copy_Entry = {icon = lucide.CLIPBOARD_COPY, label = "Copy the journal's entry", group = "Services", keys = {{.C, {.Alt, .Shift}}, {}}},
+	.Journal_Window   = {icon = lucide.EXTERNAL_LINK, label = "The journal in its own window", group = "Services", keys = {{.J, {.Ctrl, .Shift}}, {}}},
 
-	.Startup_Enable   = {label = "Enable", group = "Startup", keys = {{.E, {.Ctrl}}, {}}},
-	.Startup_Disable  = {label = "Disable", group = "Startup", keys = {{.D, {.Ctrl}}, {}}},
-	.Startup_Toggle   = {label = "Enable or disable", group = "Startup", keys = {{.Space, {}}, {}}},
-	.Startup_Open     = {label = "Open file location", group = "Startup", keys = {{.Return, {}}, {}}},
-	.Startup_Copy     = {label = "Copy command", group = "Startup", keys = {{.C, {.Ctrl}}, {}}},
+	.Startup_Enable   = {icon = lucide.CHECK, label = "Enable", group = "Startup", keys = {{.E, {.Ctrl}}, {}}},
+	.Startup_Disable  = {icon = lucide.X, label = "Disable", group = "Startup", keys = {{.D, {.Ctrl}}, {}}},
+	.Startup_Toggle   = {icon = lucide.ARROW_UP_DOWN, label = "Enable or disable", group = "Startup", keys = {{.Space, {}}, {}}},
+	.Startup_Open     = {icon = lucide.FOLDER_OPEN, label = "Open file location", group = "Startup", keys = {{.Return, {}}, {}}},
+	.Startup_Copy     = {icon = lucide.COPY, label = "Copy command", group = "Startup", keys = {{.C, {.Ctrl}}, {}}},
 
-	.Socket_End_Task  = {label = "End task", group = "Connections", keys = {{.Delete, {}}, {}}},
-	.Socket_Kill      = {label = "Kill…", group = "Connections", keys = {{.Delete, {.Shift}}, {}}},
-	.Socket_Open      = {label = "Open in Processes", group = "Connections", keys = {{.Return, {}}, {}}},
-	.Socket_Copy      = {label = "Copy address", group = "Connections", keys = {{.C, {.Ctrl}}, {}}},
+	.Socket_End_Task  = {icon = lucide.X, label = "End task", group = "Connections", keys = {{.Delete, {}}, {}}},
+	.Socket_Kill      = {icon = lucide.ZAP, label = "Kill…", group = "Connections", keys = {{.Delete, {.Shift}}, {}}},
+	.Socket_Open      = {icon = lucide.LAYOUT_LIST, label = "Open in Processes", group = "Connections", keys = {{.Return, {}}, {}}},
+	.Socket_Copy      = {icon = lucide.COPY, label = "Copy address", group = "Connections", keys = {{.C, {.Ctrl}}, {}}},
 
-	.Info_Copy        = {label = "Copy all", group = "Information", keys = {{.C, {.Ctrl}}, {}}},
+	.Info_Copy        = {icon = lucide.COPY, label = "Copy all", group = "Information", keys = {{.C, {.Ctrl}}, {}}},
 
-	.Props_Suspend        = {label = "Suspend or resume", group = "Properties", keys = {{.P, {.Ctrl}}, {}}},
-	.Props_End_Task       = {label = "End task", group = "Properties", keys = {{.Delete, {}}, {}}},
-	.Props_Kill           = {label = "Kill…", group = "Properties", keys = {{.Delete, {.Shift}}, {}}},
-	.Props_Raise_Priority = {label = "Raise the priority", group = "Properties", keys = {{.Up, {.Ctrl}}, {}}},
-	.Props_Lower_Priority = {label = "Lower the priority", group = "Properties", keys = {{.Down, {.Ctrl}}, {}}},
-	.Props_Affinity       = {label = "Set affinity…", group = "Properties", keys = {{.A, {.Ctrl, .Shift}}, {}}},
-	.Props_Filter         = {label = "Filter the list", group = "Properties", keys = {{.F, {.Ctrl}}, {}}},
-	.Props_Next_Tab       = {label = "Next tab", group = "Properties", keys = {{.Tab, {.Ctrl}}, {}}},
-	.Props_Previous_Tab   = {label = "Previous tab", group = "Properties", keys = {{.Tab, {.Ctrl, .Shift}}, {}}},
-	.Props_Close          = {label = "Close", group = "Properties", keys = {{.Escape, {}}, {}}},
+	.Props_Suspend        = {icon = lucide.PAUSE, label = "Suspend or resume", group = "Properties", keys = {{.P, {.Ctrl}}, {}}},
+	.Props_End_Task       = {icon = lucide.X, label = "End task", group = "Properties", keys = {{.Delete, {}}, {}}},
+	.Props_Kill           = {icon = lucide.ZAP, label = "Kill…", group = "Properties", keys = {{.Delete, {.Shift}}, {}}},
+	.Props_Raise_Priority = {icon = lucide.ARROW_UP, label = "Raise the priority", group = "Properties", keys = {{.Up, {.Ctrl}}, {}}},
+	.Props_Lower_Priority = {icon = lucide.ARROW_DOWN, label = "Lower the priority", group = "Properties", keys = {{.Down, {.Ctrl}}, {}}},
+	.Props_Affinity       = {icon = lucide.MICROCHIP, label = "Set affinity…", group = "Properties", keys = {{.A, {.Ctrl, .Shift}}, {}}},
+	.Props_Filter         = {icon = lucide.FILTER, label = "Filter the list", group = "Properties", keys = {{.F, {.Ctrl}}, {}}},
+	.Props_Next_Tab       = {icon = lucide.ARROW_RIGHT, label = "Next tab", group = "Properties", keys = {{.Tab, {.Ctrl}}, {}}},
+	.Props_Previous_Tab   = {icon = lucide.ARROW_LEFT, label = "Previous tab", group = "Properties", keys = {{.Tab, {.Ctrl, .Shift}}, {}}},
+	.Props_Close          = {icon = lucide.X, label = "Close", group = "Properties", keys = {{.Escape, {}}, {}}},
 }
 
 // The section a command acts in (nil: everywhere).
@@ -138,7 +140,7 @@ cmd_tab :: proc(c: Cmd) -> Maybe(Tab) {
 	case c <= .Previous_Section:                   return nil
 	case c <= .Pin:                                return .Processes   // (the last command of Processes)
 	case c <= .Previous_Device:                    return .Performance
-	case c <= .Journal_Copy_Entry:                 return .Services
+	case c <= .Journal_Window:                     return .Services
 	case c <= .Startup_Copy:                       return .Startup
 	case c <= .Socket_Copy:                        return .Connections
 	case c == .Info_Copy:                          return .Information
@@ -186,14 +188,12 @@ commands_keys :: proc(app: ^App, field_keeps: bool) {
 }
 
 // Opens the command palette.
-palette_open :: proc(app: ^App) {
-	if app.palette == 0 { app.palette = ui.key_from_string(0, "inspecteur_palette") }
-	ui.palette_open(app.palette)
-}
+palette_open :: proc(app: ^App) { ui.palette_open(&app.palette) }
 
-// The palette while it is open: the commands of the window, of the sections, and of the section shown.
+// The palette while it is open: the commands of the window, of the sections, and of the section shown. Its size, when the
+// user changes it, is kept (view.palette_size).
 palette_build :: proc(app: ^App) {
-	if app.palette == 0 { return }
+	if !app.palette.open { return }
 	list := make([dynamic]ui.Command, context.temp_allocator)
 	cmds := make([dynamic]Cmd, context.temp_allocator)
 	enabled := make([dynamic]bool, context.temp_allocator)
@@ -204,7 +204,9 @@ palette_build :: proc(app: ^App) {
 		append(&cmds, c)
 		append(&enabled, cmd_can(app, c))
 	}
-	if i := ui.palette(app.palette, list[:], enabled[:]); i >= 0 { cmd_run(app, cmds[i]) }
+	i, resized := ui.palette(&app.palette, list[:], enabled[:])
+	if resized { pref_save(&app.prefs, "view.palette_size", fmt.tprintf("%.0f %.0f", app.palette.size.x, app.palette.size.y)) }
+	if i >= 0 { cmd_run(app, cmds[i]) }
 }
 
 // The sheet of the keys while it is open: every command, its section's first.
@@ -222,9 +224,9 @@ cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 	switch c {
 	case .Palette, .Shortcuts, .Filter, .Read_Again, .Light_Dark, .Setup, .Settings, .Pause_Refresh, .Refresh_Speed, .Diagnose: return true
 	case .Check_Updates: return app.updater != nil
-	case .Zoom_In:    return app.settings.font_size < FONT_SIZE_MAX
-	case .Zoom_Out:   return app.settings.font_size > FONT_SIZE_MIN
-	case .Zoom_Reset: return app.settings.font_size != FONT_SIZE_DEFAULT
+	case .Zoom_In:    return ui.zoom(&app.main.state) < ui.ZOOM_MAX
+	case .Zoom_Out:   return ui.zoom(&app.main.state) > ui.ZOOM_MIN
+	case .Zoom_Reset: return ui.zoom(&app.main.state) != 1
 	case .Clear_Filter: return len(app.search.buf) > 0
 	case .Show_Processes, .Show_Performance, .Show_Services, .Show_Startup, .Show_Connections, .Show_Information, .Next_Section, .Previous_Section: return true
 	case .End_Task, .Kill, .End_Tree: return p != nil || ui.list_mark_count(&app.vl) > 0
@@ -246,7 +248,7 @@ cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 	case .Service_Start, .Service_Stop, .Service_Restart, .Service_Enable, .Service_Disable, .Service_Open, .Service_Copy, .Service_Open_File: return service_can(app, c)
 	case .Service_Details: return true
 	case .Service_Manager: return true
-	case .Journal_Search, .Journal_Level, .Journal_Boot, .Journal_Follow, .Journal_Copy, .Journal_Copy_Entry: return journal_can(app, c)
+	case .Journal_Search, .Journal_Level, .Journal_Boot, .Journal_Follow, .Journal_Copy, .Journal_Copy_Entry, .Journal_Window: return journal_can(app, c)
 	case .Startup_Enable, .Startup_Disable, .Startup_Toggle, .Startup_Open, .Startup_Copy: return startup_can(app, c)
 	case .Socket_End_Task, .Socket_Kill, .Socket_Open:
 		s, ok := selected_socket(app)
@@ -273,9 +275,9 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Read_Again:       refresh_now(app)
 	case .Pause_Refresh:    refresh_pause(app, !app.paused)
 	case .Refresh_Speed:    refresh_menu_open(app)
-	case .Zoom_In:          zoom(app, app.settings.font_size + 1)
-	case .Zoom_Out:         zoom(app, app.settings.font_size - 1)
-	case .Zoom_Reset:       zoom(app, FONT_SIZE_DEFAULT)
+	case .Zoom_In:          ui.set_zoom(&app.main.state, ui.zoom(&app.main.state) * ui.ZOOM_STEP)
+	case .Zoom_Out:         ui.set_zoom(&app.main.state, ui.zoom(&app.main.state) / ui.ZOOM_STEP)
+	case .Zoom_Reset:       ui.set_zoom(&app.main.state, 1)
 	case .Light_Dark:       light_dark_switch(app)
 	case .Setup:            setup_open(app)
 	case .Settings:         settings_toggle(app)
@@ -323,7 +325,7 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Service_Details:  service_details_switch(app)
 	case .Service_Open_File: service_open_file(app)
 	case .Service_Manager:  services_switch(app, app.services.manager == .System ? .User : .System)
-	case .Journal_Search, .Journal_Level, .Journal_Boot, .Journal_Follow, .Journal_Copy, .Journal_Copy_Entry: journal_run(app, c)
+	case .Journal_Search, .Journal_Level, .Journal_Boot, .Journal_Follow, .Journal_Copy, .Journal_Copy_Entry, .Journal_Window: journal_run(app, c)
 	case .Startup_Enable:   startup_toggle(app, true)
 	case .Startup_Disable:  startup_toggle(app, false)
 	case .Startup_Toggle:   if it, ok := selected_startup(app); ok { startup_toggle(app, !it.enabled) }

@@ -4,6 +4,7 @@ package inspecteur
 // overrides a preference for one run. Each one has its line in docs/configuration.md (settings_test.odin checks it).
 
 import "core:fmt"
+import "core:strconv"
 import "core:strings"
 import config "gt:config"
 import "gt:platform"
@@ -41,7 +42,9 @@ PREF_DEFS := [?]config.Def{
 	{name = "view.finish", category = "appearance", description = "How surfaces are drawn. Machined: raised buttons and panels, sunken fields, graphs and meters (a light theme is drawn flat). Flat: plain surfaces and thin lines. Gradient: surfaces shaded top to bottom. Glass: surfaces that let the page show through.", kind = .String, default = {s = "machined"}, choices = {"machined", "flat", "gradient", "glass"}},
 	{name = "view.zebra", category = "appearance", description = "Shade every second row of the tables: a line of numbers reads across.", kind = .Bool, default = {b = true}},
 	{name = "view.rules", category = "appearance", description = "Draw a thin line under each row of the tables.", kind = .Bool, default = {b = true}},
-	{name = "view.font_size", category = "appearance", description = "The text size, in logical pixels. Ctrl+= and Ctrl+- change it, Ctrl+0 sets it back.", kind = .Float, default = {f = FONT_SIZE_DEFAULT}, min = FONT_SIZE_MIN, max = FONT_SIZE_MAX, bounded = true},
+	{name = "view.font_size", category = "appearance", description = "The text size at a zoom of 100 %, in logical pixels: every size of the window follows it.", kind = .Float, default = {f = FONT_SIZE_DEFAULT}, min = FONT_SIZE_MIN, max = FONT_SIZE_MAX, bounded = true},
+	{name = "view.zoom", category = "appearance", description = "The zoom of the window: 1 is 100 %. Ctrl+wheel, Ctrl+= and Ctrl+- change it, Ctrl+0 sets it back.", kind = .Float, default = {f = 1}, min = 0.5, max = 3, bounded = true, hidden = true},
+	{name = "view.palette_size", category = "window", description = "The command palette's size, in logical pixels: its width and its height (empty: the default). Dragging its edges or its corner changes it.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "view.width", category = "window", description = "The window's width at start, in logical pixels.", kind = .Int, default = {i = 1100}, min = 480, max = 8000, bounded = true},
 	{name = "view.height", category = "window", description = "The window's height at start, in logical pixels.", kind = .Int, default = {i = 720}, min = 320, max = 8000, bounded = true},
 	{name = "update.auto", category = "updates", description = "Check for a new version a while after the start and then every day, download it and put it in place: it runs at the next start. Only the installed copy updates itself (a copy of the Nix store is Nix's to update).", kind = .Bool, default = {b = true}},
@@ -79,9 +82,11 @@ Settings :: struct {
 	mode:       ui.Theme_Mode,
 	finish:     ui.Finish,
 	font_size:  f32,
+	zoom:       f32,        // view.zoom
 	zebra:      bool,     // view.zebra
 	rules:      bool,     // view.rules
 	size:       [2]int,
+	palette_size: [2]f32,   // view.palette_size ({}: the default)
 	setup_choice: string, // owned: setup.choice
 	update_auto: bool,    // update.auto
 }
@@ -120,9 +125,15 @@ prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Sett
 	s.mode = ui.theme_mode_of(config.string_of(p, "view.mode"))
 	s.finish = ui.finish_of(config.string_of(p, "view.finish"))
 	s.font_size = f32(config.float_of(p, "view.font_size"))
+	s.zoom = f32(config.float_of(p, "view.zoom"))
 	s.zebra = config.bool_of(p, "view.zebra")
 	s.rules = config.bool_of(p, "view.rules")
 	s.size = {int(config.int_of(p, "view.width")), int(config.int_of(p, "view.height"))}
+	if parts := strings.fields(config.string_of(p, "view.palette_size"), context.temp_allocator); len(parts) == 2 {
+		w, wok := strconv.parse_f32(parts[0])
+		h, hok := strconv.parse_f32(parts[1])
+		if wok && hok { s.palette_size = {w, h} }
+	}
 	s.setup_choice = strings.clone(config.string_of(p, "setup.choice"), allocator)
 	s.update_auto = config.bool_of(p, "update.auto")
 	return

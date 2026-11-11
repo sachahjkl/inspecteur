@@ -108,19 +108,9 @@ JOURNAL_LINES :: 1000
 JOURNAL_FOLLOW_MS :: 2000
 
 Services :: struct {
-	details_worker: ui.Worker,
-	details_bus:  Service_Bus,       // the details' thread's own
-	details_ask:  struct { manager: Manager, name: [SERVICE_NAME_MAX]u8, name_len: int, boot: bool },   // under its mutex
-	details_next: time.Tick,         // when the followed journal is read again
-	details_shared: ^Unit_Details,   // its last reading, under its mutex
-	details:      ^Unit_Details,     // the window's
+	pane:         Journal_View,      // the details' pane: the selected service's details and journal (journal.odin)
 	select_name:  string,            // owned: a service to select once a reading lists it (Go to service)
 	details_for:  u64,               // the service the pane was asked for (its name's id)
-	journal_vl:   ui.Virtual_List,   // the pane's entries
-	journal_for:  u64,               // the service the list was put at the end for
-	journal_last: u64,               // the newest entry's id when the list was last built (a new one: back to the end)
-	journal_search: ui.Text_Field,   // the pane's own search (Ctrl+J)
-	journal_search_key: ui.Key,
 	worker:  ui.Worker,
 	bus:     Service_Bus,      // the thread's own (services_linux.odin)
 	demo:    ^Demo,            // not nil: the services are the demo's
@@ -150,19 +140,14 @@ services_init :: proc(s: ^Services, app: ^App) {
 	s.manager = app.settings.manager
 	s.demo = app.demo
 	ui.worker_start(&s.worker, services_job, s, app.main.win)
-	ui.worker_start(&s.details_worker, details_job, s, app.main.win)
+	journal_view_init(&s.pane, app.demo, app.main.win)
 }
 
 services_destroy :: proc(s: ^Services) {
 	ui.worker_stop(&s.worker)
-	ui.worker_stop(&s.details_worker)
 	service_bus_close(&s.bus)
-	service_bus_close(&s.details_bus)
-	unit_details_free(s.details_shared)
-	unit_details_free(s.details)
+	journal_view_destroy(&s.pane)
 	delete(s.select_name)
-	ui.vlist_destroy(&s.journal_vl)
-	ui.field_destroy(&s.journal_search)
 	service_list_free(s.shared)
 	service_list_free(s.list)
 	section_table_destroy(&s.rows)
@@ -215,56 +200,13 @@ services_job :: proc(w: ^ui.Worker) {
 	ui.worker_published(w)
 }
 
-@(private = "file")
-unit_details_free :: proc(d: ^Unit_Details) {
-	if d == nil { return }
-	virtual.arena_destroy(&d.arena)
-	free(d)
-}
-
-// Asks for the details of the service `name` of the manager shown (its unit, its journal).
+// Asks for the details of the service `name` of the manager shown (its unit, its journal), for the pane.
 details_ask :: proc(app: ^App, name: string) {
-	s := &app.services
-	ui.worker_lock(&s.details_worker)
-	s.details_ask.manager = s.manager
-	s.details_ask.name_len = copy(s.details_ask.name[:], name)
-	s.details_ask.boot = app.settings.journal_boot
-	ui.worker_unlock(&s.details_worker)
-	ui.worker_ask(&s.details_worker)
-}
-
-@(private = "file")
-details_job :: proc(w: ^ui.Worker) {
-	s := (^Services)(w.user)
-	ui.worker_lock(w)
-	ask := s.details_ask
-	ui.worker_unlock(w)
-	d := new(Unit_Details)
-	a := virtual.arena_allocator(&d.arena)
-	d.journal = make([dynamic]Journal_Entry, a)
-	d.manager = ask.manager
-	d.boot = ask.boot
-	d.name = strings.clone(string(ask.name[:ask.name_len]), a)
-	d.tasks, d.cpu_ns = DETAIL_UNKNOWN, DETAIL_UNKNOWN
-	if s.demo != nil { demo_unit_details(s.demo, d, a) } else { unit_details_read(&s.details_bus, d, a) }
-	ui.worker_lock(w)
-	old := s.details_shared
-	s.details_shared = d
-	ui.worker_unlock(w)
-	unit_details_free(old)
-	ui.worker_published(w)
+	journal_view_ask(&app.services.pane, app.services.manager, name, app.settings.journal_boot)
 }
 
 // The window's turn: the details read become the pane's.
-details_take :: proc(app: ^App) {
-	s := &app.services
-	if !ui.worker_take(&s.details_worker) { return }
-	ui.worker_lock(&s.details_worker)
-	old := s.details
-	s.details, s.details_shared = s.details_shared, nil
-	ui.worker_unlock(&s.details_worker)
-	unit_details_free(old)
-}
+details_take :: proc(app: ^App) { journal_view_take(&app.services.pane) }
 
 // The window's turn: a new reading becomes the rows; what an action came to is said.
 services_take :: proc(app: ^App) {

@@ -20,6 +20,7 @@ import prefs_page "gt:prefs_page"
 import process "gt:process"
 import setup "gt:setup"
 import update "gt:update"
+import instance "gt:instance"
 import identity "identity"
 
 // The corners: nearly square (a table of numbers, not cards): about a pixel on a button, none to see on a row.
@@ -66,7 +67,7 @@ App :: struct {
 	columns_menu: ui.Key,           // the menu of the table's columns (table_view.odin)
 	bar_rect:    ui.Rect,           // the Processes section's bar, as last laid out (the columns' menu opens under it)
 	theme_menu:  ui.Key,            // the menu of the theme (view.odin)
-	palette:     ui.Key,            // the command palette (commands.odin)
+	palette:     ui.Command_Palette,   // the command palette (commands.odin)
 	shortcuts_open: bool,           // the sheet of the keys
 	diagnosis_open: bool,   // "Why is it slow?" (F2, diagnosis.odin)
 	setup:       setup.Dialog,      // the install's dialog (setup.odin)
@@ -78,6 +79,8 @@ App :: struct {
 	update_serial: int,             // the updater's state last said
 	installed_copy: bool,           // this copy is the installed one: it updates itself (update.auto)
 	restart:     bool,              // at the end, the new program starts (an update in place)
+	journal_windows: [dynamic]^Journal_Window,   // the journals in windows of their own (journal_window.odin)
+	one_copy:    ^instance.Server,  // the name of the one Inspecteur that runs, served (one_copy.odin)
 	tz:          ^datetime.TZ_Region,   // local time, for the processes' start (loaded when first needed)
 	tz_tried:    bool,
 	search:      ui.Text_Field,
@@ -103,11 +106,18 @@ Run_Options :: struct {
 	tab:         Tab,
 	demo:        bool,
 	setup:       bool,   // --setup: the install's dialog open
+	owner:       instance.Owner,   // the one Inspecteur's name, this start's (one_copy_acquire)
+	owns:        bool,
 }
+
+// The App of the process (a call posted from another thread finds it).
+the_app: ^App
 
 app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	app := new(App)
 	defer free(app)
+	the_app = app
+	defer the_app = nil
 	app.prefs = prefs^
 	prefs^ = {}
 	app.settings = prefs_read(&app.prefs)
@@ -131,6 +141,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	table_layout_load(&app.table, app.settings)
 	app.table.tree = app.settings.tree
 	pins_load(&app.table, app.settings.pinned)
+	app.palette.size = app.settings.palette_size
 	app.vl.multi = true   // (Ctrl and Shift clicks, Ctrl+A: End task and Kill act on every row marked)
 	app.tab = opts.tab
 	refresh(app)
@@ -153,6 +164,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	h.after_input = FRAMES_AFTER_INPUT
 	h.partial_redraw = true   // (a sample changes some cells: only they are drawn again)
 	ui.set_rounding(&h.state, ROUNDING)
+	ui.set_zoom(&h.state, app.settings.zoom)
 	h.params = app_params
 	app.devtools = devtools.start_from_env(win, "inspecteur")
 	h.before_input = proc(h: ^host.Host) { app := (^App)(h.user); devtools.service(app.devtools, &h.state, &app.shared.r) }
@@ -168,6 +180,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	section_first_show(app)
 	if opts.setup { setup_open(app) } else { setup_offer(app) }
 	updates_start(app)
+	if opts.owns { one_copy_serve(app, opts.owner) }
 
 	t_window := time.tick_now()
 	platform.show_window(win)
@@ -178,13 +191,15 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 		fmt.printfln("first-frame %d read %.1f window %.1f frame %.1f (draw %.1f, present %.1f)", time.now()._nsec, ms(t_main, t_read), ms(t_read, t_window), ms(t_window, time.tick_now()), time.duration_milliseconds(h.times.draw), time.duration_milliseconds(h.times.present))
 	}
 	for !platform.is_closed(win) {
-		host.hosts_wait({h})
+		journal_windows_wait(app)
 		if !app.paused && time.tick_diff(app.next_sample, time.tick_now()) >= 0 { refresh(app) }
 		if !app.paused { services_tick(app) }
 		sections_take(app)
 		updates_follow(app)
 		t_frame := time.tick_now()
 		host.host_frame(h)
+		journal_windows_frame(app)
+		zoom_follow(app)
 		app.frame_time += time.tick_since(t_frame)
 		app.frames += 1
 	}
@@ -194,6 +209,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 		fmt.printfln("costs: %d samples, %.2f ms each; %d frames, %.2f ms each", app.refreshes, mean(app.refresh_time, app.refreshes), app.frames, mean(app.frame_time, app.frames))
 	}
 	devtools.stop(app.devtools)
+	one_copy_stop(app)
+	journal_windows_close(app)
 	updates_stop(app)
 	prefs_page.destroy(&app.settings_page)
 	connections_destroy(&app.connections)
@@ -219,6 +236,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	delete(app.own_units)
 	props_destroy(&app.props)
 	for &vl in app.props_lists { ui.vlist_destroy(&vl) }
+	ui.palette_destroy(&app.palette)
 	settings_free(&app.settings)
 	config.prefs_destroy(&app.prefs)
 	// (an update in place: the new program, once this one has let go of the window)
@@ -337,15 +355,16 @@ until_sample :: proc(app: ^App) -> int {
 
 // What each build is given: the palette and the base style of the preferences.
 @(private = "file")
-app_params :: proc(h: ^host.Host, bp: ^ui.Build_Params) {
-	app := (^App)(h.user)
+app_params :: proc(h: ^host.Host, bp: ^ui.Build_Params) { window_params(h, bp, (^App)(h.user)) }
+
+// What each build of a window of inspecteur is given (the main one, a journal's): the theme, the base style.
+window_params :: proc(h: ^host.Host, bp: ^ui.Build_Params, app: ^App) {
 	// (applied only when it changes, or the system goes light or dark: a palette applied starts a cross-fade)
 	choice := ui.Theme_Choice{name = app.settings.theme, mode = app.settings.mode, finish = app.settings.finish}
 	if ui.theme_show(&app.shared.theme, ui.THEMES[:], choice, &app.theme_shown, render.blend_space(&app.shared.r)) { platform.set_dark_title(h.win, !app.theme_shown.light) }
 	// (in a window the user is not in, the search's caret neither shows nor blinks: at rest, one frame per sample)
 	bp.inactive = !h.win.active
-	// (Ctrl+=, Ctrl+- and Ctrl+0 are Inspecteur's commands: they set view.font_size, which is kept)
-	bp.disable_zoom = true
+	// (the toolkit's zoom: Ctrl+wheel, Ctrl+=, Ctrl+-, Ctrl+0; zoom_follow keeps it)
 	bp.base = ui.Style{pref = {.X = ui.text_size(), .Y = ui.px(26)}, font = app.shared.font, font_size = app.settings.font_size, text_pad = 6, cursor = .Arrow}
 }
 

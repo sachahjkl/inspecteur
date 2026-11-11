@@ -95,6 +95,11 @@ live_services :: proc(l: ^Live) {
 	check(l, cdp.key(c, "alt+l") && file_has(prefs_path(l), "services.journal_level\twarnings"), "Alt+L: warnings and worse, kept")
 	check(l, cdp.key(c, "alt+l") && cdp.key(c, "alt+l") && file_has(prefs_path(l), "services.journal_level\tall"), "Alt+L twice: errors, then all")
 	check(l, cdp.key(c, "alt+b") && file_has(prefs_path(l), "services.journal_boot\tfalse") && cdp.key(c, "alt+b"), "Alt+B: every boot, and back")
+	// its journal in a window of its own: sway lists it; closed, it goes and the main window answers on
+	title := fmt.tprintf("%s: journal", service)
+	check(l, cdp.key(c, "ctrl+shift+j") && wait_sway_title(l, title, true), "Ctrl+Shift+J: the journal in a window of its own (%s)", title)
+	check(l, sway_command(l, fmt.tprintf(`[title="%s"] kill`, title)) && wait_sway_title(l, title, false), "closed, the window goes")
+	check(l, cdp.wait_name(c, "svc_journal_count", SESSION_WAIT), "the main window answers on")
 
 	if !select_unit(l, service) { return }
 	if !check(l, cdp.key(c, "ctrl+r"), "Ctrl+R: Restart") { return }
@@ -321,3 +326,35 @@ wait_named_prefix :: proc(c: ^cdp.Client, name, prefix: string) -> bool {
 }
 
 prefs_path :: proc(l: ^Live) -> string { return fmt.tprintf("%s/config/inspecteur/prefs", l.dir) }
+
+// swaymsg on the session's sway (its socket in the runtime folder).
+@(private = "file")
+swaymsg :: proc(l: ^Live, args: ..string) -> (out: string, ok: bool) {
+	code: int
+	run := fmt.tprintf("%s/run", l.dir)
+	sock := ""
+	if fis, err := os.read_all_directory_by_path(run, context.temp_allocator); err == nil {
+		for fi in fis { if strings.has_prefix(fi.name, "sway-ipc.") { sock = fmt.tprintf("%s/%s", run, fi.name) } }
+	}
+	if sock == "" { return }
+	cmd := make([dynamic]string, context.temp_allocator)
+	append(&cmd, "swaymsg", "-s", sock)
+	append(&cmd, ..args)
+	out, code = toolbox.capture(cmd[:])
+	return out, code == 0
+}
+
+@(private = "file")
+sway_command :: proc(l: ^Live, command: string) -> bool { _, ok := swaymsg(l, command); return ok }
+
+// Waits until sway's tree has a window titled `title` (`present`), or has none.
+@(private = "file")
+wait_sway_title :: proc(l: ^Live, title: string, present: bool) -> bool {
+	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
+	for time.tick_diff(time.tick_now(), deadline) > 0 {
+		tree, _ := swaymsg(l, "-t", "get_tree")
+		if strings.contains(tree, fmt.tprintf(`"name": "%s"`, title)) == present { return true }
+		time.sleep(SESSION_POLL)
+	}
+	return false
+}

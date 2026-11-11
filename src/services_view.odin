@@ -48,7 +48,7 @@ build_services :: proc(app: ^App, em: f32) {
 service_details_build :: proc(app: ^App, em: f32) {
 	s := &app.services
 	u, selected := selected_service(app)
-	d := s.details
+	d := s.pane.details
 	// (the line above the pane, dragged, sets its height: kept when let go)
 	h := app.settings.details_em
 	ui.next({width = ui.fill()})
@@ -89,7 +89,7 @@ service_details_body :: proc(app: ^App, u: Service, selected: bool, d: ^Unit_Det
 		if tool { service_details_switch(app) }
 		ui.spacer(ui.px(em * 0.4))
 	}
-	journal_build(app, u, selected, d, em)
+	journal_build(app, &s.pane, u.name, s.manager, selected, em)
 }
 
 // The pane's height at least and at most, in ems (services.details_height).
@@ -107,7 +107,7 @@ service_details_switch :: proc(app: ^App) {
 
 // The selected service's unit file, opened (the person's text editor).
 service_open_file :: proc(app: ^App) {
-	d := app.services.details
+	d := app.services.pane.details
 	if d == nil || d.file == "" { return }
 	if platform.open_path(d.file) { say(app, "Opened %s", d.file) } else { say(app, "No program opens %s", d.file) }
 }
@@ -140,7 +140,7 @@ service_can :: proc(app: ^App, c: Cmd) -> bool {
 	case .Service_Open:    return u.pid > 0
 	case .Service_Copy:    return true
 	case .Service_Open_File:
-		d := app.services.details
+		d := app.services.pane.details
 		return d != nil && d.name == u.name && d.manager == app.services.manager && d.file != ""
 	}
 	return false

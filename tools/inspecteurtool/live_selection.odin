@@ -94,8 +94,8 @@ live_view_keys :: proc(l: ^Live) {
 	check(l, file_has(prefs, "processes.refresh_ms\t2000"), "kept")
 	check(l, cdp.key(c, "ctrl+shift+r") && cdp.wait_for(c, "Normal: 1 s", SESSION_WAIT) && cdp.click_text(c, "Normal: 1 s"), "back to every second")
 	check(l, file_has(prefs, "processes.refresh_ms\t1000"), "kept")
-	check(l, cdp.key(c, "ctrl+=") && file_has(prefs, "view.font_size\t14"), "Ctrl+=: a larger text, kept")
-	check(l, cdp.key(c, "ctrl+0") && file_has(prefs, "view.font_size\t13"), "Ctrl+0: the default size again")
+	check(l, cdp.key(c, "ctrl+=") && file_has(prefs, "view.zoom\t1.1"), "Ctrl+=: zoomed in, kept")
+	check(l, cdp.key(c, "ctrl+0") && file_has(prefs, "view.zoom\t1\n"), "Ctrl+0: 100 %% again")
 	check(l, cdp.key(c, "ctrl+t") && cdp.wait_for(c, "as a tree", SESSION_WAIT) && file_has(prefs, "processes.view\ttree"), "Ctrl+T: every process under its parent, kept")
 	check(l, cdp.key(c, "ctrl+t") && cdp.wait_for(c, "Background processes", SESSION_WAIT) && file_has(prefs, "processes.view\tapps"), "Ctrl+T again: the apps")
 }

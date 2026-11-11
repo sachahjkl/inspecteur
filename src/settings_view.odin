@@ -15,10 +15,11 @@ settings_toggle :: proc(app: ^App) {
 	if app.settings_open { prefs_page.focus_search(&app.settings_page) }
 }
 
-// The keys of the settings: Ctrl+, and Escape go back, unless an editor of a preference has the keyboard (Escape gives
+// The keys of the settings: Ctrl+F gives the search the keyboard; Ctrl+, and Escape go back, unless an editor of a preference has the keyboard (Escape gives
 // it back to the page first).
 settings_keys :: proc(app: ^App) {
 	if ui.key_press(.Comma, {.Ctrl}) { settings_toggle(app); return }
+	if ui.key_press(.F, {.Ctrl}) { prefs_page.focus_search(&app.settings_page) }   // (as the window's filter)
 	if ui.key_press(.Escape) && !prefs_page.editing(&app.settings_page) { app.settings_open = false }
 }
 
@@ -39,7 +40,7 @@ CUSTOM := [?]string{"view.theme"}
 settings_build :: proc(app: ^App) {
 	ui.next({width = ui.fill(), height = ui.fill()})
 	prefs_page.build(&app.settings_page, &app.prefs, {
-		user = app, changed = settings_changed, choices = settings_choices,
+		user = app, changed = settings_changed, choices = settings_choices, preview = settings_preview,
 		custom_names = CUSTOM[:], custom = settings_custom,
 		updater = app.updater, update_pref = "update.auto", restart = proc(user: rawptr) { updates_restart((^App)(user)) },
 		pages = SETTINGS_PAGES[:], icon_font = app.icons, search_icon = lucide.SEARCH, reset_icon = lucide.ROTATE_CCW,
@@ -63,6 +64,20 @@ settings_choices :: proc(user: rawptr, name: string) -> (labels, values: []strin
 	out := make([]string, len(ui.THEMES), context.temp_allocator)
 	for t, i in ui.THEMES { out[i] = t.name }
 	return out, out
+}
+
+// While a slider is held: what can follow it at once does (the refresh's period); the text size waits for the release
+// (every size of the window would move under the pointer).
+@(private = "file")
+settings_preview :: proc(user: rawptr, name: string, value: f64) {
+	app := (^App)(user)
+	switch name {
+	case "processes.refresh_ms":
+		app.settings.refresh_ms = int(value)
+		app.next_sample = time.tick_add(time.tick_now(), time.Duration(app.settings.refresh_ms) * time.Millisecond)
+	case "services.refresh_ms":
+		app.settings.services_ms = int(value)
+	}
 }
 
 // A preference was set or reset: saved, read again, and what it changes applied.

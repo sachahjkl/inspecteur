@@ -132,11 +132,11 @@ live_commands :: proc(l: ^Live) {
 	c := &l.c
 	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
 	check(l, cdp.key(c, "Escape") && cdp.key(c, "ctrl+1"), "the Processes section")
-	check(l, cdp.key(c, "ctrl+k") && cdp.wait_for(c, "Type to search", SESSION_WAIT), "Ctrl+K opens the palette")
+	check(l, cdp.key(c, "ctrl+k") && cdp.wait_name(c, "palette_field", SESSION_WAIT), "Ctrl+K opens the palette")
 	check(l, cdp.type_text(c, "performance") && cdp.wait_for(c, "Performance  ·  Sections", SESSION_WAIT), "typing finds the Performance section")
 	check(l, cdp.key(c, "Enter") && cdp.wait_name(c, "cpu_graph", SESSION_WAIT), "Enter shows it")
-	check(l, cdp.key(c, "ctrl+shift+p") && cdp.wait_for(c, "Type to search", SESSION_WAIT), "Ctrl+Shift+P opens it too")
-	check(l, cdp.key(c, "Escape") && cdp.wait_for(c, "Type to search", SESSION_WAIT, gone = true), "Escape closes it")
+	check(l, cdp.key(c, "ctrl+shift+p") && cdp.wait_name(c, "palette_field", SESSION_WAIT), "Ctrl+Shift+P opens it too")
+	check(l, cdp.key(c, "Escape") && cdp.wait_name(c, "palette_field", SESSION_WAIT, gone = true), "Escape closes it")
 	check(l, cdp.key(c, "F1") && cdp.wait_for(c, "Keyboard shortcuts", SESSION_WAIT), "F1 shows the keys")
 	check(l, cdp.wait_for(c, "Suspend or resume", SESSION_WAIT) && cdp.wait_for(c, "Ctrl+K, Ctrl+Shift+P", SESSION_WAIT), "with every command's keys")
 	check(l, cdp.key(c, "Escape") && cdp.wait_for(c, "Keyboard shortcuts", SESSION_WAIT, gone = true), "Escape closes them")
@@ -209,10 +209,46 @@ live_settings :: proc(l: ^Live) {
 	c := &l.c
 	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
 	check(l, cdp.key(c, "ctrl+,") && cdp.wait_for(c, "Appearance", SESSION_WAIT) && cdp.wait_for(c, "Updates", SESSION_WAIT), "Ctrl+,: the settings, their pages")
-	check(l, cdp.type_text(c, "rules") && cdp.wait_for(c, "Draw a thin line under each row of the tables.", SESSION_WAIT), "a search finds a preference")
+	// a theme's card: the window takes its colours at once
+	before := page_pixel(c)
+	check(l, cdp.click_name(c, "th0") && file_has(prefs, "view.theme\tMidnight"), "the first theme's card: Midnight, kept")
+	check(l, wait_page_pixel_not(c, before), "the window takes its colours at once")
+	check(l, cdp.click_name(c, "th1") && file_has(prefs, "view.theme\tGraphite"), "back to Graphite")
+	check(l, cdp.key(c, "ctrl+f") && cdp.type_text(c, "rules") && cdp.wait_for(c, "Draw a thin line under each row of the tables.", SESSION_WAIT), "a search finds a preference")
 	check(l, cdp.click_name(c, "sw") && file_has(prefs, "view.rules\tfalse"), "its switch changes it, kept")
 	check(l, cdp.click_name(c, "sw") && file_has(prefs, "view.rules\ttrue"), "and back")
-	check(l, cdp.key(c, "Escape") && cdp.key(c, "Escape") && cdp.wait_name(c, "settings_button", SESSION_WAIT) && cdp.wait_for(c, "Draw a thin line", SESSION_WAIT, gone = true), "Escape goes back to the sections")
+	check(l, cdp.key(c, "Escape") && cdp.wait_name(c, "settings_button", SESSION_WAIT) && cdp.wait_for(c, "Draw a thin line", SESSION_WAIT, gone = true), "Escape goes back to the sections")
+}
+
+// One Inspecteur at a time: a second start with --section hands it to this one, which shows it, and ends.
+live_one_copy :: proc(l: ^Live) {
+	c := &l.c
+	p, err := os.process_start({command = {PROGRAM, "--section", "startup"}, env = l.session.env})
+	if !check(l, err == nil, "a second start, --section startup") { return }
+	st, werr := os.process_wait(p, SESSION_WAIT)
+	check(l, werr == nil && st.exited && st.exit_code == 0, "it ends at once, handed over (%v)", st.exit_code)
+	check(l, cdp.wait_for(c, "File", SESSION_WAIT) && cdp.wait_for(c, "Status", SESSION_WAIT), "this one shows Startup (its columns File and Status)")
+	check(l, cdp.key(c, "ctrl+1") && cdp.wait_for(c, "Background processes", SESSION_WAIT), "Ctrl+1: back to Processes")
+}
+
+// The colour of the page's background (a pixel of the window's corner, under the title bar).
+@(private = "file")
+page_pixel :: proc(c: ^cdp.Client) -> u32 {
+	png, ok := cdp.screenshot(c, cdp.Clip{4, 120, 1, 1}, context.temp_allocator)
+	if !ok { return 0 }
+	pic, dok := cdp.png_decode(png, context.temp_allocator)
+	if !dok || len(pic.pixels) < 3 { return 0 }
+	return u32(pic.pixels[0]) << 16 | u32(pic.pixels[1]) << 8 | u32(pic.pixels[2])
+}
+
+@(private = "file")
+wait_page_pixel_not :: proc(c: ^cdp.Client, before: u32) -> bool {
+	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
+	for time.tick_diff(time.tick_now(), deadline) > 0 {
+		if page_pixel(c) != before { return true }
+		time.sleep(SESSION_POLL)
+	}
+	return false
 }
 
 // Selects the row whose PID cell says `pid` (clicked: the list gets the keyboard) and checks that the row selected, as

@@ -98,7 +98,7 @@ run_shots :: proc(args: []string) -> int {
 
 	// the command palette, searching
 	cdp.key(&c, "ctrl+k")
-	if need(cdp.wait_for(&c, "Type to search", SESSION_WAIT), "no palette", &failed) {
+	if need(cdp.wait_name(&c, "palette_field", SESSION_WAIT), "no palette", &failed) {
 		cdp.type_text(&c, "prio")
 		cdp.wait_for(&c, "Raise the priority", SESSION_WAIT)
 		shot(&c, out, "palette", &failed)

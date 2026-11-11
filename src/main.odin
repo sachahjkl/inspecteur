@@ -65,6 +65,14 @@ run :: proc(all_args: []string) -> int {
 				return 2
 			}
 		}
+		// (one Inspecteur at a time: a second start hands its section to the first, and ends)
+		asked := false
+		for a in args { if a == "--section" { asked = true } }
+		if !opts.demo && !opts.first_frame {
+			forwarded: bool
+			forwarded, opts.owner, opts.owns = one_copy_acquire(opts.tab, asked)
+			if forwarded { return 0 }
+		}
 		return app_run(&prefs, opts)
 	case "install":   return cmd_install()
 	case "uninstall": return cmd_uninstall()

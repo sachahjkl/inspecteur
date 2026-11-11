@@ -92,9 +92,11 @@ turned off by the user's copy of it with `Hidden=true`, as the specification say
 nothing else changed in it.
 
 A service's details (the pane under the table) come from its unit's properties over the same bus (`LoadUnit`, then
-`FragmentPath`, `StateChangeTimestamp`, `TasksCurrent`, `CPUUsageNSec`, `NRestarts`) and its journal's last lines from
-`journalctl -u <unit> -n 50` (the journal's own program reads journald's files), on a thread of their own: when another
-service is selected, and after each reading of the list. Stop and Restart are asked first: the question says when the
+`FragmentPath`, `StateChangeTimestamp`, `TasksCurrent`, `CPUUsageNSec`, `NRestarts`) and its journal's last entries
+from `journalctl -u <unit> -n 1000 -o json` (`-b`: this boot; the journal's own program reads journald's files), on a
+thread of their own: when another service is selected, and every 2 s while it is followed. A `Journal_View`
+(journal.odin) holds one service's reading, its list and its search: the pane has one, each journal window
+(journal_window.odin: another `host.Host` on the main window's `Shared`, built after it in the loop) its own. Stop and Restart are asked first: the question says when the
 service runs the desktop or Inspecteur (its main process is the display server or one Inspecteur runs under, or
 Inspecteur's own cgroup is under that unit).
 

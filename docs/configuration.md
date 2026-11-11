@@ -37,7 +37,9 @@ inspecteur --pref view.mode=light --pref processes.refresh_ms=2000
 | `view.finish` | machined | How surfaces are drawn: `machined` (raised buttons and panels; sunken fields, graphs and meters; a light theme is drawn flat), `flat` (plain surfaces, thin lines), `gradient` (surfaces shaded top to bottom) or `glass` (surfaces that let the page show through). |
 | `view.zebra` | true | Shade every second row of the tables (Processes, Services, Startup, Connections, the Properties' lists): a line of numbers reads across. |
 | `view.rules` | true | Draw a thin line under each row of the tables. |
-| `view.font_size` | 13 | The text size, in logical pixels (8 to 40). Ctrl+= and Ctrl+- change it, Ctrl+0 sets it back to 13. |
+| `view.font_size` | 13 | The text size at a zoom of 100 %, in logical pixels (8 to 40): every size of the window follows it. |
+| `view.zoom` | 1 | The zoom of the window: 1 is 100 % (0.5 to 3). Ctrl+wheel, Ctrl+= and Ctrl+- change it, Ctrl+0 sets it back. |
+| `view.palette_size` | (empty) | The command palette's size, in logical pixels: its width and its height. Dragging its edges or its corner changes it. |
 | `view.width` | 1100 | The window's width at start, in logical pixels. |
 | `view.height` | 720 | The window's height at start, in logical pixels. |
 | `update.auto` | true | Check for a new version a while after the start and then every day, download it and put it in place: it runs at the next start. Only the installed copy updates itself; a copy of the Nix store is Nix's to update. |

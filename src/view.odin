@@ -36,7 +36,7 @@ METER_FULL :: 0.9
 view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	app := (^App)(h.user)
 	em := ui.font_size()
-	free_keys := !app.menu.confirm.open && !app.props.open && !app.affinity.open && !app.shortcuts_open && !app.setup.open && !app.diagnosis_open && !ui.ctx_menu_any_open()
+	free_keys := !app.menu.confirm.open && !app.props.open && !app.affinity.open && !app.shortcuts_open && !app.setup.open && !app.diagnosis_open && !app.palette.open && !ui.ctx_menu_any_open()
 	if free_keys && app.settings_open {
 		settings_keys(app)   // (the page's own: its search takes what is typed)
 	} else if free_keys {
@@ -84,9 +84,9 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 view_keys :: proc(app: ^App) {
 	// (a filter with text and the keyboard keeps its editing keys: Delete erases a character there, not a process)
 	// (the journal's search keeps them all, empty or not: Delete there is no Stop)
-	jk := app.services.journal_search_key
+	jk := app.services.pane.search_key
 	field_keeps := ui.focus_key() == app.search_key && app.search_key != 0 && len(app.search.buf) > 0 || jk != 0 && ui.focus_key() == jk
-	if journal_search_escape(app) { return }
+	if journal_search_escape(&app.services.pane) { return }
 	commands_keys(app, field_keeps)
 	#partial switch app.tab {
 	case .Processes:   processes_keys(app, field_keeps)
@@ -557,13 +557,15 @@ refresh_button :: proc(app: ^App, em: f32) {
 }
 
 ////////////////////////////////
-// The text size (Ctrl+=, Ctrl+-, Ctrl+0)
+// The zoom (Ctrl+wheel, Ctrl+=, Ctrl+-, Ctrl+0)
 
-// Sets the text size (bounded; written to view.font_size). Every size of the window is in ems: it all follows.
-zoom :: proc(app: ^App, size: f32) {
-	s := clamp(size, FONT_SIZE_MIN, FONT_SIZE_MAX)
-	if s == app.settings.font_size { return }
-	app.settings.font_size = s
-	pref_save(&app.prefs, "view.font_size", fmt.tprintf("%.0f", s))
-	say(app, "Text size %.0f%s", s, s == FONT_SIZE_DEFAULT ? " (the default)" : "")
+// The zoom (the toolkit's: Ctrl+wheel, Ctrl+=, Ctrl+-, Ctrl+0, and the commands), after a frame: kept when it changed
+// (view.zoom), said in the footer, and the journals' windows zoomed alike.
+zoom_follow :: proc(app: ^App) {
+	z := ui.zoom(&app.main.state)
+	for w in app.journal_windows { ui.set_zoom(&w.state, z) }
+	if abs(z - app.settings.zoom) < 0.001 { return }
+	app.settings.zoom = z
+	pref_save(&app.prefs, "view.zoom", fmt.tprintf("%.3f", z))
+	say(app, "Zoom %.0f %%%s", z * 100, abs(z - 1) < 0.001 ? "" : " (Ctrl+0: 100 %)")
 }

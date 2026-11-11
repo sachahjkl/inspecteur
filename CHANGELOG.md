@@ -7,10 +7,20 @@ and the versions follow [semantic versioning](https://semver.org/).
 
 ### Added
 
+- **One Inspecteur at a time**: a second start (Ctrl+Shift+Escape again, a launcher, `--section`) shows its section in
+  the one that runs, which comes to the front.
+- **Zoom** as every program of gui_toolkit: Ctrl+wheel, Ctrl+=, Ctrl+-, Ctrl+0 (`view.zoom`, kept).
+- **The palette resizable** from its edges and its corner, its size kept (`view.palette_size`); each command with its
+  icon.
+- **The tables scroll sideways** when the window is narrower than their columns (Shift+wheel, a touchpad); the titles
+  follow.
+- The refresh's sliders in the settings apply as they move; Ctrl+F gives the settings' search the keyboard.
 - **The services' journal, in depth**: each entry's time, level in its colour, program and process, message; all,
   warnings or errors with their counts (Alt+L); this boot or every boot (Alt+B); followed live, new entries at the end
   (Alt+F); a search of its own (Ctrl+J); the selected entry whole, its message wrapped; Copy the entries shown (Alt+C) or
   the entry (Alt+Shift+C); the pane's height dragged from the line above it. Up to 1000 entries.
+- **A service's journal in a window of its own** (Ctrl+Shift+J, or the pane's button): it keeps its service while the
+  pane follows the selection, with the same keys; several at once, one per service; Ctrl+W closes it.
 
 ### Fixed
 
