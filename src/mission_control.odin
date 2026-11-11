@@ -5,7 +5,8 @@ package inspecteur
 // failed ones first), the network's sockets, what starts with the session, the system. Each panel is a tab that can be
 // dragged into another stack, beside one, to an edge, or out to float; the line between two stacks resizes them; a
 // panel can be closed and brought back from the panels' menu; Mission Control: the layout as at first (the palette, the
-// bar's button) sets it back. The layout is kept (mission.layout). A click on a line goes to its section; a right click
+// bar's button) sets it back. The layout is kept (mission.layout). A panel's menu opens it in a window of its own
+// (mission_window.odin). A click on a line goes to its section; a right click
 // opens its menu: its section, and what is related to it (a process's properties, service and connections; a service's
 // process, details and journal).
 //
@@ -36,6 +37,8 @@ MISSION_TITLES := [Mission_Panel]string{
 // services, the network, and the startup with the system in tabs.
 MISSION_DEFAULT :: "dock1 y0.320([*machine] y0.500(x0.340([*health] x0.500([*cpu] [*memory])) x0.340([*services] x0.500([*network] [*startup,system]))))"
 
+// The panels' menu's width, in ems: its last line ("Mission Control: the layout as at first") whole.
+@(private = "file") MISSION_MENU_EM :: 22
 // The lines a list panel shows at most.
 @(private = "file") MISSION_TOP :: 8
 
@@ -44,6 +47,9 @@ Mission_Control :: struct {
 	menu:      ui.Key,   // the panels' menu
 	line_menu: ui.Key,   // a line's menu (a right click)
 	line:      Mission_Line,
+	// a panel the dock let go to a window of its own, opened by the loop between two frames (mission_windows_frame), not
+	// in the middle of the main window's build
+	to_window: Maybe(Mission_Panel),
 }
 
 // What a line shows, for its menu: a process, a service or a startup item.
@@ -111,13 +117,14 @@ build_mission :: proc(app: ^App, em: f32) {
 	ui.next({width = ui.fill(), height = ui.fill()})
 	ui.dock_begin(d, "###mission", {
 		title = proc(user: rawptr, panel: u32) -> string { return MISSION_TITLES[Mission_Panel(panel)] },
-		on_save = mission_save, user = app, close_buttons = true,
+		on_save = mission_save, user = app, close_buttons = true, windows = true,
 	})
 	for p in Mission_Panel {
 		if ui.dock_panel(d, u32(p)) { mission_panel(app, p, em) }
 	}
 	res := ui.dock_end(d)
 	if res.closed != ui.DOCK_NO_PANEL { say(app, "%s closed: the panels' menu brings it back", MISSION_TITLES[Mission_Panel(res.closed)]) }
+	if res.windowed != ui.DOCK_NO_PANEL { app.mission.to_window = Mission_Panel(res.windowed) }
 	mission_menu(app, em)
 	mission_line_menu(app, em)
 }
@@ -139,7 +146,7 @@ mission_bar_right :: proc(app: ^App, em: f32) {
 mission_menu :: proc(app: ^App, em: f32) {
 	if app.mission.menu == 0 { return }
 	d := &app.mission.dock
-	if ui.ctx_menu(app.mission.menu, em * 16) {
+	if ui.ctx_menu(app.mission.menu, em * MISSION_MENU_EM) {
 		ui.menu_heading("Panels")
 		for p in Mission_Panel {
 			on := ui.dock_has(d, u32(p))
@@ -159,13 +166,29 @@ mission_menu :: proc(app: ^App, em: f32) {
 }
 
 // Where a panel brought back goes: with the first panel shown (else the empty space).
+// A panel back from its window, where a panel brought back from the menu goes; the layout kept.
+mission_dock_back :: proc(app: ^App, p: Mission_Panel) {
+	d := &app.mission.dock
+	if ui.dock_has(d, u32(p)) { return }
+	ui.dock_add(d, u32(p), mission_place(d))
+	ui.dock_activate(d, u32(p))
+	mission_save(app, d)
+}
+
+// What Mission Control sums up, read now: each section (when it is shown, or one of its panels is in a window).
+mission_read :: proc(app: ^App) {
+	connections_ask(app)
+	if !app.information.asked { information_ask(&app.information) }
+	services_ask(app)
+	startup_ask(app)
+}
+
 @(private = "file")
 mission_place :: proc(d: ^ui.Dock) -> ui.Dock_Target {
 	for p in Mission_Panel { if ui.dock_has(d, u32(p)) { return ui.dock_with(d, u32(p)) } }
 	return {place = .Tab, node = d.main, index = -1}
 }
 
-@(private = "file")
 mission_panel :: proc(app: ^App, p: Mission_Panel, em: f32) {
 	ui.next({width = ui.fill(), height = ui.fill(), axis = .Y, bg = surface("well")})
 	body := ui.build_box({.Draw_Background, .Clip, .View_Scroll_Y, .View_Clamp_Y}, fmt.tprintf("###mc_%s", MISSION_NAMES[p]))
@@ -513,7 +536,6 @@ mission_line_menu_open :: proc(app: ^App, line: Mission_Line, pos: ui.Vec2) {
 
 // The menu of a line: its section first, then what is related to it. The process is found again by its pid and start
 // time (gone: the menu closes); the service and the startup item by their names in their sections.
-@(private = "file")
 mission_line_menu :: proc(app: ^App, em: f32) {
 	mc := &app.mission
 	if mc.line_menu == 0 { return }

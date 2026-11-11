@@ -35,8 +35,10 @@ inspecteur --pref view.mode=light --pref processes.refresh_ms=2000
 | `connections.widths` | (empty) | The widths of the Connections table's columns that were resized, in ems (`remote_address=20`). |
 | `connections.order` | (empty) | The order of the Connections table's columns, apart by commas (`process,state,remote_address`). |
 | `connections.sort` | process | The column the sockets are sorted by: `process`, `pid`, `protocol`, `local_address`, `remote_address` or `state`; a `-` before it for the largest (or Z) first. |
+| `connections.refresh_ms` | 3000 | How often the sockets are read again while Connections or Mission Control is shown, in milliseconds (1000 to 60000). A reading goes through every process's open files: a longer period costs less. |
 | `services.refresh_ms` | 3000 | How often the services are read again while their section is shown, in milliseconds (1000 to 60000). |
 | `mission.layout` | (empty) | Mission Control's panels: where each one is docked, its stacks and their sizes, those closed left out. Its panels' menu brings one back; *Mission Control: the layout as at first* sets it back. |
+| `mission.windows` | (empty) | Mission Control's panels in windows of their own, apart by commas (`health,network`): they open again at the start. A panel's menu opens one; closed, it goes back to Mission Control. |
 | `view.theme` | Graphite | The window's colours: a theme of gui_toolkit by its name (Graphite, Midnight, Nord, Gruvbox, Tokyo Night, Catppuccin...). |
 | `view.mode` | system | The theme's version: `system` (light or dark, as the system), `dark` or `light`. Ctrl+Shift+L switches light and dark. A theme of one version (Graphite is dark only) gives way to Silver when the other version is chosen. |
 | `view.finish` | machined | How surfaces are drawn: `machined` (raised buttons and panels; sunken fields, graphs and meters; a light theme is drawn flat), `flat` (plain surfaces, thin lines), `gradient` (surfaces shaded top to bottom) or `glass` (surfaces that let the page show through). `edged`: the machined reliefs crisp, nothing blurred. |
@@ -45,10 +47,9 @@ inspecteur --pref view.mode=light --pref processes.refresh_ms=2000
 | `view.font_size` | 13 | The text size at a zoom of 100 %, in logical pixels (8 to 40): every size of the window follows it. |
 | `view.zoom` | 1 | The zoom of the window: 1 is 100 % (0.5 to 3). Ctrl+wheel, Ctrl+= and Ctrl+- change it, Ctrl+0 sets it back. |
 | `view.system_title` | false | The window's title bar drawn by the system (its buttons, its snapping) in place of Inspecteur's own. A desktop that draws none (GNOME) keeps Inspecteur's. |
+| `view.placement` | (empty) | Where the window was left and its size, in physical pixels, and whether it was maximized (`120 80 1400 900 maximized`; empty: the first start's size). Written when it closes; Wayland lets a program set the size alone. |
 | `view.palette_size` | (empty) | The command palette's size, in logical pixels: its width and its height. Dragging its edges or its corner changes it. |
 | `view.section` | processes | The section shown at the start: the one shown last (`mission control`, `processes`, `performance`, `services`, `startup`, `connections`, `information`). `--section` shows another. |
 | `performance.cpu_view` | overall | The CPU's page in Performance: one graph for all the processors (`overall`), or one per logical processor (`logical`). Ctrl+G switches them. |
-| `view.width` | 1100 | The window's width at start, in logical pixels. |
-| `view.height` | 720 | The window's height at start, in logical pixels. |
 | `update.auto` | true | Check for a new version a while after the start and then every day, download it and put it in place: it runs at the next start. Only the installed copy updates itself; a copy of the Nix store is Nix's to update. |
 | `setup.choice` | (empty) | What was answered to the install's dialog: `installed`, `standalone` (this copy runs on its own: not offered again), or dismissed for a version. |

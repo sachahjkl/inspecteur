@@ -162,7 +162,7 @@ cmd_tip :: proc(c: Cmd) -> string { return ui.command_tip(COMMANDS[c]) }
 
 // A menu's line of the command: its label, its key, greyed when it cannot act; clicked: it is run.
 cmd_item :: proc(app: ^App, c: Cmd, label := "") {
-	if ui.menu_item(label != "" ? label : COMMANDS[c].label, ui.command_shortcut(COMMANDS[c]), enabled = cmd_can(app, c)).clicked { cmd_run(app, c) }
+	if ui.menu_item(label != "" ? label : COMMANDS[c].label, ui.command_shortcut(COMMANDS[c]), icon = COMMANDS[c].icon, enabled = cmd_can(app, c), icon_font = app.icons).clicked { cmd_run(app, c) }
 }
 
 // The keys the filter keeps while it has the keyboard and some text: they edit it.

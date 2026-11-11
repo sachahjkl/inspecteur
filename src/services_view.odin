@@ -29,6 +29,7 @@ build_services :: proc(app: ^App, em: f32) {
 	ev := section_table_build(&s.rows, empty)
 	if ev.sorted { ui.table_apply(&s.rows.table, &s.rows.data, app.query) }
 	if ev.sorted || ev.resized || ev.moved { section_layout_save(&s.rows.table, &app.prefs, "services") }
+	section_header_menu(&s.rows, ev, "services", em)
 	if ev.activated && cmd_can(app, .Service_Open) { service_reveal(app) }
 	if ev.menu { services_menu_open(app, ev.menu_at) }
 	// (the pane follows the selection: another service selected is read at once)

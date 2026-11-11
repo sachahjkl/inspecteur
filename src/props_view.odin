@@ -63,8 +63,9 @@ props_slice :: proc(labels: ^[Props_Tab]string) -> []string { return (cast([^]st
 
 @(private = "file")
 props_title :: proc(app: ^App, p: ^Proc, em: f32) {
-	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 3))})
-	if ui.row(.Center, {.Draw_Side_Bottom}, "###props_title") {
+	// (on the bars' darker surface, a line under it: the title and its facts apart from the tabs)
+	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 3)), bg = surface("bar")})
+	if ui.row(.Center, {.Draw_Background, .Draw_Side_Bottom}, "###props_title") {
 		ui.spacer(ui.px(em))
 		glyph(app, lucide.INFO, em * 1.8, ui.color("accent"))
 		ui.spacer(ui.px(em * 0.4))

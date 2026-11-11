@@ -232,6 +232,12 @@ live_mission :: proc(l: ^Live) {
 	_, menu_ok := cdp.call(c, "Toolkit.click", `{"text":"Busiest: memory","index":1}`)
 	check(l, menu_ok && cdp.wait_name(c, "mc_memory", SESSION_WAIT, gone = true) && file_has(prefs, "mission.layout"), "a panel closed, the layout kept")
 	check(l, cdp.click_name(c, "mission_reset") && cdp.wait_name(c, "mc_memory", SESSION_WAIT), "the layout as at first brings it back")
+	// a panel in a window of its own (its tab's menu): out of the dock, kept; the window closed, it comes back
+	_, tab_menu := cdp.call(c, "Toolkit.click", fmt.tprintf(`{{"name":"dock_tab_%d","index":0,"count":1,"button":"right"}}`, 2))
+	check(l, tab_menu && cdp.wait_for(c, "Open in a window", SESSION_WAIT) && cdp.click_text(c, "Open in a window"), "a panel's menu: Open in a window")
+	check(l, wait_sway_title(l, "Health", true) && cdp.wait_name(c, "mc_health", SESSION_WAIT, gone = true), "Health in a window of its own, out of the dock")
+	check(l, file_has(prefs, "mission.windows\thealth"), "the window is kept")
+	check(l, sway_command(l, `[title="Health"] kill`) && wait_sway_title(l, "Health", false) && cdp.wait_name(c, "mc_health", SESSION_WAIT), "its window closed, Health is back in Mission Control")
 	// a line's menu (a right click), its first item: the process in Processes; then a click on the line's middle (its name)
 	_, right_ok := cdp.call(c, "Toolkit.click", `{"name":"mc_cpu_0","index":0,"count":1,"button":"right"}`)
 	check(l, right_ok && cdp.wait_for(c, "Show in Processes", SESSION_WAIT) && cdp.wait_for(c, "Show its connections", SESSION_WAIT), "a line's right click: its menu")

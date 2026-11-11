@@ -29,6 +29,9 @@ ROUNDING :: 0.25
 // Frames owed after an event (what it set off settles: the layout, the reveal of the selected row).
 FRAMES_AFTER_INPUT :: 3
 
+// The window's size at its first start, in logical pixels (then view.placement's).
+WINDOW_SIZE :: [2]int{1100, 720}
+
 Tab :: enum u8 { Mission_Control, Processes, Performance, Services, Startup, Connections, Information }
 
 TAB_LABELS := [Tab]string{.Mission_Control = "Mission Control", .Processes = "Processes", .Performance = "Performance", .Services = "Services", .Startup = "Startup", .Connections = "Connections", .Information = "Information"}
@@ -83,6 +86,7 @@ App :: struct {
 	installed_copy: bool,           // this copy is the installed one: it updates itself (update.auto)
 	restart:     bool,              // at the end, the new program starts (an update in place)
 	journal_windows: [dynamic]^Journal_Window,   // the journals in windows of their own (journal_window.odin)
+	mission_windows: [dynamic]^Mission_Window,   // Mission Control's panels in windows of their own (mission_window.odin)
 	one_copy:    ^instance.Server,  // the name of the one Inspecteur that runs, served (one_copy.odin)
 	tz:          ^datetime.TZ_Region,   // local time, for the processes' start (loaded when first needed)
 	tz_tried:    bool,
@@ -152,7 +156,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 
 	t_read := time.tick_now()
 	platform.set_app_id(APP_NAME)
-	if !host.host_open(&app.main, &app.shared, {title = "Inspecteur", size = app.settings.size, integrated_title = !app.settings.system_title}, view_build, app) {
+	if !host.host_open(&app.main, &app.shared, {title = "Inspecteur", size = WINDOW_SIZE, integrated_title = !app.settings.system_title}, view_build, app) {
 		fmt.eprintln("inspecteur: no window")
 		return 1
 	}
@@ -188,22 +192,29 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	if opts.owns { one_copy_serve(app, opts.owner) }
 
 	t_window := time.tick_now()
+	// (the window as it was left: its size, maximized or not; its place too where the system lets a program set it)
+	if pl, ok := platform.placement_parse(config.string_of(&app.prefs, "view.placement")); ok { platform.set_placement(win, pl) }
 	platform.show_window(win)
 	host.host_frame(h)
+	mission_windows_restore(app)
 	if opts.first_frame {
 		// (a tool reads it: the end of the first frame, then where the time went since main)
 		ms :: proc(a, b: time.Tick) -> f64 { return time.duration_milliseconds(time.tick_diff(a, b)) }
 		fmt.printfln("first-frame %d read %.1f window %.1f frame %.1f (draw %.1f, present %.1f)", time.now()._nsec, ms(t_main, t_read), ms(t_read, t_window), ms(t_window, time.tick_now()), time.duration_milliseconds(h.times.draw), time.duration_milliseconds(h.times.present))
 	}
 	for !platform.is_closed(win) {
-		journal_windows_wait(app)
+		windows_wait(app)
 		if !app.paused && !app.held && time.tick_diff(app.next_sample, time.tick_now()) >= 0 { refresh(app) }
-		if !app.paused && !app.held { services_tick(app) }
+		if !app.paused && !app.held {
+			services_tick(app)
+			connections_tick(app)
+		}
 		sections_take(app)
 		updates_follow(app)
 		t_frame := time.tick_now()
 		host.host_frame(h)
 		journal_windows_frame(app)
+		mission_windows_frame(app)
 		zoom_follow(app)
 		app.frame_time += time.tick_since(t_frame)
 		app.frames += 1
@@ -213,9 +224,11 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 		mean :: proc(d: time.Duration, n: int) -> f64 { return n > 0 ? time.duration_milliseconds(d) / f64(n) : 0 }
 		fmt.printfln("costs: %d samples, %.2f ms each; %d frames, %.2f ms each", app.refreshes, mean(app.refresh_time, app.refreshes), app.frames, mean(app.frame_time, app.frames))
 	}
+	if app.demo == nil { pref_save(&app.prefs, "view.placement", platform.placement_text(platform.get_placement(win))) }
 	devtools.stop(app.devtools)
 	one_copy_stop(app)
 	journal_windows_close(app)
+	mission_windows_close(app)
 	updates_stop(app)
 	prefs_page.destroy(&app.settings_page)
 	mission_destroy(app)
@@ -271,8 +284,6 @@ refresh :: proc(app: ^App) {
 	rows_again(app)
 	app.next_sample = time.tick_add(now, time.Duration(app.settings.refresh_ms) * time.Millisecond)
 	if app.props.open { props_tick(&app.props, find_proc(&app.sampler, app.props.pid, app.props.start) != nil) }
-	// (a section that reads on a thread of its own reads only while it is shown)
-	if app.tab == .Connections || app.tab == .Mission_Control { ui.worker_ask(&app.connections.worker) }
 	app.refresh_time += time.tick_since(now)
 	app.refreshes += 1
 	app.main.settle = max(app.main.settle, 1)
@@ -305,16 +316,11 @@ tab_show :: proc(app: ^App, tab: Tab) {
 @(private = "file")
 section_first_show :: proc(app: ^App) {
 	#partial switch app.tab {
-	case .Connections: ui.worker_ask(&app.connections.worker)
+	case .Connections: connections_ask(app)
 	case .Information: if !app.information.asked { information_ask(&app.information) }
 	case .Services:    services_ask(app)
 	case .Startup:     startup_ask(app)
-	case .Mission_Control:
-		// (it sums up every section: each one is read)
-		ui.worker_ask(&app.connections.worker)
-		if !app.information.asked { information_ask(&app.information) }
-		services_ask(app)
-		startup_ask(app)
+	case .Mission_Control: mission_read(app)   // (it sums up every section: each one is read)
 	}
 }
 

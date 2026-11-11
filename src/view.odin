@@ -81,7 +81,7 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	shortcuts_build(app)
 	setup_build(app, em)
 	diagnosis_build(app, em)
-	ui.wake_within(&app.main.state, min(until_sample(app), services_due_ms(app)))
+	ui.wake_within(&app.main.state, min(until_sample(app), services_due_ms(app), connections_due_ms(app)))
 }
 
 @(private = "file")

@@ -40,8 +40,10 @@ PREF_DEFS := [?]config.Def{
 	{name = "connections.widths", category = "connections", description = "The widths of the Connections table's columns that were resized, in ems (remote_address=20).", kind = .String, default = {s = ""}, hidden = true},
 	{name = "connections.order", category = "connections", description = "The order of the Connections table's columns, apart by commas (process,state,remote_address).", kind = .String, default = {s = ""}, hidden = true},
 	{name = "connections.sort", category = "connections", description = "The column the sockets are sorted by (process, pid, protocol, local_address, remote_address, state), a - before it for the largest (or Z) first.", kind = .String, default = {s = "process"}, hidden = true},
+	{name = "connections.refresh_ms", category = "connections", description = "How often the sockets are read again while Connections or Mission Control is shown, in milliseconds. A reading goes through every process's open files: a longer period costs less.", kind = .Int, default = {i = 3000}, min = 1000, max = 60_000, bounded = true, unit = "ms", tags = {"network", "sockets", "speed", "interval"}},
 	{name = "services.refresh_ms", category = "services", description = "How often the services are read again while their section is shown, in milliseconds.", kind = .Int, default = {i = 3000}, min = 1000, max = 60_000, bounded = true, unit = "ms"},
 	{name = "mission.layout", category = "mission", description = "Mission Control's panels: where each one is docked, its stacks and their sizes, those closed left out (the dock's text). Its panels' menu brings one back; Mission Control: the layout as at first sets it back.", kind = .String, default = {s = ""}, hidden = true},
+	{name = "mission.windows", category = "mission", description = "Mission Control's panels in windows of their own, apart by commas (health,network): they open again at the start. A panel's menu opens one; closed, it goes back to Mission Control.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "view.theme", category = "appearance", description = "The window's colours: a theme of the toolkit by its name (Graphite, Midnight, Nord, Gruvbox, Tokyo Night, Catppuccin...).", kind = .String, default = {s = "Graphite"}, tags = {"colours", "colors", "palette", "look"}},
 	{name = "view.mode", category = "appearance", description = "The theme's version: the system's (light or dark, followed as it changes), dark, or light.", kind = .String, default = {s = "system"}, choices = {"system", "dark", "light"}, tags = {"dark", "light", "night"}},
 	{name = "view.finish", category = "appearance", description = "How surfaces are drawn. Machined: raised buttons and panels, sunken fields, graphs and meters (a light theme is drawn flat). Flat: plain surfaces and thin lines. Gradient: surfaces shaded top to bottom. Glass: surfaces that let the page show through. Edged: the machined reliefs crisp, nothing blurred (the Console theme's).", kind = .String, default = {s = "machined"}, choices = {"machined", "flat", "gradient", "glass", "edged"}, tags = {"look", "style", "relief"}},
@@ -50,11 +52,10 @@ PREF_DEFS := [?]config.Def{
 	{name = "view.font_size", category = "appearance", description = "The text size at a zoom of 100 %, in logical pixels: every size of the window follows it.", kind = .Float, default = {f = FONT_SIZE_DEFAULT}, min = FONT_SIZE_MIN, max = FONT_SIZE_MAX, bounded = true, tags = {"text size", "bigger", "smaller"}},
 	{name = "view.zoom", category = "appearance", description = "The zoom of the window: 1 is 100 %. Ctrl+wheel, Ctrl+= and Ctrl+- change it, Ctrl+0 sets it back.", kind = .Float, default = {f = 1}, min = 0.5, max = 3, bounded = true, hidden = true, tags = {"scale", "bigger", "smaller"}},
 	{name = "view.system_title", category = "window", description = "The window's title bar drawn by the system (its buttons, its snapping) in place of Inspecteur's own.", kind = .Bool, default = {b = false}, tags = {"decorations", "native", "frame", "title bar"}},
+	{name = "view.placement", category = "window", description = "Where the window was left and its size, in physical pixels, and whether it was maximized (\"120 80 1400 900 maximized\"; empty: the first start's size). Written when it closes; Wayland lets a program set the size alone.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "view.palette_size", category = "window", description = "The command palette's size, in logical pixels: its width and its height (empty: the default). Dragging its edges or its corner changes it.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "view.section", category = "window", description = "The section shown at the start: the one shown last (mission control, processes, performance, services, startup, connections, information). --section shows another.", kind = .String, default = {s = "processes"}, hidden = true},
 	{name = "performance.cpu_view", category = "window", description = "The CPU's page in Performance: one graph for all the processors (overall), or one per logical processor (logical). Ctrl+G switches them.", kind = .String, default = {s = "overall"}, choices = {"overall", "logical"}, hidden = true},
-	{name = "view.width", category = "window", description = "The window's width at start, in logical pixels.", kind = .Int, default = {i = 1100}, min = 480, max = 8000, bounded = true},
-	{name = "view.height", category = "window", description = "The window's height at start, in logical pixels.", kind = .Int, default = {i = 720}, min = 320, max = 8000, bounded = true},
 	{name = "update.auto", category = "updates", description = "Check for a new version a while after the start and then every day, download it and put it in place: it runs at the next start. Only the installed copy updates itself (a copy of the Nix store is Nix's to update).", kind = .Bool, default = {b = true}, tags = {"upgrade", "version", "new version"}},
 	{name = "setup.choice", category = "setup", description = "What was answered to the install's dialog: installed, standalone (this copy runs on its own: not offered again), or dismissed for a version.", kind = .String, default = {s = ""}, hidden = true},
 }
@@ -82,6 +83,7 @@ Settings :: struct {
 	journal_follow: bool,   // services.journal_follow
 	details_em: f32,        // services.details_height
 	services_ms: int,       // services.refresh_ms
+	connections_ms: int,    // connections.refresh_ms
 	columns:    string,   // owned: processes.columns, .widths, .order, .sort as written
 	order:      string,
 	widths:     string,
@@ -96,7 +98,6 @@ Settings :: struct {
 	mission_layout: string, // owned: mission.layout
 	zebra:      bool,     // view.zebra
 	rules:      bool,     // view.rules
-	size:       [2]int,
 	palette_size: [2]f32,   // view.palette_size ({}: the default)
 	setup_choice: string, // owned: setup.choice
 	update_auto: bool,    // update.auto
@@ -128,6 +129,7 @@ prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Sett
 	s.details_em = f32(config.float_of(p, "services.details_height"))
 	s.manager = config.string_of(p, "services.manager") == "user" ? .User : .System
 	s.services_ms = int(config.int_of(p, "services.refresh_ms"))
+	s.connections_ms = int(config.int_of(p, "connections.refresh_ms"))
 	s.columns = strings.clone(config.string_of(p, "processes.columns"), allocator)
 	s.widths = strings.clone(config.string_of(p, "processes.widths"), allocator)
 	s.sort = strings.clone(config.string_of(p, "processes.sort"), allocator)
@@ -142,7 +144,6 @@ prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Sett
 	s.mission_layout = strings.clone(config.string_of(p, "mission.layout"), allocator)
 	s.zebra = config.bool_of(p, "view.zebra")
 	s.rules = config.bool_of(p, "view.rules")
-	s.size = {int(config.int_of(p, "view.width")), int(config.int_of(p, "view.height"))}
 	if parts := strings.fields(config.string_of(p, "view.palette_size"), context.temp_allocator); len(parts) == 2 {
 		w, wok := strconv.parse_f32(parts[0])
 		h, hok := strconv.parse_f32(parts[1])

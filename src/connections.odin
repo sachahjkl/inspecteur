@@ -8,6 +8,7 @@ package inspecteur
 import "core:net"
 import "core:strconv"
 import "core:strings"
+import "core:time"
 import lucide "gt:lucide"
 import "gt:ui"
 
@@ -48,6 +49,7 @@ Connections :: struct {
 	rows:    Section_Table,
 	read:    bool,              // a reading came at least once
 	menu:    ui.Key,
+	next:    time.Tick,         // the next reading while they are shown (connections.refresh_ms)
 }
 
 CONN_COLUMNS := [?]ui.Table_Column{
@@ -171,4 +173,29 @@ remote_text :: proc(s: Socket) -> string {
 	for b in s.remote { if b != 0 { zero = false } }
 	if zero { return "" }
 	return endpoint_text(s.remote, s.rport, s.v6)
+}
+
+// The sockets are read on their own period (connections.refresh_ms), not at each sample of the processes: a reading
+// goes through every process's open files. Only while they are shown: their section, Mission Control or one of its
+// panels in a window.
+connections_shown :: proc(app: ^App) -> bool {
+	return app.tab == .Connections || app.tab == .Mission_Control || len(app.mission_windows) > 0
+}
+
+// A reading now (the section shown, F5), the next one a period later.
+connections_ask :: proc(app: ^App) {
+	ui.worker_ask(&app.connections.worker)
+	app.connections.next = time.tick_add(time.tick_now(), time.Duration(app.settings.connections_ms) * time.Millisecond)
+}
+
+// Each turn of the loop (not while the refresh is paused): a reading when one is due and they are shown.
+connections_tick :: proc(app: ^App) {
+	if !connections_shown(app) || ui.worker_busy(&app.connections.worker) { return }
+	if time.tick_diff(app.connections.next, time.tick_now()) >= 0 { connections_ask(app) }
+}
+
+// The milliseconds until the next reading is due, while they are shown (the window wakes for it); max(int) otherwise.
+connections_due_ms :: proc(app: ^App) -> int {
+	if !connections_shown(app) || app.paused || app.held { return max(int) }
+	return max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), app.connections.next))) + 1, 1)
 }

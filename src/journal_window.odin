@@ -125,10 +125,12 @@ journal_window_keys :: proc(w: ^Journal_Window) {
 }
 
 // The loop's wait: the main window and the journals' (a journal's own timers count: following, a tooltip).
-journal_windows_wait :: proc(app: ^App) {
-	hosts := make([dynamic]^host.Host, 0, 1 + len(app.journal_windows), context.temp_allocator)
+// The loop's wait: on every window, the main one, the journals' and Mission Control's panels'.
+windows_wait :: proc(app: ^App) {
+	hosts := make([dynamic]^host.Host, 0, 1 + len(app.journal_windows) + len(app.mission_windows), context.temp_allocator)
 	append(&hosts, &app.main)
 	for w in app.journal_windows { append(&hosts, &w.window) }
+	for w in app.mission_windows { append(&hosts, &w.window) }
 	host.hosts_wait(hosts[:])
 }
 

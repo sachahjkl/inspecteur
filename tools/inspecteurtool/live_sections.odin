@@ -344,11 +344,9 @@ swaymsg :: proc(l: ^Live, args: ..string) -> (out: string, ok: bool) {
 	return out, code == 0
 }
 
-@(private = "file")
 sway_command :: proc(l: ^Live, command: string) -> bool { _, ok := swaymsg(l, command); return ok }
 
 // Waits until sway's tree has a window titled `title` (`present`), or has none.
-@(private = "file")
 wait_sway_title :: proc(l: ^Live, title: string, present: bool) -> bool {
 	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
 	for time.tick_diff(time.tick_now(), deadline) > 0 {

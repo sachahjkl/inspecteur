@@ -30,6 +30,7 @@ SETTINGS_PAGES := [?]prefs_page.Page_Info{
 	{category = "appearance", title = "Appearance", icon = lucide.PALETTE},
 	{category = "processes",  title = "Processes",  icon = lucide.LAYOUT_LIST},
 	{category = "services",   title = "Services",   icon = lucide.SETTINGS},
+	{category = "connections", title = "Connections", icon = lucide.GLOBE},
 	{category = "window",     title = "Window",     icon = lucide.APP_WINDOW},
 	{category = "updates",    title = "Updates",    icon = lucide.DOWNLOAD},
 }

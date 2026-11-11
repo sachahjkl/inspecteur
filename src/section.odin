@@ -19,6 +19,7 @@ Section_Table :: struct {
 	data:  ui.Table_Data,
 	icons: [dynamic]Row_Icon,
 	app:   ^App,
+	menu:  ui.Key,   // its header's menu
 }
 
 section_table_init :: proc(st: ^Section_Table, app: ^App, columns: []ui.Table_Column) {
@@ -52,6 +53,19 @@ section_table_build :: proc(st: ^Section_Table, empty: string) -> ui.Table_Event
 	rows_look(st.app, &st.table.vl)
 	ui.next({width = ui.fill(), height = ui.fill()})
 	return ui.table_build("###table", &st.table, &st.data, shown)
+}
+
+// What the table's header asked: its menu (a right click), a column reset, unsorted, the columns shown, the defaults; the
+// layout kept in `<section>.*`, the rows sorted again.
+section_header_menu :: proc(st: ^Section_Table, ev: ui.Table_Events, section: string, em: f32) {
+	app := st.app
+	if st.menu == 0 { st.menu = ui.key_from_string(0, fmt.tprintf("inspecteur_%s_columns", section)) }
+	if ev.columns { ui.ctx_menu_open(st.menu, ui.mouse_pos()) }
+	if ui.ctx_menu(st.menu, em * 16) {
+		changed, sorted := ui.table_menu_items(&st.table.layout)
+		if sorted { ui.table_apply(&st.table, &st.data, app.query) }
+		if changed { section_layout_save(&st.table, &app.prefs, section) }
+	}
 }
 
 // The icon of data row `row`: its app's, else its glyph.
