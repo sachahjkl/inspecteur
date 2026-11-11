@@ -5,6 +5,7 @@ package inspecteur
 // the window is built again. Between two samples, with no input, nothing runs.
 
 import "core:fmt"
+import "core:strings"
 import "core:time"
 import "core:time/datetime"
 import "core:time/timezone"
@@ -145,6 +146,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	app.palette.size = app.settings.palette_size
 	app.vl.multi = true   // (Ctrl and Shift clicks, Ctrl+A: End task and Kill act on every row marked)
 	app.tab = opts.tab
+	app.cpu_grid = config.string_of(&app.prefs, "performance.cpu_view") == "logical"
 	refresh(app)
 
 	t_read := time.tick_now()
@@ -293,6 +295,7 @@ rows_again :: proc(app: ^App) {
 tab_show :: proc(app: ^App, tab: Tab) {
 	if app.tab == tab { return }
 	app.tab = tab
+	pref_save(&app.prefs, "view.section", strings.to_lower(TAB_LABELS[tab], context.temp_allocator))
 	section_first_show(app)
 	if tab == .Performance { gpu_want(&app.machine.gpu, true) }
 }

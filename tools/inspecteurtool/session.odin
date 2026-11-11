@@ -33,6 +33,7 @@ Session :: struct {
 	up:      bool,       // sway runs (session_stop stops it)
 	output:  string,     // inspecteur's standard output and error (a file)
 	started: time.Time,  // just before inspecteur was started
+	command: []string,   // inspecteur's command line (program_restart)
 }
 
 // Starts sway and inspecteur in `dir` (made anew) with `args`. `renderer`: sway's (pixman: the CPU, anywhere; vulkan: the
@@ -96,12 +97,39 @@ session_start :: proc(s: ^Session, dir: string, port: int, args: []string = nil,
 	append(&command, PROGRAM)
 	if !setup { append(&command, "--pref", "setup.choice=standalone") }
 	append(&command, ..args)
+	s.command = make([]string, len(command))
+	for a, i in command { s.command[i] = strings.clone(a) }
 	s.started = time.now()
-	p, err := os.process_start({command = command[:], env = s.env, stdout = out, stderr = out})
+	p, err := os.process_start({command = s.command, env = s.env, stdout = out, stderr = out})
 	os.close(out)
 	if err != nil { return fmt.tprintf("%s does not start", PROGRAM) }
 	s.program = p
 	return ""
+}
+
+// Closes inspecteur's window (it ends as the person's would) and starts it again in the same session and folders: what
+// it kept is read again. `c` is then the new window's connection. False: it did not end with 0, or did not come back.
+program_restart :: proc(s: ^Session, c: ^cdp.Client) -> bool {
+	_ = cdp.send(c, "Browser.close")
+	cdp.close(c)
+	state, err := os.process_wait(s.program, SESSION_WAIT)
+	if err != nil || !state.exited {
+		_ = os.process_kill(s.program)   // (the process this session started)
+		_, _ = os.process_wait(s.program, SESSION_WAIT)
+		s.program = {}
+		return false
+	}
+	s.program = {}
+	if state.exit_code != 0 { return false }
+	out, oerr := os.open(s.output, {.Write, .Append})
+	if oerr != nil { return false }
+	p, perr := os.process_start({command = s.command, env = s.env, stdout = out, stderr = out})
+	os.close(out)
+	if perr != nil { return false }
+	s.program = p
+	ok: bool
+	c^, ok = window_connect(s)
+	return ok
 }
 
 // The person's session bus: DBUS_SESSION_BUS_ADDRESS, else the socket of the user's service manager,
@@ -137,6 +165,8 @@ session_stop :: proc(s: ^Session) -> (exit_code: int) {
 	}
 	for e in s.env { delete(e) }
 	delete(s.env)
+	for a in s.command { delete(a) }
+	delete(s.command)
 	delete(s.dir)
 	delete(s.output)
 	return

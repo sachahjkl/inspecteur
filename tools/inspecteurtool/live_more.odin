@@ -316,3 +316,51 @@ wait_state :: proc(pid: int, want: u8, within := SESSION_WAIT) -> bool {
 	}
 	return false
 }
+
+// What the window kept, after a restart: the Processes table's widths, its columns' order and its sort (none, after a
+// third click), the section shown last and the CPU's view.
+live_restart :: proc(l: ^Live) {
+	c := &l.c
+	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
+	check(l, cdp.key(c, "Escape") && cdp.key(c, "ctrl+2") && cdp.wait_for(c, "Background processes", SESSION_WAIT), "Processes, before a restart")
+	cdp.wait_idle(c, SESSION_WAIT)
+	// CPU's title (column 6) dragged to the left of PID's (column 1)
+	cpu, pid := cdp.find_name(c, "hd_6"), cdp.find_name(c, "hd_1")
+	if !check(l, len(cpu) == 1 && len(pid) == 1, "the CPU and PID titles are there") { return }
+	x0, y := cpu[0].x + cpu[0].w / 2, cpu[0].y + cpu[0].h / 2
+	x1 := pid[0].x + 4
+	moved := live_mouse(c, "mouseMoved", x0, y) && live_mouse(c, "mousePressed", x0, y)
+	for k in 1 ..= 6 { moved = moved && live_mouse(c, "mouseMoved", x0 + (x1 - x0) * f64(k) / 6, y) }
+	moved = moved && live_mouse(c, "mouseReleased", x1, y)
+	cdp.wait_idle(c, SESSION_WAIT)
+	cpu, pid = cdp.find_name(c, "hd_6"), cdp.find_name(c, "hd_1")
+	check(l, moved && len(cpu) == 1 && len(pid) == 1 && cpu[0].x < pid[0].x, "dragging CPU's title puts its column before PID's")
+	check(l, file_has(prefs, "processes.order\tname,cpu,"), "the order is in the preferences")
+	// three clicks on PID's title: lowest first, highest first, none
+	for _ in 0 ..< 3 { cdp.click_name(c, "hd_1"); cdp.wait_idle(c, SESSION_WAIT) }
+	check(l, file_has(prefs, "processes.sort\tnone"), "a third click: unsorted, kept")
+	up := column_numbers(c, "c1")
+	check(l, turns(up, ascending = true) <= 1, "unsorted, the rows go by PID (%d turns)", turns(up, true))
+	pid_before := cdp.find_name(c, "hd_1")
+	name_before := cdp.find_name(c, "hd_0")
+	check(l, cdp.key(c, "ctrl+3") && cdp.key(c, "ctrl+g") && cdp.wait_name(c, "core_box0", SESSION_WAIT), "Performance, a graph per logical processor")
+	check(l, file_has(prefs, "view.section\tperformance") && file_has(prefs, "performance.cpu_view\tlogical"), "the section and the CPU's view are kept")
+	if !check(l, len(pid_before) == 1 && len(name_before) == 1, "the Name and PID titles were there") { return }
+	if !check(l, program_restart(&l.session, c), "inspecteur closed and started again") { return }
+	check(l, cdp.wait_name(c, "core_box0", SESSION_WAIT), "it comes back on Performance, a graph per logical processor")
+	check(l, cdp.key(c, "ctrl+2") && cdp.wait_for(c, "Background processes", SESSION_WAIT), "Processes")
+	cdp.wait_idle(c, SESSION_WAIT)
+	pid_after, name_after, cpu_after := cdp.find_name(c, "hd_1"), cdp.find_name(c, "hd_0"), cdp.find_name(c, "hd_6")
+	check(l, len(pid_after) == 1 && abs(pid_after[0].w - pid_before[0].w) < 2, "the PID column keeps its width (%.0f px, then %.0f)", pid_before[0].w, len(pid_after) == 1 ? pid_after[0].w : 0)
+	check(l, len(name_after) == 1 && abs(name_after[0].w - name_before[0].w) < 2, "the Name column keeps its width (%.0f px, then %.0f)", name_before[0].w, len(name_after) == 1 ? name_after[0].w : 0)
+	check(l, len(cpu_after) == 1 && len(pid_after) == 1 && cpu_after[0].x < pid_after[0].x, "CPU's column is still before PID's")
+	again := column_numbers(c, "c1")
+	check(l, turns(again, ascending = true) <= 1, "still unsorted, by PID (%d turns)", turns(again, true))
+}
+
+// A mouse event of the left button at x, y (the window's pixels).
+@(private = "file")
+live_mouse :: proc(c: ^cdp.Client, kind: string, x, y: f64) -> bool {
+	_, ok := cdp.call(c, "Input.dispatchMouseEvent", fmt.tprintf(`{{"type":%q,"x":%v,"y":%v,"button":"left","buttons":%d,"clickCount":1}}`, kind, x, y, kind == "mouseReleased" ? 0 : 1))
+	return ok
+}

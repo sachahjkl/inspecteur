@@ -54,7 +54,7 @@ build_performance :: proc(app: ^App, em: f32) {
 			// (the key that switches them, in each segment's tooltip)
 			key := ui.command_shortcut(COMMANDS[.Cpu_Grid])
 			tips := []string{fmt.tprintf("One graph for all the processors (%s)", key), fmt.tprintf("One graph per logical processor (%s)", key)}
-			if ui.segmented("###cpu_view", labels, &sel, tips) { app.cpu_grid = sel == 1 }
+			if ui.segmented("###cpu_view", labels, &sel, tips) { cpu_grid_set(app, sel == 1) }
 		}
 		ui.spacer(ui.px(em * 0.6))
 	}
@@ -125,10 +125,15 @@ device_step :: proc(app: ^App, dir: int) {
 	app.device = list[clamp(at + dir, 0, len(list) - 1)]
 }
 
-// The CPU's page: one graph, or one per logical processor.
+// The CPU's page: one graph, or one per logical processor (kept: performance.cpu_view).
 cpu_grid_switch :: proc(app: ^App) {
 	app.device = {.Cpu, 0}
-	app.cpu_grid = !app.cpu_grid
+	cpu_grid_set(app, !app.cpu_grid)
+}
+
+cpu_grid_set :: proc(app: ^App, on: bool) {
+	app.cpu_grid = on
+	pref_save(&app.prefs, "performance.cpu_view", on ? "logical" : "overall")
 }
 
 // A device that went (an interface, a GPU no longer read): back to the CPU.

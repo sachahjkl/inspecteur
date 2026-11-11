@@ -190,8 +190,8 @@ cmd_button :: proc(app: ^App, id, icon: string, c: Cmd, em: f32) {
 	if tool_button(app, id, icon, cmd_tip(c), cmd_can(app, c), em) { cmd_run(app, c) }
 }
 
-// The columns' titles (the toolkit's header: a click sorts, again reverses; the rule before a title, dragged, resizes
-// its column; a right click opens the menu of the columns).
+// The columns' titles (the toolkit's header: a click sorts, again reverses, a third gives none; a title dragged sideways
+// moves its column; the rule before a title, dragged, resizes its column; a right click opens the menu of the columns).
 @(private = "file")
 build_header :: proc(app: ^App, em: f32) -> (view: ui.Key) {
 	t := &app.table
@@ -202,7 +202,7 @@ build_header :: proc(app: ^App, em: f32) -> (view: ui.Key) {
 		rows_again(app)
 		table_layout_save(t, &app.prefs)
 	}
-	if ev.resized { table_layout_save(t, &app.prefs) }
+	if ev.resized || ev.moved { table_layout_save(t, &app.prefs) }
 	if ev.menu {
 		if app.columns_menu == 0 { app.columns_menu = ui.key_from_string(0, "inspecteur_columns") }
 		ui.ctx_menu_open(app.columns_menu, ui.mouse_pos())
@@ -235,7 +235,7 @@ columns_menu :: proc(app: ^App, em: f32) {
 			sort := t.layout.sort
 			ui.table_layout_reset(&t.layout)
 			// (the sort's column may be one the defaults hide: the rows go by name then)
-			if !t.layout.shown[t.layout.sort] { t.layout.sort = int(Column.Name) }
+			if t.layout.sort >= 0 && !t.layout.shown[t.layout.sort] { t.layout.sort = int(Column.Name) }
 			if t.layout.sort != sort { rows_again(app) }
 			table_layout_save(t, &app.prefs)
 		}
@@ -395,8 +395,9 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 
 	weak := r.kind == .App   // (an app's pid, user and the like are its first process's)
 	io_dash := r.kind == .Process && !p.io_known
-	for c in Column {
-		if c == .Name || !t.layout.shown[int(c)] { continue }
+	for k in t.layout.order {
+		c := Column(k)
+		if c == .Name || !t.layout.shown[k] { continue }
 		switch c {
 		case .Name:
 		case .PID:        cell(t, c, fmt.tprintf("%d", p.pid), &tip, weak = true)

@@ -113,7 +113,11 @@ columns_of :: proc(keys: string) -> (out: bit_set[Column]) {
 }
 
 // The sort's column.
-table_sort :: proc(t: ^Table) -> Column { return Column(t.layout.sort) }
+// The sort's column; `sorted` false: none (the rows by PID, as they are read).
+table_sort :: proc(t: ^Table) -> (c: Column, sorted: bool) {
+	if t.layout.sort < 0 { return .Name, false }
+	return Column(t.layout.sort), true
+}
 
 SECTION_IDS :: [3]u64{0x5ec7_0000_0000_0001, 0x5ec7_0000_0000_0002, 0x5ec7_0000_0000_0003}
 // Section rows' index: Apps, Background processes, Pinned.
@@ -388,7 +392,7 @@ Sort_Item :: struct {
 sort_item_proc :: proc(t: ^Table, s: ^Sampler, i: int) -> Sort_Item {
 	p := &s.procs[i]
 	it := Sort_Item{pid = p.pid, index = i}
-	sort_value(&it, table_sort(t), s, p)
+	if c, sorted := table_sort(t); sorted { sort_value(&it, c, s, p) }
 	return it
 }
 
@@ -397,7 +401,9 @@ sort_item_proc :: proc(t: ^Table, s: ^Sampler, i: int) -> Sort_Item {
 sort_item_group :: proc(t: ^Table, s: ^Sampler, g: Group, k: int, name: string) -> Sort_Item {
 	root := &s.procs[g.root]
 	it := Sort_Item{pid = root.pid, index = k}
-	#partial switch table_sort(t) {
+	sort, sorted := table_sort(t)
+	if !sorted { return it }   // (by its first process's PID)
+	#partial switch sort {
 	case .Name:       it.text = name
 	case .CPU:        it.num = f64(g.cpu)
 	case .CPU_Graph:  for m in t.members[g.first:][:g.count] { it.num += f64(cpu_recent(&s.procs[m])) }
@@ -408,7 +414,7 @@ sort_item_group :: proc(t: ^Table, s: ^Sampler, g: Group, k: int, name: string) 
 	case .Read:       it.num = g.read_rate
 	case .Write:      it.num = g.write_rate
 	case .Threads:    it.num = f64(g.threads)
-	case:             sort_value(&it, table_sort(t), s, root)
+	case:             sort_value(&it, sort, s, root)
 	}
 	return it
 }

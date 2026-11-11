@@ -48,7 +48,9 @@ run :: proc(all_args: []string) -> int {
 	verb := len(args) > 0 ? args[0] : ""
 	switch verb {
 	case "", "--first-frame", "--section", "--demo", "--setup":
-		opts := Run_Options{tab = .Processes}   // (Mission Control is a click away)
+		// (the section shown last; --section another)
+		opts := Run_Options{tab = .Processes}
+		if tab, ok := tab_of(config.string_of(&prefs, "view.section")); ok { opts.tab = tab }
 		for i := 0; i < len(args); i += 1 {
 			switch args[i] {
 			case "--first-frame": opts.first_frame = true

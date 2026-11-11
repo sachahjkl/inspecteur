@@ -13,7 +13,8 @@ inspecteur --pref view.mode=light --pref processes.refresh_ms=2000
 |---|---|---|
 | `processes.columns` | pid,user,cpu,cpu_graph,memory,read,write,threads | The columns of the Processes table besides the name, apart by commas: `pid`, `ppid`, `user`, `state`, `nice`, `cpu`, `cpu_graph` (the CPU of the last 30 seconds, a bar per sample in the colours of the load), `memory` (private memory), `resident`, `gpu` (the share of a GPU's time it keeps busy: NVIDIA's GPUs tell it), `gpu_memory`, `read`, `write`, `threads`, `started`, `command`, `executable`. A right click on the table's header (or Ctrl+Shift+C) changes them. |
 | `processes.widths` | (empty) | The widths of the columns that were resized, in ems, apart by commas (`pid=6,command=30`). Dragging the line before a column's title changes them. |
-| `processes.sort` | name | The column the processes are sorted by (one of `processes.columns`, or `name`). |
+| `processes.order` | (empty) | The order of the Processes table's columns after the name, apart by commas (`cpu,pid,user`). Dragging a column's title sideways changes it. |
+| `processes.sort` | name | The column the processes are sorted by (one of `processes.columns`, or `name`; `none`: by PID, as they are read). A click on a title sorts by it, a second the other way, a third gives `none`. |
 | `processes.descending` | false | Sort from the largest (or from Z) down. |
 | `processes.refresh_ms` | 1000 | How often the processes and the machine are read again, in milliseconds (250 to 10000): a point of the Performance section's graphs each time, so that their span is 60 times this period. The title bar's refresh menu (Ctrl+Shift+R) changes it; Ctrl+Space pauses the refresh and resumes it (a pause is not kept). |
 | `processes.view` | apps | How the processes are listed: `apps` (the apps' groups, then the background processes) or `tree` (every process under its parent). Ctrl+T switches them. |
@@ -21,6 +22,7 @@ inspecteur --pref view.mode=light --pref processes.refresh_ms=2000
 | `processes.summary` | true | Show the summary of the machine over the Processes table: CPU, memory, disks, network, the first GPU, the processor's temperature and the pressure (the share of the time tasks waited), each with its last minute; a click shows the device in Performance. Ctrl+B shows or hides it. |
 | `services.manager` | system | The services the Services section lists: the system's (`system`) or the user's (`user`). Its System and User buttons change it. |
 | `services.widths` | (empty) | The widths of the Services table's columns that were resized, in ems (`description=30`). Dragging the line before a column's title changes them. |
+| `services.order` | (empty) | The order of the Services table's columns, apart by commas (`name,state,description`). Dragging a column's title sideways changes it. |
 | `services.sort` | name | The column the services are sorted by: `name`, `description`, `state`, `startup`, `load`, `pid` or `memory`; a `-` before it for the largest (or Z) first. A click on a title changes it. |
 | `services.details` | true | Show the selected service's details (its unit file, since when it is in its state, its tasks, CPU time and restarts) and its journal's last lines under the table. Ctrl+I shows or hides them. |
 | `services.journal_boot` | true | The details' journal shows this boot's entries alone; `false`: its last entries, from any boot. Alt+B switches it. |
@@ -28,8 +30,10 @@ inspecteur --pref view.mode=light --pref processes.refresh_ms=2000
 | `services.journal_follow` | true | Read the details' journal again every 2 seconds while it is shown: new entries come in at the end. Alt+F switches it. |
 | `services.details_height` | 16 | The height of the details' pane, in ems (6 to 80). Dragging the line above it changes it. |
 | `startup.widths` | (empty) | The widths of the Startup table's columns that were resized, in ems (`command=24`). |
+| `startup.order` | (empty) | The order of the Startup table's columns, apart by commas (`name,status,command`). |
 | `startup.sort` | name | The column the startup items are sorted by: `name`, `command`, `type`, `status` or `file`; a `-` before it for Z first. |
 | `connections.widths` | (empty) | The widths of the Connections table's columns that were resized, in ems (`remote_address=20`). |
+| `connections.order` | (empty) | The order of the Connections table's columns, apart by commas (`process,state,remote_address`). |
 | `connections.sort` | process | The column the sockets are sorted by: `process`, `pid`, `protocol`, `local_address`, `remote_address` or `state`; a `-` before it for the largest (or Z) first. |
 | `services.refresh_ms` | 3000 | How often the services are read again while their section is shown, in milliseconds (1000 to 60000). |
 | `mission.layout` | (empty) | Mission Control's panels: where each one is docked, its stacks and their sizes, those closed left out. Its panels' menu brings one back; *Mission Control: the layout as at first* sets it back. |
@@ -42,6 +46,8 @@ inspecteur --pref view.mode=light --pref processes.refresh_ms=2000
 | `view.zoom` | 1 | The zoom of the window: 1 is 100 % (0.5 to 3). Ctrl+wheel, Ctrl+= and Ctrl+- change it, Ctrl+0 sets it back. |
 | `view.system_title` | false | The window's title bar drawn by the system (its buttons, its snapping) in place of Inspecteur's own. A desktop that draws none (GNOME) keeps Inspecteur's. |
 | `view.palette_size` | (empty) | The command palette's size, in logical pixels: its width and its height. Dragging its edges or its corner changes it. |
+| `view.section` | processes | The section shown at the start: the one shown last (`mission control`, `processes`, `performance`, `services`, `startup`, `connections`, `information`). `--section` shows another. |
+| `performance.cpu_view` | overall | The CPU's page in Performance: one graph for all the processors (`overall`), or one per logical processor (`logical`). Ctrl+G switches them. |
 | `view.width` | 1100 | The window's width at start, in logical pixels. |
 | `view.height` | 720 | The window's height at start, in logical pixels. |
 | `update.auto` | true | Check for a new version a while after the start and then every day, download it and put it in place: it runs at the next start. Only the installed copy updates itself; a copy of the Nix store is Nix's to update. |

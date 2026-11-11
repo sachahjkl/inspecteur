@@ -94,7 +94,7 @@ summary_tile :: proc(app: ^App, t: Tile, em: f32) {
 	if sig.clicked {
 		tab_show(app, .Performance)
 		app.device = t.device
-		app.cpu_grid = false
+		cpu_grid_set(app, false)
 	}
 }
 

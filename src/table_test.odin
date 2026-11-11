@@ -1,5 +1,6 @@
 package inspecteur
 
+import "core:strings"
 import "core:testing"
 
 // The table's rows: the filter (a name, a pid's start), the sort (a group by its sums: its private memory).
@@ -72,7 +73,19 @@ the_columns_are_kept :: proc(t: ^testing.T) {
 	tb2: Table
 	defer table_destroy(&tb2)
 	table_layout_load(&tb2, Settings{columns = "pid", sort = "cpu"})
-	testing.expect_value(t, table_sort(&tb2), Column.Name)
+	c, sorted := table_sort(&tb2)
+	testing.expect(t, sorted && c == .Name, "by name")
+	// unsorted, and the columns' order, kept
+	tb3: Table
+	defer table_destroy(&tb3)
+	table_layout_load(&tb3, Settings{columns = "pid,cpu,user", order = "cpu,user,pid", sort = "none"})
+	_, sorted = table_sort(&tb3)
+	testing.expect(t, !sorted, "unsorted")
+	v3 := table_layout_values(&tb3)
+	testing.expect_value(t, v3.sort, "none")
+	// (the columns named take the places they held, in the text's order: cpu, user, pid from left to right)
+	cpu, user, pid := strings.index(v3.order, ",cpu,"), strings.index(v3.order, ",user,"), strings.index(v3.order, ",pid,")
+	testing.expect(t, strings.has_prefix(v3.order, "name,") && 0 < cpu && cpu < user && user < pid, v3.order)
 }
 
 @(test)

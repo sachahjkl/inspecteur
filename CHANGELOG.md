@@ -6,6 +6,12 @@ and the versions follow [semantic versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Columns moved by their titles**: a title dragged sideways moves its column, in Processes, Services, Startup and
+  Connections; the order is kept (`processes.order`, `services.order`, `startup.order`, `connections.order`).
+- **A third click on a title leaves the rows unsorted**: as they are read (the processes by PID); kept as
+  `processes.sort = none` (gui_toolkit 0.188.0).
+- **The window opens as it was left**: on the section shown last (`view.section`; `--section` shows another), the CPU's
+  page overall or per logical processor (`performance.cpu_view`).
 - **Each core's temperature**, in the logical processors' view (Ctrl+G) and, coolest to hottest, in the CPU's
   details: from coretemp's "Core N" sensors (Intel), else from the SMU's power table of the ryzen_smu driver (AMD, Zen
   to Zen 3; NixOS: `hardware.cpu.amd.ryzen-smu.enable`). Without either, nothing is shown.

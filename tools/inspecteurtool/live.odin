@@ -141,6 +141,7 @@ live_window :: proc(l: ^Live) {
 	live_settings(l)
 	live_one_copy(l)
 	live_mission(l)
+	live_restart(l)
 
 	// a picture of the window, for the person who runs the test (build/live, kept with --keep or a failure: it shows
 	// the machine's own processes, so it is not one of the documentation's pictures)
