@@ -32,11 +32,16 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@v16
       - uses: DeterminateSystems/magic-nix-cache-action@v8
 
-      # (the toolkit's text library: cargo's target directory, keyed by its sources)
+      # (the toolkit's text library: cargo's target directory and the crates it was built from, keyed by its sources. The
+      # crates too: with the library restored, cargo fetches nothing, and the notices' `cargo metadata --offline` reads them)
       - uses: actions/cache@v4
         with:
-          path: ext/gui_toolkit/build/text
-          key: text-linux-nix-${{ hashFiles('ext/gui_toolkit/native/text/**', 'flake.lock') }}
+          path: |
+            ext/gui_toolkit/build/text
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: text-cargo-linux-nix-${{ hashFiles('ext/gui_toolkit/native/text/**', 'flake.lock') }}
 
       # (the shell's dbus reads its session bus's configuration where NixOS keeps it, /etc/dbus-1, which this runner does not
       # have: a session bus of its own for sway's dbus-run-session)
