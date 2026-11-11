@@ -20,11 +20,11 @@ PREF_DEFS := [?]config.Def{
 	{name = "processes.widths", category = "processes", description = "The widths of the columns that were resized, in ems, apart by commas (pid=6,command=30). Dragging the line before a column's title changes them.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "processes.sort", category = "processes", description = "The column the processes are sorted by (one of processes.columns, or name).", kind = .String, default = {s = "name"}, hidden = true},
 	{name = "processes.descending", category = "processes", description = "Sort from the largest (or from Z) down.", kind = .Bool, default = {b = false}, hidden = true},
-	{name = "processes.refresh_ms", category = "processes", description = "How often the processes and the machine are read again, in milliseconds: a point of the Performance section's graphs each time. The title bar's refresh menu (Ctrl+Shift+R) changes it.", kind = .Int, default = {i = 1000}, min = 250, max = 10_000, bounded = true, unit = "ms"},
-	{name = "processes.view", category = "processes", description = "How the processes are listed: apps, the apps' groups and the background processes; tree, every process under its parent. Ctrl+T switches them.", kind = .String, default = {s = "apps"}, choices = {"apps", "tree"}},
+	{name = "processes.refresh_ms", category = "processes", description = "How often the processes and the machine are read again, in milliseconds: a point of the Performance section's graphs each time. The title bar's refresh menu (Ctrl+Shift+R) changes it.", kind = .Int, default = {i = 1000}, min = 250, max = 10_000, bounded = true, unit = "ms", tags = {"speed", "interval", "update", "period"}},
+	{name = "processes.view", category = "processes", description = "How the processes are listed: apps, the apps' groups and the background processes; tree, every process under its parent. Ctrl+T switches them.", kind = .String, default = {s = "apps"}, choices = {"apps", "tree"}, tags = {"tree", "apps", "group"}},
 	{name = "processes.pinned", category = "processes", description = "The apps and processes pinned over the others, by name, apart by commas. Alt+P pins or unpins the selected row.", kind = .String, default = {s = ""}, hidden = true},
-	{name = "processes.summary", category = "processes", description = "Show the summary of the machine over the Processes table: CPU, memory, disks, network, GPU, temperature and pressure, each with its last minute. Ctrl+B shows or hides it.", kind = .Bool, default = {b = true}},
-	{name = "services.manager", category = "services", description = "The services the Services section lists: the system's (system) or the user's (user). Its System and User buttons change it.", kind = .String, default = {s = "system"}, choices = {"system", "user"}},
+	{name = "processes.summary", category = "processes", description = "Show the summary of the machine over the Processes table: CPU, memory, disks, network, GPU, temperature and pressure, each with its last minute. Ctrl+B shows or hides it.", kind = .Bool, default = {b = true}, tags = {"header", "overview"}},
+	{name = "services.manager", category = "services", description = "The services the Services section lists: the system's (system) or the user's (user). Its System and User buttons change it.", kind = .String, default = {s = "system"}, choices = {"system", "user"}, tags = {"system", "user", "systemd"}},
 	{name = "services.widths", category = "services", description = "The widths of the Services table's columns that were resized, in ems (description=30). Dragging the line before a column's title changes them.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "services.sort", category = "services", description = "The column the services are sorted by (name, description, state, startup, load, pid, memory), a - before it for the largest (or Z) first. A click on a title changes it.", kind = .String, default = {s = "name"}, hidden = true},
 	{name = "services.details", category = "services", description = "Show the selected service's details and its journal's last lines under the table (Ctrl+I).", kind = .Bool, default = {b = true}},
@@ -38,17 +38,18 @@ PREF_DEFS := [?]config.Def{
 	{name = "connections.sort", category = "connections", description = "The column the sockets are sorted by (process, pid, protocol, local_address, remote_address, state), a - before it for the largest (or Z) first.", kind = .String, default = {s = "process"}, hidden = true},
 	{name = "services.refresh_ms", category = "services", description = "How often the services are read again while their section is shown, in milliseconds.", kind = .Int, default = {i = 3000}, min = 1000, max = 60_000, bounded = true, unit = "ms"},
 	{name = "mission.layout", category = "mission", description = "Mission Control's panels: where each one is docked, its stacks and their sizes, those closed left out (the dock's text). Its panels' menu brings one back; Mission Control: the layout as at first sets it back.", kind = .String, default = {s = ""}, hidden = true},
-	{name = "view.theme", category = "appearance", description = "The window's colours: a theme of the toolkit by its name (Graphite, Midnight, Nord, Gruvbox, Tokyo Night, Catppuccin...).", kind = .String, default = {s = "Graphite"}},
-	{name = "view.mode", category = "appearance", description = "The theme's version: the system's (light or dark, followed as it changes), dark, or light.", kind = .String, default = {s = "system"}, choices = {"system", "dark", "light"}},
-	{name = "view.finish", category = "appearance", description = "How surfaces are drawn. Machined: raised buttons and panels, sunken fields, graphs and meters (a light theme is drawn flat). Flat: plain surfaces and thin lines. Gradient: surfaces shaded top to bottom. Glass: surfaces that let the page show through.", kind = .String, default = {s = "machined"}, choices = {"machined", "flat", "gradient", "glass"}},
-	{name = "view.zebra", category = "appearance", description = "Shade every second row of the tables: a line of numbers reads across.", kind = .Bool, default = {b = true}},
-	{name = "view.rules", category = "appearance", description = "Draw a thin line under each row of the tables.", kind = .Bool, default = {b = true}},
-	{name = "view.font_size", category = "appearance", description = "The text size at a zoom of 100 %, in logical pixels: every size of the window follows it.", kind = .Float, default = {f = FONT_SIZE_DEFAULT}, min = FONT_SIZE_MIN, max = FONT_SIZE_MAX, bounded = true},
-	{name = "view.zoom", category = "appearance", description = "The zoom of the window: 1 is 100 %. Ctrl+wheel, Ctrl+= and Ctrl+- change it, Ctrl+0 sets it back.", kind = .Float, default = {f = 1}, min = 0.5, max = 3, bounded = true, hidden = true},
+	{name = "view.theme", category = "appearance", description = "The window's colours: a theme of the toolkit by its name (Graphite, Midnight, Nord, Gruvbox, Tokyo Night, Catppuccin...).", kind = .String, default = {s = "Graphite"}, tags = {"colours", "colors", "palette", "look"}},
+	{name = "view.mode", category = "appearance", description = "The theme's version: the system's (light or dark, followed as it changes), dark, or light.", kind = .String, default = {s = "system"}, choices = {"system", "dark", "light"}, tags = {"dark", "light", "night"}},
+	{name = "view.finish", category = "appearance", description = "How surfaces are drawn. Machined: raised buttons and panels, sunken fields, graphs and meters (a light theme is drawn flat). Flat: plain surfaces and thin lines. Gradient: surfaces shaded top to bottom. Glass: surfaces that let the page show through. Edged: the machined reliefs crisp, nothing blurred (the Console theme's).", kind = .String, default = {s = "machined"}, choices = {"machined", "flat", "gradient", "glass", "edged"}, tags = {"look", "style", "relief"}},
+	{name = "view.zebra", category = "appearance", description = "Shade every second row of the tables: a line of numbers reads across.", kind = .Bool, default = {b = true}, tags = {"stripes", "rows"}},
+	{name = "view.rules", category = "appearance", description = "Draw a thin line under each row of the tables.", kind = .Bool, default = {b = true}, tags = {"lines", "rows"}},
+	{name = "view.font_size", category = "appearance", description = "The text size at a zoom of 100 %, in logical pixels: every size of the window follows it.", kind = .Float, default = {f = FONT_SIZE_DEFAULT}, min = FONT_SIZE_MIN, max = FONT_SIZE_MAX, bounded = true, tags = {"text size", "bigger", "smaller"}},
+	{name = "view.zoom", category = "appearance", description = "The zoom of the window: 1 is 100 %. Ctrl+wheel, Ctrl+= and Ctrl+- change it, Ctrl+0 sets it back.", kind = .Float, default = {f = 1}, min = 0.5, max = 3, bounded = true, hidden = true, tags = {"scale", "bigger", "smaller"}},
+	{name = "view.system_title", category = "window", description = "The window's title bar drawn by the system (its buttons, its snapping) in place of Inspecteur's own.", kind = .Bool, default = {b = false}, tags = {"decorations", "native", "frame", "title bar"}},
 	{name = "view.palette_size", category = "window", description = "The command palette's size, in logical pixels: its width and its height (empty: the default). Dragging its edges or its corner changes it.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "view.width", category = "window", description = "The window's width at start, in logical pixels.", kind = .Int, default = {i = 1100}, min = 480, max = 8000, bounded = true},
 	{name = "view.height", category = "window", description = "The window's height at start, in logical pixels.", kind = .Int, default = {i = 720}, min = 320, max = 8000, bounded = true},
-	{name = "update.auto", category = "updates", description = "Check for a new version a while after the start and then every day, download it and put it in place: it runs at the next start. Only the installed copy updates itself (a copy of the Nix store is Nix's to update).", kind = .Bool, default = {b = true}},
+	{name = "update.auto", category = "updates", description = "Check for a new version a while after the start and then every day, download it and put it in place: it runs at the next start. Only the installed copy updates itself (a copy of the Nix store is Nix's to update).", kind = .Bool, default = {b = true}, tags = {"upgrade", "version", "new version"}},
 	{name = "setup.choice", category = "setup", description = "What was answered to the install's dialog: installed, standalone (this copy runs on its own: not offered again), or dismissed for a version.", kind = .String, default = {s = ""}, hidden = true},
 }
 
@@ -82,6 +83,7 @@ Settings :: struct {
 	theme:      string,   // owned
 	mode:       ui.Theme_Mode,
 	finish:     ui.Finish,
+	system_title: bool,     // view.system_title
 	font_size:  f32,
 	zoom:       f32,        // view.zoom
 	mission_layout: string, // owned: mission.layout
@@ -126,6 +128,7 @@ prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Sett
 	s.theme = strings.clone(config.string_of(p, "view.theme"), allocator)
 	s.mode = ui.theme_mode_of(config.string_of(p, "view.mode"))
 	s.finish = ui.finish_of(config.string_of(p, "view.finish"))
+	s.system_title = config.bool_of(p, "view.system_title")
 	s.font_size = f32(config.float_of(p, "view.font_size"))
 	s.zoom = f32(config.float_of(p, "view.zoom"))
 	s.mission_layout = strings.clone(config.string_of(p, "mission.layout"), allocator)

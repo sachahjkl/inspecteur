@@ -6,6 +6,7 @@ package inspecteur
 
 import "core:time"
 import config "gt:config"
+import "gt:platform"
 import prefs_page "gt:prefs_page"
 import "gt:ui"
 import lucide "gt:lucide"
@@ -39,13 +40,29 @@ CUSTOM := [?]string{"view.theme"}
 // The page, as large as the body.
 settings_build :: proc(app: ^App) {
 	ui.next({width = ui.fill(), height = ui.fill()})
-	prefs_page.build(&app.settings_page, &app.prefs, {
+	prefs_page.build(&app.settings_page, &app.prefs, settings_options(app))
+}
+
+// What the page is given; the palette lists the settings by the same (palette_build).
+settings_options :: proc(app: ^App) -> prefs_page.Options {
+	return {
 		user = app, changed = settings_changed, choices = settings_choices, preview = settings_preview,
-		custom_names = CUSTOM[:], custom = settings_custom,
+		custom_names = CUSTOM[:], custom = settings_custom, problem = settings_problem,
 		updater = app.updater, update_pref = "update.auto", restart = proc(user: rawptr) { updates_restart((^App)(user)) },
 		pages = SETTINGS_PAGES[:], icon_font = app.icons, search_icon = lucide.SEARCH, reset_icon = lucide.ROTATE_CCW,
+		version = "Inspecteur " + APP_VERSION,
 		foot = "prefs: ~/.config/inspecteur/prefs",
-	})
+	}
+}
+
+// What Inspecteur has to say under a preference's line: a title bar the desktop cannot draw.
+@(private = "file")
+settings_problem :: proc(user: rawptr, name: string) -> string {
+	app := (^App)(user)
+	if name == "view.system_title" && app.settings.system_title && !platform.system_title_available(app.main.win) {
+		return "This desktop draws no title bar for Inspecteur's window (GNOME): Inspecteur keeps its own."
+	}
+	return ""
 }
 
 // The themes as cards, each in its own colours.
@@ -95,6 +112,8 @@ settings_changed :: proc(user: rawptr, name: string) {
 		app.next_sample = time.tick_add(time.tick_now(), time.Duration(app.settings.refresh_ms) * time.Millisecond)
 	case "services.manager":
 		services_switch(app, app.settings.manager)
+	case "view.system_title":
+		platform.set_integrated_title(app.main.win, !app.settings.system_title)
 	}
 	settings_free(&old)
 	updates_auto(app)

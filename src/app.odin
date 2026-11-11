@@ -149,7 +149,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 
 	t_read := time.tick_now()
 	platform.set_app_id(APP_NAME)
-	if !host.host_open(&app.main, &app.shared, {title = "Inspecteur", size = app.settings.size, integrated_title = true}, view_build, app) {
+	if !host.host_open(&app.main, &app.shared, {title = "Inspecteur", size = app.settings.size, integrated_title = !app.settings.system_title}, view_build, app) {
 		fmt.eprintln("inspecteur: no window")
 		return 1
 	}

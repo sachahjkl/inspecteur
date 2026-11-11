@@ -6,6 +6,15 @@ and the versions follow [semantic versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **The settings in the command palette** (Ctrl+K): each preference is a line under "Settings · <page>"; chosen, the
+  settings open on it alone.
+- **Commands and settings found by other words**: "kill" finds End task, "dark" the theme's version, "slow" Why is it
+  slow?; the matched letters are lit.
+- **The edged finish** (`view.finish = edged`, the Console theme's): the machined reliefs crisp, nothing blurred.
+- **The system's title bar, by choice** (`view.system_title`), where the desktop draws one.
+- The settings' pages say Inspecteur's version at their bottom.
+
+### Added
 
 - **Mission Control** (Ctrl+1; the other sections Ctrl+2 to Ctrl+7): the whole machine on one page, in panels of
   gui_toolkit's dock that the user moves, stacks, resizes, floats, closes and brings back; the layout as at first; the

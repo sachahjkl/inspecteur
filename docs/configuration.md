@@ -35,11 +35,12 @@ inspecteur --pref view.mode=light --pref processes.refresh_ms=2000
 | `mission.layout` | (empty) | Mission Control's panels: where each one is docked, its stacks and their sizes, those closed left out. Its panels' menu brings one back; *Mission Control: the layout as at first* sets it back. |
 | `view.theme` | Graphite | The window's colours: a theme of gui_toolkit by its name (Graphite, Midnight, Nord, Gruvbox, Tokyo Night, Catppuccin...). |
 | `view.mode` | system | The theme's version: `system` (light or dark, as the system), `dark` or `light`. Ctrl+Shift+L switches light and dark. A theme of one version (Graphite is dark only) gives way to Silver when the other version is chosen. |
-| `view.finish` | machined | How surfaces are drawn: `machined` (raised buttons and panels; sunken fields, graphs and meters; a light theme is drawn flat), `flat` (plain surfaces, thin lines), `gradient` (surfaces shaded top to bottom) or `glass` (surfaces that let the page show through). |
+| `view.finish` | machined | How surfaces are drawn: `machined` (raised buttons and panels; sunken fields, graphs and meters; a light theme is drawn flat), `flat` (plain surfaces, thin lines), `gradient` (surfaces shaded top to bottom) or `glass` (surfaces that let the page show through). `edged`: the machined reliefs crisp, nothing blurred. |
 | `view.zebra` | true | Shade every second row of the tables (Processes, Services, Startup, Connections, the Properties' lists): a line of numbers reads across. |
 | `view.rules` | true | Draw a thin line under each row of the tables. |
 | `view.font_size` | 13 | The text size at a zoom of 100 %, in logical pixels (8 to 40): every size of the window follows it. |
 | `view.zoom` | 1 | The zoom of the window: 1 is 100 % (0.5 to 3). Ctrl+wheel, Ctrl+= and Ctrl+- change it, Ctrl+0 sets it back. |
+| `view.system_title` | false | The window's title bar drawn by the system (its buttons, its snapping) in place of Inspecteur's own. A desktop that draws none (GNOME) keeps Inspecteur's. |
 | `view.palette_size` | (empty) | The command palette's size, in logical pixels: its width and its height. Dragging its edges or its corner changes it. |
 | `view.width` | 1100 | The window's width at start, in logical pixels. |
 | `view.height` | 720 | The window's height at start, in logical pixels. |
