@@ -28,10 +28,10 @@ ROUNDING :: 0.25
 // Frames owed after an event (what it set off settles: the layout, the reveal of the selected row).
 FRAMES_AFTER_INPUT :: 3
 
-Tab :: enum u8 { Processes, Performance, Services, Startup, Connections, Information }
+Tab :: enum u8 { Mission_Control, Processes, Performance, Services, Startup, Connections, Information }
 
-TAB_LABELS := [Tab]string{.Processes = "Processes", .Performance = "Performance", .Services = "Services", .Startup = "Startup", .Connections = "Connections", .Information = "Information"}
-TAB_ICONS := [Tab]string{.Processes = lucide.LAYOUT_LIST, .Performance = lucide.GAUGE, .Services = lucide.SETTINGS, .Startup = lucide.POWER, .Connections = lucide.GLOBE, .Information = lucide.INFO}
+TAB_LABELS := [Tab]string{.Mission_Control = "Mission Control", .Processes = "Processes", .Performance = "Performance", .Services = "Services", .Startup = "Startup", .Connections = "Connections", .Information = "Information"}
+TAB_ICONS := [Tab]string{.Mission_Control = lucide.LAYOUT_GRID, .Processes = lucide.LAYOUT_LIST, .Performance = lucide.GAUGE, .Services = lucide.SETTINGS, .Startup = lucide.POWER, .Connections = lucide.GLOBE, .Information = lucide.INFO}
 
 App :: struct {
 	shared:      host.Shared,
@@ -70,6 +70,7 @@ App :: struct {
 	palette:     ui.Command_Palette,   // the command palette (commands.odin)
 	shortcuts_open: bool,           // the sheet of the keys
 	diagnosis_open: bool,   // "Why is it slow?" (F2, diagnosis.odin)
+	mission:     Mission_Control,   // the Mission Control section: its panels (mission_control.odin)
 	setup:       setup.Dialog,      // the install's dialog (setup.odin)
 	setup_logo:  render.Texture,    // its logo (made when it first shows)
 	setup_logo_made: bool,
@@ -177,6 +178,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	services_init(&app.services, app)
 	startup_init(&app.startup, app)
 	dump_init(&app.dump, app)
+	mission_init(app)
 	section_first_show(app)
 	if opts.setup { setup_open(app) } else { setup_offer(app) }
 	updates_start(app)
@@ -213,6 +215,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	journal_windows_close(app)
 	updates_stop(app)
 	prefs_page.destroy(&app.settings_page)
+	mission_destroy(app)
 	connections_destroy(&app.connections)
 	information_destroy(&app.information)
 	services_destroy(&app.services)
@@ -266,7 +269,7 @@ refresh :: proc(app: ^App) {
 	app.next_sample = time.tick_add(now, time.Duration(app.settings.refresh_ms) * time.Millisecond)
 	if app.props.open { props_tick(&app.props, find_proc(&app.sampler, app.props.pid, app.props.start) != nil) }
 	// (a section that reads on a thread of its own reads only while it is shown)
-	if app.tab == .Connections { ui.worker_ask(&app.connections.worker) }
+	if app.tab == .Connections || app.tab == .Mission_Control { ui.worker_ask(&app.connections.worker) }
 	app.refresh_time += time.tick_since(now)
 	app.refreshes += 1
 	app.main.settle = max(app.main.settle, 1)
@@ -302,6 +305,12 @@ section_first_show :: proc(app: ^App) {
 	case .Information: if !app.information.asked { information_ask(&app.information) }
 	case .Services:    services_ask(app)
 	case .Startup:     startup_ask(app)
+	case .Mission_Control:
+		// (it sums up every section: each one is read)
+		ui.worker_ask(&app.connections.worker)
+		if !app.information.asked { information_ask(&app.information) }
+		services_ask(app)
+		startup_ask(app)
 	}
 }
 

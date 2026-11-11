@@ -19,12 +19,14 @@ Cmd :: enum u8 {
 	Palette, Shortcuts, Filter, Clear_Filter, Read_Again, Pause_Refresh, Refresh_Speed, Zoom_In, Zoom_Out, Zoom_Reset,
 	Light_Dark, Setup, Settings, Check_Updates, Diagnose,
 	// Sections
-	Show_Processes, Show_Performance, Show_Services, Show_Startup, Show_Connections, Show_Information, Next_Section, Previous_Section,
+	Show_Mission_Control, Show_Processes, Show_Performance, Show_Services, Show_Startup, Show_Connections, Show_Information, Next_Section, Previous_Section,
 	// Processes
 	End_Task, Kill, End_Tree, Select_All, Suspend, Properties, Open_Location, Copy_Command, Default_Action, Open_Group,
 	Close_Group, Raise_Priority, Lower_Priority, Affinity, Go_To_Service, Dump, Search_Online, Tree_View, Columns, Summary, Pin,
 	// Performance
 	Cpu_Grid, Next_Device, Previous_Device,
+	// Mission Control
+	Mission_Panels, Mission_Reset,
 	// Services
 	Service_Start, Service_Stop, Service_Restart, Service_Enable, Service_Disable, Service_Open, Service_Copy, Service_Details,
 	Service_Open_File, Service_Manager, Journal_Search, Journal_Level, Journal_Boot, Journal_Follow, Journal_Copy, Journal_Copy_Entry, Journal_Window,
@@ -56,12 +58,13 @@ COMMANDS := [Cmd]ui.Command{
 	.Check_Updates    = {icon = lucide.HARD_DRIVE_DOWNLOAD, label = "Check for updates", group = "Window"},
 	.Diagnose         = {icon = lucide.LIGHTBULB, label = "Why is it slow?", group = "Window", keys = {{.F2, {}}, {}}},
 
-	.Show_Processes   = {icon = lucide.LAYOUT_LIST, label = "Processes", group = "Sections", keys = {{.N1, {.Ctrl}}, {}}},
-	.Show_Performance = {icon = lucide.GAUGE, label = "Performance", group = "Sections", keys = {{.N2, {.Ctrl}}, {}}},
-	.Show_Services    = {icon = lucide.SETTINGS, label = "Services", group = "Sections", keys = {{.N3, {.Ctrl}}, {}}},
-	.Show_Startup     = {icon = lucide.POWER, label = "Startup", group = "Sections", keys = {{.N4, {.Ctrl}}, {}}},
-	.Show_Connections = {icon = lucide.GLOBE, label = "Connections", group = "Sections", keys = {{.N5, {.Ctrl}}, {}}},
-	.Show_Information = {icon = lucide.INFO, label = "Information", group = "Sections", keys = {{.N6, {.Ctrl}}, {}}},
+	.Show_Mission_Control = {icon = lucide.LAYOUT_GRID, label = "Mission Control", group = "Sections", keys = {{.N1, {.Ctrl}}, {}}},
+	.Show_Processes   = {icon = lucide.LAYOUT_LIST, label = "Processes", group = "Sections", keys = {{.N2, {.Ctrl}}, {}}},
+	.Show_Performance = {icon = lucide.GAUGE, label = "Performance", group = "Sections", keys = {{.N3, {.Ctrl}}, {}}},
+	.Show_Services    = {icon = lucide.SETTINGS, label = "Services", group = "Sections", keys = {{.N4, {.Ctrl}}, {}}},
+	.Show_Startup     = {icon = lucide.POWER, label = "Startup", group = "Sections", keys = {{.N5, {.Ctrl}}, {}}},
+	.Show_Connections = {icon = lucide.GLOBE, label = "Connections", group = "Sections", keys = {{.N6, {.Ctrl}}, {}}},
+	.Show_Information = {icon = lucide.INFO, label = "Information", group = "Sections", keys = {{.N7, {.Ctrl}}, {}}},
 	.Next_Section     = {icon = lucide.ARROW_RIGHT, label = "Next section", group = "Sections", keys = {{.Tab, {.Ctrl}}, {}}},
 	.Previous_Section = {icon = lucide.ARROW_LEFT, label = "Previous section", group = "Sections", keys = {{.Tab, {.Ctrl, .Shift}}, {}}},
 
@@ -87,6 +90,8 @@ COMMANDS := [Cmd]ui.Command{
 	.Summary          = {icon = lucide.LAYOUT_GRID, label = "Show or hide the summary of the machine", group = "Processes", keys = {{.B, {.Ctrl}}, {}}},
 	.Pin              = {icon = lucide.PIN, label = "Pin or unpin", group = "Processes", keys = {{.P, {.Alt}}, {}}},
 
+	.Mission_Panels   = {icon = lucide.LAYOUT_GRID, label = "Mission Control: panels…", group = "Mission Control"},
+	.Mission_Reset    = {icon = lucide.ROTATE_CCW, label = "Mission Control: the layout as at first", group = "Mission Control"},
 	.Cpu_Grid         = {icon = lucide.LAYOUT_GRID, label = "One graph per logical processor", group = "Performance", keys = {{.G, {.Ctrl}}, {}}},
 	.Next_Device      = {icon = lucide.ARROW_DOWN, label = "Next device", group = "Performance", keys = {{.Down, {}}, {}}},
 	.Previous_Device  = {icon = lucide.ARROW_UP, label = "Previous device", group = "Performance", keys = {{.Up, {}}, {}}},
@@ -140,6 +145,7 @@ cmd_tab :: proc(c: Cmd) -> Maybe(Tab) {
 	case c <= .Previous_Section:                   return nil
 	case c <= .Pin:                                return .Processes   // (the last command of Processes)
 	case c <= .Previous_Device:                    return .Performance
+	case c <= .Mission_Reset:                      return .Mission_Control
 	case c <= .Journal_Window:                     return .Services
 	case c <= .Startup_Copy:                       return .Startup
 	case c <= .Socket_Copy:                        return .Connections
@@ -228,7 +234,7 @@ cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 	case .Zoom_Out:   return ui.zoom(&app.main.state) > ui.ZOOM_MIN
 	case .Zoom_Reset: return ui.zoom(&app.main.state) != 1
 	case .Clear_Filter: return len(app.search.buf) > 0
-	case .Show_Processes, .Show_Performance, .Show_Services, .Show_Startup, .Show_Connections, .Show_Information, .Next_Section, .Previous_Section: return true
+	case .Show_Mission_Control, .Show_Processes, .Show_Performance, .Show_Services, .Show_Startup, .Show_Connections, .Show_Information, .Next_Section, .Previous_Section: return true
 	case .End_Task, .Kill, .End_Tree: return p != nil || ui.list_mark_count(&app.vl) > 0
 	case .Select_All: return len(app.table.rows) > 0
 	case .Properties, .Search_Online: return p != nil
@@ -245,6 +251,7 @@ cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 	case .Raise_Priority, .Lower_Priority: return p != nil && selected_is_process(app)
 	case .Columns, .Summary: return true
 	case .Cpu_Grid, .Next_Device, .Previous_Device: return true
+	case .Mission_Panels, .Mission_Reset: return true
 	case .Service_Start, .Service_Stop, .Service_Restart, .Service_Enable, .Service_Disable, .Service_Open, .Service_Copy, .Service_Open_File: return service_can(app, c)
 	case .Service_Details: return true
 	case .Service_Manager: return true
@@ -283,6 +290,7 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Settings:         settings_toggle(app)
 	case .Check_Updates:    update.check_now(app.updater); say(app, "Checking for updates…")
 	case .Diagnose:         app.diagnosis_open = true
+	case .Show_Mission_Control: tab_show(app, .Mission_Control)
 	case .Show_Processes:   tab_show(app, .Processes)
 	case .Show_Performance: tab_show(app, .Performance)
 	case .Show_Services:    tab_show(app, .Services)
@@ -312,6 +320,8 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Columns:          columns_menu_open(app)
 	case .Summary:          summary_switch(app)
 	case .Pin:              pin_switch(app)
+	case .Mission_Panels:   mission_panels_open(app)
+	case .Mission_Reset:    mission_reset(app)
 	case .Cpu_Grid:         cpu_grid_switch(app)
 	case .Next_Device:      device_step(app, 1)
 	case .Previous_Device:  device_step(app, -1)

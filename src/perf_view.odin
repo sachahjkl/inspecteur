@@ -225,7 +225,6 @@ page_title :: proc(title, what: string, em: f32) {
 }
 
 // A graph with its captions: what it shows and its top above it, its span and its bottom under it.
-@(private = "file")
 captioned_graph :: proc(app: ^App, id, what: string, series: []Series, top: f32, top_text: proc(v: f32) -> string, em: f32, height: ui.Size, floor: f32 = 0, period_ms := 0) {
 	lines := line_series(series)
 	shown_top := ui.line_graph_top(lines, {top = top, floor = floor})

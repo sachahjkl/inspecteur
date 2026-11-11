@@ -48,7 +48,7 @@ run :: proc(all_args: []string) -> int {
 	verb := len(args) > 0 ? args[0] : ""
 	switch verb {
 	case "", "--first-frame", "--section", "--demo", "--setup":
-		opts: Run_Options
+		opts := Run_Options{tab = .Processes}   // (Mission Control is a click away)
 		for i := 0; i < len(args); i += 1 {
 			switch args[i] {
 			case "--first-frame": opts.first_frame = true

@@ -7,6 +7,10 @@ and the versions follow [semantic versioning](https://semver.org/).
 
 ### Added
 
+- **Mission Control** (Ctrl+1; the other sections Ctrl+2 to Ctrl+7): the whole machine on one page, in panels of
+  gui_toolkit's dock that the user moves, stacks, resizes, floats, closes and brings back; the layout as at first; the
+  layout kept (`mission.layout`). A click on a line goes to its section.
+- **A horizontal scroll bar** under the tables wider than their room.
 - **One Inspecteur at a time**: a second start (Ctrl+Shift+Escape again, a launcher, `--section`) shows its section in
   the one that runs, which comes to the front.
 - **Zoom** as every program of gui_toolkit: Ctrl+wheel, Ctrl+=, Ctrl+-, Ctrl+0 (`view.zoom`, kept).
@@ -24,6 +28,9 @@ and the versions follow [semantic versioning](https://semver.org/).
 
 ### Fixed
 
+- **Resizing a column** resizes the column at the left of the line, as in a file manager: the columns after it move,
+  none before. **A third click on a title** comes back to the table's own sort.
+- **The palette's field** is flush with its edges; the keys stay clear of its scroll bar.
 - **The palette no longer crashes on a search that keeps nothing** (gui_toolkit 0.176.1).
 - **Resizing a column moves no other column a frame late** (gui_toolkit 0.169.0: the fill column is resolved in the same
   build); the stripes of the tables are fainter.

@@ -58,6 +58,7 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 				ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
 				if ui.column(id = "###section") {
 					switch app.tab {
+					case .Mission_Control: build_mission(app, em)
 					case .Processes:   build_processes(app, em)
 					case .Performance: build_performance(app, em)
 					case .Services:    build_services(app, em)
@@ -316,7 +317,7 @@ build_sidebar :: proc(app: ^App, em: f32) {
 				if !on { ui.pop_tags() }
 			}
 			if sig.clicked { tab_show(app, tab) }
-			tip_after(sig, cmd_tip(Cmd(int(Cmd.Show_Processes) + int(tab))))
+			tip_after(sig, cmd_tip(Cmd(int(Cmd.Show_Mission_Control) + int(tab))))
 		}
 		ui.spacer(ui.fill())
 		build_meters(app, em)
@@ -346,7 +347,7 @@ build_filter :: proc(app: ^App, em: f32) {
 }
 
 FILTER_HINTS := [Tab]string{
-	.Processes = "Filter processes...", .Performance = "", .Services = "Filter services...", .Startup = "Filter startup...",
+	.Mission_Control = "", .Processes = "Filter processes...", .Performance = "", .Services = "Filter services...", .Startup = "Filter startup...",
 	.Connections = "Filter connections...", .Information = "",
 }
 

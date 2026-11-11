@@ -140,11 +140,12 @@ live_window :: proc(l: ^Live) {
 	live_setup(l)
 	live_settings(l)
 	live_one_copy(l)
+	live_mission(l)
 
 	// a picture of the window, for the person who runs the test (build/live, kept with --keep or a failure: it shows
 	// the machine's own processes, so it is not one of the documentation's pictures)
 	check(l, cdp.key(c, "Escape"), "Escape clears the search")
-	check(l, cdp.key(c, "ctrl+1") && click_header(c, "CPU"), "sort by CPU")
+	check(l, cdp.key(c, "ctrl+2") && click_header(c, "CPU"), "sort by CPU")
 	cdp.wait_for(c, "Background processes", SESSION_WAIT)
 	cdp.wait_idle(c, SESSION_WAIT)
 	check(l, cdp.shot(c, fmt.tprintf("%s/window.png", l.dir)), "a picture in %s", l.dir)

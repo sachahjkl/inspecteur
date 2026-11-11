@@ -131,7 +131,7 @@ live_group_kill :: proc(l: ^Live) {
 live_commands :: proc(l: ^Live) {
 	c := &l.c
 	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
-	check(l, cdp.key(c, "Escape") && cdp.key(c, "ctrl+1"), "the Processes section")
+	check(l, cdp.key(c, "Escape") && cdp.key(c, "ctrl+2"), "the Processes section")
 	check(l, cdp.key(c, "ctrl+k") && cdp.wait_name(c, "palette_field", SESSION_WAIT), "Ctrl+K opens the palette")
 	check(l, cdp.type_text(c, "performance") && cdp.wait_for(c, "Performance  ·  Sections", SESSION_WAIT), "typing finds the Performance section")
 	check(l, cdp.key(c, "Enter") && cdp.wait_name(c, "cpu_graph", SESSION_WAIT), "Enter shows it")
@@ -143,7 +143,7 @@ live_commands :: proc(l: ^Live) {
 	check(l, cdp.key(c, "Escape") && cdp.wait_for(c, "Keyboard shortcuts", SESSION_WAIT, gone = true), "Escape closes them")
 	check(l, cdp.key(c, "ctrl+Tab") && cdp.wait_name(c, "svc_start", SESSION_WAIT), "Ctrl+Tab: the next section, Services")
 	check(l, cdp.key(c, "ctrl+shift+Tab") && cdp.wait_name(c, "cpu_graph", SESSION_WAIT), "Ctrl+Shift+Tab: back to Performance")
-	check(l, cdp.key(c, "ctrl+1") && cdp.key(c, "ctrl+shift+c") && cdp.wait_for(c, "Default columns", SESSION_WAIT), "Ctrl+Shift+C in Processes: the columns' menu")
+	check(l, cdp.key(c, "ctrl+2") && cdp.key(c, "ctrl+shift+c") && cdp.wait_for(c, "Default columns", SESSION_WAIT), "Ctrl+Shift+C in Processes: the columns' menu")
 	check(l, cdp.key(c, "Escape") && cdp.wait_for(c, "Default columns", SESSION_WAIT, gone = true), "Escape closes the menu")
 	// From the system's version, the key goes to the other one than the system shows: dark on a desktop in dark, light on
 	// a runner that has no dark setting. Either is right; the second press must give the other.
@@ -221,6 +221,20 @@ live_settings :: proc(l: ^Live) {
 	check(l, cdp.key(c, "Escape") && cdp.wait_name(c, "settings_button", SESSION_WAIT) && cdp.wait_for(c, "Draw a thin line", SESSION_WAIT, gone = true), "Escape goes back to the sections")
 }
 
+// Mission Control (Ctrl+1): its panels; one closed from its menu, brought back; the layout as at first, kept.
+live_mission :: proc(l: ^Live) {
+	c := &l.c
+	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
+	check(l, cdp.key(c, "ctrl+1") && cdp.wait_name(c, "mc_machine", SESSION_WAIT) && cdp.wait_name(c, "mc_health", SESSION_WAIT) && cdp.wait_name(c, "mc_cpu", SESSION_WAIT), "Ctrl+1: Mission Control, its panels")
+	check(l, cdp.wait_name(c, "mc_cpu_0", SESSION_WAIT), "the busiest processes are listed")
+	check(l, cdp.click_name(c, "mission_panels") && cdp.wait_for(c, "Busiest: memory", SESSION_WAIT), "the panels' menu")
+	// (the menu's line, not the tab of the same name: the menu is built after the panels)
+	_, menu_ok := cdp.call(c, "Toolkit.click", `{"text":"Busiest: memory","index":1}`)
+	check(l, menu_ok && cdp.wait_name(c, "mc_memory", SESSION_WAIT, gone = true) && file_has(prefs, "mission.layout"), "a panel closed, the layout kept")
+	check(l, cdp.click_name(c, "mission_reset") && cdp.wait_name(c, "mc_memory", SESSION_WAIT), "the layout as at first brings it back")
+	check(l, cdp.key(c, "ctrl+2") && cdp.wait_for(c, "Background processes", SESSION_WAIT), "Ctrl+2: Processes")
+}
+
 // One Inspecteur at a time: a second start with --section hands it to this one, which shows it, and ends.
 live_one_copy :: proc(l: ^Live) {
 	c := &l.c
@@ -229,7 +243,7 @@ live_one_copy :: proc(l: ^Live) {
 	st, werr := os.process_wait(p, SESSION_WAIT)
 	check(l, werr == nil && st.exited && st.exit_code == 0, "it ends at once, handed over (%v)", st.exit_code)
 	check(l, cdp.wait_for(c, "File", SESSION_WAIT) && cdp.wait_for(c, "Status", SESSION_WAIT), "this one shows Startup (its columns File and Status)")
-	check(l, cdp.key(c, "ctrl+1") && cdp.wait_for(c, "Background processes", SESSION_WAIT), "Ctrl+1: back to Processes")
+	check(l, cdp.key(c, "ctrl+2") && cdp.wait_for(c, "Background processes", SESSION_WAIT), "Ctrl+2: back to Processes")
 }
 
 // The colour of the page's background (a pixel of the window's corner, under the title bar).

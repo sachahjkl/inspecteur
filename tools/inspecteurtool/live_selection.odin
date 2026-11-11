@@ -86,7 +86,7 @@ live_end_tree :: proc(l: ^Live) {
 live_view_keys :: proc(l: ^Live) {
 	c := &l.c
 	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
-	check(l, cdp.key(c, "Escape") && cdp.key(c, "ctrl+1"), "the Processes section")
+	check(l, cdp.key(c, "Escape") && cdp.key(c, "ctrl+2"), "the Processes section")
 	check(l, cdp.key(c, "ctrl+space") && cdp.wait_for(c, "Refresh paused", SESSION_WAIT), "Ctrl+Space pauses the refresh")
 	check(l, cdp.wait_for(c, "Paused", SESSION_WAIT), "the footer says Paused")
 	check(l, cdp.key(c, "ctrl+space") && cdp.wait_for(c, "Refresh every 1 s", SESSION_WAIT), "Ctrl+Space again resumes it")

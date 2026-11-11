@@ -52,7 +52,7 @@ run_bench :: proc(args: []string) -> int {
 		if k == BENCH_STARTS - 1 {
 			rest(&s, seconds, "at rest")
 			// (the sections that read on threads of their own, shown: what they cost while they are on the screen)
-			for section in ([]struct { key, name: string }{{"ctrl+3", "Services"}, {"ctrl+5", "Connections"}}) {
+			for section in ([]struct { key, name: string }{{"ctrl+4", "Services"}, {"ctrl+6", "Connections"}}) {
 				if show(&s, section.key) { rest(&s, seconds, fmt.tprintf("%s shown", section.name)) }
 			}
 		}

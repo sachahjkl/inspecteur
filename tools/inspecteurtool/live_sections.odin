@@ -13,11 +13,11 @@ import cdp "gt:cdp"
 import toolbox "gt:toolbox"
 
 // The sidebar's rows (view.odin: ###side_<tab>), in the order of the Tab enum.
-SIDE_PROCESSES   :: "side_0"
-SIDE_SERVICES    :: "side_2"
-SIDE_STARTUP     :: "side_3"
-SIDE_CONNECTIONS :: "side_4"
-SIDE_INFORMATION :: "side_5"
+SIDE_PROCESSES   :: "side_1"
+SIDE_SERVICES    :: "side_3"
+SIDE_STARTUP     :: "side_4"
+SIDE_CONNECTIONS :: "side_5"
+SIDE_INFORMATION :: "side_6"
 // More than the toolkit's DOUBLE_CLICK_MS (450 ms) between two clicks on a row.
 DOUBLE_CLICK_GAP :: 600 * time.Millisecond
 

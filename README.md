@@ -15,6 +15,12 @@ Information.
 
 ## Features
 
+- **Mission Control** (Ctrl+1): the whole machine on one page, in panels you arrange: the machine's tiles and graphs,
+  what the diagnosis says, the busiest processes by CPU and by memory, the failed services, the network's sockets, what
+  starts with the session, the system. Drag a panel's tab into another stack, beside one, to an edge or out to float;
+  resize the stacks; close a panel and bring it back from the panels' menu; the layout as at first. The layout is kept.
+
+  ![Mission Control](docs/screenshots/mission_control.png)
 - **Processes**: name with the app's icon, PID, user, CPU %, private memory, disk read and write rates, threads, and more
   columns on a right click of the header (Ctrl+Shift+C): parent, state, priority, resident memory, GPU memory, start time,
   command line, executable. Read again each second; the refresh pauses (Ctrl+Space) and goes faster or slower from the
@@ -76,7 +82,7 @@ The pictures show the demo's made-up machine (`inspecteur --demo`), not a real o
 | typing, Ctrl+F | filter the section shown; Escape clears the filter |
 | Ctrl+K, Ctrl+Shift+P | the command palette (its edges and corner resize it) |
 | F1 | every key |
-| Ctrl+1 to Ctrl+6, Ctrl+Tab, Ctrl+Shift+Tab | show a section, the next, the previous |
+| Ctrl+1 to Ctrl+7, Ctrl+Tab, Ctrl+Shift+Tab | show a section (Ctrl+1: Mission Control), the next, the previous |
 | F5 | read the section again now |
 | Ctrl+Space, Ctrl+Shift+R | pause or resume the refresh; its speed |
 | Ctrl+wheel, Ctrl+=, Ctrl+-, Ctrl+0 | zoom in, out, 100 % |

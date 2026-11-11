@@ -120,7 +120,7 @@ run_shots :: proc(args: []string) -> int {
 	}
 
 	// the Performance section: the graphs need some history (a few samples)
-	cdp.key(&c, "ctrl+2")
+	cdp.key(&c, "ctrl+3")
 	cdp.wait_name(&c, "cpu_graph", SESSION_WAIT)
 	time.sleep(PERF_SETTLE)
 	shot(&c, out, "performance_cpu", &failed)
@@ -136,12 +136,19 @@ run_shots :: proc(args: []string) -> int {
 		shot(&c, out, p.picture, &failed)
 	}
 
+	// Mission Control, once every section has read
+	cdp.key(&c, "ctrl+1")
+	if need(cdp.wait_name(&c, "mc_svc_0", SESSION_WAIT), "no Mission Control", &failed) {
+		time.sleep(1500 * time.Millisecond)
+		shot(&c, out, "mission_control", &failed)
+	}
+
 	// the sections that read on threads of their own: each once its reading is shown
 	sections := []struct { key, ready, picture: string }{
-		{"ctrl+3", "running", "services"},
-		{"ctrl+4", " on", "startup"},
-		{"ctrl+5", "listening or open", "connections"},
-		{"ctrl+6", "Operating system", "information"},
+		{"ctrl+4", "running", "services"},
+		{"ctrl+5", " on", "startup"},
+		{"ctrl+6", "listening or open", "connections"},
+		{"ctrl+7", "Operating system", "information"},
 	}
 	for sec in sections {
 		cdp.key(&c, sec.key)
@@ -151,7 +158,7 @@ run_shots :: proc(args: []string) -> int {
 	}
 
 	// a failed service's journal: warnings and worse, an entry selected and shown whole
-	cdp.key(&c, "ctrl+3")
+	cdp.key(&c, "ctrl+4")
 	if need(cdp.wait_for(&c, "running", SESSION_WAIT), "no Services section", &failed) {
 		cdp.type_text(&c, "nginx")
 		cdp.wait_idle(&c, SESSION_WAIT)
@@ -179,7 +186,7 @@ run_shots :: proc(args: []string) -> int {
 		cdp.key(&c, "Escape")
 		cdp.wait_name(&c, "settings_button", SESSION_WAIT)
 	}
-	cdp.key(&c, "ctrl+1")
+	cdp.key(&c, "ctrl+2")
 	need(cdp.wait_for(&c, "Background processes", SESSION_WAIT), "no Processes section", &failed)
 	cdp.key(&c, "ctrl+shift+l")
 	cdp.wait_for(&c, "Light colours", SESSION_WAIT)

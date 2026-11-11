@@ -147,16 +147,17 @@ live_columns :: proc(l: ^Live) {
 	// the PID column's rule, dragged 40 px to the left: the column is wider
 	before := cdp.find_name(c, "hd_1")
 	rules := cdp.find_name(c, "rule")
-	if !check(l, len(before) == 1 && len(rules) > 0, "the PID column has its rule") { return }
-	r := rules[0]
+	// (a column's line is at its right edge: PID's is the second, after the name's)
+	if !check(l, len(before) == 1 && len(rules) > 1, "the PID column has its rule") { return }
+	r := rules[1]
 	x, y := r.x + r.w / 2, r.y + r.h / 2
 	mouse :: proc(c: ^cdp.Client, kind: string, x, y: f64) -> bool {
 		_, ok := cdp.call(c, "Input.dispatchMouseEvent", fmt.tprintf(`{{"type":%q,"x":%v,"y":%v,"button":"left","buttons":1,"clickCount":1}}`, kind, x, y))
 		return ok
 	}
 	moved := mouse(c, "mouseMoved", x, y) && mouse(c, "mousePressed", x, y)
-	for k in 1 ..= 4 { moved = moved && mouse(c, "mouseMoved", x - f64(k) * 10, y) }
-	moved = moved && mouse(c, "mouseReleased", x - 40, y)
+	for k in 1 ..= 4 { moved = moved && mouse(c, "mouseMoved", x + f64(k) * 10, y) }
+	moved = moved && mouse(c, "mouseReleased", x + 40, y)
 	cdp.wait_idle(c, SESSION_WAIT)
 	after := cdp.find_name(c, "hd_1")
 	check(l, moved && len(after) == 1 && after[0].w > before[0].w + 30, "dragging its rule widens the PID column (%.0f px to %.0f)", before[0].w, len(after) == 1 ? after[0].w : 0)

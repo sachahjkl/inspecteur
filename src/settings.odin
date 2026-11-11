@@ -37,6 +37,7 @@ PREF_DEFS := [?]config.Def{
 	{name = "connections.widths", category = "connections", description = "The widths of the Connections table's columns that were resized, in ems (remote_address=20).", kind = .String, default = {s = ""}, hidden = true},
 	{name = "connections.sort", category = "connections", description = "The column the sockets are sorted by (process, pid, protocol, local_address, remote_address, state), a - before it for the largest (or Z) first.", kind = .String, default = {s = "process"}, hidden = true},
 	{name = "services.refresh_ms", category = "services", description = "How often the services are read again while their section is shown, in milliseconds.", kind = .Int, default = {i = 3000}, min = 1000, max = 60_000, bounded = true, unit = "ms"},
+	{name = "mission.layout", category = "mission", description = "Mission Control's panels: where each one is docked, its stacks and their sizes, those closed left out (the dock's text). Its panels' menu brings one back; Mission Control: the layout as at first sets it back.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "view.theme", category = "appearance", description = "The window's colours: a theme of the toolkit by its name (Graphite, Midnight, Nord, Gruvbox, Tokyo Night, Catppuccin...).", kind = .String, default = {s = "Graphite"}},
 	{name = "view.mode", category = "appearance", description = "The theme's version: the system's (light or dark, followed as it changes), dark, or light.", kind = .String, default = {s = "system"}, choices = {"system", "dark", "light"}},
 	{name = "view.finish", category = "appearance", description = "How surfaces are drawn. Machined: raised buttons and panels, sunken fields, graphs and meters (a light theme is drawn flat). Flat: plain surfaces and thin lines. Gradient: surfaces shaded top to bottom. Glass: surfaces that let the page show through.", kind = .String, default = {s = "machined"}, choices = {"machined", "flat", "gradient", "glass"}},
@@ -83,6 +84,7 @@ Settings :: struct {
 	finish:     ui.Finish,
 	font_size:  f32,
 	zoom:       f32,        // view.zoom
+	mission_layout: string, // owned: mission.layout
 	zebra:      bool,     // view.zebra
 	rules:      bool,     // view.rules
 	size:       [2]int,
@@ -126,6 +128,7 @@ prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Sett
 	s.finish = ui.finish_of(config.string_of(p, "view.finish"))
 	s.font_size = f32(config.float_of(p, "view.font_size"))
 	s.zoom = f32(config.float_of(p, "view.zoom"))
+	s.mission_layout = strings.clone(config.string_of(p, "mission.layout"), allocator)
 	s.zebra = config.bool_of(p, "view.zebra")
 	s.rules = config.bool_of(p, "view.rules")
 	s.size = {int(config.int_of(p, "view.width")), int(config.int_of(p, "view.height"))}
@@ -146,6 +149,7 @@ settings_free :: proc(s: ^Settings) {
 	delete(s.sort)
 	delete(s.pinned)
 	delete(s.setup_choice)
+	delete(s.mission_layout)
 	s^ = {}
 }
 
