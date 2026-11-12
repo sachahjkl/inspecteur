@@ -23,7 +23,7 @@ Cmd :: enum u8 {
 	Show_Mission_Control, Show_Processes, Show_Performance, Show_Services, Show_Startup, Show_Connections, Show_Information, Next_Section, Previous_Section,
 	// Processes
 	End_Task, Kill, End_Tree, Select_All, Suspend, Properties, Open_Location, Copy_Command, Default_Action, Open_Group,
-	Close_Group, Raise_Priority, Lower_Priority, Affinity, Send_Signal, Go_To_Service, Dump, Search_Online, Tree_View, Columns, Summary, Pin,
+	Close_Group, Raise_Priority, Lower_Priority, Affinity, Send_Signal, Show_Window, Go_To_Service, Dump, Search_Online, Tree_View, Columns, Summary, Pin,
 	// Performance
 	Cpu_Grid, Next_Device, Previous_Device,
 	// Mission Control
@@ -84,6 +84,7 @@ COMMANDS := [Cmd]ui.Command{
 	.Lower_Priority   = {icon = lucide.ARROW_DOWN, label = "Lower the priority", group = "Processes", keys = {{.Down, {.Ctrl}}, {}}, tags = {"nice", "renice", "background"}},
 	.Affinity         = {icon = lucide.MICROCHIP, label = "Set affinity…", group = "Processes", keys = {{.A, {.Ctrl, .Shift}}, {}}, tags = {"cpu", "cores", "pin"}},
 	.Send_Signal      = {icon = lucide.ZAP, label = "Send a signal", group = "Processes", tags = {"signal", "sighup", "sigusr1", "sigint", "reload", "hang up"}},
+	.Show_Window      = {icon = lucide.APP_WINDOW, label = "Show its window", group = "Processes", keys = {{.W, {.Ctrl, .Shift}}, {}}, tags = {"window", "focus", "switch", "raise", "front"}},
 	.Go_To_Service    = {icon = lucide.SERVER, label = "Go to service", group = "Processes", keys = {{.S, {.Ctrl, .Shift}}, {}}},
 	.Dump             = {icon = lucide.SAVE, label = "Create dump file…", group = "Processes", keys = {{.D, {.Ctrl, .Shift}}, {}}, tags = {"core", "gcore", "debug"}},
 	.Search_Online    = {icon = lucide.SEARCH, label = "Search online", group = "Processes", keys = {{.F, {.Ctrl, .Shift}}, {}}, tags = {"web", "google", "what is"}},
@@ -256,6 +257,7 @@ cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 	case .Affinity: return p != nil && selected_is_process(app)
 	case .Go_To_Service: return p != nil && selected_is_process(app) && p.unit != ""
 	case .Send_Signal:   return p != nil
+	case .Show_Window:   r, ok := selected_row(app); return ok && len(windows_of(app, row_entry(app, r))) > 0
 	case .Dump: return p != nil && selected_is_process(app)
 	case .Tree_View: return true
 	case .Pin: return pin_name(app) != "" && !app.table.tree
@@ -330,6 +332,7 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Lower_Priority:   if p := selected_proc(app); p != nil { priority_step(app, p, 1) }
 	case .Affinity:         if p := selected_proc(app); p != nil { affinity_open(app, p) }
 	case .Go_To_Service:    if p := selected_proc(app); p != nil { go_to_service(app, p) }
+	case .Show_Window:      if r, ok := selected_row(app); ok { window_show(app, row_entry(app, r)) }
 	case .Send_Signal:      tab_show(app, .Processes); row_menu_open(app, {app.sel_rect.min.x + ui.font_size() * 2.5, app.sel_rect.max.y}, from_keyboard = true)
 	case .Dump:             if p := selected_proc(app); p != nil { dump_ask(app, p) }
 	case .Search_Online:    search_online(app)

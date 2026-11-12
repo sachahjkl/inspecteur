@@ -25,6 +25,10 @@ live_app_entry :: proc(dir: string) {
 	_ = os.make_directory_all(apps)
 	entry := fmt.tprintf("[Desktop Entry]\nType=Application\nName=%s\nExec=inspecteur-live-app-%d\n", live_app_name(), os.get_pid())
 	_ = os.write_entire_file(fmt.tprintf("%s/%s.desktop", apps, live_app_id()), entry)
+	// Inspecteur's own window is an app's (its app id, inspecteur, the window class of this entry): its row has the
+	// window's button (live_app_window), on a runner where Inspecteur is not installed too
+	own := "[Desktop Entry]\nType=Application\nName=Inspecteur\nExec=inspecteur-live-none\nStartupWMClass=inspecteur\n"
+	_ = os.write_entire_file(fmt.tprintf("%s/%swindow.desktop", apps, live_app_id()), own)
 }
 
 // Inspecteur's own row: Suspend is refused, and the process does not stop.

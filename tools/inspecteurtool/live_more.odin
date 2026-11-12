@@ -401,3 +401,13 @@ live_send_signal :: proc(l: ^Live) {
 	check(l, reaped && state.exit_code == 10, "it ends by SIGUSR1 (%d)", state.exit_code)
 	cdp.key(c, "Escape")
 }
+
+// Show its window: Inspecteur's own row (its app, found by the filter) has the button where the compositor tells the
+// session's windows (sway does); clicked, Inspecteur's window stays at the front and answers on.
+live_app_window :: proc(l: ^Live) {
+	c := &l.c
+	check(l, cdp.key(c, "Escape") && cdp.key(c, "ctrl+2") && cdp.type_text(c, "inspecteur"), "Processes, filtered to Inspecteur")
+	if !check(l, cdp.wait_name(c, "win", READER_WAIT), "its row has the window's button") { _ = cdp.key(c, "Escape"); return }
+	check(l, cdp.click_name(c, "win") && wait_sway_title(l, "Inspecteur", true) && cdp.wait_name(c, "win", SESSION_WAIT), "clicked: its window is there and answers on")
+	check(l, cdp.key(c, "Escape"), "Escape clears the filter")
+}

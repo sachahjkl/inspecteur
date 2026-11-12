@@ -141,6 +141,7 @@ live_window :: proc(l: ^Live) {
 	live_setup(l)
 	live_settings(l)
 	live_one_copy(l)
+	live_app_window(l)
 	live_mission(l)
 	live_restart(l)
 

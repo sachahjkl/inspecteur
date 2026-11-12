@@ -87,6 +87,7 @@ App :: struct {
 	restart:     bool,              // at the end, the new program starts (an update in place)
 	journal_windows: [dynamic]^Journal_Window,   // the journals in windows of their own (journal_window.odin)
 	mission_windows: [dynamic]^Mission_Window,   // Mission Control's panels in windows of their own (mission_window.odin)
+	windows:     [dynamic]App_Window,   // the apps' windows, read at each sample (window_list.odin)
 	one_copy:    ^instance.Server,  // the name of the one Inspecteur that runs, served (one_copy.odin)
 	tz:          ^datetime.TZ_Region,   // local time, for the processes' start (loaded when first needed)
 	tz_tried:    bool,
@@ -228,6 +229,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	devtools.stop(app.devtools)
 	one_copy_stop(app)
 	journal_windows_close(app)
+	app_windows_clear(app)
+	delete(app.windows)
 	mission_windows_close(app)
 	updates_stop(app)
 	prefs_page.destroy(&app.settings_page)
@@ -281,6 +284,7 @@ refresh :: proc(app: ^App) {
 	// anyway)
 	gpu_want(&app.machine.gpu, app.tab == .Performance || app.table.layout.shown[int(Column.GPU_Memory)] || app.table.layout.shown[int(Column.GPU)])
 	table_group(&app.table, app.sampler.procs[:])
+	app_windows_read(app)
 	rows_again(app)
 	app.next_sample = time.tick_add(now, time.Duration(app.settings.refresh_ms) * time.Millisecond)
 	if app.props.open { props_tick(&app.props, find_proc(&app.sampler, app.props.pid, app.props.start) != nil) }

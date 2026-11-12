@@ -382,6 +382,15 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 				ui.label(fmt.tprintf("(%d)###k", count))
 			}
 		}
+		// its app's window, a click away (an app's row, or a process of an app with a window)
+		if list := windows_of(app, row_entry(app, r)); len(list) > 0 {
+			ui.spacer(ui.px(em * 0.3))
+			ui.next({width = ui.px(em * 1.6), height = ui.px(em * 1.4), font = app.icons, font_size = em * 0.9, text_pad = 0, text_align = .Center})
+			sig: ui.Signal
+			if ui.tags("ghost_button") { sig = ui.button(fmt.tprintf("%s###win", lucide.APP_WINDOW)) }
+			if sig.clicked { window_show(app, row_entry(app, r)) }
+			tip_after(sig, fmt.tprintf("%s (%s)", window_tip(list), ui.command_shortcut(COMMANDS[.Show_Window])))
+		}
 		ui.spacer(ui.fill())
 	}
 

@@ -253,6 +253,7 @@ row_menu_items :: proc(app: ^App) {
 		cmd_item(app, .Lower_Priority)
 		cmd_item(app, .Affinity)
 		ui.menu_separator()
+		cmd_item(app, .Show_Window)
 		cmd_item(app, .Go_To_Service)
 		cmd_item(app, .Open_Location)
 		cmd_item(app, .Copy_Command)
