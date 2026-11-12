@@ -243,6 +243,11 @@ row_menu_items :: proc(app: ^App) {
 		cmd_item(app, .End_Tree)
 		p := selected_proc(app)
 		cmd_item(app, .Suspend, p != nil && p.state == .Stopped ? "Resume" : "Suspend")
+		if ui.menu_submenu(COMMANDS[.Send_Signal].label) {
+			for s in SIGNAL_ITEMS {
+				if ui.menu_item(s.label, enabled = cmd_can(app, .Send_Signal)).clicked { signal_selected(app, s.sig) }
+			}
+		}
 		ui.menu_separator()
 		cmd_item(app, .Raise_Priority)
 		cmd_item(app, .Lower_Priority)
@@ -270,6 +275,38 @@ copy_command :: proc(app: ^App, p: ^Proc) {
 	if p.cmdline == "" { return }
 	platform.set_clipboard(app.main.win, p.cmdline)
 	say(app, "Copied the command line of %s", p.name)
+}
+
+// The signals the row's menu sends (Send a signal), each by its name and its number's.
+@(rodata)
+SIGNAL_ITEMS := [?]struct { sig: process.Signal, label: string }{
+	{.Hangup, "Hang up (SIGHUP)"}, {.Interrupt, "Interrupt (SIGINT)"}, {.Quit, "Quit (SIGQUIT)"},
+	{.Terminate, "Terminate (SIGTERM)"}, {.Kill, "Kill (SIGKILL)…"}, {.Stop, "Stop (SIGSTOP)"}, {.Continue, "Continue (SIGCONT)"},
+	{.User1, "User 1 (SIGUSR1)"}, {.User2, "User 2 (SIGUSR2)"},
+}
+
+// Sends `sig` to the selected processes (an app's row: its first processes, as End task), with the guards of the others:
+// a kill is confirmed; a stop is not sent to Inspecteur, what it runs under or the display server (nothing could resume
+// them); a signal that may end them asks first.
+signal_selected :: proc(app: ^App, sig: process.Signal) {
+	#partial switch sig {
+	case .Kill:      kill_selected(app); return
+	case .Terminate: end_selected(app); return
+	}
+	c, ok := chosen_of_selection(app, whole = false)
+	defer chosen_free(&c)
+	if !ok { return }
+	#partial switch sig {
+	case .Stop:
+		for t in c.targets {
+			if guard_of(app, t.pid) != .None { say(app, "Not stopped: it is Inspecteur, runs it or draws the desktop, and nothing could resume it"); return }
+		}
+		send_signal(app, &c, sig)
+	case .Continue:
+		send_signal(app, &c, sig)
+	case:
+		signal_or_confirm(app, &c, sig)
+	}
 }
 
 // Asks the selected processes to end (SIGTERM).

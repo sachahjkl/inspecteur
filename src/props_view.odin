@@ -63,9 +63,11 @@ props_slice :: proc(labels: ^[Props_Tab]string) -> []string { return (cast([^]st
 
 @(private = "file")
 props_title :: proc(app: ^App, p: ^Proc, em: f32) {
-	// (on the bars' darker surface, a line under it: the title and its facts apart from the tabs)
-	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 3)), bg = surface("bar")})
-	if ui.row(.Center, {.Draw_Background, .Draw_Side_Bottom}, "###props_title") {
+	// (on the bars' darker surface, a line under it: the title and its facts apart from the tabs; the dialog's corners
+	// and rim kept, as the toolkit's strip across a dialog's top draws it)
+	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 3)), bg = surface("bar"), radius = em * ui.DIALOG_RADIUS_EM})
+	if ui.row(.Center, {}, "###props_title") {
+		ui.parent_box().custom = ui.dialog_top_draw
 		ui.spacer(ui.px(em))
 		glyph(app, lucide.INFO, em * 1.8, ui.color("accent"))
 		ui.spacer(ui.px(em * 0.4))

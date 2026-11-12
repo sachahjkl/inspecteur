@@ -371,3 +371,33 @@ live_mouse :: proc(c: ^cdp.Client, kind: string, x, y: f64) -> bool {
 	_, ok := cdp.call(c, "Input.dispatchMouseEvent", fmt.tprintf(`{{"type":%q,"x":%v,"y":%v,"button":"left","buttons":%d,"clickCount":1}}`, kind, x, y, kind == "mouseReleased" ? 0 : 1))
 	return ok
 }
+
+// Send a signal (the row's menu): SIGUSR1 to the test's own child, a sleep, which it ends (a sleep takes none). The row
+// is checked to be the child's first (select_child).
+live_send_signal :: proc(l: ^Live) {
+	c := &l.c
+	child, mark, started := start_child("61")
+	if !check(l, started, "start sleep %s, a child of this test", mark) { return }
+	reaped := false
+	defer if !reaped { _ = os.process_kill(child); _, _ = os.process_wait(child, SESSION_WAIT) }
+	pid := fmt.tprintf("%d", child.pid)
+	check(l, cdp.key(c, "Escape") && cdp.type_text(c, mark), "filter by its mark")
+	// (listed at the next sample)
+	listed := false
+	deadline := time.tick_add(time.tick_now(), READER_WAIT)
+	for !listed && time.tick_diff(time.tick_now(), deadline) > 0 {
+		listed = pid_cell(c, pid) >= 0
+		if !listed { time.sleep(SESSION_POLL) }
+	}
+	if !check(l, listed, "it is listed") { _ = cdp.key(c, "Escape"); return }
+	if !select_child(l, pid) { _ = cdp.key(c, "Escape"); return }
+	at := pid_cell(c, pid)
+	_, menu := cdp.call(c, "Toolkit.click", fmt.tprintf(`{{"name":"c1","index":%d,"button":"right"}}`, max(at, 0)))
+	check(l, at >= 0 && menu && cdp.wait_for(c, "Send a signal", SESSION_WAIT), "its menu has Send a signal")
+	check(l, cdp.click_text(c, "Send a signal") && cdp.wait_for(c, "User 1 (SIGUSR1)", SESSION_WAIT), "the signals, by their names")
+	if !check(l, cdp.click_text(c, "User 1 (SIGUSR1)"), "User 1 (SIGUSR1)") { return }
+	state, err := os.process_wait(child, SESSION_WAIT)
+	reaped = err == nil && state.exited
+	check(l, reaped && state.exit_code == 10, "it ends by SIGUSR1 (%d)", state.exit_code)
+	cdp.key(c, "Escape")
+}

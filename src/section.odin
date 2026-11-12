@@ -7,9 +7,12 @@ package inspecteur
 import "core:fmt"
 import "gt:ui"
 
-// The icon before a row's first cell: an app's icon by its desktop entry's name, else a glyph of Lucide.
+// The icon before a row's first cell: the first of its names the icon theme has (an app's desktop entry's Icon=, then
+// others: a service's own name, its family's), else a glyph of Lucide. The names are tried when the row is drawn: a
+// table of a hundred rows looks up the dozen in view.
 Row_Icon :: struct {
-	app:   string,   // in the data's arena (ui.table_data_clone)
+	app:   string,      // in the data's arena (ui.table_data_clone)
+	alts:  [2]string,   // the theme's names after it, in order (in the arena)
 	glyph: string,
 }
 
@@ -43,7 +46,11 @@ section_rows_reset :: proc(st: ^Section_Table, cols: int) {
 
 section_row :: proc(st: ^Section_Table, id: u64, search: string, icon := Row_Icon{}, tone := ui.Table_Tone.Normal) {
 	ui.table_data_row(&st.data, id, search, tone)
-	append(&st.icons, Row_Icon{app = ui.table_data_clone(&st.data, icon.app), glyph = icon.glyph})
+	append(&st.icons, Row_Icon{
+		app = ui.table_data_clone(&st.data, icon.app),
+		alts = {ui.table_data_clone(&st.data, icon.alts[0]), ui.table_data_clone(&st.data, icon.alts[1])},
+		glyph = icon.glyph,
+	})
 }
 
 // The table, its header and its rows. `empty`: what it says with no row and no filter.
@@ -74,7 +81,11 @@ row_icon_lead :: proc(t: ^ui.Table, row: int, size: f32) {
 	st := (^Section_Table)(t.lead_user)
 	app := st.app
 	icon := st.icons[row]
-	ic := icon.app != "" ? icon_of(app, icon.app) : Icon{}
+	ic: Icon
+	for name in ([3]string{icon.app, icon.alts[0], icon.alts[1]}) {
+		if name == "" { continue }
+		if ic = icon_of(app, name); ic.ok { break }
+	}
 	if ic.ok {
 		icon_box(ic, size, app.icons)
 	} else if icon.glyph != "" {

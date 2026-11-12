@@ -125,6 +125,7 @@ live_window :: proc(l: ^Live) {
 	// another one: Shift+Delete asks, Kill kills
 	check(l, cdp.key(c, "Escape"), "Escape clears the search")
 	if !live_kill(l) { return }
+	live_send_signal(l)
 
 	live_marks(l)
 	live_end_tree(l)

@@ -346,16 +346,12 @@ service_family :: proc(unit: string) -> Service_Family {
 }
 
 // A service's icon: its main process's app (as in Processes), else the person's theme's icon of the service's own name
-// ("bluetooth", "cups"), else of its family's, else its family's glyph.
+// ("bluetooth", "cups"), else of its family's, else its family's glyph (the row tries them when it is drawn).
 service_icon :: proc(app: ^App, u: Service) -> Row_Icon {
 	f := service_family(u.name)
+	entry := ""
 	if u.pid > 0 {
-		if p := find_pid(&app.sampler, u.pid); p != nil && p.entry >= 0 {
-			if name := app.catalog.entries[p.entry].icon; name != "" && icon_of(app, name).ok { return {app = name, glyph = f.glyph} }
-		}
+		if p := find_pid(&app.sampler, u.pid); p != nil && p.entry >= 0 { entry = app.catalog.entries[p.entry].icon }
 	}
-	for name in ([]string{service_stem(u.name), f.theme}) {
-		if name != "" && icon_of(app, name).ok { return {app = name, glyph = f.glyph} }
-	}
-	return {glyph = f.glyph}
+	return {app = entry, alts = {service_stem(u.name), f.theme}, glyph = f.glyph}
 }
