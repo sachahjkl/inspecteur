@@ -6,13 +6,20 @@ package inspecteur
 
 import "core:strings"
 
-// The name a selected row is pinned by: its app's for a group, its process's otherwise ("" for none).
+// The name a selected row is pinned by: its app's for a group and for a process of one (the Pinned section holds what
+// the others list at their top: apps and background processes; a process's name pinned inside a group showed nowhere),
+// its process's otherwise ("" for none).
 pin_name :: proc(app: ^App) -> string {
 	r, ok := selected_row(app)
 	if !ok { return "" }
+	t := &app.table
 	switch r.kind {
-	case .App:     return app.catalog.entries[app.table.groups[r.index].entry].name
-	case .Process: return app.sampler.procs[r.index].name
+	case .App:     return app.catalog.entries[t.groups[r.index].entry].name
+	case .Process:
+		if int(r.index) < len(t.owner) {
+			if o := t.owner[r.index]; o >= 0 { return app.catalog.entries[app.sampler.procs[o].entry].name }
+		}
+		return app.sampler.procs[r.index].name
 	case .Section:
 	}
 	return ""

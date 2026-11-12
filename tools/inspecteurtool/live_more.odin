@@ -282,6 +282,22 @@ click_last :: proc(c: ^cdp.Client, text: string) -> bool {
 }
 
 // The file comes to hold `text`.
+// The value of a preference in the file, once it is there (until SESSION_WAIT); "" otherwise.
+pref_line :: proc(path, name: string) -> string {
+	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
+	for time.tick_diff(time.tick_now(), deadline) > 0 {
+		data, err := os.read_entire_file(path, context.temp_allocator)
+		if err == nil {
+			rest := string(data)
+			for line in strings.split_lines_iterator(&rest) {
+				if len(line) > len(name) && strings.has_prefix(line, name) && line[len(name)] == '\t' { return line[len(name) + 1:] }
+			}
+		}
+		time.sleep(SESSION_POLL)
+	}
+	return ""
+}
+
 file_has :: proc(path, text: string) -> bool {
 	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
 	for time.tick_diff(time.tick_now(), deadline) > 0 {

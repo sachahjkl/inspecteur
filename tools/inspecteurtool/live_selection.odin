@@ -159,7 +159,9 @@ wait_allowed :: proc(pid: int, want: string) -> bool {
 }
 
 // Alt+P pins the test's own child: a Pinned section above the others shows it, the preference keeps its name; Alt+P
-// again unpins it. Nothing is signalled.
+// again unpins it. Nothing is signalled. The child is a background process, or a process of the app whose scope the
+// test runs in (a terminal's, on a desktop): then its app is pinned. The name is read from the preference, and the
+// window must say that one.
 live_pin :: proc(l: ^Live) {
 	c := &l.c
 	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
@@ -180,7 +182,8 @@ live_pin :: proc(l: ^Live) {
 	if !check(l, listed, "it is listed") { _ = cdp.key(c, "Escape"); return }
 	if !select_child(l, pid) { _ = cdp.key(c, "Escape"); return }
 	check(l, cdp.key(c, "alt+p") && cdp.wait_for(c, "Pinned (1)", SESSION_WAIT), "Alt+P pins it: a Pinned section")
-	check(l, file_has(prefs, "processes.pinned\tsleep"), "the preference keeps its name")
+	name := pref_line(prefs, "processes.pinned")
+	check(l, name != "" && cdp.wait_for(c, fmt.tprintf("%s is pinned over the others", name), SESSION_WAIT), "the preference keeps its name, the one the window says (%q)", name)
 	check(l, cdp.key(c, "alt+p") && cdp.wait_for(c, "Pinned (1)", SESSION_WAIT, gone = true), "Alt+P again unpins it")
 	check(l, cdp.key(c, "Escape"), "Escape clears the filter")
 }
