@@ -98,11 +98,10 @@ settings_preview :: proc(user: rawptr, name: string, value: f64) {
 	}
 }
 
-// A preference was set or reset: saved, read again, and what it changes applied.
+// A preference was set or reset: read again, and what it changes applied (the loop writes the file).
 @(private = "file")
 settings_changed :: proc(user: rawptr, name: string) {
 	app := (^App)(user)
-	if !config.save_user(&app.prefs, prefs_file()) { say(app, "The preferences cannot be written") }
 	old := app.settings
 	app.settings = prefs_read(&app.prefs)
 	switch name {

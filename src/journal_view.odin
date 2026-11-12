@@ -264,7 +264,7 @@ journal_entry_text :: proc(app: ^App, e: Journal_Entry) -> string {
 
 journal_level_set :: proc(app: ^App, l: Journal_Level) {
 	app.settings.journal_level = l
-	pref_save(&app.prefs, "services.journal_level", JOURNAL_LEVEL_KEYS[l])
+	pref_set(&app.prefs, "services.journal_level", JOURNAL_LEVEL_KEYS[l])
 	for v in journal_views(app) {
 		v.vl.sel = -1
 		ui.vlist_scroll_to(&v.vl, max(f32))
@@ -274,7 +274,7 @@ journal_level_set :: proc(app: ^App, l: Journal_Level) {
 
 journal_boot_set :: proc(app: ^App, boot: bool) {
 	app.settings.journal_boot = boot
-	pref_save(&app.prefs, "services.journal_boot", boot ? "true" : "false")
+	pref_set(&app.prefs, "services.journal_boot", boot ? "true" : "false")
 	// (each view read again, back to its end once read)
 	app.services.pane.shown_for = 0
 	if u, ok := selected_service(app); ok { details_ask(app, u.name) }
@@ -311,7 +311,7 @@ journal_run_on :: proc(app: ^App, v: ^Journal_View, c: Cmd) {
 	case .Journal_Boot:   journal_boot_set(app, !app.settings.journal_boot)
 	case .Journal_Follow:
 		app.settings.journal_follow = !app.settings.journal_follow
-		pref_save(&app.prefs, "services.journal_follow", app.settings.journal_follow ? "true" : "false")
+		pref_set(&app.prefs, "services.journal_follow", app.settings.journal_follow ? "true" : "false")
 		for w in journal_views(app) { w.next = time.tick_now() }
 		say(app, app.settings.journal_follow ? "Following the journal: new entries come in at the end" : "The journal is not read again")
 	case .Journal_Copy:

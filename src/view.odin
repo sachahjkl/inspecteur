@@ -229,7 +229,7 @@ group_toggle :: proc(app: ^App, r: Row) {
 tree_view_switch :: proc(app: ^App) {
 	app.table.tree = !app.table.tree
 	app.settings.tree = app.table.tree
-	pref_save(&app.prefs, "processes.view", app.table.tree ? "tree" : "apps")
+	pref_set(&app.prefs, "processes.view", app.table.tree ? "tree" : "apps")
 	tab_show(app, .Processes)
 	rows_again(app)
 	app.vl.reveal = REVEAL_BUILDS
@@ -493,7 +493,7 @@ theme_button :: proc(app: ^App, em: f32) {
 				if ui.menu_item(t.name, checked = app.settings.theme == t.name).clicked {
 					delete(app.settings.theme)
 					app.settings.theme = strings.clone(t.name)
-					pref_save(&app.prefs, "view.theme", t.name)
+					pref_set(&app.prefs, "view.theme", t.name)
 				}
 			}
 		}
@@ -528,7 +528,7 @@ refresh_pause :: proc(app: ^App, pause: bool) {
 // Sets the refresh's period (written to processes.refresh_ms); the refresh resumes.
 refresh_speed_set :: proc(app: ^App, ms: int) {
 	app.settings.refresh_ms = ms
-	pref_save(&app.prefs, "processes.refresh_ms", fmt.tprintf("%d", ms))
+	pref_set(&app.prefs, "processes.refresh_ms", fmt.tprintf("%d", ms))
 	app.paused = false
 	app.next_sample = time.tick_add(time.tick_now(), time.Duration(ms) * time.Millisecond)
 	say(app, "Refresh every %s: the graphs span %s", refresh_text(app), span_text(HISTORY_POINTS, ms))
@@ -571,6 +571,6 @@ zoom_follow :: proc(app: ^App) {
 	for w in app.journal_windows { ui.set_zoom(&w.state, z) }
 	if abs(z - app.settings.zoom) < 0.001 { return }
 	app.settings.zoom = z
-	pref_save(&app.prefs, "view.zoom", fmt.tprintf("%.3f", z))
+	pref_set(&app.prefs, "view.zoom", fmt.tprintf("%.3f", z))
 	say(app, "Zoom %.0f %%%s", z * 100, abs(z - 1) < 0.001 ? "" : " (Ctrl+0: 100 %)")
 }

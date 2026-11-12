@@ -55,7 +55,7 @@ service_details_build :: proc(app: ^App, em: f32) {
 	ui.next({width = ui.fill()})
 	split := ui.splitter("###svc_split", .Y, &h, DETAILS_MIN_EM, DETAILS_MAX_EM, {after = true, unit = em, flush = true, line_at = .Start})
 	if split.changed { app.settings.details_em = h }
-	if split.finished { pref_save(&app.prefs, "services.details_height", fmt.tprintf("%.1f", h)) }
+	if split.finished { pref_set(&app.prefs, "services.details_height", fmt.tprintf("%.1f", h)) }
 	ui.next({width = ui.fill(), height = ui.px(em * app.settings.details_em), axis = .Y, bg = surface("well")})
 	pane := ui.build_box({.Clip, .Draw_Background, .Draw_Side_Top}, "###svc_pane")
 	if ui.parent(pane) { service_details_body(app, u, selected, d, em) }
@@ -100,7 +100,7 @@ DETAILS_MAX_EM :: 80
 // Shows or hides the pane of the details (written to services.details).
 service_details_switch :: proc(app: ^App) {
 	app.settings.details = !app.settings.details
-	pref_save(&app.prefs, "services.details", app.settings.details ? "true" : "false")
+	pref_set(&app.prefs, "services.details", app.settings.details ? "true" : "false")
 	app.services.details_for = 0
 	tab_show(app, .Services)
 	say(app, app.settings.details ? "The selected service's details and journal" : "Details hidden")
@@ -179,7 +179,7 @@ services_switch :: proc(app: ^App, m: Manager) {
 	if s.manager == m { return }
 	s.manager = m
 	app.settings.manager = m
-	pref_save(&app.prefs, "services.manager", MANAGER_KEYS[m])
+	pref_set(&app.prefs, "services.manager", MANAGER_KEYS[m])
 	s.rows.table.vl.sel = -1
 	services_rows(app)
 	services_ask(app)

@@ -166,11 +166,10 @@ settings_free :: proc(s: ^Settings) {
 	s^ = {}
 }
 
-// Sets a preference to `value` and writes the user's file: what the window changes (the columns, the theme's version)
-// is there at the next start. False: the value is refused, or the file cannot be written.
-pref_save :: proc(p: ^config.Prefs, name, value: string) -> bool {
-	if config.set_from_string(p, name, value, .User) != .None { return false }
-	return config.save_user(p, prefs_file())
+// Sets a preference to `value`: what the window changes (the columns, the theme's version) is there at the next start
+// (the loop's writer writes the user's file: config.user_writer_save). False: the value is refused.
+pref_set :: proc(p: ^config.Prefs, name, value: string) -> bool {
+	return config.set_from_string(p, name, value, .User) == .None
 }
 
 // The table's columns from the settings: those shown, their widths, the sort.
@@ -216,13 +215,12 @@ section_layout_load :: proc(t: ^ui.Table, p: ^config.Prefs, section: string) {
 	ui.table_sort_apply(&t.layout, keys, config.string_of(p, fmt.tprintf("%s.sort", section)))
 }
 
-// A section's table's widths, columns' order and sort, written to the preferences.
+// A section's table's widths, columns' order and sort, into the preferences.
 section_layout_save :: proc(t: ^ui.Table, p: ^config.Prefs, section: string) {
 	keys := section_column_keys(t.columns)
 	config.set_from_string(p, fmt.tprintf("%s.widths", section), ui.table_widths_text(&t.layout, keys), .User)
 	config.set_from_string(p, fmt.tprintf("%s.order", section), ui.table_order_text(&t.layout, keys), .User)
 	config.set_from_string(p, fmt.tprintf("%s.sort", section), ui.table_sort_text(&t.layout, keys), .User)
-	config.save_user(p, prefs_file())
 }
 
 // "Remote address" is remote_address (temporary allocator).
@@ -235,7 +233,7 @@ section_column_keys :: proc(columns: []ui.Table_Column) -> []string {
 	return out
 }
 
-// The table's columns into the preferences, written.
+// The table's columns into the preferences.
 table_layout_save :: proc(t: ^Table, p: ^config.Prefs) {
 	v := table_layout_values(t)
 	config.set_from_string(p, "processes.columns", v.columns, .User)
@@ -243,5 +241,4 @@ table_layout_save :: proc(t: ^Table, p: ^config.Prefs) {
 	config.set_from_string(p, "processes.order", v.order, .User)
 	config.set_from_string(p, "processes.sort", v.sort, .User)
 	config.set_from_string(p, "processes.descending", v.descending ? "true" : "false", .User)
-	config.save_user(p, prefs_file())
 }

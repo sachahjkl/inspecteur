@@ -221,7 +221,7 @@ palette_build :: proc(app: ^App) {
 		append(&enabled, true)
 	}
 	i, resized := ui.palette(&app.palette, list[:], enabled[:])
-	if resized { pref_save(&app.prefs, "view.palette_size", fmt.tprintf("%.0f %.0f", app.palette.size.x, app.palette.size.y)) }
+	if resized { pref_set(&app.prefs, "view.palette_size", fmt.tprintf("%.0f %.0f", app.palette.size.x, app.palette.size.y)) }
 	switch {
 	case i >= commands:
 		app.settings_open = true
@@ -398,13 +398,13 @@ THEME_OF_BOTH :: "Silver"
 // way to THEME_OF_BOTH: the choice is seen, and the footer says why the theme changed.
 mode_set :: proc(app: ^App, mode: ui.Theme_Mode) {
 	app.settings.mode = mode
-	pref_save(&app.prefs, "view.mode", THEME_MODE_KEYS[mode])
+	pref_set(&app.prefs, "view.mode", THEME_MODE_KEYS[mode])
 	def, _, ok := ui.theme_find(ui.THEMES[:], app.settings.theme)
 	lacks := ok && (def.versions == .Dark_Only && mode == .Light || def.versions == .Light_Only && mode == .Dark)
 	if lacks {
 		old := app.settings.theme
 		app.settings.theme = strings.clone(THEME_OF_BOTH)
-		pref_save(&app.prefs, "view.theme", THEME_OF_BOTH)
+		pref_set(&app.prefs, "view.theme", THEME_OF_BOTH)
 		say(app, "%s colours: %s has no %s version, %s has", mode == .Light ? "Light" : "Dark", old, mode == .Light ? "light" : "dark", THEME_OF_BOTH)
 		delete(old)
 		return

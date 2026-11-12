@@ -101,7 +101,7 @@ summary_tile :: proc(app: ^App, t: Tile, em: f32) {
 // Shows or hides the summary (written to processes.summary).
 summary_switch :: proc(app: ^App) {
 	app.settings.summary = !app.settings.summary
-	pref_save(&app.prefs, "processes.summary", app.settings.summary ? "true" : "false")
+	pref_set(&app.prefs, "processes.summary", app.settings.summary ? "true" : "false")
 	tab_show(app, .Processes)
 	say(app, app.settings.summary ? "The summary of the machine is shown" : "The summary of the machine is hidden")
 }

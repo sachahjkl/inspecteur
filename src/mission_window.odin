@@ -128,5 +128,5 @@ mission_windows_close :: proc(app: ^App) {
 mission_windows_save :: proc(app: ^App) {
 	names := make([dynamic]string, context.temp_allocator)
 	for w in app.mission_windows { append(&names, MISSION_NAMES[w.panel]) }
-	pref_save(&app.prefs, "mission.windows", strings.join(names[:], ",", context.temp_allocator))
+	pref_set(&app.prefs, "mission.windows", strings.join(names[:], ",", context.temp_allocator))
 }

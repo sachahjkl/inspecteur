@@ -67,7 +67,7 @@ setup_build :: proc(app: ^App, em: f32) {
 
 @(private = "file")
 setup_choice :: proc(app: ^App, choice: string) {
-	pref_save(&app.prefs, "setup.choice", choice)
+	pref_set(&app.prefs, "setup.choice", choice)
 	delete(app.settings.setup_choice)
 	app.settings.setup_choice = fmt.aprintf("%s", choice)
 }

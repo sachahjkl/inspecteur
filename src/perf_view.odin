@@ -133,7 +133,7 @@ cpu_grid_switch :: proc(app: ^App) {
 
 cpu_grid_set :: proc(app: ^App, on: bool) {
 	app.cpu_grid = on
-	pref_save(&app.prefs, "performance.cpu_view", on ? "logical" : "overall")
+	pref_set(&app.prefs, "performance.cpu_view", on ? "logical" : "overall")
 }
 
 // A device that went (an interface, a GPU no longer read): back to the CPU.

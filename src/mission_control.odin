@@ -90,7 +90,7 @@ mission_name :: proc(user: rawptr, id: u32) -> string {
 mission_save :: proc(user: rawptr, d: ^ui.Dock) {
 	app := (^App)(user)
 	text := ui.dock_format(d, mission_name, app)
-	pref_save(&app.prefs, "mission.layout", text)
+	pref_set(&app.prefs, "mission.layout", text)
 	delete(app.settings.mission_layout)
 	app.settings.mission_layout = strings.clone(text)
 }

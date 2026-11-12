@@ -42,6 +42,7 @@ App :: struct {
 	main:        host.Host,
 	icons:       font.Font_Id,      // Lucide
 	prefs:       config.Prefs,
+	prefs_writer: config.User_Writer,   // writes the user's file off the loop: each round saves what changed
 	settings:    Settings,
 	devtools:    ^devtools.Server,  // TOOLKIT_DEVTOOLS=<port>: driven and captured over the Chrome DevTools Protocol
 	theme_shown: ui.Theme_Shown,
@@ -161,6 +162,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 		fmt.eprintln("inspecteur: no window")
 		return 1
 	}
+	// (from here the program ends through the loop's end, which stops the writer)
+	config.user_writer_start(&app.prefs_writer, &app.prefs, prefs_file())
 	h := &app.main
 	win := h.win
 	app.icons, _ = font.load_embedded(&app.shared.fonts, lucide.DATA)
@@ -219,13 +222,17 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 		zoom_follow(app)
 		app.frame_time += time.tick_since(t_frame)
 		app.frames += 1
+		// (what this round changed in the preferences: the writer's thread writes the file)
+		config.user_writer_save(&app.prefs_writer, &app.prefs)
+		if config.user_writer_failed(&app.prefs_writer) { say(app, "The preferences cannot be written") }
 	}
 
 	if opts.first_frame {
 		mean :: proc(d: time.Duration, n: int) -> f64 { return n > 0 ? time.duration_milliseconds(d) / f64(n) : 0 }
 		fmt.printfln("costs: %d samples, %.2f ms each; %d frames, %.2f ms each", app.refreshes, mean(app.refresh_time, app.refreshes), app.frames, mean(app.frame_time, app.frames))
 	}
-	if app.demo == nil { pref_save(&app.prefs, "view.placement", platform.placement_text(platform.get_placement(win))) }
+	if app.demo == nil { pref_set(&app.prefs, "view.placement", platform.placement_text(platform.get_placement(win))) }
+	if !config.user_writer_stop(&app.prefs_writer, &app.prefs) { fmt.eprintln("inspecteur: the preferences cannot be written") }
 	devtools.stop(app.devtools)
 	one_copy_stop(app)
 	journal_windows_close(app)
@@ -311,7 +318,7 @@ rows_again :: proc(app: ^App) {
 tab_show :: proc(app: ^App, tab: Tab) {
 	if app.tab == tab { return }
 	app.tab = tab
-	pref_save(&app.prefs, "view.section", strings.to_lower(TAB_LABELS[tab], context.temp_allocator))
+	pref_set(&app.prefs, "view.section", strings.to_lower(TAB_LABELS[tab], context.temp_allocator))
 	section_first_show(app)
 	if tab == .Performance { gpu_want(&app.machine.gpu, true) }
 }

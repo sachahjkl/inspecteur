@@ -47,7 +47,7 @@ pin_switch :: proc(app: ^App) {
 	}
 	names := make([dynamic]string, context.temp_allocator)
 	for n in t.pinned { append(&names, n) }
-	pref_save(&app.prefs, "processes.pinned", strings.join(names[:], ",", context.temp_allocator))
+	pref_set(&app.prefs, "processes.pinned", strings.join(names[:], ",", context.temp_allocator))
 	rows_again(app)
 	say(app, pinned ? "%s is pinned over the others" : "%s is unpinned", name)
 }
