@@ -204,7 +204,7 @@ live_kill :: proc(l: ^Live) -> bool {
 // pressed when this fails.
 select_child :: proc(l: ^Live, pid: string) -> bool {
 	c := &l.c
-	at := pid_cell(c, pid)
+	at := wait_pid_cell(c, pid)
 	if !check(l, at >= 0, "its PID cell is in view") { return false }
 	_, ok := cdp.call(c, "Toolkit.click", fmt.tprintf(`{{"name":"c1","index":%d}}`, at))
 	if !check(l, ok, "click its PID cell") { return false }
@@ -218,6 +218,15 @@ select_child :: proc(l: ^Live, pid: string) -> bool {
 // name and place: the pid's text could be inside the mark of the command line.)
 // The last row whose PID cell says `pid`: the process's own (an app's group shows its first process's PID too, above
 // it: another Inspecteur of the session makes Inspecteur a group).
+// pid_cell's, waited for until READER_WAIT: a process the test just started is listed at the next sample.
+wait_pid_cell :: proc(c: ^cdp.Client, pid: string) -> int {
+	deadline := time.tick_add(time.tick_now(), READER_WAIT)
+	for {
+		if at := pid_cell(c, pid); at >= 0 || time.tick_diff(time.tick_now(), deadline) <= 0 { return at }
+		time.sleep(SESSION_POLL)
+	}
+}
+
 pid_cell :: proc(c: ^cdp.Client, pid: string) -> int {
 	at := -1
 	for b, i in cdp.find_name(c, "c1") { if b.text == pid { at = i } }

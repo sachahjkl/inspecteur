@@ -282,7 +282,7 @@ wait_page_pixel_not :: proc(c: ^cdp.Client, before: u32) -> bool {
 select_named :: proc(l: ^Live, pid, name: string) -> bool {
 	c := &l.c
 	time.sleep(DOUBLE_CLICK_GAP)
-	at := pid_cell(c, pid)
+	at := wait_pid_cell(c, pid)
 	if !check(l, at >= 0, "its PID cell is in view") { return false }
 	_, ok := cdp.call(c, "Toolkit.click", fmt.tprintf(`{{"name":"c1","index":%d}}`, at))
 	cdp.wait_idle(c, SESSION_WAIT)
