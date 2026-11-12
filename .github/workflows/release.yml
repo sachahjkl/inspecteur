@@ -38,10 +38,14 @@ jobs:
           UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
         run: build/inspecteurtool package ${{ github.ref_name }}
 
+      # (gh asks git for the repository: in the container the checkout is another user's, which git refuses unless it is
+      # said safe; GH_REPO names the repository besides)
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           build/inspecteurtool notes ${{ github.ref_name }} > build/notes.md
           if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
             gh release upload "${{ github.ref_name }}" build/dist/* --clobber
