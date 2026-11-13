@@ -76,7 +76,7 @@ Props :: struct {
 	shown_of:   int,       // the reading they are of (serial)
 	shown_tab:  Props_Tab,
 	shown_query: string,   // owned
-	title_bg:   ui.Color,  // the title strip's colour (ui.dialog_top_draw reads it while the frame is drawn)
+	title_bg:   ui.Color,  // the title strip's colour (ui.top_strip_draw reads it while the frame is drawn)
 }
 
 // A priority offered (PRIORITIES, the system's: system_linux.odin): its name and its value as a nice value (-20 the

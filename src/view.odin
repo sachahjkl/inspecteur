@@ -322,18 +322,11 @@ build_sidebar :: proc(app: ^App, em: f32) {
 // The filter, at the top of the sidebar. Typing anywhere goes to it.
 @(private = "file")
 build_filter :: proc(app: ^App, em: f32) {
-	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * BAR_EM))})
-	if ui.row(.Center, {.Draw_Side_Bottom}, "###filter") {
-		ui.spacer(ui.px(em * 0.5))
-		if ui.tags("weak") { ui.icon(lucide.SEARCH, em * 1.6) }
-		ui.next({width = ui.fill(), height = ui.pct(1)})
-		if ui.tags("bare") {
-			res := ui.line_edit("###search", &app.search, {placeholder = i18n.tr(FILTER_HINTS[tab_listed(app.tab) ? app.tab : .Processes])})
-			app.search_key = res.box.key
-			tip_after(res, i18n.tr("Filter: type anywhere (Ctrl+F); Escape clears it"))
-		}
-		ui.spacer(ui.px(em * 0.4))
-	}
+	// (the toolkit's band over a list, as tall as the bars)
+	ui.next({height = ui.px(ui.dense(em * BAR_EM))})
+	res := ui.search_band("filter", &app.search, {placeholder = i18n.tr(FILTER_HINTS[tab_listed(app.tab) ? app.tab : .Processes])})
+	app.search_key = res.box.key
+	tip_after(res, i18n.tr("Filter: type anywhere (Ctrl+F); Escape clears it"))
 	if q := strings.to_lower(ui.line_edit_string(&app.search), context.temp_allocator); q != app.query {
 		query_set(app, q)
 		// (a section with no table: the filter is for the processes)

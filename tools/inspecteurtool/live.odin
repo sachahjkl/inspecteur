@@ -86,7 +86,7 @@ live_window :: proc(l: ^Live) {
 	live_connections(l)
 	live_information(l)
 	live_performance(l)
-	check(l, cdp.click_text(c, "Processes"), "the Processes section")
+	check(l, cdp.click_name(c, "side_1"), "the Processes section")   // (by name: the filter's hint, "Filter processes...", says the word too)
 	check(l, cdp.wait_for(c, "Background processes", SESSION_WAIT), "its table is there")
 	live_columns(l)
 	live_theme(l)

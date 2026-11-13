@@ -68,9 +68,9 @@ props_title :: proc(app: ^App, p: ^Proc, em: f32) {
 	// (on the bars' darker surface, a line under it: the title and its facts apart from the tabs; the dialog's corners
 	// and rim kept, as the toolkit's strip across a dialog's top draws it)
 	app.props.title_bg = surface("bar")
-	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 3)), radius = em * ui.DIALOG_RADIUS_EM})
+	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 3)), radius = 0})
 	if ui.row(.Center, {}, "###props_title") {
-		ui.parent_box().custom = ui.dialog_top_draw
+		ui.parent_box().custom = ui.top_strip_draw
 		ui.parent_box().custom_user = &app.props.title_bg
 		ui.spacer(ui.px(em))
 		ui.icon(lucide.INFO, em * 1.8, ui.color("accent"))

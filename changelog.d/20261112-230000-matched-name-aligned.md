@@ -1,3 +1,0 @@
-type: Fixed
-
-**A name the filter finds is aligned with its row**: the lit name of an app or a process sat higher than the rest of its row (gui_toolkit 0.216.1).

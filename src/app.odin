@@ -79,6 +79,7 @@ App :: struct {
 	bar_rect:    ui.Rect,           // the Processes section's bar, as last laid out (the columns' menu opens under it)
 	palette:     ui.Command_Palette,   // the command palette (commands.odin)
 	palette_table: Palette_Table,   // its list, made again only when it changes (commands.odin)
+	palette_choices: ui.Choice_Memory,   // what the user chose in it before (palette_choices_file)
 	sheet:       ui.Shortcuts_Sheet,   // the sheet of the keys (commands.odin)
 	sheet_commands: [dynamic]ui.Command,   // its list, made at its first opening
 	diagnosis_open: bool,   // "Why is it slow?" (F2, diagnosis.odin)
@@ -188,6 +189,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 		app.logo.ok = true
 	}
 	h.state.icon_font = app.icons
+	// (the file is read by a task: the window's state is made, its chores run it)
+	ui.choice_memory_open(&app.palette_choices, &h.state, palette_choices_file(app))
 	h.after_input = FRAMES_AFTER_INPUT
 	// (the zoom, the rounding, the scrolling, the delays, partial redraw...: applied now, then each as it changes;
 	// inspecteur's own defaults are settings.odin's OWN_DEFAULTS)
@@ -288,6 +291,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	ui.shortcuts_sheet_destroy(&app.sheet)
 	delete(app.sheet_commands)
 	palette_table_destroy(&app.palette_table)
+	// (it writes what changed and waits for its writer's thread: the window is closed by now)
+	ui.choice_memory_close(&app.palette_choices)
 	settings_free(&app.settings)
 	prefs_page.standard_unwatch(&app.standard)
 	config.prefs_destroy(&app.prefs)

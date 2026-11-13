@@ -10,10 +10,12 @@ package inspecteur
 
 import "core:fmt"
 import "core:mem/virtual"
+import "core:reflect"
 import "core:slice"
 import "core:strings"
 import i18n "gt:i18n"
 import lucide "gt:lucide"
+import "gt:platform"
 import prefs_page "gt:prefs_page"
 import "gt:ui"
 import update "gt:update"
@@ -208,6 +210,13 @@ commands_keys :: proc(app: ^App, field_keeps: bool) {
 // Opens the command palette.
 palette_open :: proc(app: ^App) { ui.palette_open(&app.palette) }
 
+// Where the palette's choices are kept: <state>/inspecteur/palette_choices; none (in memory only) in the demo, whose
+// pictures must not depend on what the user chose.
+palette_choices_file :: proc(app: ^App) -> string {
+	if app.demo != nil { return "" }
+	return strings.concatenate({platform.user_dir(.State, APP_NAME, context.temp_allocator), "/palette_choices"}, context.temp_allocator)
+}
+
 // The palette's list: the commands of the window, of the sections and of the section shown, then one line per
 // preference (prefs_page.palette_commands). It is made again only when what it holds can change: the section shown, the
 // preferences (their version) or the language (the settings' group is translated text), never at each frame. Its
@@ -216,7 +225,8 @@ Palette_Table :: struct {
 	arena:    virtual.Arena,
 	commands: []ui.Command,
 	cmds:     []Cmd,        // the command of each line before the settings'
-	names:    []string,     // the preferences' names, the lines after `cmds`
+	settings: []string,     // the preferences' names, the lines after `cmds`
+	names:    []string,     // line -> its key in the memory of choices (a command's enum name, stable across languages; "" for a setting: not remembered)
 	disabled: [dynamic]bool,   // per line, filled at each frame: what can act depends on the selection
 	tab:      Tab,          // what it was made for
 	prefs:    u64,
@@ -230,18 +240,22 @@ palette_table_make :: proc(table: ^Palette_Table, app: ^App) {
 	a := virtual.arena_allocator(&table.arena)
 	commands := make([dynamic]ui.Command, a)
 	cmds := make([dynamic]Cmd, a)
+	names := make([dynamic]string, a)
 	for c in Cmd {
 		if cmd_is_props(c) || c == .Palette { continue }
 		if t, ok := cmd_tab(c).?; ok && t != app.tab { continue }
 		append(&commands, COMMANDS[c])
 		append(&cmds, c)
+		// (the enum's name: static text, the same in every language and every section)
+		append(&names, reflect.enum_string(c))
 	}
 	// the settings too, each a line under "Settings · <page>": chosen, the page opens on it alone
-	settings, names := prefs_page.palette_commands(&app.prefs, settings_options(app), a)
+	settings, setting_names := prefs_page.palette_commands(&app.prefs, settings_options(app), a)
 	append(&commands, ..settings)
-	table.commands, table.cmds = commands[:], cmds[:]
-	table.names = make([]string, len(names), a)
-	for n, i in names { table.names[i] = strings.clone(n, a) }
+	for _ in settings { append(&names, "") }
+	table.commands, table.cmds, table.names = commands[:], cmds[:], names[:]
+	table.settings = make([]string, len(setting_names), a)
+	for n, i in setting_names { table.settings[i] = strings.clone(n, a) }
 	resize(&table.disabled, len(table.commands))
 	table.tab, table.prefs, table.language = app.tab, app.prefs.version, i18n.current()
 	table.version += 1
@@ -261,14 +275,16 @@ palette_build :: proc(app: ^App) {
 		palette_table_make(table, app)
 	}
 	for c, i in table.cmds { table.disabled[i] = !cmd_can(app, c) }
-	i, resized := ui.palette(&app.palette, table.commands, table.disabled[:], {version = table.version})
+	// (the memory's own version counts its changes: the palette reads it beside the table's)
+	i, resized := ui.palette(&app.palette, table.commands, table.disabled[:], {memory = &app.palette_choices, names = table.names, version = table.version})
 	if resized { pref_set(&app.prefs, "view.palette_size", fmt.tprintf("%.0f %.0f", app.palette.size.x, app.palette.size.y)) }
 	commands := len(table.cmds)
 	switch {
 	case i >= commands:
 		app.settings_open = true
-		prefs_page.show(&app.settings_page, &app.prefs, settings_options(app), table.names[i - commands])
+		prefs_page.show(&app.settings_page, &app.prefs, settings_options(app), table.settings[i - commands])
 	case i >= 0:
+		ui.choice_note(&app.palette_choices, table.names[i])
 		cmd_run(app, table.cmds[i])
 	}
 }
