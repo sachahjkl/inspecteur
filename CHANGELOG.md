@@ -3,6 +3,11 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.4.2] - 2026-11-13
+
+### Changed
+- **One licence at one price, and a new pricing page**: the inspecteur licence is now one edition at 15 €, paid once, taxes included; the Patron edition is gone. The pricing page shows inspecteur's icon and name, one card with the price, what the licence gives as a list, one button, then "Before you buy". The licence is named "inspecteur licence" on the site, at checkout and in the licence file.
+
 ## [0.4.1] - 2026-11-13
 
 ### Fixed
@@ -182,6 +187,7 @@ and the versions follow [semantic versioning](https://semver.org/).
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.4.2]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.4.2
 [0.4.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.4.1
 [0.4.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.4.0
 [0.3.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.3.0
