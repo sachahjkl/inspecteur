@@ -18,9 +18,9 @@ PROPS_KEY_EM                   :: 11   // the General tab's labels
 
 props_build :: proc(app: ^App, em: f32) {
 	pp := &app.props
-	if ui.modal_sized("properties", {em * PROPS_W_EM, em * PROPS_H_EM} * ui.scale(), &pp.size, &pp.open, {em * PROPS_MIN_W_EM, em * PROPS_MIN_H_EM} * ui.scale()) {
+	if ui.modal("properties", &pp.open, {width_em = PROPS_W_EM, height_em = PROPS_H_EM, min_width_em = PROPS_MIN_W_EM, min_height_em = PROPS_MIN_H_EM, size = &pp.size}) {
 		// (its keys inside it: an open dialog holds the keys, the code built outside it gets none)
-		if !app.menu.confirm.open && !app.affinity.open && !ui.ctx_menu_any_open() { props_keys(app) }
+		if !app.menu.confirm.open && !app.affinity.open && !ui.menu_any_open() { props_keys(app) }
 		p := find_proc(&app.sampler, pp.pid, pp.start)
 		if p != nil && !pp.gone && (pp.data == nil || pp.tab != pp.data.read_tab) { props_read(app) }   // (a tab shown is read at once)
 		ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
@@ -83,7 +83,7 @@ props_title :: proc(app: ^App, p: ^Proc, em: f32) {
 			ui.label(fmt.tprintf("%s%s###props_pid", fmt.tprintf(i18n.tr("PID %d"), app.props.pid), p != nil ? fmt.tprintf("  ·  %s", state_text(p.state)) : ""))
 		}
 		ui.next({width = ui.px(em * 2.2), height = ui.px(em * 2.2)})
-		if ui.icon_button("###props_close", lucide.X, face = .Ghost, tip = cmd_tip(.Props_Close)).clicked { app.props.open = false }
+		if ui.button("props_close", icon = lucide.X, o = {face = .Ghost, tip = cmd_tip(.Props_Close)}).clicked { app.props.open = false }
 		ui.spacer(ui.px(em * 0.6))
 	}
 }
@@ -223,7 +223,7 @@ props_list :: proc(app: ^App, id: string, titles: []string, widths: []f32, count
 	// (the rows the filter keeps, a row whose cells hold its text: made again when the reading, the tab or the filter
 	// changes, not at each frame)
 	n := count(d)
-	q := strings.to_lower(ui.field_string(&pp.filter), context.temp_allocator)
+	q := strings.to_lower(ui.line_edit_string(&pp.filter), context.temp_allocator)
 	if pp.shown_of != pp.serial || pp.shown_tab != pp.tab || pp.shown_query != q {
 		pp.shown_of, pp.shown_tab = pp.serial, pp.tab
 		delete(pp.shown_query)
@@ -326,7 +326,7 @@ props_actions :: proc(app: ^App, p: ^Proc, em: f32) {
 			ui.spacer(ui.px(em * 0.5))
 			names: [len(PRIORITIES)]string
 			for q, i in PRIORITIES { names[i] = i18n.tr(q.name) }
-			if !ui.ctx_menu_any_open() { pp.nice_sel = priority_index(p.nice) }
+			if !ui.menu_any_open() { pp.nice_sel = priority_index(p.nice) }
 			ui.next({width = ui.px(em * 11), height = ui.px(ui.dense(em * 2.1))})
 			if ui.dropdown("###priority", names[:], &pp.nice_sel) { set_priority(app, p, PRIORITIES[pp.nice_sel].nice) }
 			hover_tip("priority", fmt.tprintf("%s (%s), %s (%s)", cmd_label(.Props_Raise_Priority), ui.command_shortcut(COMMANDS[.Props_Raise_Priority]), cmd_label(.Props_Lower_Priority), ui.command_shortcut(COMMANDS[.Props_Lower_Priority])))
@@ -354,7 +354,7 @@ props_actions :: proc(app: ^App, p: ^Proc, em: f32) {
 // A button of the foot: its icon and its label, its colour as strong as what it does (`intent`); its tooltip says its key.
 @(private = "file")
 props_button :: proc(app: ^App, id, icon, label: string, c: Cmd, em: f32, intent := ui.Intent.Neutral) -> bool {
-	return ui.button_icon(id, icon, label, intent = intent, height = ui.dense(em * 2.1), tip = fmt.tprintf("%s (%s)", label, ui.command_shortcut(COMMANDS[c]))).clicked
+	return ui.button(id, label, icon, {intent = intent, height = ui.dense(em * 2.1), tip = fmt.tprintf("%s (%s)", label, ui.command_shortcut(COMMANDS[c]))}).clicked
 }
 
 // The keys of the dialog (the Properties group of commands.odin). While its filter has the keyboard and some text, the
@@ -366,7 +366,7 @@ props_keys :: proc(app: ^App) {
 	for c in Cmd {
 		if !cmd_is_props(c) || c == .Props_Close { continue }   // (Escape: the dialog's own)
 		if keeps && (c == .Props_End_Task || c == .Props_Kill) { continue }
-		if ui.command_pressed(COMMANDS[c], cmd_can(app, c)) { cmd_run(app, c) }
+		if ui.command_pressed(COMMANDS[c], !cmd_can(app, c)) { cmd_run(app, c) }
 	}
 }
 
@@ -375,7 +375,7 @@ props_keys :: proc(app: ^App) {
 props_filter_field :: proc(app: ^App, em: f32) {
 	pp := &app.props
 	ui.next({width = ui.px(em * 14), height = ui.px(ui.dense(em * 2))})
-	res := ui.line_edit("###props_filter", &pp.filter, i18n.tr("Filter the list..."))
+	res := ui.line_edit("###props_filter", &pp.filter, {placeholder = i18n.tr("Filter the list...")})
 	pp.filter_key = res.box.key
 	tip_after(res, cmd_tip(.Props_Filter))
 	ui.spacer(ui.px(em * 0.6))

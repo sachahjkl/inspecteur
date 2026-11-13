@@ -160,22 +160,16 @@ cmd_tab :: proc(c: Cmd) -> Maybe(Tab) {
 
 cmd_is_props :: proc(c: Cmd) -> bool { return c >= .Props_Suspend }
 
-// The command as shown: its label and its group in the language in use (COMMANDS keeps the English, the catalogue's keys).
-cmd_shown :: proc(c: Cmd) -> ui.Command {
-	cmd := COMMANDS[c]
-	cmd.label, cmd.group = i18n.tr(cmd.label), i18n.tr(cmd.group)
-	return cmd
-}
-
-// The command's label as shown.
+// The command's label as shown (COMMANDS keeps the English, the catalogue's keys: the toolkit translates the palette's,
+// the sheet's and the tooltips' itself).
 cmd_label :: proc(c: Cmd) -> string { return i18n.tr(COMMANDS[c].label) }
 
 // "Kill… (Shift+Delete)": a button's tooltip.
-cmd_tip :: proc(c: Cmd) -> string { return ui.command_tip(cmd_shown(c)) }
+cmd_tip :: proc(c: Cmd) -> string { return ui.command_tip(COMMANDS[c]) }
 
 // A menu's line of the command: its label, its key, greyed when it cannot act; clicked: it is run.
 cmd_item :: proc(app: ^App, c: Cmd, label := "") {
-	if ui.menu_item(label != "" ? label : cmd_label(c), ui.command_shortcut(COMMANDS[c]), icon = COMMANDS[c].icon, enabled = cmd_can(app, c), icon_font = app.icons).clicked { cmd_run(app, c) }
+	if ui.menu_item(label != "" ? label : cmd_label(c), ui.command_shortcut(COMMANDS[c]), icon = COMMANDS[c].icon, disabled = !cmd_can(app, c), icon_font = app.icons).clicked { cmd_run(app, c) }
 }
 
 // The keys the filter keeps while it has the keyboard and some text: they edit it.
@@ -203,7 +197,7 @@ commands_keys :: proc(app: ^App, field_keeps: bool) {
 				if field_keeps && editing_chord(ch) { ch = {} }
 			}
 		}
-		if ui.command_pressed(cmd, cmd_can(app, c)) { cmd_run(app, c) }
+		if ui.command_pressed(cmd, !cmd_can(app, c)) { cmd_run(app, c) }
 	}
 }
 
@@ -216,22 +210,22 @@ palette_build :: proc(app: ^App) {
 	if !app.palette.open { return }
 	list := make([dynamic]ui.Command, context.temp_allocator)
 	cmds := make([dynamic]Cmd, context.temp_allocator)
-	enabled := make([dynamic]bool, context.temp_allocator)
+	disabled := make([dynamic]bool, context.temp_allocator)
 	for c in Cmd {
 		if cmd_is_props(c) || c == .Palette { continue }
 		if t, ok := cmd_tab(c).?; ok && t != app.tab { continue }
-		append(&list, cmd_shown(c))
+		append(&list, COMMANDS[c])
 		append(&cmds, c)
-		append(&enabled, cmd_can(app, c))
+		append(&disabled, !cmd_can(app, c))
 	}
 	// the settings too, each a line under "Settings · <page>": chosen, the page opens on it alone
 	settings, names := prefs_page.palette_commands(&app.prefs, settings_options(app))
 	commands := len(list)
 	for c in settings {
 		append(&list, c)
-		append(&enabled, true)
+		append(&disabled, false)
 	}
-	i, resized := ui.palette(&app.palette, list[:], enabled[:])
+	i, resized := ui.palette(&app.palette, list[:], disabled[:])
 	if resized { pref_set(&app.prefs, "view.palette_size", fmt.tprintf("%.0f %.0f", app.palette.size.x, app.palette.size.y)) }
 	switch {
 	case i >= commands:
@@ -245,9 +239,9 @@ palette_build :: proc(app: ^App) {
 // The sheet of the keys while it is open: every command, its section's first.
 shortcuts_build :: proc(app: ^App) {
 	list := make([dynamic]ui.Command, context.temp_allocator)
-	for c in Cmd { if cmd_tab(c) == nil && !cmd_is_props(c) { append(&list, cmd_shown(c)) } }
-	for c in Cmd { if _, ok := cmd_tab(c).?; ok { append(&list, cmd_shown(c)) } }
-	for c in Cmd { if cmd_is_props(c) { append(&list, cmd_shown(c)) } }
+	for c in Cmd { if cmd_tab(c) == nil && !cmd_is_props(c) { append(&list, COMMANDS[c]) } }
+	for c in Cmd { if _, ok := cmd_tab(c).?; ok { append(&list, COMMANDS[c]) } }
+	for c in Cmd { if cmd_is_props(c) { append(&list, COMMANDS[c]) } }
 	ui.shortcuts_sheet("shortcuts", list[:], &app.shortcuts_open)
 }
 
@@ -306,8 +300,8 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Palette:          palette_open(app)
 	case .Shortcuts:        app.shortcuts_open = true
 	// (its text selected: what is typed then replaces it, as in a browser's Ctrl+F)
-	case .Filter:           if app.search_key != 0 { ui.set_focus(app.search_key); ui.field_select_all(&app.search) }
-	case .Clear_Filter:     ui.field_clear(&app.search)
+	case .Filter:           if app.search_key != 0 { ui.set_focus(app.search_key); ui.line_edit_select_all(&app.search) }
+	case .Clear_Filter:     ui.line_edit_clear(&app.search)
 	case .Read_Again:       refresh_now(app)
 	case .Pause_Refresh:    refresh_pause(app, !app.paused)
 	case .Refresh_Speed:    refresh_menu_open(app)
@@ -404,7 +398,7 @@ light_dark_switch :: proc(app: ^App) {
 // Sets one preference of the look (appearance.theme, appearance.mode) and reads the look again: the next build shows it.
 look_set :: proc(app: ^App, name, value: string) {
 	pref_set(&app.prefs, name, value)
-	prefs_page.appearance_free(&app.settings.look)
+	prefs_page.appearance_destroy(&app.settings.look)
 	app.settings.look = prefs_page.appearance_read(&app.prefs)
 }
 

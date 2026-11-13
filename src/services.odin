@@ -127,7 +127,6 @@ Services :: struct {
 	list:    ^Service_List,    // the window's
 	rows:    Section_Table,
 	manager: Manager,          // the one shown
-	menu:    ui.Key,
 	next:    time.Tick,        // the next reading while the section is shown
 	pending: Service_Action,   // an action asked and not answered yet
 }
@@ -178,12 +177,12 @@ services_ask :: proc(app: ^App, action := Service_Action.None, unit := "") {
 		s.ask.unit_len = copy(s.ask.unit[:], unit)
 	}
 	sync.unlock(&s.mutex)
-	tasks.ask(ui.chores(), &s.job)
+	tasks.job_ask(ui.chores(), &s.job)
 	s.next = time.tick_add(time.tick_now(), time.Duration(app.settings.services_ms) * time.Millisecond)
 }
 
 // Whether a reading is asked or under way.
-services_busy :: proc(app: ^App) -> bool { return tasks.busy(ui.chores(), &app.services.job) }
+services_busy :: proc(app: ^App) -> bool { return tasks.job_busy(ui.chores(), &app.services.job) }
 
 @(private = "file")
 services_work :: proc(data: rawptr) {

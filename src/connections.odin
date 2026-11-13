@@ -54,7 +54,6 @@ Connections :: struct {
 	holders: [dynamic]Socket_Holder,   // the processes that hold sockets, the most first
 	rows:    Section_Table,
 	read:    bool,              // a reading came at least once
-	menu:    ui.Key,
 	next:    time.Tick,         // the next reading while they are shown (connections.refresh_ms)
 }
 
@@ -215,13 +214,13 @@ connections_shown :: proc(app: ^App) -> bool {
 
 // A reading now (the section shown, F5), the next one a period later.
 connections_ask :: proc(app: ^App) {
-	tasks.ask(ui.chores(), &app.connections.job)
+	tasks.job_ask(ui.chores(), &app.connections.job)
 	app.connections.next = time.tick_add(time.tick_now(), time.Duration(app.settings.connections_ms) * time.Millisecond)
 }
 
 // Each turn of the loop (not while the refresh is paused): a reading when one is due and they are shown.
 connections_tick :: proc(app: ^App) {
-	if !connections_shown(app) || tasks.busy(ui.chores(), &app.connections.job) { return }
+	if !connections_shown(app) || tasks.job_busy(ui.chores(), &app.connections.job) { return }
 	if time.tick_diff(app.connections.next, time.tick_now()) >= 0 { connections_ask(app) }
 }
 

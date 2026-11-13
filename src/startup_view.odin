@@ -55,19 +55,17 @@ startup_actions :: proc(app: ^App, em: f32) {
 	cmd_button(app, "st_copy", lucide.COPY, .Startup_Copy, em)
 }
 
+STARTUP_MENU :: "inspecteur_startup_menu"
+
 startup_menu_open :: proc(app: ^App, pos: ui.Vec2, from_keyboard := false) {
-	s := &app.startup
 	if _, ok := selected_startup(app); !ok { return }
-	if s.menu == 0 { s.menu = ui.key_from_string(0, "inspecteur_startup_menu") }
-	ui.ctx_menu_open(s.menu, pos, from_keyboard = from_keyboard)
+	ui.menu_open(STARTUP_MENU, pos, from_keyboard = from_keyboard)
 }
 
 @(private = "file")
 startup_menu :: proc(app: ^App, em: f32) {
-	s := &app.startup
-	if s.menu == 0 { return }
-	if ui.ctx_menu(s.menu) {
-		if _, ok := selected_startup(app); !ok { ui.ctx_menu_close(); return }
+	if ui.menu(STARTUP_MENU) {
+		if _, ok := selected_startup(app); !ok { ui.menu_close(); return }
 		cmd_item(app, .Startup_Enable)
 		cmd_item(app, .Startup_Disable)
 		ui.menu_separator()

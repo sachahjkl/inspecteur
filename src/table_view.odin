@@ -158,7 +158,7 @@ build_bar :: proc(app: ^App, em: f32) {
 // size. A button that cannot act now is greyed (its tooltip still says what it would do).
 tool_button :: proc(id, icon, tip: string, enabled: bool, em: f32) -> bool {
 	ui.next({width = ui.px(em * 2.2), height = ui.px(ui.dense(em * 2))})
-	return ui.icon_button(id, icon, tip = tip, disabled = !enabled).clicked && enabled
+	return ui.button(id, icon = icon, o = {tip = tip, disabled = !enabled}).clicked && enabled
 }
 
 // The button of a command: greyed when it cannot act; clicked, it runs.
@@ -179,22 +179,20 @@ build_header :: proc(app: ^App, em: f32) -> (view: ui.Key) {
 		table_layout_save(t, &app.prefs)
 	}
 	if ev.resized || ev.moved { table_layout_save(t, &app.prefs) }
-	if ev.menu {
-		if app.columns_menu == 0 { app.columns_menu = ui.key_from_string(0, "inspecteur_columns") }
-		ui.ctx_menu_open(app.columns_menu, ui.mouse_pos())
-	}
+	if ev.menu { ui.menu_open(COLUMNS_MENU, ui.mouse_pos()) }
 	columns_menu(app, em)
 	return
 }
+
+COLUMNS_MENU :: "inspecteur_columns"
 
 // Opens the menu of the columns under the table's header (Ctrl+Shift+C).
 columns_menu_open :: proc(app: ^App) {
 	tab_show(app, .Processes)
 	app.table.layout.menu_column = -1   // (from the keyboard: no title)
-	if app.columns_menu == 0 { app.columns_menu = ui.key_from_string(0, "inspecteur_columns") }
 	// (under the header: the bar's rect, as the last layout made it, and the header's height)
 	em := ui.font_size()
-	ui.ctx_menu_open(app.columns_menu, {app.bar_rect.min.x + em * 2, app.bar_rect.max.y + ui.dense(em * HEADER_EM)}, from_keyboard = true)
+	ui.menu_open(COLUMNS_MENU, ui.Vec2{app.bar_rect.min.x + em * 2, app.bar_rect.max.y + ui.dense(em * HEADER_EM)}, from_keyboard = true)
 }
 
 // The header's menu (the toolkit's): the column right-clicked reset, unsorted, each column but the name shown or not,
@@ -202,8 +200,7 @@ columns_menu_open :: proc(app: ^App) {
 @(private = "file")
 columns_menu :: proc(app: ^App, em: f32) {
 	t := &app.table
-	if app.columns_menu == 0 { return }
-	if ui.ctx_menu(app.columns_menu, em * 16) {
+	if ui.menu(COLUMNS_MENU, em * 16) {
 		changed, sorted := ui.table_menu_items(&t.layout)
 		if sorted { rows_again(app) }
 		if changed { table_layout_save(t, &app.prefs) }
@@ -248,7 +245,7 @@ build_rows :: proc(app: ^App, em: f32) {
 	if len(t.rows) == 0 && t.query != "" {
 		if ui.tags("weak") {
 			ui.next({width = ui.fill(), height = ui.px(em * 5)})
-			if ui.style({text_align = .Center}) { ui.label(fmt.tprintf("%s###empty", fmt.tprintf(i18n.tr("No process matches “%s”."), ui.text_shown(ui.field_string(&app.search))))) }
+			if ui.style({text_align = .Center}) { ui.label(fmt.tprintf("%s###empty", fmt.tprintf(i18n.tr("No process matches “%s”."), ui.text_shown(ui.line_edit_string(&app.search))))) }
 		}
 	}
 }
@@ -358,7 +355,7 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 		if list := windows_of(app, row_entry(app, r)); len(list) > 0 {
 			ui.spacer(ui.px(em * 0.3))
 			ui.next({width = ui.px(em * 1.6), height = ui.px(em * 1.4), font_size = em * 0.9, text_pad = 0})
-			if ui.icon_button("win", lucide.APP_WINDOW, tip = fmt.tprintf("%s (%s)", window_tip(list), ui.command_shortcut(COMMANDS[.Show_Window]))).clicked { window_show(app, row_entry(app, r)) }
+			if ui.button("win", icon = lucide.APP_WINDOW, o = {tip = fmt.tprintf("%s (%s)", window_tip(list), ui.command_shortcut(COMMANDS[.Show_Window]))}).clicked { window_show(app, row_entry(app, r)) }
 		}
 		ui.spacer(ui.fill())
 	}

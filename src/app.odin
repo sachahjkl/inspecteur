@@ -66,7 +66,6 @@ App :: struct {
 	next_sample: time.Tick,
 	paused:      bool,              // the refresh is paused (Ctrl+Space): nothing is read but on F5
 	held:        bool,              // Ctrl is held: the refresh waits for its release, as in Windows' Task Manager (view_build)
-	refresh_menu: ui.Key,           // the menu of the refresh's speed (view.odin)
 	refresh_rect: ui.Rect,          // its button in the title bar, as last laid out (the menu opens under it)
 
 	tab:         Tab,
@@ -77,9 +76,7 @@ App :: struct {
 	information: Information,       // what the system is (information.odin), read when first shown and on F5
 	device:      Device,            // the Performance section's device shown (perf_view.odin)
 	cpu_grid:    bool,              // the CPU's page shows a graph per logical processor
-	columns_menu: ui.Key,           // the menu of the table's columns (table_view.odin)
 	bar_rect:    ui.Rect,           // the Processes section's bar, as last laid out (the columns' menu opens under it)
-	theme_menu:  ui.Key,            // the menu of the theme (view.odin)
 	palette:     ui.Command_Palette,   // the command palette (commands.odin)
 	shortcuts_open: bool,           // the sheet of the keys
 	diagnosis_open: bool,   // "Why is it slow?" (F2, diagnosis.odin)
@@ -100,7 +97,7 @@ App :: struct {
 	windows:     [dynamic]App_Window,   // the apps' windows, read at each sample (window_list.odin)
 	one_copy:    ^instance.Server,  // the name of the one Inspecteur that runs, served (one_copy.odin)
 	tz:          ^datetime.TZ_Region,   // local time, for the processes' start (the first reading's; nil: UTC)
-	search:      ui.Text_Field,
+	search:      ui.Line_Edit,
 	search_key:  ui.Key,
 	vl:          ui.Virtual_List,   // the rows (vl.sel: the selected row)
 	sel_rect:    ui.Rect,           // the selected row, as last built (where the Menu key opens the menu)
@@ -270,7 +267,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	if app.logo.ok { render.destroy_texture(&app.shared.r, app.logo.tex) }
 	setup_finish(app)
 	host.host_close(h)
-	ui.field_destroy(&app.search)
+	ui.line_edit_destroy(&app.search)
 	ui.vlist_destroy(&app.vl)
 	table_destroy(&app.table)
 	catalog_destroy(&app.catalog)
@@ -387,7 +384,7 @@ window_params :: proc(h: ^host.Host, bp: ^ui.Build_Params, app: ^App) {
 // system's notifications by default, a toast of the window where the system shows none). What is under way stays in
 // the status bar (say).
 announce :: proc(app: ^App, title: string, body := "") {
-	app.announcer.mode = prefs_page.messages_mode(&app.prefs)
+	app.announcer.mode = prefs_page.announce_mode(&app.prefs)
 	ui.announce(&app.announcer, .Good, title, body)
 }
 

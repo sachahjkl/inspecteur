@@ -34,7 +34,7 @@ Journal_View :: struct {
 	vl:         ui.Virtual_List,  // the entries
 	shown_for:  u64,              // the service the list was put at the end for
 	last:       u64,              // the newest entry's id when the list was last built (a new one: back to the end)
-	search:     ui.Text_Field,    // its own search (Ctrl+J)
+	search:     ui.Line_Edit,    // its own search (Ctrl+J)
 	search_key: ui.Key,
 }
 
@@ -60,7 +60,7 @@ journal_view_destroy :: proc(v: ^Journal_View) {
 	delete(v.shown_ids)
 	delete(v.shown_query)
 	ui.vlist_destroy(&v.vl)
-	ui.field_destroy(&v.search)
+	ui.line_edit_destroy(&v.search)
 	v^ = {}
 }
 
@@ -71,11 +71,11 @@ journal_view_ask :: proc(v: ^Journal_View, manager: Manager, name: string, boot:
 	v.ask.name_len = copy(v.ask.name[:], name)
 	v.ask.boot = boot
 	sync.unlock(&v.mutex)
-	tasks.ask(ui.chores(), &v.job)
+	tasks.job_ask(ui.chores(), &v.job)
 }
 
 // Whether a reading is asked or under way.
-journal_view_busy :: proc(v: ^Journal_View) -> bool { return tasks.busy(ui.chores(), &v.job) }
+journal_view_busy :: proc(v: ^Journal_View) -> bool { return tasks.job_busy(ui.chores(), &v.job) }
 
 // True once after a reading came in (the window settles its layout).
 journal_view_taken :: proc(v: ^Journal_View) -> bool {

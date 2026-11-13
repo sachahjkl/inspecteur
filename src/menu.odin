@@ -41,7 +41,6 @@ Chosen :: struct {
 }
 
 Row_Menu :: struct {
-	key:     ui.Key,
 	confirm: Confirm,   // the confirmation of a kill, of an end that would end Inspecteur or the session, of a service's stop
 }
 
@@ -169,7 +168,7 @@ chosen_tree :: proc(app: ^App) -> (c: Chosen, ok: bool) {
 // The service the process belongs to, selected in the Services section (its manager's: the system's or the user's).
 go_to_service :: proc(app: ^App, p: ^Proc) {
 	if p.unit == "" { return }
-	ui.field_clear(&app.search)
+	ui.line_edit_clear(&app.search)
 	query_set(app, "")
 	services_switch(app, p.unit_user ? .User : .System)
 	tab_show(app, .Services)
@@ -217,24 +216,24 @@ dump_ask :: proc(app: ^App, p: ^Proc) {
 	m.open = true
 }
 
+ROW_MENU :: "inspecteur_row_menu"
+
 // Opens the menu of the selected row at `pos` (window pixels).
 row_menu_open :: proc(app: ^App, pos: ui.Vec2, from_keyboard := false) {
 	if selected_proc(app) == nil { return }
-	m := &app.menu
-	if m.key == 0 { m.key = ui.key_from_string(0, "inspecteur_row_menu") }
-	ui.ctx_menu_open(m.key, pos, from_keyboard = from_keyboard)
+	ui.menu_open(ROW_MENU, pos, from_keyboard = from_keyboard)
 }
 
 // The menu and the confirmation, when open (built at the end of the window's build).
 row_menu_build :: proc(app: ^App, em: f32) {
-	if app.menu.key != 0 { row_menu_items(app) }
+	row_menu_items(app)
 	confirm_build(app, em)
 }
 
 @(private = "file")
 row_menu_items :: proc(app: ^App) {
-	if ui.ctx_menu(app.menu.key) {
-		if selected_proc(app) == nil { ui.ctx_menu_close(); return }
+	if ui.menu(ROW_MENU) {
+		if selected_proc(app) == nil { ui.menu_close(); return }
 		cmd_item(app, .End_Task)
 		cmd_item(app, .Kill)
 		cmd_item(app, .End_Tree)
@@ -242,7 +241,7 @@ row_menu_items :: proc(app: ^App) {
 		cmd_item(app, .Suspend, p != nil && p.state == .Stopped ? i18n.tr("Resume") : i18n.tr("Suspend"))
 		if ui.menu_submenu(cmd_label(.Send_Signal)) {
 			for s in SIGNAL_ITEMS {
-				if ui.menu_item(i18n.tr(s.label), enabled = cmd_can(app, .Send_Signal)).clicked { signal_selected(app, s.sig) }
+				if ui.menu_item(i18n.tr(s.label), disabled = !cmd_can(app, .Send_Signal)).clicked { signal_selected(app, s.sig) }
 			}
 		}
 		ui.menu_separator()

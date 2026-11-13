@@ -165,7 +165,7 @@ join_comma :: proc(parts: []string) -> string {
 diagnosis_build :: proc(app: ^App, em: f32) {
 	w := em * DIAG_W_EM
 	// (the dialog ends with this if's block: modal_end is deferred to it)
-	if ui.modal("diagnosis", w, &app.diagnosis_open) {
+	if ui.modal("diagnosis", &app.diagnosis_open, {width_em = DIAG_W_EM}) {
 		pad := em * 1.4
 		ui.next({width = ui.px(w), height = ui.children_sum(), axis = .Y})
 		if ui.column(id = "###diagnosis") {
@@ -196,7 +196,7 @@ diagnosis_build :: proc(app: ^App, em: f32) {
 			ui.next({width = ui.px(w), height = ui.children_sum()})
 			if ui.row(id = "###diag_foot") {
 				ui.spacer(ui.fill())
-				if ui.button(fmt.tprintf("%s###diag_close", i18n.tr("Close"))).clicked { app.diagnosis_open = false }
+				if ui.button("diag_close", i18n.tr("Close")).clicked { app.diagnosis_open = false }
 				ui.spacer(ui.px(pad))
 			}
 			ui.spacer(ui.px(pad))

@@ -67,7 +67,6 @@ Startup :: struct {
 	ask:     Startup_Ask,      // under the mutex
 	list:    ^Startup_List,    // the window's
 	rows:    Section_Table,
-	menu:    ui.Key,
 	pending: bool,             // a change asked and not answered yet
 	asked:   bool,
 }
@@ -113,7 +112,7 @@ startup_ask :: proc(app: ^App, change := false, item := Startup_Item{}, on := fa
 		s.ask.name_len = copy(s.ask.name[:], item.name)
 	}
 	sync.unlock(&s.mutex)
-	tasks.ask(ui.chores(), &s.job)
+	tasks.job_ask(ui.chores(), &s.job)
 }
 
 @(private = "file")

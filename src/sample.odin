@@ -106,7 +106,7 @@ sample_ask :: proc(app: ^App) {
 	s.ask = {history = !app.sample_extra, cpu_shown = app.tab == .Performance && app.device.kind == .Cpu}
 	sync.unlock(&s.mutex)
 	app.sample_extra = false
-	s.asked = tasks.ask(ui.chores(), &s.job)
+	s.asked = tasks.job_ask(ui.chores(), &s.job)
 }
 
 // Once the window is there: the readings are posted to it. Waits for the first reading (at most FIRST_READING_WAIT) and

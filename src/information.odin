@@ -57,11 +57,11 @@ info_free :: proc(s: ^Info_Static) {
 // Asks for a reading (the first time the section is shown, and on F5).
 information_ask :: proc(inf: ^Information) {
 	inf.asked = true
-	tasks.ask(ui.chores(), &inf.job)
+	tasks.job_ask(ui.chores(), &inf.job)
 }
 
 // Whether a reading is asked or under way.
-information_busy :: proc(inf: ^Information) -> bool { return tasks.busy(ui.chores(), &inf.job) }
+information_busy :: proc(inf: ^Information) -> bool { return tasks.job_busy(ui.chores(), &inf.job) }
 
 @(private = "file")
 information_work :: proc(data: rawptr) {

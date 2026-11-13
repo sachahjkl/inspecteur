@@ -43,7 +43,7 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	app.held = ui.key_held(.Ctrl)
 	// (the user's themes file: a task looks at it now and then and reads it when it changed; window_params shows it)
 	if prefs_page.themes_file_poll(&app.themes_file, &h.state) { h.settle = max(h.settle, FRAMES_AFTER_INPUT) }
-	free_keys := !app.menu.confirm.open && !app.props.open && !app.affinity.open && !app.shortcuts_open && !app.setup.open && !app.diagnosis_open && !app.palette.open && !ui.ctx_menu_any_open()
+	free_keys := !app.menu.confirm.open && !app.props.open && !app.affinity.open && !app.shortcuts_open && !app.setup.open && !app.diagnosis_open && !app.palette.open && !ui.menu_any_open()
 	if free_keys && app.settings_open {
 		settings_keys(app)   // (the page's own: its search takes what is typed)
 	} else if free_keys {
@@ -190,7 +190,7 @@ processes_reveal :: proc(app: ^App, pid: i32, start: u64) -> bool {
 	if p == nil { return false }
 	at := -1
 	for &q, i in app.sampler.procs { if &q == p { at = i; break } }
-	ui.field_clear(&app.search)
+	ui.line_edit_clear(&app.search)
 	query_set(app, "")
 	delete(app.table.query)
 	app.table.query = ""
@@ -273,13 +273,13 @@ build_title :: proc(app: ^App, em: f32) {
 		ui.spacer(ui.fill())
 		refresh_button(app, em)
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
-		if ui.icon_button("palette_button", lucide.COMMAND, tip = cmd_tip(.Palette)).clicked { palette_open(app) }
+		if ui.button("palette_button", icon = lucide.COMMAND, o = {tip = cmd_tip(.Palette)}).clicked { palette_open(app) }
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
-		if ui.icon_button("help_button", lucide.KEYBOARD, tip = cmd_tip(.Shortcuts)).clicked { app.shortcuts_open = true }
+		if ui.button("help_button", icon = lucide.KEYBOARD, o = {tip = cmd_tip(.Shortcuts)}).clicked { app.shortcuts_open = true }
 		theme_button(app, em)
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
 		// (the settings shown: the button is held down)
-		if ui.icon_button("settings_button", lucide.SLIDERS_HORIZONTAL, tip = cmd_tip(.Settings), face = app.settings_open ? .Toggled : .Ghost).clicked { settings_toggle(app) }
+		if ui.button("settings_button", icon = lucide.SLIDERS_HORIZONTAL, o = {tip = cmd_tip(.Settings), face = app.settings_open ? .Toggled : .Ghost}).clicked { settings_toggle(app) }
 		ui.spacer(ui.px(em * 0.4))
 		_, _ = ui.window_buttons()
 	}
@@ -328,13 +328,13 @@ build_filter :: proc(app: ^App, em: f32) {
 		if ui.tags("weak") { ui.icon(lucide.SEARCH, em * 1.6) }
 		ui.next({width = ui.fill(), height = ui.pct(1)})
 		if ui.tags("bare") {
-			res := ui.line_edit("###search", &app.search, i18n.tr(FILTER_HINTS[tab_listed(app.tab) ? app.tab : .Processes]))
+			res := ui.line_edit("###search", &app.search, {placeholder = i18n.tr(FILTER_HINTS[tab_listed(app.tab) ? app.tab : .Processes])})
 			app.search_key = res.box.key
 			tip_after(res, i18n.tr("Filter: type anywhere (Ctrl+F); Escape clears it"))
 		}
 		ui.spacer(ui.px(em * 0.4))
 	}
-	if q := strings.to_lower(ui.field_string(&app.search), context.temp_allocator); q != app.query {
+	if q := strings.to_lower(ui.line_edit_string(&app.search), context.temp_allocator); q != app.query {
 		query_set(app, q)
 		// (a section with no table: the filter is for the processes)
 		if !tab_listed(app.tab) { tab_show(app, .Processes) }
@@ -452,16 +452,16 @@ text_cut :: proc(b: ^ui.Box, text: string) -> bool {
 // The theme's menu (the title bar's button)
 
 THEME_MODE_LABELS := [ui.Theme_Mode]string{.System = i18n.later("As the system"), .Dark = i18n.later("Dark"), .Light = i18n.later("Light")}
+THEME_MENU :: "inspecteur_theme"
 THEME_MODE_KEYS := [ui.Theme_Mode]string{.System = "system", .Dark = "dark", .Light = "light"}
 
 // The theme's version (the system's, dark, light) and the theme, chosen from a menu and written to the preferences.
 @(private = "file")
 theme_button :: proc(app: ^App, em: f32) {
-	if app.theme_menu == 0 { app.theme_menu = ui.key_from_string(0, "inspecteur_theme") }
 	ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
-	sig := ui.icon_button("theme", lucide.SUN_MOON, tip = fmt.tprintf(i18n.tr("Colours: light or dark (%s), the theme"), ui.command_shortcut(COMMANDS[.Light_Dark])), lit = ui.ctx_menu_is_open(app.theme_menu))
-	if sig.clicked { ui.ctx_menu_open_rect(app.theme_menu, sig.box.rect) }
-	if ui.ctx_menu(app.theme_menu) {
+	sig := ui.button("theme", icon = lucide.SUN_MOON, o = {tip = fmt.tprintf(i18n.tr("Colours: light or dark (%s), the theme"), ui.command_shortcut(COMMANDS[.Light_Dark])), lit = ui.menu_is_open(THEME_MENU)})
+	if sig.clicked { ui.menu_open(THEME_MENU, sig.box.rect) }
+	if ui.menu(THEME_MENU) {
 		ui.menu_heading(i18n.tr("Version"))
 		for mode in ui.Theme_Mode {
 			if ui.menu_item(i18n.tr(THEME_MODE_LABELS[mode]), checked = app.settings.look.mode == mode).clicked { mode_set(app, mode) }
@@ -512,21 +512,20 @@ refresh_speed_set :: proc(app: ^App, ms: int) {
 	say(app, i18n.tr("Refresh every %s: the graphs span %s"), refresh_text(app), span_text(HISTORY_POINTS, ms))
 }
 
+REFRESH_MENU :: "inspecteur_refresh"
+
 refresh_menu_open :: proc(app: ^App) {
-	if app.refresh_menu == 0 { app.refresh_menu = ui.key_from_string(0, "inspecteur_refresh") }
-	r := app.refresh_rect
-	ui.ctx_menu_open_rect(app.refresh_menu, r)
+	ui.menu_open(REFRESH_MENU, app.refresh_rect)
 }
 
 @(private = "file")
 refresh_button :: proc(app: ^App, em: f32) {
 	ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
 	tip := app.paused ? fmt.tprintf(i18n.tr("Refresh: paused. %s (%s), Resume (%s)"), cmd_label(.Refresh_Speed), ui.command_shortcut(COMMANDS[.Refresh_Speed]), ui.command_shortcut(COMMANDS[.Pause_Refresh])) : fmt.tprintf(i18n.tr("Refresh: every %s. %s (%s), Pause (%s)"), refresh_text(app), cmd_label(.Refresh_Speed), ui.command_shortcut(COMMANDS[.Refresh_Speed]), ui.command_shortcut(COMMANDS[.Pause_Refresh]))
-	sig := ui.icon_button("refresh", app.paused ? lucide.PAUSE : lucide.REFRESH_CW, tip = tip, lit = app.refresh_menu != 0 && ui.ctx_menu_is_open(app.refresh_menu))
+	sig := ui.button("refresh", icon = app.paused ? lucide.PAUSE : lucide.REFRESH_CW, o = {tip = tip, lit = ui.menu_is_open(REFRESH_MENU)})
 	app.refresh_rect = sig.box.rect
 	if sig.clicked { refresh_menu_open(app) }
-	if app.refresh_menu == 0 { return }
-	if ui.ctx_menu(app.refresh_menu) {
+	if ui.menu(REFRESH_MENU) {
 		if ui.menu_item(app.paused ? i18n.tr("Resume") : i18n.tr("Pause"), ui.command_shortcut(COMMANDS[.Pause_Refresh]), checked = app.paused).clicked { refresh_pause(app, !app.paused) }
 		cmd_item(app, .Read_Again, i18n.tr("Read again now"))
 		ui.menu_separator()

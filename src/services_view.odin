@@ -187,19 +187,17 @@ services_switch :: proc(app: ^App, m: Manager) {
 	services_ask(app)
 }
 
+SERVICES_MENU :: "inspecteur_service_menu"
+
 services_menu_open :: proc(app: ^App, pos: ui.Vec2, from_keyboard := false) {
-	s := &app.services
 	if _, ok := selected_service(app); !ok { return }
-	if s.menu == 0 { s.menu = ui.key_from_string(0, "inspecteur_service_menu") }
-	ui.ctx_menu_open(s.menu, pos, from_keyboard = from_keyboard)
+	ui.menu_open(SERVICES_MENU, pos, from_keyboard = from_keyboard)
 }
 
 @(private = "file")
 services_menu :: proc(app: ^App, em: f32) {
-	s := &app.services
-	if s.menu == 0 { return }
-	if ui.ctx_menu(s.menu) {
-		if _, ok := selected_service(app); !ok { ui.ctx_menu_close(); return }
+	if ui.menu(SERVICES_MENU) {
+		if _, ok := selected_service(app); !ok { ui.menu_close(); return }
 		cmd_item(app, .Service_Start)
 		cmd_item(app, .Service_Stop)
 		cmd_item(app, .Service_Restart)

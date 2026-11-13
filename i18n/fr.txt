@@ -8,13 +8,13 @@ en %s now runs at %s
 fr %s tourne maintenant en %s
 
 en Access denied: %s
-fr Accès refusé : %s
+fr Accès refusé : %s
 
 en The priority of %s cannot be changed
 fr La priorité de %s ne peut pas être changée
 
 en Access denied: %s is another user's process
-fr Accès refusé : %s est un processus d'un autre utilisateur
+fr Accès refusé : %s est un processus d'un autre utilisateur
 
 en The affinity of %s cannot be read
 fr L'affinité de %s ne peut pas être lue
@@ -23,34 +23,34 @@ en %s runs on %s now
 fr %s tourne maintenant sur %s
 
 en Access denied: only its owner, or %s, may change the affinity of %s
-fr Accès refusé : seul son propriétaire, ou %s, peut changer l'affinité de %s
+fr Accès refusé : seul son propriétaire, ou %s, peut changer l'affinité de %s
 
 en The affinity of %s cannot be changed
 fr L'affinité de %s ne peut pas être changée
 
 en Inspecteur does not suspend itself: nothing could resume it
-fr Inspecteur ne se suspend pas lui-même : rien ne pourrait le reprendre
+fr Inspecteur ne se suspend pas lui-même : rien ne pourrait le reprendre
 
 en %s runs Inspecteur: suspended, it would stop Inspecteur too
-fr %s exécute Inspecteur : suspendu, il arrêterait aussi Inspecteur
+fr %s exécute Inspecteur : suspendu, il arrêterait aussi Inspecteur
 
 en %s draws the desktop: suspended, it would freeze every window, this one too
-fr %s dessine le bureau : suspendu, il figerait toutes les fenêtres, celle-ci aussi
+fr %s dessine le bureau : suspendu, il figerait toutes les fenêtres, celle-ci aussi
 
 en %s is %s's: Inspecteur may not end it (only its owner, or %s, may)
-fr %s appartient à %s : Inspecteur ne peut pas le terminer (seul son propriétaire, ou %s, le peut)
+fr %s appartient à %s : Inspecteur ne peut pas le terminer (seul son propriétaire, ou %s, le peut)
 
 en %s cannot be ended (error %d)
 fr %s ne peut pas être terminé (erreur %d)
 
 en %s is %s's: Inspecteur may not suspend it (only its owner, or %s, may)
-fr %s appartient à %s : Inspecteur ne peut pas le suspendre (seul son propriétaire, ou %s, le peut)
+fr %s appartient à %s : Inspecteur ne peut pas le suspendre (seul son propriétaire, ou %s, le peut)
 
 en %s cannot be suspended (error %d)
 fr %s ne peut pas être suspendu (erreur %d)
 
 en %s is %s's: Inspecteur may not resume it (only its owner, or %s, may)
-fr %s appartient à %s : Inspecteur ne peut pas le reprendre (seul son propriétaire, ou %s, le peut)
+fr %s appartient à %s : Inspecteur ne peut pas le reprendre (seul son propriétaire, ou %s, le peut)
 
 en %s cannot be resumed (error %d)
 fr %s ne peut pas être repris (erreur %d)
@@ -74,13 +74,13 @@ en Choose at least one processor
 fr Choisissez au moins un processeur
 
 en The demo's processes are not the system's: nothing was changed
-fr Les processus de la démo ne sont pas ceux du système : rien n'a été changé
+fr Les processus de la démo ne sont pas ceux du système : rien n'a été changé
 
 en Affinity of %s (PID %d)
 fr Affinité de %s (PID %d)
 
 en The logical processors it may run on: each of its threads runs on these alone.
-fr Les processeurs logiques sur lesquels il peut tourner : chacun de ses threads tourne sur eux seuls.
+fr Les processeurs logiques sur lesquels il peut tourner : chacun de ses threads tourne sur eux seuls.
 
 en CPU %d
 fr CPU %d
@@ -122,7 +122,7 @@ en Inspecteur ended without warning last time
 fr Inspecteur s'est arrêté sans prévenir la dernière fois
 
 en Its report: %s
-fr Son rapport : %s
+fr Son rapport : %s
 
 en The preferences cannot be written
 fr Les réglages ne peuvent pas être écrits
@@ -158,7 +158,7 @@ en Zoom out
 fr Zoom arrière
 
 en Zoom: 100 %
-fr Zoom : 100 %
+fr Zoom : 100 %
 
 en Light or dark
 fr Clair ou sombre
@@ -173,7 +173,7 @@ en Check for updates
 fr Rechercher des mises à jour
 
 en Why is it slow?
-fr Pourquoi est-ce lent ?
+fr Pourquoi est-ce lent ?
 
 en Sections
 fr Sections
@@ -254,10 +254,10 @@ en Pin or unpin
 fr Épingler ou détacher
 
 en Mission Control: panels…
-fr Mission Control : panneaux…
+fr Mission Control : panneaux…
 
 en Mission Control: the layout as at first
-fr Mission Control : la disposition d'origine
+fr Mission Control : la disposition d'origine
 
 en One graph per logical processor
 fr Un graphique par processeur logique
@@ -302,10 +302,10 @@ en Search the journal
 fr Rechercher dans le journal
 
 en Journal: all, warnings, errors
-fr Journal : tout, avertissements, erreurs
+fr Journal : tout, avertissements, erreurs
 
 en Journal: this boot or every boot
-fr Journal : ce démarrage ou tous les démarrages
+fr Journal : ce démarrage ou tous les démarrages
 
 en Follow the journal
 fr Suivre le journal
@@ -347,10 +347,10 @@ en Checking for updates…
 fr Recherche de mises à jour…
 
 en Light colours: %s has no light version, %s has
-fr Couleurs claires : %s n'a pas de version claire, %s en a une
+fr Couleurs claires : %s n'a pas de version claire, %s en a une
 
 en Dark colours: %s has no dark version, %s has
-fr Couleurs sombres : %s n'a pas de version sombre, %s en a une
+fr Couleurs sombres : %s n'a pas de version sombre, %s en a une
 
 en Light colours
 fr Couleurs claires
@@ -451,7 +451,7 @@ en No line in the journal.
 fr Aucune ligne dans le journal.
 
 en The processors are %.0f%% busy. The busiest: %s.
-fr Les processeurs sont occupés à %.0f%%. Les plus actifs : %s.
+fr Les processeurs sont occupés à %.0f%%. Les plus actifs : %s.
 
 en Tasks waited for a processor %.0f%% of the last 10 seconds.
 fr Des tâches ont attendu un processeur %.0f%% des 10 dernières secondes.
@@ -463,19 +463,19 @@ en Tasks waited for the disks %.0f%% of the last 10 seconds.
 fr Des tâches ont attendu les disques %.0f%% des 10 dernières secondes.
 
 en The memory is %.0f%% in use (%s of %s). The largest: %s.
-fr La mémoire est utilisée à %.0f%% (%s sur %s). Les plus gros : %s.
+fr La mémoire est utilisée à %.0f%% (%s sur %s). Les plus gros : %s.
 
 en %s of the swap is in use: pages wait on the disk.
-fr %s du swap est utilisé : des pages attendent sur le disque.
+fr %s du swap est utilisé : des pages attendent sur le disque.
 
 en The disk %s is busy %.0f%% of the time. Reading and writing the most: %s.
-fr Le disque %s est occupé %.0f%% du temps. Ceux qui lisent et écrivent le plus : %s.
+fr Le disque %s est occupé %.0f%% du temps. Ceux qui lisent et écrivent le plus : %s.
 
 en The GPU %s is %.0f%% busy.
 fr Le GPU %s est occupé à %.0f%%.
 
 en The processor is hot: %.0f °C.
-fr Le processeur est chaud : %.0f °C.
+fr Le processeur est chaud : %.0f °C.
 
 en The processor slowed for its heat %d time since Inspecteur started.
 en+ The processor slowed for its heat %d times since Inspecteur started.
@@ -483,13 +483,13 @@ fr Le processeur a ralenti à cause de sa chaleur %d fois depuis le lancement d'
 fr+ Le processeur a ralenti à cause de sa chaleur %d fois depuis le lancement d'Inspecteur.
 
 en Nothing stands out: the processors are %.0f%% busy and the memory has room.
-fr Rien ne ressort : les processeurs sont occupés à %.0f%% et la mémoire a de la place.
+fr Rien ne ressort : les processeurs sont occupés à %.0f%% et la mémoire a de la place.
 
 en none
 fr aucun
 
 en The demo's processes are not the system's: no dump was written
-fr Les processus de la démo ne sont pas ceux du système : aucune image mémoire n'a été écrite
+fr Les processus de la démo ne sont pas ceux du système : aucune image mémoire n'a été écrite
 
 en A dump is being written already
 fr Une image mémoire est déjà en cours d'écriture
@@ -498,16 +498,16 @@ en Writing a dump of %s…
 fr Écriture d'une image mémoire de %s…
 
 en No dump: %s
-fr Pas d'image mémoire : %s
+fr Pas d'image mémoire : %s
 
 en Wrote the dump %s
-fr Image mémoire écrite : %s
+fr Image mémoire écrite : %s
 
 en gdb's gcore writes it into ~/.cache/inspecteur/dumps.
 fr gcore de gdb l'écrit dans ~/.cache/inspecteur/dumps.
 
 en gcore is not installed: it comes with gdb
-fr gcore n'est pas installé : il est fourni avec gdb
+fr gcore n'est pas installé : il est fourni avec gdb
 
 en the process has ended
 fr le processus est terminé
@@ -656,7 +656,7 @@ en Displays
 fr Écrans
 
 en %s; holds %d%% of its design capacity
-fr %s ; garde %d%% de sa capacité d'origine
+fr %s ; garde %d%% de sa capacité d'origine
 
 en Battery
 fr Batterie
@@ -695,10 +695,10 @@ fr Informations du système copiées (%d ligne)
 fr+ Informations du système copiées (%d lignes)
 
 en Select a service: its journal shows here.
-fr Sélectionnez un service : son journal s'affiche ici.
+fr Sélectionnez un service : son journal s'affiche ici.
 
 en No entry is shown: another level, or another search, shows some.
-fr Aucune entrée affichée : un autre niveau, ou une autre recherche, en affiche.
+fr Aucune entrée affichée : un autre niveau, ou une autre recherche, en affiche.
 
 en All %d
 fr Tout %d
@@ -731,7 +731,7 @@ en Every boot
 fr Tous les démarrages
 
 en Following: new entries come in at the end (%s stops)
-fr Suivi : les nouvelles entrées arrivent à la fin (%s l'arrête)
+fr Suivi : les nouvelles entrées arrivent à la fin (%s l'arrête)
 
 en Search the journal (%s)
 fr Rechercher dans le journal (%s)
@@ -751,22 +751,22 @@ en Copied the entry
 fr Entrée copiée
 
 en The journal: every entry
-fr Le journal : toutes les entrées
+fr Le journal : toutes les entrées
 
 en The journal: warnings and worse
-fr Le journal : avertissements et pire
+fr Le journal : avertissements et pire
 
 en The journal: errors and worse
-fr Le journal : erreurs et pire
+fr Le journal : erreurs et pire
 
 en The journal: this boot
-fr Le journal : ce démarrage
+fr Le journal : ce démarrage
 
 en The journal: every boot
-fr Le journal : tous les démarrages
+fr Le journal : tous les démarrages
 
 en Following the journal: new entries come in at the end
-fr Suivi du journal : les nouvelles entrées arrivent à la fin
+fr Suivi du journal : les nouvelles entrées arrivent à la fin
 
 en The journal is not read again
 fr Le journal n'est plus relu
@@ -777,10 +777,10 @@ fr %d entrée copiée
 fr+ %d entrées copiées
 
 en %s: journal
-fr %s : journal
+fr %s : journal
 
 en No window for the journal: the renderer refused it
-fr Pas de fenêtre pour le journal : le moteur de rendu l'a refusée
+fr Pas de fenêtre pour le journal : le moteur de rendu l'a refusée
 
 en The journal of %s in its own window
 fr Le journal de %s dans sa propre fenêtre
@@ -795,7 +795,7 @@ en in its state since %s
 fr dans cet état depuis %s
 
 en Licence registered: thank you
-fr Licence enregistrée : merci
+fr Licence enregistrée : merci
 
 en Licence removed
 fr Licence retirée
@@ -804,7 +804,7 @@ en This licence is not Inspecteur's.
 fr Cette licence n'est pas celle d'Inspecteur.
 
 en This key is not a valid licence of Inspecteur: check that it was copied whole.
-fr Cette clé n'est pas une licence valide d'Inspecteur : vérifiez qu'elle a été copiée en entier.
+fr Cette clé n'est pas une licence valide d'Inspecteur : vérifiez qu'elle a été copiée en entier.
 
 en This build of Inspecteur accepts no licence yet.
 fr Cette version d'Inspecteur n'accepte encore aucune licence.
@@ -828,13 +828,13 @@ en Remove the licence
 fr Retirer la licence
 
 en Unregistered. Inspecteur is free; a licence supports its work.
-fr Non enregistré. Inspecteur est gratuit ; une licence soutient son travail.
+fr Non enregistré. Inspecteur est gratuit ; une licence soutient son travail.
 
 en The licence stored here is not valid: %s
-fr La licence enregistrée ici n'est pas valide : %s
+fr La licence enregistrée ici n'est pas valide : %s
 
 en Support Inspecteur: buy a licence
-fr Soutenir Inspecteur : acheter une licence
+fr Soutenir Inspecteur : acheter une licence
 
 en Paste a licence key
 fr Collez une clé de licence
@@ -893,10 +893,10 @@ en Create
 fr Créer
 
 en Create a dump file of %s?
-fr Créer un fichier d'image mémoire de %s ?
+fr Créer un fichier d'image mémoire de %s ?
 
 en Its memory is written to a file of %s at most: anything it held, passwords and documents too. %s
-fr Sa mémoire est écrite dans un fichier de %s au plus : tout ce qu'il contenait, mots de passe et documents compris. %s
+fr Sa mémoire est écrite dans un fichier de %s au plus : tout ce qu'il contenait, mots de passe et documents compris. %s
 
 en Resume
 fr Reprendre
@@ -944,10 +944,10 @@ en User 2 (SIGUSR2)
 fr Utilisateur 2 (SIGUSR2)
 
 en Not stopped: it is Inspecteur, runs it or draws the desktop, and nothing could resume it
-fr Pas suspendu : c'est Inspecteur, il l'exécute ou dessine le bureau, et rien ne pourrait le reprendre
+fr Pas suspendu : c'est Inspecteur, il l'exécute ou dessine le bureau, et rien ne pourrait le reprendre
 
 en The demo's processes are not the system's: nothing was sent
-fr Les processus de la démo ne sont pas ceux du système : rien n'a été envoyé
+fr Les processus de la démo ne sont pas ceux du système : rien n'a été envoyé
 
 en %s, PID %d
 fr %s, PID %d
@@ -965,16 +965,16 @@ en End
 fr Terminer
 
 en Kill %s?
-fr Forcer l'arrêt de %s ?
+fr Forcer l'arrêt de %s ?
 
 en End %s?
-fr Terminer %s ?
+fr Terminer %s ?
 
 en It draws the desktop: the session ends with it, and every program of the session with it. 
-fr Il dessine le bureau : la session se termine avec lui, et tous les programmes de la session avec elle. 
+fr Il dessine le bureau : la session se termine avec lui, et tous les programmes de la session avec elle. 
 
 en Inspecteur ends with it: it runs under it. 
-fr Inspecteur se termine avec lui : il tourne sous lui. 
+fr Inspecteur se termine avec lui : il tourne sous lui. 
 
 en They end at once, without the chance to save their work. End task asks them to end on their own.
 fr Ils s'arrêtent aussitôt, sans pouvoir enregistrer leur travail. Terminer la tâche leur demande de s'arrêter d'eux-mêmes.
@@ -989,13 +989,13 @@ en It is asked to end.
 fr Il lui est demandé de s'arrêter.
 
 en Stop %s?
-fr Arrêter %s ?
+fr Arrêter %s ?
 
 en Restart %s?
-fr Redémarrer %s ?
+fr Redémarrer %s ?
 
 en It stops, and its processes end; what needs it may stop too.
-fr Il s'arrête, et ses processus se terminent ; ce qui en dépend peut s'arrêter aussi.
+fr Il s'arrête, et ses processus se terminent ; ce qui en dépend peut s'arrêter aussi.
 
 en It stops, its processes end, and it starts again.
 fr Il s'arrête, ses processus se terminent, et il redémarre.
@@ -1013,16 +1013,16 @@ en Health
 fr Santé
 
 en Busiest: CPU
-fr Les plus actifs : CPU
+fr Les plus actifs : CPU
 
 en Busiest: memory
-fr Les plus gros : mémoire
+fr Les plus gros : mémoire
 
 en %d of %d panels: drag a tab to move it
-fr %d panneaux sur %d : faites glisser un onglet pour le déplacer
+fr %d panneaux sur %d : faites glisser un onglet pour le déplacer
 
 en %s closed: the panels' menu brings it back
-fr %s fermé : le menu des panneaux le fait revenir
+fr %s fermé : le menu des panneaux le fait revenir
 
 en Panels
 fr Panneaux
@@ -1040,23 +1040,23 @@ en CPU %.0f%%
 fr CPU %.0f%%
 
 en A click, or %s: why it is slow, in full.
-fr Un clic, ou %s : pourquoi c'est lent, en détail.
+fr Un clic, ou %s : pourquoi c'est lent, en détail.
 
 en %d service of the system: %d running, %d failed
 en+ %d services of the system: %d running, %d failed
-fr %d service du système : %d en cours, %d en échec
-fr+ %d services du système : %d en cours, %d en échec
+fr %d service du système : %d en cours, %d en échec
+fr+ %d services du système : %d en cours, %d en échec
 
 en %d service of the user: %d running, %d failed
 en+ %d services of the user: %d running, %d failed
-fr %d service de l'utilisateur : %d en cours, %d en échec
-fr+ %d services de l'utilisateur : %d en cours, %d en échec
+fr %d service de l'utilisateur : %d en cours, %d en échec
+fr+ %d services de l'utilisateur : %d en cours, %d en échec
 
 en No service failed.
 fr Aucun service en échec.
 
 en %s now; %d listening, %d connected
-fr %s maintenant ; %d à l'écoute, %d connectés
+fr %s maintenant ; %d à l'écoute, %d connectés
 
 en %d socket
 en+ %d sockets
@@ -1090,7 +1090,7 @@ en Show in Startup
 fr Afficher dans Démarrage
 
 en No window for %s: the renderer refused it
-fr Pas de fenêtre pour %s : le moteur de rendu l'a refusée
+fr Pas de fenêtre pour %s : le moteur de rendu l'a refusée
 
 en Overall
 fr Global
@@ -1108,7 +1108,7 @@ en Disk %d (%s)
 fr Disque %d (%s)
 
 en %s  S: %s R: %s
-fr %s  E : %s R : %s
+fr %s  E : %s R : %s
 
 en %s  asleep
 fr %s  en veille
@@ -1117,7 +1117,7 @@ en Pressure
 fr Pression
 
 en %s waits %.1f%%
-fr %s : attente %.1f%%
+fr %s : attente %.1f%%
 
 en %% Utilization of each logical processor over %s
 fr %% d'utilisation de chaque processeur logique sur %s
@@ -1278,7 +1278,7 @@ en Dedicated memory usage
 fr Utilisation de la mémoire dédiée
 
 en This GPU is asleep: the system turned it off while nothing uses it. Reading it would wake it.
-fr Ce GPU est en veille : le système l'a éteint tant que rien ne l'utilise. Le lire le réveillerait.
+fr Ce GPU est en veille : le système l'a éteint tant que rien ne l'utilise. Le lire le réveillerait.
 
 en This GPU's numbers come with NVIDIA's driver library (libnvidia-ml), not found or not answering.
 fr Les chiffres de ce GPU viennent de la bibliothèque du pilote NVIDIA (libnvidia-ml), introuvable ou muette.
@@ -1422,7 +1422,7 @@ en %s, top %s
 fr %s, maximum %s
 
 en Access denied: another user's process. Only its owner, or %s, may read it.
-fr Accès refusé : processus d'un autre utilisateur. Seul son propriétaire, ou %s, peut le lire.
+fr Accès refusé : processus d'un autre utilisateur. Seul son propriétaire, ou %s, peut le lire.
 
 en Nothing matches “%s”.
 fr Rien ne correspond à « %s ».
@@ -1548,13 +1548,13 @@ en the service manager did not reload
 fr le gestionnaire de services ne s'est pas rechargé
 
 en not allowed: %s (a system service needs an administrator's permission)
-fr non autorisé : %s (un service du système demande l'autorisation d'un administrateur)
+fr non autorisé : %s (un service du système demande l'autorisation d'un administrateur)
 
 en access denied
 fr accès refusé
 
 en journalctl cannot be run: the journal is not read
-fr journalctl ne peut pas être lancé : le journal n'est pas lu
+fr journalctl ne peut pas être lancé : le journal n'est pas lu
 
 en journalctl failed
 fr journalctl a échoué
@@ -1617,49 +1617,79 @@ en Hide the details
 fr Masquer les détails
 
 en It runs the desktop: the session ends with it.
-fr Il fait tourner le bureau : la session se termine avec lui.
+fr Il fait tourner le bureau : la session se termine avec lui.
 
 en Inspecteur runs under it: Inspecteur ends with it.
-fr Inspecteur tourne sous lui : Inspecteur se termine avec lui.
+fr Inspecteur tourne sous lui : Inspecteur se termine avec lui.
 
 en Inspecteur runs in it: Inspecteur ends with it.
-fr Inspecteur tourne dedans : Inspecteur se termine avec lui.
+fr Inspecteur tourne dedans : Inspecteur se termine avec lui.
 
 en PID %d is not in the processes' last sample
 fr Le PID %d n'est pas dans la dernière mesure des processus
 
+en Refresh
+fr Actualisation
+
 en How often the processes and the machine are read again, in milliseconds: a point of the Performance section's graphs each time. The title bar's refresh menu (Ctrl+Shift+R) changes it.
-fr L'intervalle de lecture des processus et de la machine, en millisecondes : un point des graphiques de la section Performances à chaque fois. Le menu d'actualisation de la barre de titre (Ctrl+Shift+R) le change.
+fr L'intervalle de lecture des processus et de la machine, en millisecondes : un point des graphiques de la section Performances à chaque fois. Le menu d'actualisation de la barre de titre (Ctrl+Shift+R) le change.
+
+en View
+fr Présentation
 
 en How the processes are listed: apps, the apps' groups and the background processes; tree, every process under its parent. Ctrl+T switches them.
-fr La présentation des processus : apps, les groupes des applications et les processus d'arrière-plan ; tree, chaque processus sous son parent. Ctrl+T passe de l'une à l'autre.
+fr La présentation des processus : apps, les groupes des applications et les processus d'arrière-plan ; tree, chaque processus sous son parent. Ctrl+T passe de l'une à l'autre.
+
+en Summary
+fr Résumé
 
 en Show the summary of the machine over the Processes table: CPU, memory, disks, network, GPU, temperature and pressure, each with its last minute. Ctrl+B shows or hides it.
-fr Afficher le résumé de la machine au-dessus du tableau des processus : CPU, mémoire, disques, réseau, GPU, température et pression, chacun avec sa dernière minute. Ctrl+B l'affiche ou le masque.
+fr Afficher le résumé de la machine au-dessus du tableau des processus : CPU, mémoire, disques, réseau, GPU, température et pression, chacun avec sa dernière minute. Ctrl+B l'affiche ou le masque.
+
+en Manager
+fr Gestionnaire
 
 en The services the Services section lists: the system's (system) or the user's (user). Its System and User buttons change it.
-fr Les services que liste la section Services : ceux du système (system) ou ceux de l'utilisateur (user). Ses boutons Système et Utilisateur le changent.
+fr Les services que liste la section Services : ceux du système (system) ou ceux de l'utilisateur (user). Ses boutons Système et Utilisateur le changent.
+
+en Details
+fr Détails
 
 en Show the selected service's details and its journal's last lines under the table (Ctrl+I).
 fr Afficher les détails du service sélectionné et les dernières lignes de son journal sous le tableau (Ctrl+I).
 
+en Journal boot
+fr Démarrages du journal
+
 en The details' journal shows this boot's entries alone; off: its last entries, from any boot. Alt+B switches it.
-fr Le journal des détails n'affiche que les entrées de ce démarrage ; désactivé : ses dernières entrées, de tout démarrage. Alt+B le bascule.
+fr Le journal des détails n'affiche que les entrées de ce démarrage ; désactivé : ses dernières entrées, de tout démarrage. Alt+B le bascule.
+
+en Journal level
+fr Niveau du journal
 
 en The entries of the details' journal shown: all, warnings (and worse), errors (and worse). Alt+L goes through them.
-fr Les entrées affichées du journal des détails : all (toutes), warnings (avertissements et pire), errors (erreurs et pire). Alt+L passe de l'une à l'autre.
+fr Les entrées affichées du journal des détails : all (toutes), warnings (avertissements et pire), errors (erreurs et pire). Alt+L passe de l'une à l'autre.
+
+en Journal follow
+fr Suivi du journal
 
 en Read the details' journal again every 2 seconds while it is shown: new entries come in at the end. Alt+F switches it.
-fr Relire le journal des détails toutes les 2 secondes tant qu'il est affiché : les nouvelles entrées arrivent à la fin. Alt+F le bascule.
+fr Relire le journal des détails toutes les 2 secondes tant qu'il est affiché : les nouvelles entrées arrivent à la fin. Alt+F le bascule.
 
 en How often the sockets are read again while Connections or Mission Control is shown, in milliseconds. A reading goes through every process's open files: a longer period costs less.
-fr L'intervalle de lecture des sockets tant que Connexions ou Mission Control est affiché, en millisecondes. Une lecture parcourt les fichiers ouverts de chaque processus : un intervalle plus long coûte moins.
+fr L'intervalle de lecture des sockets tant que Connexions ou Mission Control est affiché, en millisecondes. Une lecture parcourt les fichiers ouverts de chaque processus : un intervalle plus long coûte moins.
 
 en How often the services are read again while their section is shown, in milliseconds.
 fr L'intervalle de lecture des services tant que leur section est affichée, en millisecondes.
 
+en Zebra
+fr Lignes alternées
+
 en Shade every second row of the tables: a line of numbers reads across.
-fr Griser une ligne sur deux des tableaux : une ligne de nombres se lit d'un bout à l'autre.
+fr Griser une ligne sur deux des tableaux : une ligne de nombres se lit d'un bout à l'autre.
+
+en Rules
+fr Lignes de séparation
 
 en Draw a thin line under each row of the tables.
 fr Tracer un fin trait sous chaque ligne des tableaux.
@@ -1686,7 +1716,7 @@ en Rendering
 fr Rendu
 
 en This desktop draws no title bar for Inspecteur's window (GNOME): Inspecteur keeps its own.
-fr Ce bureau ne dessine pas de barre de titre pour la fenêtre d'Inspecteur (GNOME) : Inspecteur garde la sienne.
+fr Ce bureau ne dessine pas de barre de titre pour la fenêtre d'Inspecteur (GNOME) : Inspecteur garde la sienne.
 
 en Autostart entry
 fr Entrée de démarrage automatique
@@ -1704,16 +1734,16 @@ en File
 fr Fichier
 
 en Enabled %s: it starts with the session
-fr %s activé : il démarre avec la session
+fr %s activé : il démarre avec la session
 
 en Disabled %s: it no longer starts with the session
-fr %s désactivé : il ne démarre plus avec la session
+fr %s désactivé : il ne démarre plus avec la session
 
 en Not in this desktop
 fr Pas dans ce bureau
 
 en The user's service manager cannot be reached (no session bus): its services are not listed.
-fr Le gestionnaire de services de l'utilisateur est injoignable (pas de bus de session) : ses services ne sont pas listés.
+fr Le gestionnaire de services de l'utilisateur est injoignable (pas de bus de session) : ses services ne sont pas listés.
 
 en The user's service manager does not list its services.
 fr Le gestionnaire de services de l'utilisateur ne liste pas ses services.
@@ -1749,7 +1779,7 @@ en Pressure, %s
 fr Pression, %s
 
 en %s: %s. Show it in Performance
-fr %s : %s. L'afficher dans Performances
+fr %s : %s. L'afficher dans Performances
 
 en The summary of the machine is shown
 fr Le résumé de la machine est affiché
@@ -1820,7 +1850,7 @@ en Open while the filter finds some of its processes
 fr Ouvert tant que le filtre trouve certains de ses processus
 
 en CPU over the last %s: %.1f%% on average, %.1f%% at most
-fr CPU sur les dernières %s : %.1f%% en moyenne, %.1f%% au plus
+fr CPU sur les dernières %s : %.1f%% en moyenne, %.1f%% au plus
 
 en Every process under its parent
 fr Chaque processus sous son parent
@@ -1829,7 +1859,7 @@ en Apps and background processes
 fr Applications et processus d'arrière-plan
 
 en Filter: type anywhere (Ctrl+F); Escape clears it
-fr Filtre : tapez n'importe où (Ctrl+F) ; Échap l'efface
+fr Filtre : tapez n'importe où (Ctrl+F) ; Échap l'efface
 
 en Filter processes...
 fr Filtrer les processus...
@@ -1852,15 +1882,15 @@ en %s of %s
 fr %s sur %s
 
 en Selected: %s, PID %d
-fr Sélection : %s, PID %d
+fr Sélection : %s, PID %d
 
 en Selected: %d rows
-fr Sélection : %d lignes
+fr Sélection : %d lignes
 
 en Selected: %s, %d process
 en+ Selected: %s, %d processes
-fr Sélection : %s, %d processus
-fr+ Sélection : %s, %d processus
+fr Sélection : %s, %d processus
+fr+ Sélection : %s, %d processus
 
 en As the system
 fr Comme le système
@@ -1872,7 +1902,7 @@ en Light
 fr Clair
 
 en Colours: light or dark (%s), the theme
-fr Couleurs : clair ou sombre (%s), le thème
+fr Couleurs : clair ou sombre (%s), le thème
 
 en Version
 fr Version
@@ -1884,16 +1914,16 @@ en Theme
 fr Thème
 
 en High: 0.5 s
-fr Rapide : 0,5 s
+fr Rapide : 0,5 s
 
 en Normal: 1 s
-fr Normale : 1 s
+fr Normale : 1 s
 
 en Low: 2 s
-fr Lente : 2 s
+fr Lente : 2 s
 
 en Very low: 5 s
-fr Très lente : 5 s
+fr Très lente : 5 s
 
 en Paused
 fr En pause
@@ -1902,19 +1932,19 @@ en Paused while Ctrl is held
 fr En pause tant que Ctrl est enfoncée
 
 en Refresh paused: F5 reads again, Ctrl+Space resumes
-fr Actualisation en pause : F5 relit, Ctrl+Espace reprend
+fr Actualisation en pause : F5 relit, Ctrl+Espace reprend
 
 en Refresh every %s
-fr Intervalle d'actualisation : %s
+fr Intervalle d'actualisation : %s
 
 en Refresh every %s: the graphs span %s
-fr Intervalle d'actualisation : %s ; les graphiques couvrent %s
+fr Intervalle d'actualisation : %s ; les graphiques couvrent %s
 
 en Refresh: paused. %s (%s), Resume (%s)
-fr Actualisation : en pause. %s (%s), Reprendre (%s)
+fr Actualisation : en pause. %s (%s), Reprendre (%s)
 
 en Refresh: every %s. %s (%s), Pause (%s)
-fr Actualisation : intervalle de %s. %s (%s), Pause (%s)
+fr Actualisation : intervalle de %s. %s (%s), Pause (%s)
 
 en Pause
 fr Pause
@@ -1929,7 +1959,7 @@ en Zoom %.0f %%
 fr Zoom %.0f %%
 
 en Zoom %.0f %% (Ctrl+0: 100 %%)
-fr Zoom %.0f %% (Ctrl+0 : 100 %%)
+fr Zoom %.0f %% (Ctrl+0 : 100 %%)
 
 en The window of %s comes to the front
 fr La fenêtre de %s passe au premier plan
@@ -1938,7 +1968,7 @@ en That window has closed
 fr Cette fenêtre s'est fermée
 
 en Show its window: %s
-fr Afficher sa fenêtre : %s
+fr Afficher sa fenêtre : %s
 
 en Show its windows (%d), one after the other
 en+ Show its windows (%d), one after the other

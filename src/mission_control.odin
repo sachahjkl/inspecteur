@@ -42,10 +42,12 @@ MISSION_DEFAULT :: "dock1 y0.320([*machine] y0.500(x0.340([*health] x0.500([*cpu
 // The lines a list panel shows at most.
 @(private = "file") MISSION_TOP :: 8
 
+// The panels' menu, and a line's menu (a right click).
+MISSION_MENU :: "inspecteur_mission_panels"
+MISSION_LINE_MENU :: "inspecteur_mission_line"
+
 Mission_Control :: struct {
 	dock:      ui.Dock,
-	menu:      ui.Key,   // the panels' menu
-	line_menu: ui.Key,   // a line's menu (a right click)
 	line:      Mission_Line,
 	// a panel the dock let go to a window of its own, opened by the loop between two frames (mission_windows_frame), not
 	// in the middle of the main window's build
@@ -105,8 +107,7 @@ mission_reset :: proc(app: ^App) {
 
 mission_panels_open :: proc(app: ^App) {
 	tab_show(app, .Mission_Control)
-	if app.mission.menu == 0 { app.mission.menu = ui.key_from_string(0, "inspecteur_mission_panels") }
-	ui.ctx_menu_open(app.mission.menu, {app.bar_rect.max.x - ui.font_size() * 16, app.bar_rect.max.y}, from_keyboard = true)
+	ui.menu_open(MISSION_MENU, ui.Vec2{app.bar_rect.max.x - ui.font_size() * 16, app.bar_rect.max.y}, from_keyboard = true)
 }
 
 build_mission :: proc(app: ^App, em: f32) {
@@ -132,9 +133,8 @@ build_mission :: proc(app: ^App, em: f32) {
 // The bar's right: the panels' menu, the layout as at first.
 @(private = "file")
 mission_bar_right :: proc(app: ^App, em: f32) {
-	if app.mission.menu == 0 { app.mission.menu = ui.key_from_string(0, "inspecteur_mission_panels") }
 	if tool_button("mission_panels", lucide.LAYOUT_GRID, cmd_tip(.Mission_Panels), true, em) {
-		ui.ctx_menu_open(app.mission.menu, ui.mouse_pos())
+		ui.menu_open(MISSION_MENU, ui.mouse_pos())
 	}
 	if tool_button("mission_reset", lucide.ROTATE_CCW, cmd_tip(.Mission_Reset), true, em) { mission_reset(app) }
 	ui.spacer(ui.px(em * 0.4))
@@ -144,9 +144,8 @@ mission_bar_right :: proc(app: ^App, em: f32) {
 // at first.
 @(private = "file")
 mission_menu :: proc(app: ^App, em: f32) {
-	if app.mission.menu == 0 { return }
 	d := &app.mission.dock
-	if ui.ctx_menu(app.mission.menu, em * MISSION_MENU_EM) {
+	if ui.menu(MISSION_MENU, em * MISSION_MENU_EM) {
 		ui.menu_heading(i18n.tr("Panels"))
 		for p in Mission_Panel {
 			on := ui.dock_has(d, u32(p))
@@ -513,39 +512,37 @@ mission_line_menu_open :: proc(app: ^App, line: Mission_Line, pos: ui.Vec2) {
 	delete(mc.line.name)
 	mc.line = line
 	mc.line.name = strings.clone(line.name)
-	if mc.line_menu == 0 { mc.line_menu = ui.key_from_string(0, "inspecteur_mission_line") }
-	ui.ctx_menu_open(mc.line_menu, pos)
+	ui.menu_open(MISSION_LINE_MENU, pos)
 }
 
 // The menu of a line: its section first, then what is related to it. The process is found again by its pid and start
 // time (gone: the menu closes); the service and the startup item by their names in their sections.
 mission_line_menu :: proc(app: ^App, em: f32) {
 	mc := &app.mission
-	if mc.line_menu == 0 { return }
-	if ui.ctx_menu(mc.line_menu, em * 16) {
+	if ui.menu(MISSION_LINE_MENU, em * 16) {
 		line := mc.line
 		switch line.kind {
 		case .None:
-			ui.ctx_menu_close()
+			ui.menu_close()
 		case .Process:
 			p := find_proc(&app.sampler, line.pid, line.start)
-			if p == nil { ui.ctx_menu_close(); return }
+			if p == nil { ui.menu_close(); return }
 			if ui.menu_item(i18n.tr("Show in Processes"), icon = lucide.LAYOUT_LIST, icon_font = app.icons).clicked { processes_reveal(app, p.pid, p.start) }
 			if ui.menu_item(cmd_label(.Properties), icon = COMMANDS[.Properties].icon, icon_font = app.icons).clicked {
 				props_open(app, p.pid, p.start)
 			}
 			ui.menu_separator()
-			if ui.menu_item(cmd_label(.Go_To_Service), icon = COMMANDS[.Go_To_Service].icon, enabled = p.unit != "", icon_font = app.icons).clicked { go_to_service(app, p) }
+			if ui.menu_item(cmd_label(.Go_To_Service), icon = COMMANDS[.Go_To_Service].icon, disabled = p.unit == "", icon_font = app.icons).clicked { go_to_service(app, p) }
 			if ui.menu_item(i18n.tr("Show its connections"), icon = lucide.GLOBE, icon_font = app.icons).clicked { mission_show_connections(app, p.pid) }
 			ui.menu_separator()
-			if ui.menu_item(cmd_label(.Open_Location), icon = COMMANDS[.Open_Location].icon, enabled = p.exe != "", icon_font = app.icons).clicked { open_location(app, p) }
-			if ui.menu_item(cmd_label(.Copy_Command), icon = COMMANDS[.Copy_Command].icon, enabled = p.cmdline != "", icon_font = app.icons).clicked { copy_command(app, p) }
+			if ui.menu_item(cmd_label(.Open_Location), icon = COMMANDS[.Open_Location].icon, disabled = p.exe == "", icon_font = app.icons).clicked { open_location(app, p) }
+			if ui.menu_item(cmd_label(.Copy_Command), icon = COMMANDS[.Copy_Command].icon, disabled = p.cmdline == "", icon_font = app.icons).clicked { copy_command(app, p) }
 		case .Service:
 			u, found := mission_service(app, line.name)
-			if !found { ui.ctx_menu_close(); return }
+			if !found { ui.menu_close(); return }
 			if ui.menu_item(i18n.tr("Show in Services"), icon = lucide.SETTINGS, icon_font = app.icons).clicked { mission_show_service(app, line.name) }
 			q := u.pid > 0 ? find_pid(&app.sampler, u.pid) : nil
-			if ui.menu_item(i18n.tr("Show its process"), icon = lucide.LAYOUT_LIST, enabled = q != nil, icon_font = app.icons).clicked { processes_reveal(app, q.pid, q.start) }
+			if ui.menu_item(i18n.tr("Show its process"), icon = lucide.LAYOUT_LIST, disabled = q == nil, icon_font = app.icons).clicked { processes_reveal(app, q.pid, q.start) }
 			if ui.menu_item(cmd_label(.Service_Details), icon = COMMANDS[.Service_Details].icon, icon_font = app.icons).clicked {
 				mission_show_service(app, line.name)
 				if !app.settings.details { service_details_switch(app) }
@@ -576,7 +573,7 @@ mission_show_service :: proc(app: ^App, name: string) {
 @(private = "file")
 mission_show_connections :: proc(app: ^App, pid: i32) {
 	tab_show(app, .Connections)
-	ui.field_set(&app.search, fmt.tprintf("%d", pid))
+	ui.line_edit_set(&app.search, fmt.tprintf("%d", pid))
 }
 
 @(private = "file")

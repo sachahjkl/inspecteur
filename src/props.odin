@@ -61,14 +61,14 @@ Props :: struct {
 	pid:      i32,
 	start:    u64,
 	tab:      Props_Tab,
-	size:     [2]f32,   // the dialog's size, as the user left it (modal_sized)
+	size:     [2]f32,   // the dialog's size, as the user left it, in ems (ui.modal)
 	data:     ^Props_Data,   // the last reading (nil: none yet)
 	serial:   int,           // counts the readings taken (the filter's rows follow it)
 	read_at:  time.Tick,
 	reading:  bool,        // a reading is under way (its result comes at a next build: props_done)
 	gone:     bool,        // the process ended: nothing more is read
 	nice_sel: int,         // the priority menu's choice (PRIORITIES)
-	filter:   ui.Text_Field,   // the filter of the lists (Ctrl+F)
+	filter:   ui.Line_Edit,   // the filter of the lists (Ctrl+F)
 	filter_key: ui.Key,
 	// the rows the filter keeps, made again when the reading, the tab or the filter changes (props_view.odin)
 	shown:      [dynamic]int,
@@ -85,7 +85,7 @@ Priority :: struct { name: string, nice: i8 }
 
 props_destroy :: proc(p: ^Props) {
 	props_data_free(p.data)
-	ui.field_destroy(&p.filter)
+	ui.line_edit_destroy(&p.filter)
 	delete(p.shown)
 	delete(p.shown_ids)
 	delete(p.shown_query)
@@ -104,7 +104,7 @@ props_open :: proc(app: ^App, pid: i32, start: u64) {
 	props_data_free(p.data)
 	p.data = nil
 	p.serial += 1
-	ui.field_clear(&p.filter)
+	ui.line_edit_clear(&p.filter)
 	props_read(app)
 }
 

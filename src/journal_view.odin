@@ -81,7 +81,7 @@ journal_note :: proc(text: string, em: f32) {
 journal_shown :: proc(app: ^App, v: ^Journal_View) -> []int {
 	d := v.details
 	if d == nil { return nil }
-	q := strings.to_lower(strings.trim_space(ui.field_string(&v.search)), context.temp_allocator)
+	q := strings.to_lower(strings.trim_space(ui.line_edit_string(&v.search)), context.temp_allocator)
 	if v.shown_of == v.serial && v.shown_level == app.settings.journal_level && v.shown_query == q { return v.shown[:] }
 	v.shown_of, v.shown_level = v.serial, app.settings.journal_level
 	delete(v.shown_query)
@@ -135,10 +135,10 @@ journal_bar :: proc(app: ^App, v: ^Journal_View, shown: int, em: f32, in_window:
 		follow := app.settings.journal_follow
 		ui.next({width = ui.px(em * 2.2), height = ui.px(ui.dense(em * 1.9))})
 		tip := follow ? fmt.tprintf(i18n.tr("Following: new entries come in at the end (%s stops)"), ui.command_shortcut(COMMANDS[.Journal_Follow])) : cmd_tip(.Journal_Follow)
-		if ui.icon_button("svc_journal_follow", follow ? lucide.ARROW_DOWN : lucide.PAUSE, tip = tip, intent = follow ? .Primary : .Neutral, face = follow ? .Raised : .Ghost).clicked { journal_run_on(app, v, .Journal_Follow) }
+		if ui.button("svc_journal_follow", icon = follow ? lucide.ARROW_DOWN : lucide.PAUSE, o = {tip = tip, intent = follow ? .Primary : .Neutral, face = follow ? .Raised : .Ghost}).clicked { journal_run_on(app, v, .Journal_Follow) }
 		ui.spacer(ui.px(em * 0.6))
 		ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 1.9))})
-		res := ui.line_edit("###svc_journal_search", &v.search, fmt.tprintf(i18n.tr("Search the journal (%s)"), ui.command_shortcut(COMMANDS[.Journal_Search])))
+		res := ui.line_edit("###svc_journal_search", &v.search, {placeholder = fmt.tprintf(i18n.tr("Search the journal (%s)"), ui.command_shortcut(COMMANDS[.Journal_Search]))})
 		v.search_key = res.box.key
 		ui.spacer(ui.px(em * 0.4))
 		if ui.tags("weak") {
@@ -306,7 +306,7 @@ journal_run :: proc(app: ^App, c: Cmd) { journal_run_on(app, &app.services.pane,
 
 journal_run_on :: proc(app: ^App, v: ^Journal_View, c: Cmd) {
 	#partial switch c {
-	case .Journal_Search: if v.search_key != 0 { ui.set_focus(v.search_key); ui.field_select_all(&v.search) }
+	case .Journal_Search: if v.search_key != 0 { ui.set_focus(v.search_key); ui.line_edit_select_all(&v.search) }
 	case .Journal_Level:  journal_level_set(app, Journal_Level((int(app.settings.journal_level) + 1) % len(Journal_Level)))
 	case .Journal_Boot:   journal_boot_set(app, !app.settings.journal_boot)
 	case .Journal_Follow:
@@ -359,6 +359,6 @@ journal_due_ms :: proc(app: ^App) -> int {
 // window's Escape is another command's)
 journal_search_escape :: proc(v: ^Journal_View) -> bool {
 	if v.search_key == 0 || ui.focus_key() != v.search_key || !ui.key_press(.Escape) { return false }
-	if len(v.search.buf) > 0 { ui.field_clear(&v.search) } else { ui.set_focus(0) }
+	if len(v.search.buf) > 0 { ui.line_edit_clear(&v.search) } else { ui.set_focus(0) }
 	return true
 }

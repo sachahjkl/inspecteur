@@ -79,7 +79,7 @@ affinity_apply :: proc(app: ^App) {
 affinity_build :: proc(app: ^App, em: f32) {
 	a := &app.affinity
 	w := em * AFFINITY_W_EM
-	if ui.modal("affinity", w, &a.open) {
+	if ui.modal("affinity", &a.open, {width_em = AFFINITY_W_EM}) {
 		pad := em * 1.2
 		ui.next({width = ui.px(w), height = ui.children_sum(), axis = .Y})
 		if ui.column(id = "###affinity") {
@@ -117,16 +117,16 @@ affinity_build :: proc(app: ^App, em: f32) {
 			if ui.row(.Center, {}, "###affinity_foot") {
 				ui.spacer(ui.px(pad))
 				ui.next({width = ui.text_size(em * 1.2), height = ui.px(ui.dense(em * 2.2))})
-				if ui.button(fmt.tprintf("%s###affinity_all", i18n.tr("All"))).clicked { for i in 0 ..< a.count { a.cpus[i] = true } }
+				if ui.button("affinity_all", i18n.tr("All")).clicked { for i in 0 ..< a.count { a.cpus[i] = true } }
 				ui.spacer(ui.px(em * 0.4))
 				ui.next({width = ui.text_size(em * 1.2), height = ui.px(ui.dense(em * 2.2))})
-				if ui.button(fmt.tprintf("%s###affinity_none", i18n.tr("None"))).clicked { for i in 0 ..< a.count { a.cpus[i] = false } }
+				if ui.button("affinity_none", i18n.tr("None")).clicked { for i in 0 ..< a.count { a.cpus[i] = false } }
 				ui.spacer(ui.fill())
 				ui.next({width = ui.text_size(em * 1.2), height = ui.px(ui.dense(em * 2.2))})
-				if ui.button(fmt.tprintf("%s###affinity_cancel", i18n.tr("Cancel"))).clicked { a.open = false }
+				if ui.button("affinity_cancel", i18n.tr("Cancel")).clicked { a.open = false }
 				ui.spacer(ui.px(em * 0.6))
 				ui.next({width = ui.text_size(em * 1.2), height = ui.px(ui.dense(em * 2.2))})
-				if ui.button(fmt.tprintf("%s###affinity_apply", i18n.tr("Apply (Enter)")), intent = .Primary).clicked || ui.key_press(.Return) { affinity_apply(app) }
+				if ui.button("affinity_apply", i18n.tr("Apply (Enter)"), o = {intent = .Primary}).clicked || ui.key_press(.Return) { affinity_apply(app) }
 				ui.spacer(ui.px(pad))
 			}
 			ui.spacer(ui.px(pad))

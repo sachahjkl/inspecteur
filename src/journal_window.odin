@@ -120,7 +120,7 @@ journal_window_keys :: proc(w: ^Journal_Window) {
 		cmd := COMMANDS[c]
 		// (the search keeps its editing keys: Alt+C is no editing key, Ctrl+J gives it the keyboard again)
 		if field && c == .Journal_Search { continue }
-		if ui.command_pressed(cmd, journal_can_on(app, &w.view, c)) { journal_run_on(app, &w.view, c) }
+		if ui.command_pressed(cmd, !journal_can_on(app, &w.view, c)) { journal_run_on(app, &w.view, c) }
 	}
 }
 

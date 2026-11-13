@@ -43,20 +43,18 @@ connections_actions :: proc(app: ^App, em: f32) {
 	cmd_button(app, "copy_address", lucide.COPY, .Socket_Copy, em)
 }
 
+CONNECTIONS_MENU :: "inspecteur_connection_menu"
+
 connections_menu_open :: proc(app: ^App, pos: ui.Vec2, from_keyboard := false) {
-	c := &app.connections
 	if _, ok := selected_socket(app); !ok { return }
-	if c.menu == 0 { c.menu = ui.key_from_string(0, "inspecteur_connection_menu") }
-	ui.ctx_menu_open(c.menu, pos, from_keyboard = from_keyboard)
+	ui.menu_open(CONNECTIONS_MENU, pos, from_keyboard = from_keyboard)
 }
 
 @(private = "file")
 connections_menu :: proc(app: ^App, em: f32) {
-	c := &app.connections
-	if c.menu == 0 { return }
-	if ui.ctx_menu(c.menu) {
+	if ui.menu(CONNECTIONS_MENU) {
 		s, ok := selected_socket(app)
-		if !ok { ui.ctx_menu_close(); return }
+		if !ok { ui.menu_close(); return }
 		_ = s
 		cmd_item(app, .Socket_End_Task)
 		cmd_item(app, .Socket_Kill)

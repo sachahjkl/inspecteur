@@ -20,21 +20,14 @@ Row_Icon :: struct {
 // A section's table, its rows and their icons (one per data row, in the order of the rows).
 Section_Table :: struct {
 	table: ui.Table,
-	english: []ui.Table_Column,   // the columns as declared: their English titles name them in the preferences
-	columns: []ui.Table_Column,   // owned: the same, their titles in the language in use (the table's)
+	columns: []ui.Table_Column,   // as declared: their English titles name them in the preferences (the toolkit shows them translated)
 	data:  ui.Table_Data,
 	icons: [dynamic]Row_Icon,
 	app:   ^App,
-	menu:  ui.Key,   // its header's menu
 }
 
 section_table_init :: proc(st: ^Section_Table, app: ^App, columns: []ui.Table_Column) {
-	st.english = columns
-	st.columns = make([]ui.Table_Column, len(columns))
-	for c, i in columns {
-		st.columns[i] = c
-		st.columns[i].title = i18n.tr(c.title)
-	}
+	st.columns = columns
 	ui.table_init(&st.table, st.columns)
 	st.app = app
 	st.table.lead = row_icon_lead
@@ -43,7 +36,6 @@ section_table_init :: proc(st: ^Section_Table, app: ^App, columns: []ui.Table_Co
 
 section_table_destroy :: proc(st: ^Section_Table) {
 	ui.table_destroy(&st.table)
-	delete(st.columns)
 	ui.table_data_destroy(&st.data)
 	delete(st.icons)
 }
@@ -76,9 +68,9 @@ section_table_build :: proc(st: ^Section_Table, empty: string) -> ui.Table_Event
 // layout kept in `<section>.*`, the rows sorted again.
 section_header_menu :: proc(st: ^Section_Table, ev: ui.Table_Events, section: string, em: f32) {
 	app := st.app
-	if st.menu == 0 { st.menu = ui.key_from_string(0, fmt.tprintf("inspecteur_%s_columns", section)) }
-	if ev.columns { ui.ctx_menu_open(st.menu, ui.mouse_pos()) }
-	if ui.ctx_menu(st.menu, em * 16) {
+	menu := fmt.tprintf("inspecteur_%s_columns", section)
+	if ev.columns { ui.menu_open(menu, ui.mouse_pos()) }
+	if ui.menu(menu, em * 16) {
 		changed, sorted := ui.table_menu_items(&st.table.layout)
 		if sorted { ui.table_apply(&st.table, &st.data, app.query) }
 		if changed { section_layout_save(st, &app.prefs, section) }

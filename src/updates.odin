@@ -36,7 +36,7 @@ updates_start :: proc(app: ^App, installed: bool, exe: string) {
 updates_auto :: proc(app: ^App) {
 	if app.updater == nil { return }
 	auto := app.settings.update_auto && app.installed_copy
-	update.set_auto(app.updater, check = auto, install = auto)
+	update.set_auto(app.updater, auto ? .Install : .Off)
 }
 
 // At each turn of the loop: what changed is said in the footer.

@@ -98,7 +98,7 @@ table_columns_init :: proc(t: ^Table) {
 	shown := columns_of(PREF_DEFS[PREF_COLUMNS].default.s)
 	for c in Column {
 		t.columns[int(c)] = {
-			title = i18n.tr(COLUMN_NAMES[c]), width = COLUMN_DEFAULT_EM[c], number = c not_in COLUMN_TEXT,
+			title = COLUMN_NAMES[c], width = COLUMN_DEFAULT_EM[c], number = c not_in COLUMN_TEXT,
 			low_first = c == .PID || c == .PPID || c == .Nice, hidden = c != .Name && c not_in shown,
 		}
 	}
