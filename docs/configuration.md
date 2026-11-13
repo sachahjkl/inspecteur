@@ -14,23 +14,22 @@ inspecteur --pref appearance.mode=light --pref processes.refresh_ms=2000
 The look, the text and its fonts, the scrolling, the input, the delays and menus, the rendering, the updates and where
 messages show are the settings every program of gui_toolkit has, with the same names: its
 [docs/settings.md](https://github.com/sachahjkl/gui_toolkit/blob/main/docs/settings.md) lists them with their defaults.
-Inspecteur gives some of them its own defaults:
+The ones Inspecteur reads itself, with their defaults:
 
 | Name | Inspecteur's default | What it does here |
 |---|---|---|
 | `appearance.theme` | Graphite | The window's colours: a theme of gui_toolkit by its name (Graphite, Midnight, Nord, Gruvbox, Tokyo Night, Catppuccin...), or one of the user's own themes (below). The title bar's colours button lists them too. |
 | `appearance.mode` | system | The theme's version: `system`, `dark` or `light`. Ctrl+Shift+L switches light and dark. A theme of one version (Graphite is dark only) gives way to Silver when the other version is chosen. |
 | `appearance.finish` | machined | How surfaces are drawn: `machined`, `edged`, `flat`, `gradient` or `glass`. |
-| `appearance.glow` | 0 | No halos around the machined finish's buttons and fields: a table of numbers reads best plain. |
-| `appearance.font_size` | 13 | The text size at a zoom of 100 %, in logical pixels (10 to 24): every size of the window follows it. |
+| `appearance.font_size` | 14 | The text size at a zoom of 100 %, in logical pixels (10 to 24): every size of the window follows it. |
 | `appearance.zoom` | 1 | The zoom of the window. Ctrl+wheel, Ctrl+= and Ctrl+- change it, Ctrl+0 sets it back; Inspecteur keeps it for the next start. |
 | `window.system_title` | false | The window's title bar drawn by the system in place of Inspecteur's own; changed at once where the desktop lets it. A desktop that draws none (GNOME) keeps Inspecteur's. |
 | `update.auto` | true | Check for a new version a while after the start and then every day, download it and put it in place: it runs at the next start. Only the installed copy updates itself; a copy of the Nix store is Nix's to update. |
 | `update.base_url` | the latest GitHub release | Where the updates' manifest and program are downloaded from. Read at the start. |
 | `general.messages` | system | Where Inspecteur says what it did (copied, a licence registered): the system's notifications, the window, or nowhere. |
 
-`general.menu` and `general.autostart` are registered but no page shows them: the install (`inspecteur install`, the
-Setup's dialog) puts the menu entry in place, and Inspecteur does not start with the session.
+`general.menu` and `general.autostart` are registered but no page shows them: the install (`inspecteur --install`, the
+install's dialog, the settings' Installation page) puts the menu entry in place, and Inspecteur does not start with the session.
 
 The user's own themes are in `$XDG_CONFIG_HOME/inspecteur/themes.txt`: the settings' Appearance page shows its path
 under the themes' cards; a click makes it (with its instructions in comments) and opens it. A change to it is shown in

@@ -111,7 +111,7 @@ CPU % is a share of the whole machine: 100 % is every core busy. Preferences: [d
 ## Install
 
 - **The archive** of a release: `inspecteur-<version>-linux-x64.tar.gz`, one program. At its first start it offers to
-  install itself for the user (or `./inspecteur install`): the program in `~/.local/share/inspecteur`, its menu entry and
+  install itself for the user (or `./inspecteur --install`): the program in `~/.local/share/inspecteur`, its menu entry and
   its icons. The installed copy updates itself from the signed releases (`update.auto`). It needs a Wayland desktop,
   Vulkan and fontconfig. On NixOS the install builds the libraries it needs with `nix-build` and points the copy at them.
 - **Nix**: `nix run git+https://github.com/sachahjkl/inspecteur` (Nix 2.27 or later: the flake asks for its submodule,
@@ -124,10 +124,10 @@ CPU % is a share of the whole machine: 100 % is every core busy. Preferences: [d
 
 | | |
 |---|---|
-| `inspecteur --setup`, Ctrl+Shift+I | the install's dialog: Install, Repair, Upgrade, Uninstall, Open the installed copy |
-| `inspecteur install` | installs this copy for the user |
-| `inspecteur uninstall` | takes the install away; the preferences stay |
-| `inspecteur status` | the install's state: exit 0 installed (or a Nix package), 2 to repair, 1 not installed |
+| Settings > Installation | where the install is, its version, its pieces: Install, Repair, Upgrade, Uninstall |
+| `inspecteur --setup` | the install's dialog: Install, Repair, Upgrade, Uninstall, Open the installed copy |
+| `inspecteur --install` | installs this copy for the user |
+| `inspecteur --uninstall` | takes the install away; the preferences stay |
 
 A copy that runs from the Nix store is the Nix package's: Nix installs and updates it, and nothing is offered. To open
 Inspecteur with Ctrl+Shift+Escape, bind that key to `inspecteur` in the desktop's keyboard settings.

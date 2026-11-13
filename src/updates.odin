@@ -19,7 +19,7 @@ import inspecteur_update "update"
 // default of update.base_url (settings.odin), which a mirror or a test changes.
 UPDATE_FOLDER :: "https://github.com/sachahjkl/inspecteur/releases/latest/download/"
 
-// Once the setup's facts are read (setup_offer): `installed`, this program is the installed copy; `exe`, its path.
+// Once the install was read (setup_follow): `installed`, this program is the installed copy; `exe`, its path.
 updates_start :: proc(app: ^App, installed: bool, exe: string) {
 	if app.demo != nil || app.updater != nil { return }
 	app.installed_copy = installed
@@ -60,7 +60,7 @@ updates_follow :: proc(app: ^App) {
 @(private = "file")
 manifest_work :: proc(data: rawptr) {
 	defer version_free(data)
-	if ok, why := setup.updated(setup_config(), (^string)(data)^); !ok { log.errorf("the update is in place, but %s", why) }
+	if ok, why := setup.updated(setup_options(), (^string)(data)^); !ok { log.errorf("the update is in place, but %s", why) }
 }
 
 @(private = "file")

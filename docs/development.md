@@ -59,7 +59,7 @@ acts only on what it made itself, and checks it before it presses a key that act
 - an app of its own: a desktop entry in the session's data folder, and two sleeps in a scope named for it
   (`systemd-run --user --scope --unit=app-inspecteurlive<pid>-1.scope`); the group is killed only once the scope holds
   those two and nothing else;
-- an autostart entry, and the install of the install's dialog and of `inspecteur install` (the program, its desktop entry
+- an autostart entry, and the install of the install's dialog and of `inspecteur --install` (the program, its desktop entry
   and icons), all in the session's folders.
 
 Without a session bus (neither address), `live` says so and skips the checks of the user's service and of the app's

@@ -118,12 +118,6 @@ fr Connexions
 en Information
 fr Informations
 
-en Inspecteur ended without warning last time
-fr Inspecteur s'est arrêté sans prévenir la dernière fois
-
-en Its report: %s
-fr Son rapport : %s
-
 en The preferences cannot be written
 fr Les réglages ne peuvent pas être écrits
 
@@ -162,9 +156,6 @@ fr Zoom : 100 %
 
 en Light or dark
 fr Clair ou sombre
-
-en Install…
-fr Installer…
 
 en Settings
 fr Réglages

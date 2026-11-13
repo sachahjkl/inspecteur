@@ -61,7 +61,7 @@ session_start :: proc(s: ^Session, dir: string, port: int, args: []string = nil,
 	s.output = strings.clone(fmt.tprintf("%s/inspecteur.log", s.dir))
 	command := make([dynamic]string, context.temp_allocator)
 	append(&command, PROGRAM)
-	if !setup { append(&command, "--pref", "setup.choice=standalone") }
+	if !setup { append(&command, "--pref", "install.choice=standalone") }
 	// (a finished act is said in the window: a notification of the system would reach the person's desktop)
 	append(&command, "--pref", "general.messages=window")
 	// (English whatever the person's locale: live reads the window's English texts, the pictures are of the English)

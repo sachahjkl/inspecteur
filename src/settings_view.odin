@@ -27,8 +27,8 @@ settings_keys :: proc(app: ^App) {
 }
 
 // The General page shows where inspecteur says what it did and its language, then the licence (its page_foot):
-// general.menu and general.autostart are the Setup's (the install puts the menu entry in place, and inspecteur has no
-// reason to start with the session), so no page shows them.
+// general.menu and general.autostart are the installation's (the install puts the menu entry in place, and inspecteur has
+// no reason to start with the session), so no page shows them: the Installation page says where it is.
 @(private = "file")
 GENERAL_NAMES := [?]string{prefs_page.MESSAGES_PREF, prefs_page.LANGUAGE_PREF}
 
@@ -68,6 +68,7 @@ settings_options :: proc(app: ^App) -> prefs_page.Page_Options {
 		version = "Inspecteur " + APP_VERSION,
 		file = prefs_file(),
 		themes = app.themes_file.all[:], themes_light = app.theme_shown.light, themes_file = &app.themes_file,
+		install = &app.install, diagnostics = &app.main,
 	}
 }
 

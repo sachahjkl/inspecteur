@@ -26,7 +26,7 @@ LICENCE_TOOL :: toolbox.Licence_Tool{
 	product  = inspecteur_licence.PRODUCT,
 	dev_seed = DEV_SEED,
 	hint     = "Open inspecteur's settings (Ctrl+,), the General page: choose this file, or paste the key there.",
-	paddle   = {name = "inspecteur licence", description = "A personal, perpetual licence of inspecteur, the task manager.", amounts = "supporter=1500", currency = "EUR"},
+	paddle   = {name = "Inspecteur User License", description = "A personal, perpetual licence of inspecteur, the task manager.", amounts = "supporter=1500", currency = "EUR"},
 }
 
 main :: proc() {

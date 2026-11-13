@@ -19,6 +19,7 @@ Mission_Window :: struct {
 	using window: host.Host,
 	app:   ^App,
 	panel: Mission_Panel,
+	title_language: u32,   // i18n.version() of the system's title: set again in the new language (mission_window_build)
 }
 
 // Its size at first, in logical pixels.
@@ -33,7 +34,7 @@ mission_window_open :: proc(app: ^App, p: Mission_Panel) {
 		}
 	}
 	w := new(Mission_Window)
-	w.app, w.panel = app, p
+	w.app, w.panel, w.title_language = app, p, i18n.version()
 	if !host.host_open(&w.window, &app.shared, {title = i18n.tr(MISSION_TITLES[p]), size = MISSION_WINDOW_SIZE, integrated_title = true}, mission_window_build, w) {
 		free(w)
 		mission_dock_back(app, p)
@@ -57,6 +58,10 @@ mission_window_build :: proc(h: ^host.Host, size: host.Vec2) {
 	app := w.app
 	em := ui.font_size()
 	if ui.key_press(.W, {.Ctrl}) { platform.request_close(w.win) }
+	if w.title_language != i18n.version() {
+		w.title_language = i18n.version()
+		platform.set_title(w.win, i18n.tr(MISSION_TITLES[w.panel]))
+	}
 	tab := app.tab
 	ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
 	page := ui.build_box({.Draw_Background}, "###page")

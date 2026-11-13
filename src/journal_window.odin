@@ -22,6 +22,7 @@ Journal_Window :: struct {
 	view:    Journal_View,
 	manager: Manager,
 	name:    string,   // owned: the service
+	title_language: u32,   // i18n.version() of the system's title: set again in the new language (journal_window_build)
 }
 
 // Its size at first, in logical pixels.
@@ -36,7 +37,7 @@ journal_window_open :: proc(app: ^App, manager: Manager, name: string) {
 		}
 	}
 	w := new(Journal_Window)
-	w.app, w.manager, w.name = app, manager, strings.clone(name)
+	w.app, w.manager, w.name, w.title_language = app, manager, strings.clone(name), i18n.version()
 	if !host.host_open(&w.window, &app.shared, {title = fmt.tprintf(i18n.tr("%s: journal"), name), size = JOURNAL_WINDOW_SIZE, integrated_title = true}, journal_window_build, w) {
 		delete(w.name)
 		free(w)
@@ -63,6 +64,10 @@ journal_window_build :: proc(h: ^host.Host, size: host.Vec2) {
 	app := w.app
 	em := ui.font_size()
 	journal_window_keys(w)
+	if w.title_language != i18n.version() {
+		w.title_language = i18n.version()
+		platform.set_title(w.win, fmt.tprintf(i18n.tr("%s: journal"), w.name))
+	}
 	ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
 	page := ui.build_box({.Draw_Background}, "###page")
 	if ui.parent(page) {

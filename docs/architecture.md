@@ -214,8 +214,9 @@ key does two things in one place.
 
 `src/identity` holds what Inspecteur is to the desktop: its names, the actions of its desktop entry (one per section:
 `--section <name>`, and `StartupWMClass`, the window's class), its icons (`assets/logo_<n>.png`). `setup.odin` gives it to
-the toolkit's `gt:setup`: the install's dialog, offered at the start of a copy that is not installed (once per version,
-`setup.choice`), and `inspecteur install`, `uninstall`, `status`. On NixOS a classic install builds a profile of
+the toolkit's `gt:setup` through `prefs_page.Install`: the install's dialog, offered at the start of a copy that is not
+installed (once per version, `install.choice`), the settings' Installation page, and `--install`, `--uninstall`,
+`--setup`. The updates start once that reading says which copy runs (`setup_follow`). On NixOS a classic install builds a profile of
 `NIXOS_LIBRARIES` and points the copy at it; a copy from the Nix store is never offered an install. `inspecteurtool
 desktop_files` writes the same entry and icons for the Nix package.
 

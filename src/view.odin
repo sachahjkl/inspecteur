@@ -19,6 +19,8 @@ import "core:time"
 import "gt:host"
 import lucide "gt:lucide"
 import prefs_page "gt:prefs_page"
+import "gt:platform"
+import crash_bar "gt:crash_bar"
 import "gt:ui"
 import i18n "gt:i18n"
 
@@ -43,7 +45,7 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	app.held = ui.key_held(.Ctrl)
 	// (the user's themes file: a task looks at it now and then and reads it when it changed; window_params shows it)
 	if prefs_page.themes_file_poll(&app.themes_file, &h.state) { h.settle = max(h.settle, FRAMES_AFTER_INPUT) }
-	free_keys := !app.menu.confirm.open && !app.props.open && !app.affinity.open && !app.sheet.open && !app.setup.open && !app.diagnosis_open && !app.palette.open && !ui.menu_any_open()
+	free_keys := !app.menu.confirm.open && !app.props.open && !app.affinity.open && !app.sheet.open && !prefs_page.install_open_now(&app.install) && !app.diagnosis_open && !app.palette.open && !ui.menu_any_open()
 	if free_keys && app.settings_open {
 		settings_keys(app)   // (the page's own: its search takes what is typed)
 	} else if free_keys {
@@ -55,6 +57,7 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	page := ui.build_box({.Draw_Background}, "###page")
 	if ui.parent(page) {
 		build_title(app, em)
+		crash_bar.bar(&app.crash_bar, {name = "Inspecteur", version = APP_VERSION, repository = "sachahjkl/inspecteur"})
 		ui.next({width = ui.fill(), height = ui.fill()})
 		if app.settings_open {
 			settings_build(app)
@@ -83,7 +86,7 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	row_menu_build(app, em)   // (after the Properties: the kill's confirmation goes over them)
 	palette_build(app)
 	shortcuts_build(app)
-	setup_build(app, em)
+	if prefs_page.install_frame(&app.install, em) == .Launched { platform.request_close(app.main.win) }   // (the installed copy runs)
 	diagnosis_build(app, em)
 	ui.wake_within(&app.main.state, min(until_sample(app), services_due_ms(app), connections_due_ms(app)))
 }

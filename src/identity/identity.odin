@@ -30,7 +30,7 @@ ICONS := [?]desktop.Icon{
 
 identity :: proc() -> desktop.Identity {
 	return desktop.Identity{
-		name = "Inspecteur", key = "Inspecteur", slug = SLUG, aumid = "FromentSoftware.Inspecteur",
+		name = "Inspecteur", key = "Inspecteur", slug = SLUG,
 		description = "What runs on this computer: its processes, performance, services, startup and connections.",
 		vendor = "Froment Software",
 		entry_marker = "X-Inspecteur-Integration", registry_mark = "InspecteurIntegration", vendor_key = "FromentSoftware",

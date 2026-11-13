@@ -20,18 +20,14 @@ APP_NAME :: "inspecteur"
 // inspecteur's own texts in other languages (i18n/, written by `inspecteurtool i18n fr`); the toolkit's come with it.
 PROGRAM_CATALOGUES :: []i18n.Catalog{{"fr", #load("../i18n/fr.txt", string)}}
 
-// What inspecteur gives the standard settings as their defaults: its theme, its text size, no halos (a table of numbers
-// reads best plain), its update address. general.menu is true as the install's menu entry is: the Setup puts it there.
+// inspecteur's identity in the standard settings: its theme, its name and its update address. The rest is the toolkit's,
+// as in its other programs (prefs_page.STANDARD_DEFAULTS).
 @(private = "file")
-standard_defaults := prefs_page.Standard_Defaults{
-	theme = "Graphite", mode = "system", finish = "machined", font_size = 13, glow = 0,
-	menu = true, update_auto = true, update_base_url = UPDATE_FOLDER, app_name = "Inspecteur",
-	values = OWN_DEFAULTS[:],
+standard_defaults :: proc() -> prefs_page.Standard_Defaults {
+	d := prefs_page.STANDARD_DEFAULTS
+	d.theme, d.update_base_url, d.app_name = "Graphite", UPDATE_FOLDER, "Inspecteur"
+	return d
 }
-
-// Its other looks: nearly square corners, and only the cells a sample changes drawn again. A reset comes back to them.
-@(private = "file")
-OWN_DEFAULTS := [?]prefs_page.Standard_Value{{"appearance.rounding", "0.25"}, {"rendering.partial_redraw", "true"}}
 
 // The index of processes.columns in PREF_DEFS (its default is the columns shown by default: processes.odin).
 PREF_COLUMNS :: 0
@@ -71,7 +67,6 @@ PREF_DEFS := [?]config.Def{
 	{name = "view.palette_size", description = "The command palette's size, in logical pixels: its width and its height (empty: the default). Dragging its edges or its corner changes it.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "view.section", description = "The section shown at the start: the one shown last (mission control, processes, performance, services, startup, connections, information). --section shows another.", kind = .String, default = {s = "processes"}, hidden = true},
 	{name = "performance.cpu_view", description = "The CPU's page in Performance: one graph for all the processors (overall), or one per logical processor (logical). Ctrl+G switches them.", kind = .String, default = {s = "overall"}, choices = {"overall", "logical"}, hidden = true},
-	{name = "setup.choice", description = "What was answered to the install's dialog: installed, standalone (this copy runs on its own: not offered again), or dismissed for a version.", kind = .String, default = {s = ""}, hidden = true},
 }
 
 // The look of a table's rows (view.zebra, view.rules): every list of the window takes it at each build.
@@ -109,7 +104,6 @@ Settings :: struct {
 	zebra:      bool,     // view.zebra
 	rules:      bool,     // view.rules
 	palette_size: [2]f32,   // view.palette_size ({}: the default)
-	setup_choice: string, // owned: setup.choice
 	update_auto: bool,    // update.auto
 	update_base_url: string,   // owned: update.base_url (read at the start: the Updater keeps it)
 }
@@ -127,7 +121,7 @@ themes_file :: proc(allocator := context.temp_allocator) -> string {
 prefs_open :: proc(p: ^config.Prefs, args: []string) -> (rest: [dynamic]string, problems: [dynamic]string) {
 	p^ = config.prefs_make()
 	// (the descriptions that name the program live as long as the registry: the process's)
-	prefs_page.standard_register(p, prefs_page.STANDARD_ALL, standard_defaults)
+	prefs_page.standard_register(p, prefs_page.STANDARD_ALL, standard_defaults())
 	config.register(p, PREF_DEFS[:])
 	_, file_problems := config.load_file(p, prefs_file(), .User)
 	rest, problems = config.apply_args(p, args, context.temp_allocator)
@@ -164,7 +158,6 @@ prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Sett
 		h, hok := strconv.parse_f32(parts[1])
 		if wok && hok { s.palette_size = {w, h} }
 	}
-	s.setup_choice = strings.clone(config.string_of(p, "setup.choice"), allocator)
 	s.update_auto = config.bool_of(p, prefs_page.UPDATE_AUTO_PREF)
 	s.update_base_url = strings.clone(config.string_of(p, BASE_URL_PREF), allocator)
 	return
@@ -178,7 +171,6 @@ settings_free :: proc(s: ^Settings) {
 	delete(s.sort)
 	delete(s.order)
 	delete(s.pinned)
-	delete(s.setup_choice)
 	delete(s.mission_layout)
 	s^ = {}
 }

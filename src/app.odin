@@ -22,6 +22,7 @@ import prefs_page "gt:prefs_page"
 import process "gt:process"
 import setup "gt:setup"
 import update "gt:update"
+import crash_bar "gt:crash_bar"
 import instance "gt:instance"
 import identity "identity"
 import i18n "gt:i18n"
@@ -84,9 +85,9 @@ App :: struct {
 	sheet_commands: [dynamic]ui.Command,   // its list, made at its first opening
 	diagnosis_open: bool,   // "Why is it slow?" (F2, diagnosis.odin)
 	mission:     Mission_Control,   // the Mission Control section: its panels (mission_control.odin)
-	setup:       setup.Dialog,      // the install's dialog (setup.odin)
-	setup_logo:  render.Texture,    // its logo (made when it first shows)
-	setup_logo_made: bool,
+	install:     prefs_page.Install,   // the install: its offer, its dialog, the settings' page (setup.odin)
+	updates_asked: bool,            // the updates started, once the install was read (setup_follow)
+	crash_bar:   crash_bar.Bar,     // the last run's crash report, said at the top of the window
 	settings_open: bool,            // the settings' page shows in place of the sections (settings_view.odin)
 	settings_page: prefs_page.Page,
 	updater:     ^update.Updater,   // the updates (updates.odin); nil in the demo
@@ -126,7 +127,7 @@ Run_Options :: struct {
 	setup:       bool,   // --setup: the install's dialog open
 	owner:       instance.Owner,   // the one Inspecteur's name, this start's (one_copy_acquire)
 	owns:        bool,
-	last_crash:  string,   // the report of the last run, which crashed or was killed ("": it ended cleanly)
+	last_crash:  string,   // the report of the last run, which crashed or was killed ("": it ended cleanly): the crash bar
 }
 
 // The App of the process (a call posted from another thread finds it).
@@ -140,6 +141,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	app.prefs = prefs^
 	prefs^ = {}
 	app.settings = prefs_read(&app.prefs)
+	prefs_page.install_init(&app.install, &app.prefs, setup_options())
 	// (the language before anything is formatted for display: the first build, the window's toasts, the demo's texts)
 	prefs_page.language_start(&app.prefs, PROGRAM_CATALOGUES)
 	// (no file read here: the user's themes come at the first builds, read by a task)
@@ -179,7 +181,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	app.announcer.state = &app.main.state   // (a command runs between builds too: its toast goes to this window)
 	if opts.last_crash != "" {
 		log.warnf("the last run ended without its clean end: %s", opts.last_crash)
-		ui.announce(&app.announcer, .Bad, i18n.tr("Inspecteur ended without warning last time"), fmt.tprintf(i18n.tr("Its report: %s"), opts.last_crash))
+		crash_bar.init(&app.crash_bar, opts.last_crash)
 	}
 	sampling_attach(app, &h.state)
 	app.icons, _ = font.load_embedded(&app.shared.fonts, lucide.DATA)
@@ -187,13 +189,13 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 		app.logo.tex = render.create_texture_rgba(&app.shared.r, img.size.x, img.size.y)
 		render.update_texture_rgba(&app.shared.r, app.logo.tex, 0, 0, img.size.x, img.size.y, img.rgba)
 		app.logo.ok = true
+		app.install.logo = setup.Logo{app.logo.tex, {f32(img.size.x), f32(img.size.y)}}
 	}
 	h.state.icon_font = app.icons
 	// (the file is read by a task: the window's state is made, its chores run it)
 	ui.choice_memory_open(&app.palette_choices, &h.state, palette_choices_file(app))
 	h.after_input = FRAMES_AFTER_INPUT
-	// (the zoom, the rounding, the scrolling, the delays, partial redraw...: applied now, then each as it changes;
-	// inspecteur's own defaults are settings.odin's OWN_DEFAULTS)
+	// (the zoom, the rounding, the scrolling, the delays, partial redraw...: applied now, then each as it changes)
 	prefs_page.standard_watch(&app.standard, &app.prefs, &h.state, {renderer = &app.shared.r, fonts = &app.shared.fonts, partial_redraw = &h.partial_redraw})
 	licence_init(app)
 	h.params = app_params
@@ -205,8 +207,9 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	startup_init(&app.startup, app)
 	mission_init(app)
 	section_first_show(app)
-	if opts.setup { setup_open(app) }
-	setup_offer(app, offer = !opts.setup)   // (and then the updates)
+	// (the install is read on a task; the updates start once it says which copy runs: setup_follow. Never offered in the demo)
+	prefs_page.install_offer(&app.install, &h.state, offer = !opts.setup && app.demo == nil)
+	if opts.setup { prefs_page.install_open(&app.install) }
 	if opts.owns { one_copy_serve(app, opts.owner) }
 
 	t_window := time.tick_now()
@@ -227,6 +230,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 			services_tick(app)
 			connections_tick(app)
 		}
+		setup_follow(app)
 		updates_follow(app)
 		t_frame := time.tick_now()
 		host.host_frame(h)
@@ -270,7 +274,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	delete(app.query)
 	icons_destroy(&app.app_icons, &app.shared.r)
 	if app.logo.ok { render.destroy_texture(&app.shared.r, app.logo.tex) }
-	setup_finish(app)
+	prefs_page.install_end(&app.install)
+	crash_bar.destroy(&app.crash_bar)
 	host.host_close(h)
 	ui.line_edit_destroy(&app.search)
 	ui.vlist_destroy(&app.vl)
@@ -298,6 +303,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	config.prefs_destroy(&app.prefs)
 	// (an update in place: the new program, once this one has let go of the window)
 	if app.restart && !setup.launch(process.executable_path(), nil) { log.error("the new program does not start") }
+	prefs_page.install_launch(&app.install)   // (the installed copy the install's dialog opened, likewise)
 	return 0
 }
 

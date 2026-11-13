@@ -114,13 +114,14 @@ logo_render :: proc(size: int) -> paint.Canvas {
 	return c
 }
 
-// What the logo command writes (toolbox.write_logo): assets/logo.png, the sizes, .project/image.png.
+// What the logo command writes (toolbox.write_logo): assets/logo.png, the sizes, inspecteur.ico (resource 1 of
+// inspecteur.exe, which the toolkit's build links: Explorer, the shortcuts, every window), .project/image.png.
 @(rodata)
 LOGO_SIZE_LIST := LOGO_SIZES
 
 logo :: proc() -> toolbox.Logo {
 	return {
 		render = proc(size: int, user: rawptr) -> paint.Canvas { return logo_render(size) },
-		dir = LOGO_DIR, master = LOGO_MASTER, sizes = LOGO_SIZE_LIST[:], project_image = true,
+		dir = LOGO_DIR, master = LOGO_MASTER, sizes = LOGO_SIZE_LIST[:], ico = "assets/inspecteur.ico", project_image = true,
 	}
 }

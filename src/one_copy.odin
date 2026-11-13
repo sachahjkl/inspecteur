@@ -15,13 +15,25 @@ import "gt:ui"
 // How long a second start waits for the first while it is starting or closing.
 @(private = "file") ONE_COPY_WAIT_MS :: 3000
 
+// What a start that only asks whether Inspecteur runs sends (--status): the running one does nothing with it.
+@(private = "file") ONE_COPY_PING :: "ping"
+
+@(private = "file")
+one_copy_options :: proc() -> instance.Instance_Options {
+	return {name = instance.key("inspecteur", platform.user_dir(.Config, "", context.temp_allocator)), identity = process.executable_path(), wait_ms = ONE_COPY_WAIT_MS}
+}
+
+// Whether an Inspecteur runs and answers (--status: setup.Setup_Options.running).
+one_copy_running :: proc() -> bool {
+	return instance.send(one_copy_options(), transmute([]byte)string(ONE_COPY_PING)) == .Forwarded
+}
+
 // At a start with the window: hands `tab` (asked: `asked`) to a running Inspecteur. `forwarded`: it took it, this start
 // ends; else `owner` is this one's to serve (First), or nothing (another copy, or one that does not answer).
 one_copy_acquire :: proc(tab: Tab, asked: bool) -> (forwarded: bool, owner: instance.Owner, owns: bool) {
 	token := platform.activation_token_from_env(context.temp_allocator)
 	message := fmt.tprintf("%s\n%s", asked ? TAB_LABELS[tab] : "", token)
-	cfg := instance.Instance_Options{name = instance.key("inspecteur", platform.user_dir(.Config, "", context.temp_allocator)), identity = process.executable_path(), wait_ms = ONE_COPY_WAIT_MS}
-	outcome, o := instance.acquire(cfg, transmute([]byte)message)
+	outcome, o := instance.acquire(one_copy_options(), transmute([]byte)message)
 	switch outcome {
 	case .Forwarded:      return true, {}, false
 	case .First:          return false, o, true
@@ -49,7 +61,7 @@ one_copy_show :: proc(data: rawptr, word: u64) {
 	text := string(([^]u8)(data)[:word])
 	defer delete(text)
 	app := the_app
-	if app == nil { return }
+	if app == nil || text == ONE_COPY_PING { return }
 	section, _, token := strings.partition(text, "\n")
 	if t, ok := tab_of(section); ok && section != "" {
 		app.settings_open = false

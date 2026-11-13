@@ -23,7 +23,7 @@ import update "gt:update"
 Cmd :: enum u8 {
 	// Window
 	Palette, Shortcuts, Filter, Clear_Filter, Read_Again, Pause_Refresh, Refresh_Speed, Zoom_In, Zoom_Out, Zoom_Reset,
-	Light_Dark, Setup, Settings, Check_Updates, Diagnose,
+	Light_Dark, Settings, Check_Updates, Diagnose,
 	// Sections
 	Show_Mission_Control, Show_Processes, Show_Performance, Show_Services, Show_Startup, Show_Connections, Show_Information, Next_Section, Previous_Section,
 	// Processes
@@ -59,7 +59,6 @@ COMMANDS := [Cmd]ui.Command{
 	.Zoom_Out         = {icon = lucide.ZOOM_OUT, label = i18n.later("Zoom out"), group = i18n.later("Window"), keys = {{.Minus, {.Ctrl}}, {.Num_Subtract, {.Ctrl}}}},
 	.Zoom_Reset       = {icon = lucide.SEARCH, label = i18n.later("Zoom: 100 %"), group = i18n.later("Window"), keys = {{.N0, {.Ctrl}}}},
 	.Light_Dark       = {icon = lucide.SUN_MOON, label = i18n.later("Light or dark"), group = i18n.later("Window"), keys = {{.L, {.Ctrl, .Shift}}}, tags = {"theme", "dark", "night", "colours"}},
-	.Setup            = {icon = lucide.DOWNLOAD, label = i18n.later("Install…"), group = i18n.later("Window"), keys = {{.I, {.Ctrl, .Shift}}}},
 	.Settings         = {icon = lucide.SLIDERS_HORIZONTAL, label = i18n.later("Settings"), group = i18n.later("Window"), keys = {{.Comma, {.Ctrl}}}, tags = {"preferences", "options", "configure"}},
 	.Check_Updates    = {icon = lucide.HARD_DRIVE_DOWNLOAD, label = i18n.later("Check for updates"), group = i18n.later("Window")},
 	.Diagnose         = {icon = lucide.LIGHTBULB, label = i18n.later("Why is it slow?"), group = i18n.later("Window"), keys = {{.F2, {}}}, tags = {"slow", "lag", "performance", "why"}},
@@ -230,7 +229,7 @@ Palette_Table :: struct {
 	disabled: [dynamic]bool,   // per line, filled at each frame: what can act depends on the selection
 	tab:      Tab,          // what it was made for
 	prefs:    u64,
-	language: ^i18n.Language,
+	language: u32,          // i18n.version() it was made in: a change of language makes it again
 	version:  u64,          // bumped at each making (0: not made); the palette's version
 }
 
@@ -257,7 +256,7 @@ palette_table_make :: proc(table: ^Palette_Table, app: ^App) {
 	table.settings = make([]string, len(setting_names), a)
 	for n, i in setting_names { table.settings[i] = strings.clone(n, a) }
 	resize(&table.disabled, len(table.commands))
-	table.tab, table.prefs, table.language = app.tab, app.prefs.version, i18n.current()
+	table.tab, table.prefs, table.language = app.tab, app.prefs.version, i18n.version()
 	table.version += 1
 }
 
@@ -271,7 +270,7 @@ palette_table_destroy :: proc(table: ^Palette_Table) {
 palette_build :: proc(app: ^App) {
 	if !app.palette.open { return }
 	table := &app.palette_table
-	if table.version == 0 || table.tab != app.tab || table.prefs != app.prefs.version || table.language != i18n.current() {
+	if table.version == 0 || table.tab != app.tab || table.prefs != app.prefs.version || table.language != i18n.version() {
 		palette_table_make(table, app)
 	}
 	for c, i in table.cmds { table.disabled[i] = !cmd_can(app, c) }
@@ -306,7 +305,7 @@ shortcuts_build :: proc(app: ^App) {
 cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 	p := selected_proc(app)
 	switch c {
-	case .Palette, .Shortcuts, .Filter, .Read_Again, .Light_Dark, .Setup, .Settings, .Pause_Refresh, .Refresh_Speed, .Diagnose: return true
+	case .Palette, .Shortcuts, .Filter, .Read_Again, .Light_Dark, .Settings, .Pause_Refresh, .Refresh_Speed, .Diagnose: return true
 	case .Check_Updates: return app.updater != nil
 	case .Zoom_In:    return ui.zoom(&app.main.state) < ui.ZOOM_MAX
 	case .Zoom_Out:   return ui.zoom(&app.main.state) > ui.ZOOM_MIN
@@ -366,7 +365,6 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Zoom_Out:         ui.set_zoom(&app.main.state, ui.zoom(&app.main.state) / ui.feel(&app.main.state).zoom_step)
 	case .Zoom_Reset:       ui.set_zoom(&app.main.state, 1)
 	case .Light_Dark:       light_dark_switch(app)
-	case .Setup:            setup_open(app)
 	case .Settings:         settings_toggle(app)
 	case .Check_Updates:    update.check_now(app.updater); say(app, i18n.tr("Checking for updates…"))
 	case .Diagnose:         app.diagnosis_open = true
