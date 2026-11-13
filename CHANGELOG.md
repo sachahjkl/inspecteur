@@ -3,6 +3,23 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.5.0] - 2026-11-13
+
+### Added
+- **A Diagnostics page in the settings, with a Copy button.** It shows the versions, the system, the graphics adapter (and whether a software rasterizer draws), the window's size and scale, the last frames' times and how much partial redraw drew. If inspecteur is slow, copy it and send it.
+
+### Changed
+- **The licence has its own page in the settings, worded as in the other programs.** It says whether inspecteur is registered. It offers Buy a licence, a field to paste a key, Choose a licence file… and Remove the licence.
+- **A crash of the last run shows in a bar at the top of the window**, in place of a message with the report's path. The bar says what happened and offers Open the report, Copy and Report on GitHub (a new issue with the report in it). Its cross dismisses it.
+- **The install is in the settings: an Installation page.** It says where the installed copy is, its version, and whether this copy is the installed one. It shows the menu entry and the PATH, with Install, Repair, Upgrade and Uninstall. The palette finds the page ("install").
+The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in the other programs. `--status` says what is installed and whether inspecteur runs. `inspecteur install`, `uninstall`, `status` and the Install… command (Ctrl+Shift+I) are gone.
+- **A change of language shows at once**: the windows, the settings and the titles of the journal's and Mission Control's windows take the new language without a restart.
+- **inspecteur has the same settings and look as the other programs of Froment Software.** Only its theme, Graphite, is its own. It now starts with 14 px text (was 13), the machined finish's glow and the usual rounded corners (they were nearly square). A setting that you changed keeps your value; Reset in the settings gives the new defaults.
+
+### Fixed
+- **Narrow windows and longer words cut no text.** In a narrow window, the Performance page puts its table of details under the big numbers instead of over them. The journal's bar wraps onto a second line, and the startup problem wraps under the bar. A process's name ends with "…" where it is cut. The journal's level and boot, the System and User choice and the CPU view's choice are as wide as their longest word in every language.
+- **French done right.** The services' states (active, running, enabled, static, loaded…) are in the language in use, in Services, their details and Mission Control. The settings' choices of the process view, the manager and the journal level are translated. Keys have the names that a French keyboard prints, and numbers use the French decimal mark and spacing. Some words are clearer ("Actualiser", "Fils", "État", "Carte graphique", "Fermeture en attente"), and the program writes its name "inspecteur" everywhere.
+
 ## [0.4.2] - 2026-11-13
 
 ### Changed
@@ -187,6 +204,7 @@ and the versions follow [semantic versioning](https://semver.org/).
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.5.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.5.0
 [0.4.2]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.4.2
 [0.4.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.4.1
 [0.4.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.4.0

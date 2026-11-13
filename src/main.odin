@@ -15,7 +15,7 @@ import tk_log "gt:log"
 import process "gt:process"
 import setup "gt:setup"
 
-APP_VERSION :: "0.4.2"
+APP_VERSION :: "0.5.0"
 
 USAGE :: `inspecteur: what runs on this computer
 
