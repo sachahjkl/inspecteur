@@ -31,7 +31,9 @@ odin run tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/insp
 | `logo` | `assets/logo*.png` and `.project/image.png`, drawn by the toolkit's paint package |
 | `desktop_files <prefix>` | the desktop entry and the icons under `<prefix>/share`: what the Nix package installs |
 | `notices [--check]` | THIRD-PARTY-NOTICES (the toolkit's `notices_command`): the licences of what the program embeds and links (gui_toolkit and its attributions, Roboto, Inconsolata, Lucide, Odin's core library, wgpu-native, the text library's crates from `cargo metadata`); `--check` fails when it is not up to date |
-| `site build <site> <out>`, `check`, `card` | the site's pages (gui_toolkit's `gt:site`) |
+| `site build <site> <out>`, `check`, `card` | the site's pages (gui_toolkit's `gt:site`), then the shop's: pricing, thanks, terms, refunds, privacy, imprint (`shop` in `tools/inspecteurtool/site.odin`; "Coming soon" until the shop is set up) |
+| `update keygen \| pubkey \| manifest \| verify` | inspecteur's update key and its signed manifests |
+| `licence keygen \| pubkey \| issue \| verify \| secrets`, `paddle [-apply]` | the licence's key pair, a licence issued by hand, a check, the licence Worker's secrets; the Paddle catalogue (gui_toolkit's `toolbox.licence_commands`, its docs/licence.md). `-dev` uses the development pair (`DEV_SEED`, public on purpose) |
 | `package [version]`, `notes <version>`, `ship <patch\|minor\|major\|x.y.z>` | the release's archive (the program, LICENSE, THIRD-PARTY-NOTICES, README, CHANGELOG) and its SHA-256; the changelog's section; the release itself from a clean `master`, the fragments assembled (gui_toolkit's `gt:release` and `gt:changelog`) |
 | `changelog new <type> <subject> <text>`, `check`, `preview` | a fragment of `changelog.d/`; all of them well formed (`check` runs it); what the next version brings |
 

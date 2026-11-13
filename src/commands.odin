@@ -382,12 +382,19 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 // The theme's version: light after dark, dark after light; from the system's, the other one than the system's.
 light_dark_switch :: proc(app: ^App) {
 	mode: ui.Theme_Mode
-	switch app.settings.mode {
+	switch app.settings.look.mode {
 	case .Light:  mode = .Dark
 	case .Dark:   mode = .Light
 	case .System: mode = app.theme_shown.light ? .Dark : .Light
 	}
 	mode_set(app, mode)
+}
+
+// Sets one preference of the look (appearance.theme, appearance.mode) and reads the look again: the next build shows it.
+look_set :: proc(app: ^App, name, value: string) {
+	pref_set(&app.prefs, name, value)
+	prefs_page.appearance_free(&app.settings.look)
+	app.settings.look = prefs_page.appearance_read(&app.prefs)
 }
 
 // The theme a light or dark choice moves to when the theme shown has one version only: the nearest of those that have
@@ -397,16 +404,13 @@ THEME_OF_BOTH :: "Silver"
 // Sets the theme's version (written to the preferences). A theme that has no such version (Graphite is dark only) gives
 // way to THEME_OF_BOTH: the choice is seen, and the footer says why the theme changed.
 mode_set :: proc(app: ^App, mode: ui.Theme_Mode) {
-	app.settings.mode = mode
-	pref_set(&app.prefs, "view.mode", THEME_MODE_KEYS[mode])
-	def, _, ok := ui.theme_find(ui.THEMES[:], app.settings.theme)
+	look_set(app, prefs_page.MODE_PREF, THEME_MODE_KEYS[mode])
+	def, _, ok := ui.theme_find(app.themes_file.all[:], app.settings.look.theme)
 	lacks := ok && (def.versions == .Dark_Only && mode == .Light || def.versions == .Light_Only && mode == .Dark)
 	if lacks {
-		old := app.settings.theme
-		app.settings.theme = strings.clone(THEME_OF_BOTH)
-		pref_set(&app.prefs, "view.theme", THEME_OF_BOTH)
+		old := strings.clone(app.settings.look.theme, context.temp_allocator)
+		look_set(app, prefs_page.THEME_PREF, THEME_OF_BOTH)
 		say(app, "%s colours: %s has no %s version, %s has", mode == .Light ? "Light" : "Dark", old, mode == .Light ? "light" : "dark", THEME_OF_BOTH)
-		delete(old)
 		return
 	}
 	#partial switch mode {

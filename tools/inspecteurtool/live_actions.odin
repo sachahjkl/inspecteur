@@ -153,12 +153,12 @@ live_commands :: proc(l: ^Live) {
 	// a runner that has no dark setting. Either is right; the second press must give the other.
 	first := "light"
 	pressed := cdp.key(c, "ctrl+shift+l")
-	if pressed && !file_has(prefs, "view.mode\tlight") { first = "dark" }
+	if pressed && !file_has(prefs, "appearance.mode\tlight") { first = "dark" }
 	other := first == "light" ? "dark" : "light"
-	check(l, pressed && file_has(prefs, fmt.tprintf("view.mode\t%s", first)), "Ctrl+Shift+L: the %s version, kept", first)
-	check(l, cdp.key(c, "ctrl+shift+l") && file_has(prefs, fmt.tprintf("view.mode\t%s", other)), "again: the %s version", other)
+	check(l, pressed && file_has(prefs, fmt.tprintf("appearance.mode\t%s", first)), "Ctrl+Shift+L: the %s version, kept", first)
+	check(l, cdp.key(c, "ctrl+shift+l") && file_has(prefs, fmt.tprintf("appearance.mode\t%s", other)), "again: the %s version", other)
 	check(l, cdp.click_name(c, "theme") && cdp.wait_for(c, "As the system", SESSION_WAIT) && cdp.click_text(c, "As the system"), "back to the system's version")
-	check(l, file_has(prefs, "view.mode\tsystem"), "kept")
+	check(l, file_has(prefs, "appearance.mode\tsystem"), "kept")
 }
 
 // The install's dialog, at the first start of a copy that is not installed: Keep standalone closes it for good.
@@ -208,17 +208,20 @@ live_setup :: proc(l: ^Live) {
 	check(l, run({"uninstall"}, env) == 0 && !os.exists(cli_entry), "inspecteur uninstall takes it away")
 }
 
-// The settings (Ctrl+,): the preferences' page in place of the sections; a switch there changes a preference, kept;
-// Escape goes back.
+// The settings (Ctrl+,): the preferences' page in place of the sections, General first (the licence), the toolkit's
+// standard settings and inspecteur's own; a switch there changes a preference, kept; Escape goes back.
 live_settings :: proc(l: ^Live) {
 	c := &l.c
 	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
 	check(l, cdp.key(c, "ctrl+,") && cdp.wait_for(c, "Appearance", SESSION_WAIT) && cdp.wait_for(c, "Updates", SESSION_WAIT), "Ctrl+,: the settings, their pages")
+	// the first page: General, its licence (the test's profile has none)
+	check(l, cdp.wait_for(c, "Unregistered", SESSION_WAIT), "the General page says the licence's state")
+	check(l, cdp.click_text(c, "Appearance") && cdp.wait_for(c, "Light or dark", SESSION_WAIT), "the Appearance page")
 	// a theme's card: the window takes its colours at once
 	before := page_pixel(c)
-	check(l, cdp.click_name(c, "th0") && file_has(prefs, "view.theme\tMidnight"), "the first theme's card: Midnight, kept")
+	check(l, cdp.click_name(c, "th0") && file_has(prefs, "appearance.theme\tMidnight"), "the first theme's card: Midnight, kept")
 	check(l, wait_page_pixel_not(c, before), "the window takes its colours at once")
-	check(l, cdp.click_name(c, "th1") && file_has(prefs, "view.theme\tGraphite"), "back to Graphite")
+	check(l, cdp.click_name(c, "th1") && file_has(prefs, "appearance.theme\tGraphite"), "back to Graphite")
 	check(l, cdp.key(c, "ctrl+f") && cdp.type_text(c, "rules") && cdp.wait_for(c, "Draw a thin line under each row of the tables.", SESSION_WAIT), "a search finds a preference")
 	check(l, cdp.click_name(c, "sw") && file_has(prefs, "view.rules\tfalse"), "its switch changes it, kept")
 	check(l, cdp.click_name(c, "sw") && file_has(prefs, "view.rules\ttrue"), "and back")

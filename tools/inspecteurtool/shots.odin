@@ -24,7 +24,7 @@ run_shots :: proc(args: []string) -> int {
 	if run_build({"release"}) != 0 { return 1 }
 	s: Session
 	defer session_stop(&s)
-	if why := session_start(&s, SHOTS_DIR, SHOTS_PORT, {"--demo", "--pref", "view.mode=dark"}); why != "" { fmt.eprintfln("inspecteurtool shots: %s", why); return 1 }
+	if why := session_start(&s, SHOTS_DIR, SHOTS_PORT, {"--demo", "--pref", "appearance.mode=dark"}); why != "" { fmt.eprintfln("inspecteurtool shots: %s", why); return 1 }
 	c, ok := window_connect(&s)
 	if !ok { fmt.eprintln("inspecteurtool shots: the window does not answer"); return 1 }
 	defer cdp.close(&c)
@@ -180,6 +180,9 @@ run_shots :: proc(args: []string) -> int {
 	// the settings (not the install's dialog: it shows the real folders of the machine it runs on), and the light version
 	cdp.key(&c, "ctrl+,")
 	if need(cdp.wait_for(&c, "Appearance", SESSION_WAIT), "no settings", &failed) {
+		// (the first page is General; the picture shows the look's page)
+		cdp.click_text(&c, "Appearance")
+		need(cdp.wait_for(&c, "Light or dark", SESSION_WAIT), "no Appearance page", &failed)
 		time.sleep(500 * time.Millisecond)   // (the themes' cards)
 		shot(&c, out, "settings", &failed)
 		cdp.key(&c, "Escape")

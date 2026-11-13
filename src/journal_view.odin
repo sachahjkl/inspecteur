@@ -226,7 +226,7 @@ journal_entry_whole :: proc(app: ^App, e: Journal_Entry, em: f32) {
 				ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0})
 				ui.label(fmt.tprintf("%s  ·  %s###je_info", journal_time_text(app, e.usec, true), ui.text_shown(who)))
 			}
-			if tool_button("svc_journal_copy_entry", lucide.CLIPBOARD_COPY, cmd_tip(.Journal_Copy_Entry), true, em) { platform.set_clipboard(app.main.win, journal_entry_text(app, e)); copied(app, "Copied the entry") }
+			if tool_button("svc_journal_copy_entry", lucide.CLIPBOARD_COPY, cmd_tip(.Journal_Copy_Entry), true, em) { platform.set_clipboard(app.main.win, journal_entry_text(app, e)); announce(app, "Copied the entry") }
 			ui.spacer(ui.px(em * 0.4))
 		}
 		ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
@@ -320,11 +320,11 @@ journal_run_on :: proc(app: ^App, v: ^Journal_View, c: Cmd) {
 		shown := journal_shown(app, v)
 		for i in shown { strings.write_string(&b, journal_entry_text(app, d.journal[i])); strings.write_byte(&b, '\n') }
 		platform.set_clipboard(app.main.win, strings.to_string(b))
-		copied(app, fmt.tprintf("Copied %s", count_text(len(shown), "entry", "entries")))
+		announce(app, fmt.tprintf("Copied %s", count_text(len(shown), "entry", "entries")))
 	case .Journal_Copy_Entry:
 		if e, ok := journal_selected(app, v); ok {
 			platform.set_clipboard(app.main.win, journal_entry_text(app, e))
-			copied(app, "Copied the entry")
+			announce(app, "Copied the entry")
 		}
 	case .Journal_Window:
 		if d := v.details; d != nil { journal_window_open(app, d.manager, d.name) }

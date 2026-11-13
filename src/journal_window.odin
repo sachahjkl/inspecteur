@@ -45,8 +45,7 @@ journal_window_open :: proc(app: ^App, manager: Manager, name: string) {
 	w.params = proc(h: ^host.Host, bp: ^ui.Build_Params) { window_params(h, bp, (^Journal_Window)(h.user).app) }
 	w.state.icon_font = app.icons
 	w.after_input = FRAMES_AFTER_INPUT
-	w.partial_redraw = true
-	ui.set_rounding(&w.state, ROUNDING)
+	window_standard(app, &w.window)
 	platform.set_dark_title(w.win, !app.theme_shown.light)
 	// (its readings are posted to its own window: its build takes them)
 	journal_view_init(&w.view, app.demo, &w.state)

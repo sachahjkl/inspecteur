@@ -258,5 +258,5 @@ service_copy :: proc(app: ^App) {
 	u, ok := selected_service(app)
 	if !ok { return }
 	platform.set_clipboard(app.main.win, u.name)
-	copied(app, "Copied", u.name)
+	announce(app, "Copied", u.name)
 }

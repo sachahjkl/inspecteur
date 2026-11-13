@@ -1,7 +1,10 @@
 package inspecteur
 
 // The preferences: one registry (gt:config). The user's file is $XDG_CONFIG_HOME/inspecteur/prefs; `--pref name=value`
-// overrides a preference for one run. Each one has its line in docs/configuration.md (settings_test.odin checks it).
+// overrides a preference for one run. The look, the text, the scrolling, the input, the delays, the rendering, the
+// updates and the messages are the toolkit's standard settings (prefs_page.standard_register, gui_toolkit
+// docs/settings.md); inspecteur's own come after them, each with its line in docs/configuration.md (settings_test.odin
+// checks it).
 
 import "core:fmt"
 import "core:strconv"
@@ -12,6 +15,19 @@ import "gt:platform"
 import "gt:ui"
 
 APP_NAME :: "inspecteur"
+
+// What inspecteur gives the standard settings as their defaults: its theme, its text size, no halos (a table of numbers
+// reads best plain), its update address. general.menu is true as the install's menu entry is: the Setup puts it there.
+@(private = "file")
+standard_defaults := prefs_page.Standard_Defaults{
+	theme = "Graphite", mode = "system", finish = "machined", font_size = 13, glow = 0,
+	menu = true, update_auto = true, update_base_url = UPDATE_FOLDER, app_name = "Inspecteur",
+	values = OWN_DEFAULTS[:],
+}
+
+// Its other looks: nearly square corners, and only the cells a sample changes drawn again. A reset comes back to them.
+@(private = "file")
+OWN_DEFAULTS := [?]prefs_page.Standard_Value{{"appearance.rounding", "0.25"}, {"rendering.partial_redraw", "true"}}
 
 // The index of processes.columns in PREF_DEFS (its default is the columns shown by default: processes.odin).
 PREF_COLUMNS :: 0
@@ -45,19 +61,12 @@ PREF_DEFS := [?]config.Def{
 	{name = "services.refresh_ms", description = "How often the services are read again while their section is shown, in milliseconds.", kind = .Int, default = {i = 3000}, min = 1000, max = 60_000, bounded = true, unit = "ms"},
 	{name = "mission.layout", description = "Mission Control's panels: where each one is docked, its stacks and their sizes, those closed left out (the dock's text). Its panels' menu brings one back; Mission Control: the layout as at first sets it back.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "mission.windows", description = "Mission Control's panels in windows of their own, apart by commas (health,network): they open again at the start. A panel's menu opens one; closed, it goes back to Mission Control.", kind = .String, default = {s = ""}, hidden = true},
-	{name = "view.theme", description = "The window's colours: a theme of the toolkit by its name (Graphite, Midnight, Nord, Gruvbox, Tokyo Night, Catppuccin...).", kind = .String, default = {s = "Graphite"}, tags = {"colours", "colors", "palette", "look"}},
-	{name = "view.mode", description = "The theme's version: the system's (light or dark, followed as it changes), dark, or light.", kind = .String, default = {s = "system"}, choices = {"system", "dark", "light"}, tags = {"dark", "light", "night"}},
-	{name = "view.finish", description = "How surfaces are drawn. Machined: raised buttons and panels, sunken fields, graphs and meters (a light theme is drawn flat). Flat: plain surfaces and thin lines. Gradient: surfaces shaded top to bottom. Glass: surfaces that let the page show through. Edged: the machined reliefs crisp, nothing blurred (the Console theme's).", kind = .String, default = {s = "machined"}, choices = {"machined", "flat", "gradient", "glass", "edged"}, tags = {"look", "style", "relief"}},
 	{name = "view.zebra", description = "Shade every second row of the tables: a line of numbers reads across.", kind = .Bool, default = {b = true}, tags = {"stripes", "rows"}},
 	{name = "view.rules", description = "Draw a thin line under each row of the tables.", kind = .Bool, default = {b = true}, tags = {"lines", "rows"}},
-	{name = "view.font_size", description = "The text size at a zoom of 100 %, in logical pixels: every size of the window follows it.", kind = .Float, default = {f = FONT_SIZE_DEFAULT}, min = FONT_SIZE_MIN, max = FONT_SIZE_MAX, bounded = true, tags = {"text size", "bigger", "smaller"}},
-	{name = "view.zoom", description = "The zoom of the window: 1 is 100 %. Ctrl+wheel, Ctrl+= and Ctrl+- change it, Ctrl+0 sets it back.", kind = .Float, default = {f = 1}, min = 0.5, max = 3, bounded = true, hidden = true, tags = {"scale", "bigger", "smaller"}},
-	{name = "view.system_title", description = "The window's title bar drawn by the system (its buttons, its snapping) in place of Inspecteur's own.", kind = .Bool, default = {b = false}, tags = {"decorations", "native", "frame", "title bar"}},
 	{name = "view.placement", description = "Where the window was left and its size, in physical pixels, and whether it was maximized (\"120 80 1400 900 maximized\"; empty: the first start's size). Written when it closes; Wayland lets a program set the size alone.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "view.palette_size", description = "The command palette's size, in logical pixels: its width and its height (empty: the default). Dragging its edges or its corner changes it.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "view.section", description = "The section shown at the start: the one shown last (mission control, processes, performance, services, startup, connections, information). --section shows another.", kind = .String, default = {s = "processes"}, hidden = true},
 	{name = "performance.cpu_view", description = "The CPU's page in Performance: one graph for all the processors (overall), or one per logical processor (logical). Ctrl+G switches them.", kind = .String, default = {s = "overall"}, choices = {"overall", "logical"}, hidden = true},
-	{name = "update.auto", description = "Check for a new version a while after the start and then every day, download it and put it in place: it runs at the next start. Only the installed copy updates itself (a copy of the Nix store is Nix's to update).", kind = .Bool, default = {b = true}, tags = {"upgrade", "version", "new version"}},
 	{name = "setup.choice", description = "What was answered to the install's dialog: installed, standalone (this copy runs on its own: not offered again), or dismissed for a version.", kind = .String, default = {s = ""}, hidden = true},
 }
 
@@ -66,10 +75,9 @@ rows_look :: proc(app: ^App, vl: ^ui.Virtual_List) {
 	vl.zebra, vl.rules = app.settings.zebra, app.settings.rules
 }
 
-// The text size (view.font_size): its default and its bounds, in logical pixels.
-FONT_SIZE_DEFAULT :: 13
-FONT_SIZE_MIN :: 8
-FONT_SIZE_MAX :: 40
+// The standard preferences inspecteur reads by name and the toolkit gives no constant for.
+ZOOM_PREF     :: "appearance.zoom"
+BASE_URL_PREF :: "update.base_url"
 
 // The values the program reads, copied out of the registry (prefs_read).
 Settings :: struct {
@@ -90,34 +98,32 @@ Settings :: struct {
 	widths:     string,
 	sort:       string,
 	descending: bool,
-	theme:      string,   // owned
-	mode:       ui.Theme_Mode,
-	finish:     ui.Finish,
-	system_title: bool,     // view.system_title
-	font_size:  f32,
-	zoom:       f32,        // view.zoom
+	look:       prefs_page.Appearance,   // appearance.theme, mode, finish, glow, font_size (owned)
+	system_title: bool,     // window.system_title
+	zoom:       f32,        // appearance.zoom
 	mission_layout: string, // owned: mission.layout
 	zebra:      bool,     // view.zebra
 	rules:      bool,     // view.rules
 	palette_size: [2]f32,   // view.palette_size ({}: the default)
 	setup_choice: string, // owned: setup.choice
 	update_auto: bool,    // update.auto
+	update_base_url: string,   // owned: update.base_url (read at the start: the Updater keeps it)
 }
 
 prefs_file :: proc(allocator := context.temp_allocator) -> string {
 	return strings.concatenate({platform.user_dir(.Config, APP_NAME, context.temp_allocator), "/prefs"}, allocator)
 }
 
+// The user's own themes, beside the preferences (prefs_page.Themes_File).
+themes_file :: proc(allocator := context.temp_allocator) -> string {
+	return strings.concatenate({platform.user_dir(.Config, APP_NAME, context.temp_allocator), "/themes.txt"}, allocator)
+}
+
 // The registry with the user's file and `args`' --pref read in. Returns the arguments that are not preferences.
 prefs_open :: proc(p: ^config.Prefs, args: []string) -> (rest: [dynamic]string, problems: [dynamic]string) {
 	p^ = config.prefs_make()
-	// (the toolkit's general.messages: where a finished act is said; inspecteur has no launcher entry of its own to offer)
-	d := prefs_page.STANDARD_DEFAULTS
-	d.app_name = "Inspecteur"
-	prefs_page.standard_register(p, {.Session}, d)
-	for name in ([]string{prefs_page.MENU_PREF, prefs_page.AUTOSTART_PREF}) {
-		if r := config.ref_of(p, name); r != config.NO_REF { config.entry(p, r).def.hidden = true }
-	}
+	// (the descriptions that name the program live as long as the registry: the process's)
+	prefs_page.standard_register(p, prefs_page.STANDARD_ALL, standard_defaults)
 	config.register(p, PREF_DEFS[:])
 	_, file_problems := config.load_file(p, prefs_file(), .User)
 	rest, problems = config.apply_args(p, args, context.temp_allocator)
@@ -143,12 +149,9 @@ prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Sett
 	s.sort = strings.clone(config.string_of(p, "processes.sort"), allocator)
 	s.order = strings.clone(config.string_of(p, "processes.order"), allocator)
 	s.descending = config.bool_of(p, "processes.descending")
-	s.theme = strings.clone(config.string_of(p, "view.theme"), allocator)
-	s.mode = ui.theme_mode_of(config.string_of(p, "view.mode"))
-	s.finish = ui.finish_of(config.string_of(p, "view.finish"))
-	s.system_title = config.bool_of(p, "view.system_title")
-	s.font_size = f32(config.float_of(p, "view.font_size"))
-	s.zoom = f32(config.float_of(p, "view.zoom"))
+	s.look = prefs_page.appearance_read(p, allocator)
+	s.system_title = config.bool_of(p, prefs_page.SYSTEM_TITLE_PREF)
+	s.zoom = f32(config.float_of(p, ZOOM_PREF))
 	s.mission_layout = strings.clone(config.string_of(p, "mission.layout"), allocator)
 	s.zebra = config.bool_of(p, "view.zebra")
 	s.rules = config.bool_of(p, "view.rules")
@@ -158,12 +161,14 @@ prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Sett
 		if wok && hok { s.palette_size = {w, h} }
 	}
 	s.setup_choice = strings.clone(config.string_of(p, "setup.choice"), allocator)
-	s.update_auto = config.bool_of(p, "update.auto")
+	s.update_auto = config.bool_of(p, prefs_page.UPDATE_AUTO_PREF)
+	s.update_base_url = strings.clone(config.string_of(p, BASE_URL_PREF), allocator)
 	return
 }
 
 settings_free :: proc(s: ^Settings) {
-	delete(s.theme)
+	prefs_page.appearance_free(&s.look)
+	delete(s.update_base_url)
 	delete(s.columns)
 	delete(s.widths)
 	delete(s.sort)

@@ -18,6 +18,7 @@ import "core:strings"
 import "core:time"
 import "gt:host"
 import lucide "gt:lucide"
+import prefs_page "gt:prefs_page"
 import "gt:ui"
 
 // Heights in ems: the title bar, a section's bar, the header, a row, a line of the sidebar, the footer.
@@ -39,6 +40,8 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	// Ctrl held: the rows stand still under the pointer (a key pressed before the window had the keyboard is not held:
 	// the compositor's Ctrl+Shift+Escape that opened it)
 	app.held = ui.key_held(.Ctrl)
+	// (the user's themes file: a task looks at it now and then and reads it when it changed; window_params shows it)
+	if prefs_page.themes_file_poll(&app.themes_file, &h.state) { h.settle = max(h.settle, FRAMES_AFTER_INPUT) }
 	free_keys := !app.menu.confirm.open && !app.props.open && !app.affinity.open && !app.shortcuts_open && !app.setup.open && !app.diagnosis_open && !app.palette.open && !ui.ctx_menu_any_open()
 	if free_keys && app.settings_open {
 		settings_keys(app)   // (the page's own: its search takes what is typed)
@@ -460,18 +463,15 @@ theme_button :: proc(app: ^App, em: f32) {
 	if ui.ctx_menu(app.theme_menu) {
 		ui.menu_heading("Version")
 		for mode in ui.Theme_Mode {
-			if ui.menu_item(THEME_MODE_LABELS[mode], checked = app.settings.mode == mode).clicked { mode_set(app, mode) }
+			if ui.menu_item(THEME_MODE_LABELS[mode], checked = app.settings.look.mode == mode).clicked { mode_set(app, mode) }
 		}
 		ui.menu_separator()
 		cmd_item(app, .Light_Dark, "Switch light and dark")
 		ui.menu_separator()
 		if ui.menu_submenu("Theme") {
-			for t in ui.THEMES {
-				if ui.menu_item(t.name, checked = app.settings.theme == t.name).clicked {
-					delete(app.settings.theme)
-					app.settings.theme = strings.clone(t.name)
-					pref_set(&app.prefs, "view.theme", t.name)
-				}
+			// (the toolkit's themes, then the user's own: the themes file)
+			for t in app.themes_file.all {
+				if ui.menu_item(t.name, checked = app.settings.look.theme == t.name).clicked { look_set(app, prefs_page.THEME_PREF, t.name) }
 			}
 		}
 	}
@@ -541,12 +541,13 @@ refresh_button :: proc(app: ^App, em: f32) {
 // The zoom (Ctrl+wheel, Ctrl+=, Ctrl+-, Ctrl+0)
 
 // The zoom (the toolkit's: Ctrl+wheel, Ctrl+=, Ctrl+-, Ctrl+0, and the commands), after a frame: kept when it changed
-// (view.zoom), said in the footer, and the journals' windows zoomed alike.
+// (appearance.zoom: inspecteur opens as it was left), said in the footer, and the journals' windows zoomed alike. The
+// standard settings' watch sets the same zoom again when the preference is written: nothing moves.
 zoom_follow :: proc(app: ^App) {
 	z := ui.zoom(&app.main.state)
 	for w in app.journal_windows { ui.set_zoom(&w.state, z) }
 	if abs(z - app.settings.zoom) < 0.001 { return }
 	app.settings.zoom = z
-	pref_set(&app.prefs, "view.zoom", fmt.tprintf("%.3f", z))
+	pref_set(&app.prefs, ZOOM_PREF, fmt.tprintf("%.3f", z))
 	say(app, "Zoom %.0f %%%s", z * 100, abs(z - 1) < 0.001 ? "" : " (Ctrl+0: 100 %)")
 }

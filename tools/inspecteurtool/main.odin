@@ -10,15 +10,29 @@ package inspecteurtool
 
 import changelog "gt:changelog"
 import release "gt:release"
-import tk_site "gt:site"
 import toolbox "gt:toolbox"
+import inspecteur_licence "../../src/licence"
 import inspecteur_update "../../src/update"
 
 EXIT_USAGE :: toolbox.EXIT_USAGE
 
+// The development pair's private key, public on purpose ("inspecteur-dev-licence-seed-01!!"): the tests, the pictures
+// and the shop's sandbox register with it; only a debug build of inspecteur accepts it (src/licence/product.odin).
+DEV_SEED :: "aW5zcGVjdGV1ci1kZXYtbGljZW5jZS1zZWVkLTAxISE"
+
+// The `licence` and `paddle` commands: inspecteur's licence (src/licence.odin), its development pair, its Paddle
+// catalogue. The amounts are the maintainer's to set: PLACEHOLDER until then (`paddle -amounts:supporter=...,patron=...`).
+LICENCE_TOOL :: toolbox.Licence_Tool{
+	product  = inspecteur_licence.PRODUCT,
+	dev_seed = DEV_SEED,
+	hint     = "Open Inspecteur's settings (Ctrl+,), the General page: choose this file, or paste the key there.",
+	paddle   = {name = "Inspecteur User Licence", description = "A personal, perpetual licence of Inspecteur, the task manager.", amounts = "", currency = "EUR"},
+}
+
 main :: proc() {
 	p := project()
 	r := release.commands(release_config(p))
+	l := toolbox.licence_commands(LICENCE_TOOL)
 	toolbox.tool_main("inspecteurtool", {
 		{name = "build", usage = "[release]: the toolkit's text library when its sources changed, then build/inspecteur", run = run_build},
 		{name = "test", usage = ": the unit tests of the program", run = run_test},
@@ -32,6 +46,7 @@ main :: proc() {
 		r[0], r[1], r[2],
 		{name = "update", usage = "keygen <file> | pubkey | manifest <program> <version> - <out> | verify <manifest> -: inspecteur's update key and manifests", run = proc(args: []string) -> int { return toolbox.update_command(inspecteur_update.PRODUCT, args) }},
 		changelog.command(p),
-		tk_site.command(site_project()),
+		site_command(),
+		l[0], l[1],
 	}, toolbox.ROOT_MARK_DEFAULT)
 }

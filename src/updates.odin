@@ -15,7 +15,8 @@ import setup "gt:setup"
 import update "gt:update"
 import inspecteur_update "update"
 
-// The folder of the latest release's files: its manifest (update-<platform>.json and .sig) and its program.
+// The folder of the latest release's files: its manifest (update-<platform>.json and .sig) and its program. It is the
+// default of update.base_url (settings.odin), which a mirror or a test changes.
 UPDATE_FOLDER :: "https://github.com/sachahjkl/inspecteur/releases/latest/download/"
 
 // Once the setup's facts are read (setup_offer): `installed`, this program is the installed copy; `exe`, its path.
@@ -23,7 +24,7 @@ updates_start :: proc(app: ^App, installed: bool, exe: string) {
 	if app.demo != nil || app.updater != nil { return }
 	app.installed_copy = installed
 	app.updater = update.updater_start({
-		product = inspecteur_update.PRODUCT, folder = UPDATE_FOLDER, current = APP_VERSION,
+		product = inspecteur_update.PRODUCT, folder = app.settings.update_base_url != "" ? app.settings.update_base_url : UPDATE_FOLDER, current = APP_VERSION,
 		exe = exe, user_agent = fmt.tprintf("inspecteur/%s", APP_VERSION),
 		// (the updater's thread: the loop wakes, and updates_follow reads the state)
 		news = proc(user: rawptr) { platform.wake((^App)(user).main.win) }, user = app,

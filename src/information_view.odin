@@ -173,5 +173,5 @@ info_actions :: proc(app: ^App, em: f32) {
 info_copy :: proc(app: ^App) {
 	text := info_text(info_report(app))
 	platform.set_clipboard(app.main.win, text)
-	copied(app, fmt.tprintf("Copied the system's information (%d lines)", strings.count(text, "\n")))
+	announce(app, fmt.tprintf("Copied the system's information (%d lines)", strings.count(text, "\n")))
 }

@@ -6,9 +6,15 @@ package inspecteurtool
 //                                           says when it is shared; <out> is what is published
 //   inspecteurtool site check [--site folder] [--shot file.png] [--browser program]
 //                                           the pages in a real browser, served on this machine
-// {{version}} in the home page is the last version: its download link names the file of that release.
+// {{version}} in the home page is the last version: its download link names the file of that release. The shop's pages
+// (shop) are written after the toolkit's build.
 
+import "core:fmt"
+import "core:os"
+import "core:strings"
 import tk_site "gt:site"
+import toolbox "gt:toolbox"
+import inspecteur_licence "../../src/licence"
 
 // Where the site is published, what it is: the one place that says it.
 SITE_META :: tk_site.Meta{
@@ -40,4 +46,57 @@ site_project :: proc() -> tk_site.Project_Site {
 	m := SITE_META
 	m.ld_fields = SITE_LD[:]
 	return {meta = m, dir = "site", pages = {version_mark = "{{version}}"}}
+}
+
+// The shop: inspecteur's licence (src/licence), sold through Paddle by the toolkit's licence Worker. Its pages (pricing,
+// thanks, terms, refunds, privacy, imprint) are the toolkit's templates, filled at each `site build`. What is empty is
+// the maintainer's to give once the shop is set up (gui_toolkit docs/licence.md, "What the maintainer does at the end"):
+// until the client token, the price ids and the Worker are there, the buttons say "Coming soon". The price is a
+// PLACEHOLDER until the maintainer sets it.
+@(rodata)
+SHOP_PRICES := [?]tk_site.Shop_Price{
+	{edition = "supporter", price_id = "", label = "Buy the Supporter licence"},
+	{edition = "patron", price_id = "", label = "Buy the Patron licence"},
+}
+
+shop :: proc() -> tk_site.Shop {
+	return {
+		name           = "inspecteur",
+		product_title  = "Inspecteur User Licence",
+		price          = "<!-- PLACEHOLDER: the price, set by the maintainer -->Price to come",
+		price_note     = "Once. Taxes included.",
+		environment    = "sandbox",
+		client_token   = "",   // Paddle's client-side token: "" keeps the shop shut ("Coming soon")
+		prices         = SHOP_PRICES[:],
+		worker         = "",   // the licence Worker's address (gui_toolkit licence-worker/README.md)
+		thanks         = "https://inspecteur.froment.software/thanks/",
+		help           = REPOSITORY + "/issues",
+		register       = "Open Inspecteur's settings (Ctrl+,), the <strong>General</strong> page, <strong>Licence</strong>: paste the key, or choose the file.",
+		extension      = inspecteur_licence.PRODUCT.file_extension,
+		seller         = "Froment Software",
+		seller_url     = "https://froment.software",
+		code_licence   = "MIT",
+		stylesheet     = "../style.css",
+		home           = "../",
+		updated        = "2026-11-13",
+	}
+}
+
+// The site's own command: the toolkit's, then the shop's pages written into what `site build` made.
+site_command :: proc() -> toolbox.Command {
+	inner := tk_site.command(site_project())
+	return {name = inner.name, usage = inner.usage, run_with = site_run, user = new_clone(inner)}
+}
+
+@(private = "file")
+site_run :: proc(args: []string, user: rawptr) -> int {
+	inner := (^toolbox.Command)(user)
+	code := inner.run_with(args, inner.user)
+	if code != toolbox.EXIT_DONE || len(args) != 3 || args[0] != "build" { return code }
+	for page in tk_site.licence_pages(shop()) {
+		path := fmt.tprintf("%s/%s", args[2], page.path)
+		_ = os.make_directory_all(path[:strings.last_index_byte(path, '/')])   // (there already, or the write says it)
+		if os.write_entire_file(path, transmute([]u8)page.text) != nil { fmt.eprintfln("inspecteurtool site: %s cannot be written", path); return toolbox.EXIT_FAILED }
+	}
+	return toolbox.EXIT_DONE
 }

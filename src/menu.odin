@@ -272,7 +272,7 @@ open_location :: proc(app: ^App, p: ^Proc) {
 copy_command :: proc(app: ^App, p: ^Proc) {
 	if p.cmdline == "" { return }
 	platform.set_clipboard(app.main.win, p.cmdline)
-	copied(app, fmt.tprintf("Copied the command line of %s", p.name))
+	announce(app, fmt.tprintf("Copied the command line of %s", p.name))
 }
 
 // The signals the row's menu sends (Send a signal), each by its name and its number's.

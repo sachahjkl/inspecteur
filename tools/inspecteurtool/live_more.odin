@@ -171,13 +171,13 @@ live_theme :: proc(l: ^Live) {
 	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
 	check(l, cdp.click_name(c, "theme") && cdp.wait_for(c, "As the system", SESSION_WAIT), "the theme's menu opens")
 	check(l, cdp.click_text(c, "Light"), "choose Light")
-	check(l, file_has(prefs, "view.mode\tlight"), "it is in the preferences")
+	check(l, file_has(prefs, "appearance.mode\tlight"), "it is in the preferences")
 	// (the colours fade to the light version: the window is idle once the fade is over)
 	cdp.wait_idle(c, SESSION_WAIT)
 	check(l, cdp.shot(c, fmt.tprintf("%s/light.png", l.dir)), "a picture of the light version")
 	check(l, cdp.click_name(c, "theme") && cdp.wait_for(c, "As the system", SESSION_WAIT), "the menu again")
 	check(l, cdp.click_text(c, "As the system"), "back to the system's version")
-	check(l, file_has(prefs, "view.mode\tsystem"), "written")
+	check(l, file_has(prefs, "appearance.mode\tsystem"), "written")
 }
 
 // The Properties of a process of this test: its threads, its files (its output, a file of this test), suspend and

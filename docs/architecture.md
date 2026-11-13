@@ -223,7 +223,14 @@ desktop_files` writes the same entry and icons for the Nix package.
 key of `src/update/product.odin` (its private half is the release workflow's secret `UPDATE_SIGNING_KEY`, and
 `secrets/production.yaml` with SOPS), downloads the program and puts it in place; it runs at the next start.
 `settings_view.odin` shows the preferences' registry with the toolkit's `gt:prefs_page` (the layouts of the tables are
-`hidden`: the tables set them).
+`hidden`: the tables set them). The look, the text, the scrolling, the input, the delays, the rendering, the updates and
+the messages are the toolkit's standard settings (`prefs_page.standard_register` in `settings.odin`): `standard_watch`
+applies them to the main window as they change, `window_standard` to the journals' and the panels' windows; the theme
+is shown by `window_params` from `appearance_read`, over the toolkit's themes and the user's own (`themes.txt`,
+`prefs_page.Themes_File`).
+
+`licence.odin` keeps the licence (gt:licence, the product in `src/licence/product.odin`): a store read and written by
+tasks of the chores, shown under the settings' General page.
 
 ## Tests
 

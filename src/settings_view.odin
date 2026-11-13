@@ -1,11 +1,12 @@
 package inspecteur
 
 // The settings: gui_toolkit's page of the preferences (gt:prefs_page), in place of the sidebar and the section. The title
-// bar's button, Ctrl+, or the palette opens it; Escape or Ctrl+, again goes back. Each change is saved to the preferences
-// file and applied at once.
+// bar's button, Ctrl+, or the palette opens it; Escape or Ctrl+, again goes back. Each change is applied at once: the
+// toolkit's standard settings by prefs_page.standard_watch (the main window) and window_standard (the others),
+// inspecteur's by settings_changed. The loop's writer saves the file off this thread.
 
 import "core:time"
-import config "gt:config"
+import "gt:host"
 import "gt:platform"
 import prefs_page "gt:prefs_page"
 import "gt:ui"
@@ -21,24 +22,33 @@ settings_toggle :: proc(app: ^App) {
 settings_keys :: proc(app: ^App) {
 	if ui.key_press(.Comma, {.Ctrl}) { settings_toggle(app); return }
 	if ui.key_press(.F, {.Ctrl}) { prefs_page.focus_search(&app.settings_page) }   // (as the window's filter)
-	if ui.key_press(.Escape) && !prefs_page.editing(&app.settings_page) { app.settings_open = false }
+	if prefs_page.escape_leaves(&app.settings_page) { app.settings_open = false }
 }
 
-// The pages, their order and their icons. A preference's group is the first segment of its name (settings.odin); the
-// view.* preferences are split over two pages, and update.auto has a page of its own, so those pages list their names.
-@(private = "file", rodata)
+// The General page shows where inspecteur says what it did and its language, then the licence (its page_foot):
+// general.menu and general.autostart are the Setup's (the install puts the menu entry in place, and inspecteur has no
+// reason to start with the session), so no page shows them.
+@(private = "file")
+GENERAL_NAMES := [?]string{prefs_page.MESSAGES_PREF, prefs_page.LANGUAGE_PREF}
+
+// The pages, their order and their icons: each a group of the registry (the first segment of a name). The tables' look
+// (view.zebra, view.rules) has a page of its own: the other view.* preferences are hidden. (Not rodata: it slices
+// GENERAL_NAMES, set when the program starts.)
+@(private = "file")
 SETTINGS_PAGES := [?]prefs_page.Page_Info{
-	{category = "appearance", title = "Appearance", icon = lucide.PALETTE, names = []string{"view.theme", "view.mode", "view.finish", "view.zebra", "view.rules", "view.font_size"}},
-	{category = "processes",  title = "Processes",  icon = lucide.LAYOUT_LIST},
-	{category = "services",   title = "Services",   icon = lucide.SETTINGS},
-	{category = "connections", title = "Connections", icon = lucide.GLOBE},
-	{category = "window",     title = "Window",     icon = lucide.APP_WINDOW, names = []string{"view.system_title"}},
-	{category = "updates",    title = "Updates",    icon = lucide.DOWNLOAD, names = []string{"update.auto"}},
-	{category = "general",    title = "General",    icon = lucide.BELL, names = []string{"general.messages"}},
+	{category = "general",     title = "General",          icon = lucide.SLIDERS_HORIZONTAL, names = GENERAL_NAMES[:]},
+	{category = "appearance",  title = "Appearance",       icon = lucide.PALETTE},
+	{category = "window",      title = "Window",           icon = lucide.APP_WINDOW},
+	{category = "view",        title = "Tables",           icon = lucide.TABLE},
+	{category = "processes",   title = "Processes",        icon = lucide.LAYOUT_LIST},
+	{category = "services",    title = "Services",         icon = lucide.SETTINGS},
+	{category = "connections", title = "Connections",      icon = lucide.GLOBE},
+	{category = "scrolling",   title = "Scrolling",        icon = lucide.MOUSE},
+	{category = "input",       title = "Input",            icon = lucide.KEYBOARD},
+	{category = "timing",      title = "Delays and menus", icon = lucide.TIMER},
+	{category = "update",      title = "Updates",          icon = lucide.DOWNLOAD},
+	{category = "rendering",   title = "Rendering",        icon = lucide.MONITOR},
 }
-
-@(private = "file", rodata)
-CUSTOM := [?]string{"view.theme"}
 
 // The page, as large as the body.
 settings_build :: proc(app: ^App) {
@@ -46,15 +56,17 @@ settings_build :: proc(app: ^App) {
 	prefs_page.build(&app.settings_page, &app.prefs, settings_options(app))
 }
 
-// What the page is given; the palette lists the settings by the same (palette_build).
+// What the page is given: its pages, the themes (the toolkit's and the user's), the updater, the file; the palette lists
+// the settings by the same (palette_build).
 settings_options :: proc(app: ^App) -> prefs_page.Options {
 	return {
-		user = app, changed = settings_changed, choices = settings_choices, preview = settings_preview,
-		custom_names = CUSTOM[:], custom = settings_custom, problem = settings_problem,
-		updater = app.updater, update_pref = "update.auto", restart = proc(user: rawptr) { updates_restart((^App)(user)) },
+		user = app, changed = settings_changed, preview = settings_preview, problem = settings_problem,
+		page_foot = settings_page_foot,
+		updater = app.updater, restart = proc(user: rawptr) { updates_restart((^App)(user)) },
 		pages = SETTINGS_PAGES[:], icon_font = app.icons, search_icon = lucide.SEARCH, reset_icon = lucide.ROTATE_CCW,
 		version = "Inspecteur " + APP_VERSION,
 		file = prefs_file(),
+		themes = app.themes_file.all[:], themes_light = app.theme_shown.light, themes_file = &app.themes_file,
 	}
 }
 
@@ -62,28 +74,16 @@ settings_options :: proc(app: ^App) -> prefs_page.Options {
 @(private = "file")
 settings_problem :: proc(user: rawptr, name: string) -> string {
 	app := (^App)(user)
-	if name == "view.system_title" && app.settings.system_title && !platform.system_title_available(app.main.win) {
+	if name == prefs_page.SYSTEM_TITLE_PREF && app.settings.system_title && !platform.system_title_available(app.main.win) {
 		return "This desktop draws no title bar for Inspecteur's window (GNOME): Inspecteur keeps its own."
 	}
 	return ""
 }
 
-// The themes as cards, each in its own colours.
+// Under the General page's preferences: the licence.
 @(private = "file")
-settings_custom :: proc(user: rawptr, name: string, em: f32) {
-	app := (^App)(user)
-	if at := prefs_page.theme_cards(ui.THEMES[:], app.settings.theme, app.theme_shown.light, em); at >= 0 {
-		if config.set_from_string(&app.prefs, "view.theme", ui.THEMES[at].name, .User) == .None { settings_changed(app, "view.theme") }
-	}
-}
-
-// The choices of a preference known at run time: the themes.
-@(private = "file")
-settings_choices :: proc(user: rawptr, name: string) -> (labels, values: []string) {
-	if name != "view.theme" { return }
-	out := make([]string, len(ui.THEMES), context.temp_allocator)
-	for t, i in ui.THEMES { out[i] = t.name }
-	return out, out
+settings_page_foot :: proc(user: rawptr, category: string, em: f32) {
+	if category == "general" { licence_section((^App)(user), em) }
 }
 
 // While a slider is held: what can follow it at once does (the refresh's period); the text size waits for the release
@@ -100,7 +100,14 @@ settings_preview :: proc(user: rawptr, name: string, value: f64) {
 	}
 }
 
-// A preference was set or reset: read again, and what it changes applied (the loop writes the file).
+// A window of its own (a journal's, a Mission Control panel's) takes the standard settings as the main window does. The
+// renderer and the fonts are shared: the main window's watch sets them.
+window_standard :: proc(app: ^App, h: ^host.Host) {
+	prefs_page.standard_apply(&app.prefs, &h.state, {partial_redraw = &h.partial_redraw})
+}
+
+// A preference was set or reset: read again, and what it changes applied; the standard ones are applied to the main
+// window by standard_watch already, and here to the other windows (the loop writes the file).
 @(private = "file")
 settings_changed :: proc(user: rawptr, name: string) {
 	app := (^App)(user)
@@ -114,9 +121,12 @@ settings_changed :: proc(user: rawptr, name: string) {
 		app.next_sample = time.tick_add(time.tick_now(), time.Duration(app.settings.refresh_ms) * time.Millisecond)
 	case "services.manager":
 		services_switch(app, app.settings.manager)
-	case "view.system_title":
+	case prefs_page.SYSTEM_TITLE_PREF:
+		// (inspecteur's window changes its title bar at once, where the desktop lets it)
 		platform.set_integrated_title(app.main.win, !app.settings.system_title)
 	}
+	for w in app.journal_windows { window_standard(app, &w.window) }
+	for w in app.mission_windows { window_standard(app, &w.window) }
 	settings_free(&old)
 	updates_auto(app)
 }

@@ -16,6 +16,8 @@ project :: proc() -> toolbox.Project {
 	return {
 		name = "inspecteur", repository = REPOSITORY, changelog = CHANGELOG,
 		version_file = "src/main.odin", version_line = "APP_VERSION :: ", program = PROGRAM,
+		// (live, shots and bench drive the release build over CDP: Devtools; only the icons inspecteur names: Lucide_Subset)
+		features = {.Devtools, .Lucide_Subset},
 	}
 }
 

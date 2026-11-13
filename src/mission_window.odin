@@ -42,8 +42,7 @@ mission_window_open :: proc(app: ^App, p: Mission_Panel) {
 	w.params = proc(h: ^host.Host, bp: ^ui.Build_Params) { window_params(h, bp, (^Mission_Window)(h.user).app) }
 	w.state.icon_font = app.icons
 	w.after_input = FRAMES_AFTER_INPUT
-	w.partial_redraw = true
-	ui.set_rounding(&w.state, ROUNDING)
+	window_standard(app, &w.window)
 	platform.set_dark_title(w.win, !app.theme_shown.light)
 	append(&app.mission_windows, w)
 	mission_windows_save(app)

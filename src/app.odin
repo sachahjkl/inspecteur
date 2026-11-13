@@ -25,8 +25,6 @@ import update "gt:update"
 import instance "gt:instance"
 import identity "identity"
 
-// The corners: nearly square (a table of numbers, not cards): about a pixel on a button, none to see on a row.
-ROUNDING :: 0.25
 // Frames owed after an event (what it set off settles: the layout, the reveal of the selected row).
 FRAMES_AFTER_INPUT :: 3
 
@@ -47,6 +45,9 @@ App :: struct {
 	settings:    Settings,
 	devtools:    ^devtools.Server,  // TOOLKIT_DEVTOOLS=<port>: driven and captured over the Chrome DevTools Protocol
 	theme_shown: ui.Theme_Shown,
+	themes_file: prefs_page.Themes_File,   // the toolkit's themes, then the user's own (themes.txt beside the preferences)
+	standard:    prefs_page.Standard_Watch,   // the toolkit's standard settings, applied as they change
+	licence:     Licence_View,      // who supports inspecteur (licence.odin): the settings' General page
 
 	demo:        ^Demo,             // not nil: every reading is the demo's (--demo: the pictures of the documentation)
 	own_pid:     i32,               // Inspecteur's (the first reading's, as the two below)
@@ -137,6 +138,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	app.prefs = prefs^
 	prefs^ = {}
 	app.settings = prefs_read(&app.prefs)
+	// (no file read here: the user's themes come at the first builds, read by a task)
+	prefs_page.themes_file_init(&app.themes_file, themes_file(), ui.THEMES[:])
 	demo: Demo
 	if opts.demo {
 		demo_init(&demo)
@@ -183,9 +186,10 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	}
 	h.state.icon_font = app.icons
 	h.after_input = FRAMES_AFTER_INPUT
-	h.partial_redraw = true   // (a sample changes some cells: only they are drawn again)
-	ui.set_rounding(&h.state, ROUNDING)
-	ui.set_zoom(&h.state, app.settings.zoom)
+	// (the zoom, the rounding, the scrolling, the delays, partial redraw...: applied now, then each as it changes;
+	// inspecteur's own defaults are settings.odin's OWN_DEFAULTS)
+	prefs_page.standard_watch(&app.standard, &app.prefs, &h.state, {renderer = &app.shared.r, fonts = &app.shared.fonts, partial_redraw = &h.partial_redraw})
+	licence_init(app)
 	h.params = app_params
 	app.devtools = devtools.start_from_env(win, "inspecteur")
 	h.before_input = proc(h: ^host.Host) { app := (^App)(h.user); devtools.service(app.devtools, &h.state, &app.shared.r) }
@@ -248,6 +252,9 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	delete(app.windows)
 	mission_windows_close(app)
 	updates_stop(app)
+	// (the chores have stopped: no task of theirs holds the themes file or the licence's store)
+	prefs_page.themes_file_destroy(&app.themes_file)
+	licence_destroy(app)
 	prefs_page.destroy(&app.settings_page)
 	mission_destroy(app)
 	connections_destroy(&app.connections)
@@ -276,6 +283,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	for &vl in app.props_lists { ui.vlist_destroy(&vl) }
 	ui.palette_destroy(&app.palette)
 	settings_free(&app.settings)
+	prefs_page.standard_unwatch(&app.standard)
 	config.prefs_destroy(&app.prefs)
 	// (an update in place: the new program, once this one has let go of the window)
 	if app.restart && !setup.launch(process.executable_path(), nil) { log.error("the new program does not start") }
@@ -363,18 +371,18 @@ app_params :: proc(h: ^host.Host, bp: ^ui.Build_Params) { window_params(h, bp, (
 // What each build of a window of inspecteur is given (the main one, a journal's): the theme, the base style.
 window_params :: proc(h: ^host.Host, bp: ^ui.Build_Params, app: ^App) {
 	// (applied only when it changes, or the system goes light or dark: a palette applied starts a cross-fade)
-	choice := ui.Theme_Choice{name = app.settings.theme, mode = app.settings.mode, finish = app.settings.finish}
-	if ui.theme_show(&app.shared.theme, ui.THEMES[:], choice, &app.theme_shown, render.blend_space(&app.shared.r)) { platform.set_dark_title(h.win, !app.theme_shown.light) }
+	choice := prefs_page.appearance_choice(app.settings.look)
+	if ui.theme_show(&app.shared.theme, app.themes_file.all[:], choice, &app.theme_shown, render.blend_space(&app.shared.r)) { platform.set_dark_title(h.win, !app.theme_shown.light) }
 	// (in a window the user is not in, the search's caret neither shows nor blinks: at rest, one frame per sample)
 	bp.inactive = !h.win.active
 	// (the toolkit's zoom: Ctrl+wheel, Ctrl+=, Ctrl+-, Ctrl+0; zoom_follow keeps it)
-	bp.base = ui.Style{pref = {.X = ui.text_size(), .Y = ui.px(26)}, font = app.shared.font, font_size = app.settings.font_size, text_pad = 6, cursor = .Arrow}
+	bp.base = ui.Style{pref = {.X = ui.text_size(), .Y = ui.px(26)}, font = app.shared.font, font_size = app.settings.look.font_size, text_pad = 6, cursor = .Arrow}
 }
 
-// Says that something was copied (a finished act): the toolkit's announcement, where general.messages says (the
+// Says that an act is done (copied, a licence registered): the toolkit's announcement, where general.messages says (the
 // system's notifications by default, a toast of the window where the system shows none). What is under way stays in
 // the status bar (say).
-copied :: proc(app: ^App, title: string, body := "") {
+announce :: proc(app: ^App, title: string, body := "") {
 	app.announcer.mode = prefs_page.messages_mode(&app.prefs)
 	ui.announce(&app.announcer, .Good, title, body)
 }

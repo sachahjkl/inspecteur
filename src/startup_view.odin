@@ -94,5 +94,5 @@ startup_copy :: proc(app: ^App) {
 	it, ok := selected_startup(app)
 	if !ok || it.command == "" { return }
 	platform.set_clipboard(app.main.win, it.command)
-	copied(app, fmt.tprintf("Copied the command of %s", it.name))
+	announce(app, fmt.tprintf("Copied the command of %s", it.name))
 }
