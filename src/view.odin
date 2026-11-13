@@ -43,7 +43,7 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	app.held = ui.key_held(.Ctrl)
 	// (the user's themes file: a task looks at it now and then and reads it when it changed; window_params shows it)
 	if prefs_page.themes_file_poll(&app.themes_file, &h.state) { h.settle = max(h.settle, FRAMES_AFTER_INPUT) }
-	free_keys := !app.menu.confirm.open && !app.props.open && !app.affinity.open && !app.shortcuts_open && !app.setup.open && !app.diagnosis_open && !app.palette.open && !ui.menu_any_open()
+	free_keys := !app.menu.confirm.open && !app.props.open && !app.affinity.open && !app.sheet.open && !app.setup.open && !app.diagnosis_open && !app.palette.open && !ui.menu_any_open()
 	if free_keys && app.settings_open {
 		settings_keys(app)   // (the page's own: its search takes what is typed)
 	} else if free_keys {
@@ -275,7 +275,7 @@ build_title :: proc(app: ^App, em: f32) {
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
 		if ui.button("palette_button", icon = lucide.COMMAND, o = {tip = cmd_tip(.Palette)}).clicked { palette_open(app) }
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
-		if ui.button("help_button", icon = lucide.KEYBOARD, o = {tip = cmd_tip(.Shortcuts)}).clicked { app.shortcuts_open = true }
+		if ui.button("help_button", icon = lucide.KEYBOARD, o = {tip = cmd_tip(.Shortcuts)}).clicked { app.sheet.open = true }
 		theme_button(app, em)
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
 		// (the settings shown: the button is held down)

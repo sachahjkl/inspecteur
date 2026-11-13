@@ -78,7 +78,9 @@ App :: struct {
 	cpu_grid:    bool,              // the CPU's page shows a graph per logical processor
 	bar_rect:    ui.Rect,           // the Processes section's bar, as last laid out (the columns' menu opens under it)
 	palette:     ui.Command_Palette,   // the command palette (commands.odin)
-	shortcuts_open: bool,           // the sheet of the keys
+	palette_table: Palette_Table,   // its list, made again only when it changes (commands.odin)
+	sheet:       ui.Shortcuts_Sheet,   // the sheet of the keys (commands.odin)
+	sheet_commands: [dynamic]ui.Command,   // its list, made at its first opening
 	diagnosis_open: bool,   // "Why is it slow?" (F2, diagnosis.odin)
 	mission:     Mission_Control,   // the Mission Control section: its panels (mission_control.odin)
 	setup:       setup.Dialog,      // the install's dialog (setup.odin)
@@ -283,6 +285,9 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	props_destroy(&app.props)
 	for &vl in app.props_lists { ui.vlist_destroy(&vl) }
 	ui.palette_destroy(&app.palette)
+	ui.shortcuts_sheet_destroy(&app.sheet)
+	delete(app.sheet_commands)
+	palette_table_destroy(&app.palette_table)
 	settings_free(&app.settings)
 	prefs_page.standard_unwatch(&app.standard)
 	config.prefs_destroy(&app.prefs)

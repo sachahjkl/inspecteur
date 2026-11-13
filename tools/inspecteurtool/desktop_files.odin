@@ -15,7 +15,7 @@ import identity "../../src/identity"
 run_desktop_files :: proc(args: []string) -> int {
 	if len(args) != 1 { fmt.eprintln("inspecteurtool desktop_files <prefix>"); return EXIT_USAGE }
 	prefix := args[0]
-	o := desktop.Options{identity = identity.identity(), exe = fmt.tprintf("%s/bin/%s", prefix, identity.SLUG)}
+	o := desktop.Integration_Options{identity = identity.identity(), exe = fmt.tprintf("%s/bin/%s", prefix, identity.SLUG)}
 	apps := fmt.tprintf("%s/share/applications", prefix)
 	if os.make_directory_all(apps) != nil { fmt.eprintfln("inspecteurtool: %s cannot be made", apps); return 1 }
 	entry := fmt.tprintf("%s/%s.desktop", apps, identity.SLUG)

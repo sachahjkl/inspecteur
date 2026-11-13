@@ -59,7 +59,7 @@ settings_build :: proc(app: ^App) {
 
 // What the page is given: its pages, the themes (the toolkit's and the user's), the updater, the file; the palette lists
 // the settings by the same (palette_build).
-settings_options :: proc(app: ^App) -> prefs_page.Options {
+settings_options :: proc(app: ^App) -> prefs_page.Page_Options {
 	return {
 		user = app, changed = settings_changed, preview = settings_preview, problem = settings_problem,
 		page_foot = settings_page_foot,

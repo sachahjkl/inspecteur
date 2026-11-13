@@ -9,6 +9,8 @@ package inspecteur
 // command of the Properties group acts while the Properties dialog is open (props_view.odin reads its keys).
 
 import "core:fmt"
+import "core:mem/virtual"
+import "core:slice"
 import "core:strings"
 import i18n "gt:i18n"
 import lucide "gt:lucide"
@@ -45,102 +47,102 @@ Cmd :: enum u8 {
 
 COMMANDS := [Cmd]ui.Command{
 	.Palette          = {icon = lucide.COMMAND, label = i18n.later("Command palette"), group = i18n.later("Window"), keys = {{.K, {.Ctrl}}, {.P, {.Ctrl, .Shift}}}},
-	.Shortcuts        = {icon = lucide.KEYBOARD, label = i18n.later("Keyboard shortcuts"), group = i18n.later("Window"), keys = {{.F1, {}}, {}}, tags = {"keys", "help", "keyboard"}},
-	.Filter           = {icon = lucide.FILTER, label = i18n.later("Filter"), group = i18n.later("Window"), keys = {{.F, {.Ctrl}}, {}}},
-	.Clear_Filter     = {icon = lucide.X, label = i18n.later("Clear the filter"), group = i18n.later("Window"), keys = {{.Escape, {}}, {}}},
-	.Read_Again       = {icon = lucide.REFRESH_CW, label = i18n.later("Read again"), group = i18n.later("Window"), keys = {{.F5, {}}, {}}, tags = {"refresh", "reload"}},
-	.Pause_Refresh    = {icon = lucide.PAUSE, label = i18n.later("Pause or resume the refresh"), group = i18n.later("Window"), keys = {{.Space, {.Ctrl}}, {}}, tags = {"freeze", "stop updating"}},
-	.Refresh_Speed    = {icon = lucide.GAUGE, label = i18n.later("Refresh speed…"), group = i18n.later("Window"), keys = {{.R, {.Ctrl, .Shift}}, {}}, tags = {"interval", "update", "period"}},
+	.Shortcuts        = {icon = lucide.KEYBOARD, label = i18n.later("Keyboard shortcuts"), group = i18n.later("Window"), keys = {{.F1, {}}}, tags = {"keys", "help", "keyboard"}},
+	.Filter           = {icon = lucide.FILTER, label = i18n.later("Filter"), group = i18n.later("Window"), keys = {{.F, {.Ctrl}}}},
+	.Clear_Filter     = {icon = lucide.X, label = i18n.later("Clear the filter"), group = i18n.later("Window"), keys = {{.Escape, {}}}},
+	.Read_Again       = {icon = lucide.REFRESH_CW, label = i18n.later("Read again"), group = i18n.later("Window"), keys = {{.F5, {}}}, tags = {"refresh", "reload"}},
+	.Pause_Refresh    = {icon = lucide.PAUSE, label = i18n.later("Pause or resume the refresh"), group = i18n.later("Window"), keys = {{.Space, {.Ctrl}}}, tags = {"freeze", "stop updating"}},
+	.Refresh_Speed    = {icon = lucide.GAUGE, label = i18n.later("Refresh speed…"), group = i18n.later("Window"), keys = {{.R, {.Ctrl, .Shift}}}, tags = {"interval", "update", "period"}},
 	.Zoom_In          = {icon = lucide.ZOOM_IN, label = i18n.later("Zoom in"), group = i18n.later("Window"), keys = {{.Equal, {.Ctrl}}, {.Num_Add, {.Ctrl}}}},
 	.Zoom_Out         = {icon = lucide.ZOOM_OUT, label = i18n.later("Zoom out"), group = i18n.later("Window"), keys = {{.Minus, {.Ctrl}}, {.Num_Subtract, {.Ctrl}}}},
-	.Zoom_Reset       = {icon = lucide.SEARCH, label = i18n.later("Zoom: 100 %"), group = i18n.later("Window"), keys = {{.N0, {.Ctrl}}, {}}},
-	.Light_Dark       = {icon = lucide.SUN_MOON, label = i18n.later("Light or dark"), group = i18n.later("Window"), keys = {{.L, {.Ctrl, .Shift}}, {}}, tags = {"theme", "dark", "night", "colours"}},
-	.Setup            = {icon = lucide.DOWNLOAD, label = i18n.later("Install…"), group = i18n.later("Window"), keys = {{.I, {.Ctrl, .Shift}}, {}}},
-	.Settings         = {icon = lucide.SLIDERS_HORIZONTAL, label = i18n.later("Settings"), group = i18n.later("Window"), keys = {{.Comma, {.Ctrl}}, {}}, tags = {"preferences", "options", "configure"}},
+	.Zoom_Reset       = {icon = lucide.SEARCH, label = i18n.later("Zoom: 100 %"), group = i18n.later("Window"), keys = {{.N0, {.Ctrl}}}},
+	.Light_Dark       = {icon = lucide.SUN_MOON, label = i18n.later("Light or dark"), group = i18n.later("Window"), keys = {{.L, {.Ctrl, .Shift}}}, tags = {"theme", "dark", "night", "colours"}},
+	.Setup            = {icon = lucide.DOWNLOAD, label = i18n.later("Install…"), group = i18n.later("Window"), keys = {{.I, {.Ctrl, .Shift}}}},
+	.Settings         = {icon = lucide.SLIDERS_HORIZONTAL, label = i18n.later("Settings"), group = i18n.later("Window"), keys = {{.Comma, {.Ctrl}}}, tags = {"preferences", "options", "configure"}},
 	.Check_Updates    = {icon = lucide.HARD_DRIVE_DOWNLOAD, label = i18n.later("Check for updates"), group = i18n.later("Window")},
-	.Diagnose         = {icon = lucide.LIGHTBULB, label = i18n.later("Why is it slow?"), group = i18n.later("Window"), keys = {{.F2, {}}, {}}, tags = {"slow", "lag", "performance", "why"}},
+	.Diagnose         = {icon = lucide.LIGHTBULB, label = i18n.later("Why is it slow?"), group = i18n.later("Window"), keys = {{.F2, {}}}, tags = {"slow", "lag", "performance", "why"}},
 
-	.Show_Mission_Control = {icon = lucide.LAYOUT_GRID, label = i18n.later("Mission Control"), group = i18n.later("Sections"), keys = {{.N1, {.Ctrl}}, {}}},
-	.Show_Processes   = {icon = lucide.LAYOUT_LIST, label = i18n.later("Processes"), group = i18n.later("Sections"), keys = {{.N2, {.Ctrl}}, {}}},
-	.Show_Performance = {icon = lucide.GAUGE, label = i18n.later("Performance"), group = i18n.later("Sections"), keys = {{.N3, {.Ctrl}}, {}}},
-	.Show_Services    = {icon = lucide.SETTINGS, label = i18n.later("Services"), group = i18n.later("Sections"), keys = {{.N4, {.Ctrl}}, {}}},
-	.Show_Startup     = {icon = lucide.POWER, label = i18n.later("Startup"), group = i18n.later("Sections"), keys = {{.N5, {.Ctrl}}, {}}},
-	.Show_Connections = {icon = lucide.GLOBE, label = i18n.later("Connections"), group = i18n.later("Sections"), keys = {{.N6, {.Ctrl}}, {}}},
-	.Show_Information = {icon = lucide.INFO, label = i18n.later("Information"), group = i18n.later("Sections"), keys = {{.N7, {.Ctrl}}, {}}},
-	.Next_Section     = {icon = lucide.ARROW_RIGHT, label = i18n.later("Next section"), group = i18n.later("Sections"), keys = {{.Tab, {.Ctrl}}, {}}},
-	.Previous_Section = {icon = lucide.ARROW_LEFT, label = i18n.later("Previous section"), group = i18n.later("Sections"), keys = {{.Tab, {.Ctrl, .Shift}}, {}}},
+	.Show_Mission_Control = {icon = lucide.LAYOUT_GRID, label = i18n.later("Mission Control"), group = i18n.later("Sections"), keys = {{.N1, {.Ctrl}}}},
+	.Show_Processes   = {icon = lucide.LAYOUT_LIST, label = i18n.later("Processes"), group = i18n.later("Sections"), keys = {{.N2, {.Ctrl}}}},
+	.Show_Performance = {icon = lucide.GAUGE, label = i18n.later("Performance"), group = i18n.later("Sections"), keys = {{.N3, {.Ctrl}}}},
+	.Show_Services    = {icon = lucide.SETTINGS, label = i18n.later("Services"), group = i18n.later("Sections"), keys = {{.N4, {.Ctrl}}}},
+	.Show_Startup     = {icon = lucide.POWER, label = i18n.later("Startup"), group = i18n.later("Sections"), keys = {{.N5, {.Ctrl}}}},
+	.Show_Connections = {icon = lucide.GLOBE, label = i18n.later("Connections"), group = i18n.later("Sections"), keys = {{.N6, {.Ctrl}}}},
+	.Show_Information = {icon = lucide.INFO, label = i18n.later("Information"), group = i18n.later("Sections"), keys = {{.N7, {.Ctrl}}}},
+	.Next_Section     = {icon = lucide.ARROW_RIGHT, label = i18n.later("Next section"), group = i18n.later("Sections"), keys = {{.Tab, {.Ctrl}}}},
+	.Previous_Section = {icon = lucide.ARROW_LEFT, label = i18n.later("Previous section"), group = i18n.later("Sections"), keys = {{.Tab, {.Ctrl, .Shift}}}},
 
-	.End_Task         = {icon = lucide.X, label = i18n.later("End task"), group = i18n.later("Processes"), keys = {{.Delete, {}}, {}}, tags = {"kill", "stop", "close", "quit", "terminate"}},
-	.Kill             = {icon = lucide.ZAP, label = i18n.later("Kill…"), group = i18n.later("Processes"), keys = {{.Delete, {.Shift}}, {}}, tags = {"force", "sigkill", "terminate"}},
-	.End_Tree         = {icon = lucide.LIST_TREE, label = i18n.later("End process tree…"), group = i18n.later("Processes"), keys = {{.Delete, {.Ctrl}}, {}}, tags = {"kill", "children"}},
-	.Select_All       = {icon = lucide.LIST_CHECKS, label = i18n.later("Select all"), group = i18n.later("Processes"), keys = {{.A, {.Ctrl}}, {}}},
-	.Suspend          = {icon = lucide.PAUSE, label = i18n.later("Suspend or resume"), group = i18n.later("Processes"), keys = {{.P, {.Ctrl}}, {}}, tags = {"pause", "freeze", "stop", "continue", "sigstop"}},
-	.Properties       = {icon = lucide.INFO, label = i18n.later("Properties"), group = i18n.later("Processes"), keys = {{.Return, {.Alt}}, {}}, tags = {"details", "info", "threads", "files", "environment"}},
-	.Open_Location    = {icon = lucide.FOLDER_OPEN, label = i18n.later("Open file location"), group = i18n.later("Processes"), keys = {{.O, {.Ctrl}}, {}}, tags = {"folder", "executable", "reveal"}},
-	.Copy_Command     = {icon = lucide.COPY, label = i18n.later("Copy command line"), group = i18n.later("Processes"), keys = {{.C, {.Ctrl}}, {}}},
-	.Default_Action   = {icon = lucide.PLAY, label = i18n.later("Open the group, or Properties"), group = i18n.later("Processes"), keys = {{.Return, {}}, {}}},
-	.Open_Group       = {icon = lucide.CHEVRON_DOWN, label = i18n.later("Open the group"), group = i18n.later("Processes"), keys = {{.Right, {}}, {}}},
-	.Close_Group      = {icon = lucide.CHEVRON_UP, label = i18n.later("Close the group"), group = i18n.later("Processes"), keys = {{.Left, {}}, {}}},
-	.Raise_Priority   = {icon = lucide.ARROW_UP, label = i18n.later("Raise the priority"), group = i18n.later("Processes"), keys = {{.Up, {.Ctrl}}, {}}, tags = {"nice", "renice"}},
-	.Lower_Priority   = {icon = lucide.ARROW_DOWN, label = i18n.later("Lower the priority"), group = i18n.later("Processes"), keys = {{.Down, {.Ctrl}}, {}}, tags = {"nice", "renice", "background"}},
-	.Affinity         = {icon = lucide.MICROCHIP, label = i18n.later("Set affinity…"), group = i18n.later("Processes"), keys = {{.A, {.Ctrl, .Shift}}, {}}, tags = {"cpu", "cores", "pin"}},
+	.End_Task         = {icon = lucide.X, label = i18n.later("End task"), group = i18n.later("Processes"), keys = {{.Delete, {}}}, tags = {"kill", "stop", "close", "quit", "terminate"}},
+	.Kill             = {icon = lucide.ZAP, label = i18n.later("Kill…"), group = i18n.later("Processes"), keys = {{.Delete, {.Shift}}}, tags = {"force", "sigkill", "terminate"}},
+	.End_Tree         = {icon = lucide.LIST_TREE, label = i18n.later("End process tree…"), group = i18n.later("Processes"), keys = {{.Delete, {.Ctrl}}}, tags = {"kill", "children"}},
+	.Select_All       = {icon = lucide.LIST_CHECKS, label = i18n.later("Select all"), group = i18n.later("Processes"), keys = {{.A, {.Ctrl}}}},
+	.Suspend          = {icon = lucide.PAUSE, label = i18n.later("Suspend or resume"), group = i18n.later("Processes"), keys = {{.P, {.Ctrl}}}, tags = {"pause", "freeze", "stop", "continue", "sigstop"}},
+	.Properties       = {icon = lucide.INFO, label = i18n.later("Properties"), group = i18n.later("Processes"), keys = {{.Return, {.Alt}}}, tags = {"details", "info", "threads", "files", "environment"}},
+	.Open_Location    = {icon = lucide.FOLDER_OPEN, label = i18n.later("Open file location"), group = i18n.later("Processes"), keys = {{.O, {.Ctrl}}}, tags = {"folder", "executable", "reveal"}},
+	.Copy_Command     = {icon = lucide.COPY, label = i18n.later("Copy command line"), group = i18n.later("Processes"), keys = {{.C, {.Ctrl}}}},
+	.Default_Action   = {icon = lucide.PLAY, label = i18n.later("Open the group, or Properties"), group = i18n.later("Processes"), keys = {{.Return, {}}}},
+	.Open_Group       = {icon = lucide.CHEVRON_DOWN, label = i18n.later("Open the group"), group = i18n.later("Processes"), keys = {{.Right, {}}}},
+	.Close_Group      = {icon = lucide.CHEVRON_UP, label = i18n.later("Close the group"), group = i18n.later("Processes"), keys = {{.Left, {}}}},
+	.Raise_Priority   = {icon = lucide.ARROW_UP, label = i18n.later("Raise the priority"), group = i18n.later("Processes"), keys = {{.Up, {.Ctrl}}}, tags = {"nice", "renice"}},
+	.Lower_Priority   = {icon = lucide.ARROW_DOWN, label = i18n.later("Lower the priority"), group = i18n.later("Processes"), keys = {{.Down, {.Ctrl}}}, tags = {"nice", "renice", "background"}},
+	.Affinity         = {icon = lucide.MICROCHIP, label = i18n.later("Set affinity…"), group = i18n.later("Processes"), keys = {{.A, {.Ctrl, .Shift}}}, tags = {"cpu", "cores", "pin"}},
 	.Send_Signal      = {icon = lucide.ZAP, label = i18n.later("Send a signal"), group = i18n.later("Processes"), tags = {"signal", "sighup", "sigusr1", "sigint", "reload", "hang up"}},
-	.Show_Window      = {icon = lucide.APP_WINDOW, label = i18n.later("Show its window"), group = i18n.later("Processes"), keys = {{.W, {.Ctrl, .Shift}}, {}}, tags = {"window", "focus", "switch", "raise", "front"}},
-	.Go_To_Service    = {icon = lucide.SERVER, label = i18n.later("Go to service"), group = i18n.later("Processes"), keys = {{.S, {.Ctrl, .Shift}}, {}}},
-	.Dump             = {icon = lucide.SAVE, label = i18n.later("Create dump file…"), group = i18n.later("Processes"), keys = {{.D, {.Ctrl, .Shift}}, {}}, tags = {"core", "gcore", "debug"}},
-	.Search_Online    = {icon = lucide.SEARCH, label = i18n.later("Search online"), group = i18n.later("Processes"), keys = {{.F, {.Ctrl, .Shift}}, {}}, tags = {"web", "google", "what is"}},
-	.Tree_View        = {icon = lucide.FOLDER_TREE, label = i18n.later("Process tree or apps"), group = i18n.later("Processes"), keys = {{.T, {.Ctrl}}, {}}, tags = {"parent", "hierarchy"}},
-	.Columns          = {icon = lucide.COLUMNS_2, label = i18n.later("Columns…"), group = i18n.later("Processes"), keys = {{.C, {.Ctrl, .Shift}}, {}}, tags = {"show", "hide", "fields"}},
-	.Summary          = {icon = lucide.LAYOUT_GRID, label = i18n.later("Show or hide the summary of the machine"), group = i18n.later("Processes"), keys = {{.B, {.Ctrl}}, {}}},
-	.Pin              = {icon = lucide.PIN, label = i18n.later("Pin or unpin"), group = i18n.later("Processes"), keys = {{.P, {.Alt}}, {}}, tags = {"favourite", "top", "keep"}},
+	.Show_Window      = {icon = lucide.APP_WINDOW, label = i18n.later("Show its window"), group = i18n.later("Processes"), keys = {{.W, {.Ctrl, .Shift}}}, tags = {"window", "focus", "switch", "raise", "front"}},
+	.Go_To_Service    = {icon = lucide.SERVER, label = i18n.later("Go to service"), group = i18n.later("Processes"), keys = {{.S, {.Ctrl, .Shift}}}},
+	.Dump             = {icon = lucide.SAVE, label = i18n.later("Create dump file…"), group = i18n.later("Processes"), keys = {{.D, {.Ctrl, .Shift}}}, tags = {"core", "gcore", "debug"}},
+	.Search_Online    = {icon = lucide.SEARCH, label = i18n.later("Search online"), group = i18n.later("Processes"), keys = {{.F, {.Ctrl, .Shift}}}, tags = {"web", "google", "what is"}},
+	.Tree_View        = {icon = lucide.FOLDER_TREE, label = i18n.later("Process tree or apps"), group = i18n.later("Processes"), keys = {{.T, {.Ctrl}}}, tags = {"parent", "hierarchy"}},
+	.Columns          = {icon = lucide.COLUMNS_2, label = i18n.later("Columns…"), group = i18n.later("Processes"), keys = {{.C, {.Ctrl, .Shift}}}, tags = {"show", "hide", "fields"}},
+	.Summary          = {icon = lucide.LAYOUT_GRID, label = i18n.later("Show or hide the summary of the machine"), group = i18n.later("Processes"), keys = {{.B, {.Ctrl}}}},
+	.Pin              = {icon = lucide.PIN, label = i18n.later("Pin or unpin"), group = i18n.later("Processes"), keys = {{.P, {.Alt}}}, tags = {"favourite", "top", "keep"}},
 
 	.Mission_Panels   = {icon = lucide.LAYOUT_GRID, label = i18n.later("Mission Control: panels…"), group = i18n.later("Mission Control")},
 	.Mission_Reset    = {icon = lucide.ROTATE_CCW, label = i18n.later("Mission Control: the layout as at first"), group = i18n.later("Mission Control")},
-	.Cpu_Grid         = {icon = lucide.LAYOUT_GRID, label = i18n.later("One graph per logical processor"), group = i18n.later("Performance"), keys = {{.G, {.Ctrl}}, {}}},
-	.Next_Device      = {icon = lucide.ARROW_DOWN, label = i18n.later("Next device"), group = i18n.later("Performance"), keys = {{.Down, {}}, {}}},
-	.Previous_Device  = {icon = lucide.ARROW_UP, label = i18n.later("Previous device"), group = i18n.later("Performance"), keys = {{.Up, {}}, {}}},
+	.Cpu_Grid         = {icon = lucide.LAYOUT_GRID, label = i18n.later("One graph per logical processor"), group = i18n.later("Performance"), keys = {{.G, {.Ctrl}}}},
+	.Next_Device      = {icon = lucide.ARROW_DOWN, label = i18n.later("Next device"), group = i18n.later("Performance"), keys = {{.Down, {}}}},
+	.Previous_Device  = {icon = lucide.ARROW_UP, label = i18n.later("Previous device"), group = i18n.later("Performance"), keys = {{.Up, {}}}},
 
-	.Service_Start    = {icon = lucide.PLAY, label = i18n.later("Start"), group = i18n.later("Services"), keys = {{.S, {.Ctrl}}, {}}, tags = {"run", "systemd"}},
-	.Service_Stop     = {icon = lucide.SQUARE, label = i18n.later("Stop"), group = i18n.later("Services"), keys = {{.Delete, {}}, {}}, tags = {"kill", "systemd"}},
-	.Service_Restart  = {icon = lucide.ROTATE_CCW, label = i18n.later("Restart"), group = i18n.later("Services"), keys = {{.R, {.Ctrl}}, {}}, tags = {"reload", "systemd"}},
-	.Service_Enable   = {icon = lucide.CHECK, label = i18n.later("Enable"), group = i18n.later("Services"), keys = {{.E, {.Ctrl}}, {}}, tags = {"boot", "autostart"}},
-	.Service_Disable  = {icon = lucide.X, label = i18n.later("Disable"), group = i18n.later("Services"), keys = {{.D, {.Ctrl}}, {}}, tags = {"boot", "autostart"}},
-	.Service_Open     = {icon = lucide.LAYOUT_LIST, label = i18n.later("Open in Processes"), group = i18n.later("Services"), keys = {{.Return, {}}, {}}},
-	.Service_Copy     = {icon = lucide.COPY, label = i18n.later("Copy name"), group = i18n.later("Services"), keys = {{.C, {.Ctrl}}, {}}},
-	.Service_Details  = {icon = lucide.PANEL_BOTTOM, label = i18n.later("Details and journal"), group = i18n.later("Services"), keys = {{.I, {.Ctrl}}, {}}, tags = {"log", "journal", "status"}},
-	.Service_Open_File = {icon = lucide.FILE_TEXT, label = i18n.later("Open unit file"), group = i18n.later("Services"), keys = {{.O, {.Ctrl}}, {}}},
-	.Service_Manager  = {icon = lucide.USER, label = i18n.later("System or user services"), group = i18n.later("Services"), keys = {{.U, {.Ctrl}}, {}}},
-	.Journal_Search   = {icon = lucide.SEARCH, label = i18n.later("Search the journal"), group = i18n.later("Services"), keys = {{.J, {.Ctrl}}, {}}},
-	.Journal_Level    = {icon = lucide.FILTER, label = i18n.later("Journal: all, warnings, errors"), group = i18n.later("Services"), keys = {{.L, {.Alt}}, {}}},
-	.Journal_Boot     = {icon = lucide.POWER, label = i18n.later("Journal: this boot or every boot"), group = i18n.later("Services"), keys = {{.B, {.Alt}}, {}}},
-	.Journal_Follow   = {icon = lucide.ARROW_DOWN, label = i18n.later("Follow the journal"), group = i18n.later("Services"), keys = {{.F, {.Alt}}, {}}},
-	.Journal_Copy     = {icon = lucide.COPY, label = i18n.later("Copy the journal's entries shown"), group = i18n.later("Services"), keys = {{.C, {.Alt}}, {}}},
-	.Journal_Copy_Entry = {icon = lucide.CLIPBOARD_COPY, label = i18n.later("Copy the journal's entry"), group = i18n.later("Services"), keys = {{.C, {.Alt, .Shift}}, {}}},
-	.Journal_Window   = {icon = lucide.EXTERNAL_LINK, label = i18n.later("The journal in its own window"), group = i18n.later("Services"), keys = {{.J, {.Ctrl, .Shift}}, {}}},
+	.Service_Start    = {icon = lucide.PLAY, label = i18n.later("Start"), group = i18n.later("Services"), keys = {{.S, {.Ctrl}}}, tags = {"run", "systemd"}},
+	.Service_Stop     = {icon = lucide.SQUARE, label = i18n.later("Stop"), group = i18n.later("Services"), keys = {{.Delete, {}}}, tags = {"kill", "systemd"}},
+	.Service_Restart  = {icon = lucide.ROTATE_CCW, label = i18n.later("Restart"), group = i18n.later("Services"), keys = {{.R, {.Ctrl}}}, tags = {"reload", "systemd"}},
+	.Service_Enable   = {icon = lucide.CHECK, label = i18n.later("Enable"), group = i18n.later("Services"), keys = {{.E, {.Ctrl}}}, tags = {"boot", "autostart"}},
+	.Service_Disable  = {icon = lucide.X, label = i18n.later("Disable"), group = i18n.later("Services"), keys = {{.D, {.Ctrl}}}, tags = {"boot", "autostart"}},
+	.Service_Open     = {icon = lucide.LAYOUT_LIST, label = i18n.later("Open in Processes"), group = i18n.later("Services"), keys = {{.Return, {}}}},
+	.Service_Copy     = {icon = lucide.COPY, label = i18n.later("Copy name"), group = i18n.later("Services"), keys = {{.C, {.Ctrl}}}},
+	.Service_Details  = {icon = lucide.PANEL_BOTTOM, label = i18n.later("Details and journal"), group = i18n.later("Services"), keys = {{.I, {.Ctrl}}}, tags = {"log", "journal", "status"}},
+	.Service_Open_File = {icon = lucide.FILE_TEXT, label = i18n.later("Open unit file"), group = i18n.later("Services"), keys = {{.O, {.Ctrl}}}},
+	.Service_Manager  = {icon = lucide.USER, label = i18n.later("System or user services"), group = i18n.later("Services"), keys = {{.U, {.Ctrl}}}},
+	.Journal_Search   = {icon = lucide.SEARCH, label = i18n.later("Search the journal"), group = i18n.later("Services"), keys = {{.J, {.Ctrl}}}},
+	.Journal_Level    = {icon = lucide.FILTER, label = i18n.later("Journal: all, warnings, errors"), group = i18n.later("Services"), keys = {{.L, {.Alt}}}},
+	.Journal_Boot     = {icon = lucide.POWER, label = i18n.later("Journal: this boot or every boot"), group = i18n.later("Services"), keys = {{.B, {.Alt}}}},
+	.Journal_Follow   = {icon = lucide.ARROW_DOWN, label = i18n.later("Follow the journal"), group = i18n.later("Services"), keys = {{.F, {.Alt}}}},
+	.Journal_Copy     = {icon = lucide.COPY, label = i18n.later("Copy the journal's entries shown"), group = i18n.later("Services"), keys = {{.C, {.Alt}}}},
+	.Journal_Copy_Entry = {icon = lucide.CLIPBOARD_COPY, label = i18n.later("Copy the journal's entry"), group = i18n.later("Services"), keys = {{.C, {.Alt, .Shift}}}},
+	.Journal_Window   = {icon = lucide.EXTERNAL_LINK, label = i18n.later("The journal in its own window"), group = i18n.later("Services"), keys = {{.J, {.Ctrl, .Shift}}}},
 
-	.Startup_Enable   = {icon = lucide.CHECK, label = i18n.later("Enable"), group = i18n.later("Startup"), keys = {{.E, {.Ctrl}}, {}}},
-	.Startup_Disable  = {icon = lucide.X, label = i18n.later("Disable"), group = i18n.later("Startup"), keys = {{.D, {.Ctrl}}, {}}},
-	.Startup_Toggle   = {icon = lucide.ARROW_UP_DOWN, label = i18n.later("Enable or disable"), group = i18n.later("Startup"), keys = {{.Space, {}}, {}}, tags = {"autostart", "login", "boot"}},
-	.Startup_Open     = {icon = lucide.FOLDER_OPEN, label = i18n.later("Open file location"), group = i18n.later("Startup"), keys = {{.Return, {}}, {}}},
-	.Startup_Copy     = {icon = lucide.COPY, label = i18n.later("Copy command"), group = i18n.later("Startup"), keys = {{.C, {.Ctrl}}, {}}},
+	.Startup_Enable   = {icon = lucide.CHECK, label = i18n.later("Enable"), group = i18n.later("Startup"), keys = {{.E, {.Ctrl}}}},
+	.Startup_Disable  = {icon = lucide.X, label = i18n.later("Disable"), group = i18n.later("Startup"), keys = {{.D, {.Ctrl}}}},
+	.Startup_Toggle   = {icon = lucide.ARROW_UP_DOWN, label = i18n.later("Enable or disable"), group = i18n.later("Startup"), keys = {{.Space, {}}}, tags = {"autostart", "login", "boot"}},
+	.Startup_Open     = {icon = lucide.FOLDER_OPEN, label = i18n.later("Open file location"), group = i18n.later("Startup"), keys = {{.Return, {}}}},
+	.Startup_Copy     = {icon = lucide.COPY, label = i18n.later("Copy command"), group = i18n.later("Startup"), keys = {{.C, {.Ctrl}}}},
 
-	.Socket_End_Task  = {icon = lucide.X, label = i18n.later("End task"), group = i18n.later("Connections"), keys = {{.Delete, {}}, {}}},
-	.Socket_Kill      = {icon = lucide.ZAP, label = i18n.later("Kill…"), group = i18n.later("Connections"), keys = {{.Delete, {.Shift}}, {}}},
-	.Socket_Open      = {icon = lucide.LAYOUT_LIST, label = i18n.later("Open in Processes"), group = i18n.later("Connections"), keys = {{.Return, {}}, {}}},
-	.Socket_Copy      = {icon = lucide.COPY, label = i18n.later("Copy address"), group = i18n.later("Connections"), keys = {{.C, {.Ctrl}}, {}}, tags = {"ip", "port"}},
+	.Socket_End_Task  = {icon = lucide.X, label = i18n.later("End task"), group = i18n.later("Connections"), keys = {{.Delete, {}}}},
+	.Socket_Kill      = {icon = lucide.ZAP, label = i18n.later("Kill…"), group = i18n.later("Connections"), keys = {{.Delete, {.Shift}}}},
+	.Socket_Open      = {icon = lucide.LAYOUT_LIST, label = i18n.later("Open in Processes"), group = i18n.later("Connections"), keys = {{.Return, {}}}},
+	.Socket_Copy      = {icon = lucide.COPY, label = i18n.later("Copy address"), group = i18n.later("Connections"), keys = {{.C, {.Ctrl}}}, tags = {"ip", "port"}},
 
-	.Info_Copy        = {icon = lucide.COPY, label = i18n.later("Copy all"), group = i18n.later("Information"), keys = {{.C, {.Ctrl}}, {}}, tags = {"report", "system", "specs"}},
+	.Info_Copy        = {icon = lucide.COPY, label = i18n.later("Copy all"), group = i18n.later("Information"), keys = {{.C, {.Ctrl}}}, tags = {"report", "system", "specs"}},
 
-	.Props_Suspend        = {icon = lucide.PAUSE, label = i18n.later("Suspend or resume"), group = i18n.later("Properties"), keys = {{.P, {.Ctrl}}, {}}},
-	.Props_End_Task       = {icon = lucide.X, label = i18n.later("End task"), group = i18n.later("Properties"), keys = {{.Delete, {}}, {}}},
-	.Props_Kill           = {icon = lucide.ZAP, label = i18n.later("Kill…"), group = i18n.later("Properties"), keys = {{.Delete, {.Shift}}, {}}},
-	.Props_Raise_Priority = {icon = lucide.ARROW_UP, label = i18n.later("Raise the priority"), group = i18n.later("Properties"), keys = {{.Up, {.Ctrl}}, {}}},
-	.Props_Lower_Priority = {icon = lucide.ARROW_DOWN, label = i18n.later("Lower the priority"), group = i18n.later("Properties"), keys = {{.Down, {.Ctrl}}, {}}},
-	.Props_Affinity       = {icon = lucide.MICROCHIP, label = i18n.later("Set affinity…"), group = i18n.later("Properties"), keys = {{.A, {.Ctrl, .Shift}}, {}}},
-	.Props_Filter         = {icon = lucide.FILTER, label = i18n.later("Filter the list"), group = i18n.later("Properties"), keys = {{.F, {.Ctrl}}, {}}},
-	.Props_Next_Tab       = {icon = lucide.ARROW_RIGHT, label = i18n.later("Next tab"), group = i18n.later("Properties"), keys = {{.Tab, {.Ctrl}}, {}}},
-	.Props_Previous_Tab   = {icon = lucide.ARROW_LEFT, label = i18n.later("Previous tab"), group = i18n.later("Properties"), keys = {{.Tab, {.Ctrl, .Shift}}, {}}},
-	.Props_Close          = {icon = lucide.X, label = i18n.later("Close"), group = i18n.later("Properties"), keys = {{.Escape, {}}, {}}},
+	.Props_Suspend        = {icon = lucide.PAUSE, label = i18n.later("Suspend or resume"), group = i18n.later("Properties"), keys = {{.P, {.Ctrl}}}},
+	.Props_End_Task       = {icon = lucide.X, label = i18n.later("End task"), group = i18n.later("Properties"), keys = {{.Delete, {}}}},
+	.Props_Kill           = {icon = lucide.ZAP, label = i18n.later("Kill…"), group = i18n.later("Properties"), keys = {{.Delete, {.Shift}}}},
+	.Props_Raise_Priority = {icon = lucide.ARROW_UP, label = i18n.later("Raise the priority"), group = i18n.later("Properties"), keys = {{.Up, {.Ctrl}}}},
+	.Props_Lower_Priority = {icon = lucide.ARROW_DOWN, label = i18n.later("Lower the priority"), group = i18n.later("Properties"), keys = {{.Down, {.Ctrl}}}},
+	.Props_Affinity       = {icon = lucide.MICROCHIP, label = i18n.later("Set affinity…"), group = i18n.later("Properties"), keys = {{.A, {.Ctrl, .Shift}}}},
+	.Props_Filter         = {icon = lucide.FILTER, label = i18n.later("Filter the list"), group = i18n.later("Properties"), keys = {{.F, {.Ctrl}}}},
+	.Props_Next_Tab       = {icon = lucide.ARROW_RIGHT, label = i18n.later("Next tab"), group = i18n.later("Properties"), keys = {{.Tab, {.Ctrl}}}},
+	.Props_Previous_Tab   = {icon = lucide.ARROW_LEFT, label = i18n.later("Previous tab"), group = i18n.later("Properties"), keys = {{.Tab, {.Ctrl, .Shift}}}},
+	.Props_Close          = {icon = lucide.X, label = i18n.later("Close"), group = i18n.later("Properties"), keys = {{.Escape, {}}}},
 }
 
 // The section a command acts in (nil: everywhere).
@@ -191,7 +193,9 @@ commands_keys :: proc(app: ^App, field_keeps: bool) {
 		if t, ok := cmd_tab(c).?; ok && t != app.tab { continue }
 		cmd := COMMANDS[c]
 		if field_keeps || ui.focus_key() == app.search_key && app.search_key != 0 {
-			// (the filter keeps Space while it has the keyboard: a space in a name)
+			// (the filter keeps Space while it has the keyboard: a space in a name; the keys are a slice that COMMANDS
+			// shares: a copy is edited, never the table)
+			cmd.keys = slice.clone(cmd.keys, context.temp_allocator)
 			for &ch in cmd.keys {
 				if ch.key == .Space && ui.focus_key() == app.search_key { ch = {} }
 				if field_keeps && editing_chord(ch) { ch = {} }
@@ -204,45 +208,82 @@ commands_keys :: proc(app: ^App, field_keeps: bool) {
 // Opens the command palette.
 palette_open :: proc(app: ^App) { ui.palette_open(&app.palette) }
 
-// The palette while it is open: the commands of the window, of the sections, and of the section shown. Its size, when the
-// user changes it, is kept (view.palette_size).
-palette_build :: proc(app: ^App) {
-	if !app.palette.open { return }
-	list := make([dynamic]ui.Command, context.temp_allocator)
-	cmds := make([dynamic]Cmd, context.temp_allocator)
-	disabled := make([dynamic]bool, context.temp_allocator)
+// The palette's list: the commands of the window, of the sections and of the section shown, then one line per
+// preference (prefs_page.palette_commands). It is made again only when what it holds can change: the section shown, the
+// preferences (their version) or the language (the settings' group is translated text), never at each frame. Its
+// own arena holds it.
+Palette_Table :: struct {
+	arena:    virtual.Arena,
+	commands: []ui.Command,
+	cmds:     []Cmd,        // the command of each line before the settings'
+	names:    []string,     // the preferences' names, the lines after `cmds`
+	disabled: [dynamic]bool,   // per line, filled at each frame: what can act depends on the selection
+	tab:      Tab,          // what it was made for
+	prefs:    u64,
+	language: ^i18n.Language,
+	version:  u64,          // bumped at each making (0: not made); the palette's version
+}
+
+palette_table_make :: proc(table: ^Palette_Table, app: ^App) {
+	virtual.arena_destroy(&table.arena)
+	table.arena = {}
+	a := virtual.arena_allocator(&table.arena)
+	commands := make([dynamic]ui.Command, a)
+	cmds := make([dynamic]Cmd, a)
 	for c in Cmd {
 		if cmd_is_props(c) || c == .Palette { continue }
 		if t, ok := cmd_tab(c).?; ok && t != app.tab { continue }
-		append(&list, COMMANDS[c])
+		append(&commands, COMMANDS[c])
 		append(&cmds, c)
-		append(&disabled, !cmd_can(app, c))
 	}
 	// the settings too, each a line under "Settings · <page>": chosen, the page opens on it alone
-	settings, names := prefs_page.palette_commands(&app.prefs, settings_options(app))
-	commands := len(list)
-	for c in settings {
-		append(&list, c)
-		append(&disabled, false)
+	settings, names := prefs_page.palette_commands(&app.prefs, settings_options(app), a)
+	append(&commands, ..settings)
+	table.commands, table.cmds = commands[:], cmds[:]
+	table.names = make([]string, len(names), a)
+	for n, i in names { table.names[i] = strings.clone(n, a) }
+	resize(&table.disabled, len(table.commands))
+	table.tab, table.prefs, table.language = app.tab, app.prefs.version, i18n.current()
+	table.version += 1
+}
+
+palette_table_destroy :: proc(table: ^Palette_Table) {
+	virtual.arena_destroy(&table.arena)
+	delete(table.disabled)
+	table^ = {}
+}
+
+// The palette while it is open. Its size, when the user changes it, is kept (view.palette_size).
+palette_build :: proc(app: ^App) {
+	if !app.palette.open { return }
+	table := &app.palette_table
+	if table.version == 0 || table.tab != app.tab || table.prefs != app.prefs.version || table.language != i18n.current() {
+		palette_table_make(table, app)
 	}
-	i, resized := ui.palette(&app.palette, list[:], disabled[:])
+	for c, i in table.cmds { table.disabled[i] = !cmd_can(app, c) }
+	i, resized := ui.palette(&app.palette, table.commands, table.disabled[:], {version = table.version})
 	if resized { pref_set(&app.prefs, "view.palette_size", fmt.tprintf("%.0f %.0f", app.palette.size.x, app.palette.size.y)) }
+	commands := len(table.cmds)
 	switch {
 	case i >= commands:
 		app.settings_open = true
-		prefs_page.show(&app.settings_page, &app.prefs, settings_options(app), names[i - commands])
+		prefs_page.show(&app.settings_page, &app.prefs, settings_options(app), table.names[i - commands])
 	case i >= 0:
-		cmd_run(app, cmds[i])
+		cmd_run(app, table.cmds[i])
 	}
 }
 
-// The sheet of the keys while it is open: every command, its section's first.
+// The sheet of the keys while it is open: every command, its section's first. The list is made once, at the first
+// opening: COMMANDS does not change, and the sheet translates the labels itself. Its address stays, so the sheet needs
+// no version.
 shortcuts_build :: proc(app: ^App) {
-	list := make([dynamic]ui.Command, context.temp_allocator)
-	for c in Cmd { if cmd_tab(c) == nil && !cmd_is_props(c) { append(&list, COMMANDS[c]) } }
-	for c in Cmd { if _, ok := cmd_tab(c).?; ok { append(&list, COMMANDS[c]) } }
-	for c in Cmd { if cmd_is_props(c) { append(&list, COMMANDS[c]) } }
-	ui.shortcuts_sheet("shortcuts", list[:], &app.shortcuts_open)
+	if app.sheet.open && len(app.sheet_commands) == 0 {
+		for c in Cmd { if cmd_tab(c) == nil && !cmd_is_props(c) { append(&app.sheet_commands, COMMANDS[c]) } }
+		for c in Cmd { if _, ok := cmd_tab(c).?; ok { append(&app.sheet_commands, COMMANDS[c]) } }
+		for c in Cmd { if cmd_is_props(c) { append(&app.sheet_commands, COMMANDS[c]) } }
+	}
+	// (called while closed too: the modal's Escape and its closing are its own)
+	ui.shortcuts_sheet(&app.sheet, "shortcuts", app.sheet_commands[:])
 }
 
 // Whether the command can act now.
@@ -298,7 +339,7 @@ cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 cmd_run :: proc(app: ^App, c: Cmd) {
 	switch c {
 	case .Palette:          palette_open(app)
-	case .Shortcuts:        app.shortcuts_open = true
+	case .Shortcuts:        app.sheet.open = true
 	// (its text selected: what is typed then replaces it, as in a browser's Ctrl+F)
 	case .Filter:           if app.search_key != 0 { ui.set_focus(app.search_key); ui.line_edit_select_all(&app.search) }
 	case .Clear_Filter:     ui.line_edit_clear(&app.search)

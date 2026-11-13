@@ -21,6 +21,6 @@ import inspecteur_update "../../src/update"
 DIST_FILES := [?][2]string{{"README.md", "README.md"}, {"LICENSE", "LICENSE"}, {"THIRD-PARTY-NOTICES", "THIRD-PARTY-NOTICES"}, {"CHANGELOG.md", "CHANGELOG.md"}}
 
 // (no check of its own before the tag: the release workflow runs inspecteurtool check on the tag, then builds)
-release_config :: proc(p: toolbox.Project) -> release.Config {
+release_config :: proc(p: toolbox.Project) -> release.Release_Options {
 	return {project = p, dist = "build/dist", files = DIST_FILES[:], update = inspecteur_update.PRODUCT}
 }

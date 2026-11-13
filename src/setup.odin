@@ -35,11 +35,11 @@ NIXOS_LIBRARIES := [?]string{
 @(private = "file") LOGO_ICON :: 5
 
 // What the setup knows of inspecteur.
-setup_config :: proc() -> setup.Config {
+setup_config :: proc() -> setup.Setup_Options {
 	id := identity.identity()
 	id.nix_runtime_name = "inspecteur-runtime"
 	id.nixos_libraries = NIXOS_LIBRARIES[:]
-	return setup.Config{identity = id, version = APP_VERSION, install_folder = APP_NAME, icons = identity.ICONS[:]}
+	return setup.Setup_Options{identity = id, version = APP_VERSION, install_folder = APP_NAME, icons = identity.ICONS[:]}
 }
 
 // What the setup's facts say at a start (setup.facts reads the install's files: a task of the chores).
