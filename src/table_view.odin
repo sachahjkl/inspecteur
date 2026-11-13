@@ -343,7 +343,8 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 			ui.icon(r.kind == .App ? lucide.APP_WINDOW : lucide.SQUARE_TERMINAL, em * ICON_EM)
 		}
 		ui.spacer(ui.px(em * 0.5))
-		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
+		// (the name gives way first, and ends with "…" where it is cut: its count and its window's button stay whole)
+		ui.next({width = ui.text_size(0, 0), height = ui.pct(1), text_pad = 0})
 		if lit := ui.word_ranges(name, t.query); len(lit) > 0 { ui.matched_label("###n", name, lit) } else { ui.label(fmt.tprintf("%s###n", ui.text_shown(name))) }
 		if count > 0 {
 			if ui.tags("weak") {
@@ -372,12 +373,12 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 		case .User:       cell(t, c, p.user, &tip, weak = true)
 		case .State:      cell(t, c, state_text(p.state), &tip, weak = p.state != .Stopped && p.state != .Zombie)
 		case .Nice:       cell(t, c, fmt.tprintf("%d", p.nice), &tip, weak = p.nice == 0)
-		case .CPU:        cell(t, c, fmt.tprintf("%.1f%%", cpu), &tip, heat = cpu / HEAT_CPU_FULL, page = page)
+		case .CPU:        cell(t, c, percent_text(f64(cpu), 1), &tip, heat = cpu / HEAT_CPU_FULL, page = page)
 		case .CPU_Graph:
 			if text := cpu_graph_cell(app, r, page, em); text != "" { tip = text }
 		case .Memory:     cell(t, c, size_text(private), &tip, heat = app.machine.mem.total > 0 ? f32(f64(private) / f64(app.machine.mem.total) / HEAT_MEM_FULL) : 0, page = page)
 		case .Resident:   cell(t, c, size_text(resident), &tip, weak = true)
-		case .GPU:        cell(t, c, gpu > 0 ? fmt.tprintf("%.0f%%", gpu) : "", &tip, heat = gpu / HEAT_GPU_FULL, page = page)
+		case .GPU:        cell(t, c, gpu > 0 ? percent_text(f64(gpu)) : "", &tip, heat = gpu / HEAT_GPU_FULL, page = page)
 		case .GPU_Memory: cell(t, c, gpu_mem > 0 ? size_text(gpu_mem) : "", &tip)
 		case .Read:       cell(t, c, io_dash ? "–" : rate_text(read), &tip, weak = io_dash)
 		case .Write:      cell(t, c, io_dash ? "–" : rate_text(write), &tip, weak = io_dash)
@@ -421,7 +422,7 @@ cpu_graph_cell :: proc(app: ^App, r: Row, page: ui.Color, em: f32) -> (tip: stri
 	if d.count > 0 && ui.pointer_on(box) {
 		sum, top: f32
 		for v in d.values[:d.count] { sum += v; top = max(top, v) }
-		tip = fmt.tprintf(i18n.tr("CPU over the last %s: %.1f%% on average, %.1f%% at most"), span_text(d.count, app.settings.refresh_ms), sum / f32(d.count), top)
+		tip = fmt.tprintf(i18n.tr("CPU over the last %s: %s on average, %s at most"), span_text(d.count, app.settings.refresh_ms), percent_text(f64(sum / f32(d.count)), 1), percent_text(f64(top), 1))
 	}
 	return
 }

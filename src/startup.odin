@@ -74,7 +74,7 @@ Startup :: struct {
 STARTUP_COLUMNS := [?]ui.Table_Column{
 	{title = i18n.later("Name"), width = 0},
 	{title = i18n.later("Command"), width = 18, weak = true},
-	{title = i18n.later("Type"), width = 9},
+	{title = i18n.later("Type"), width = 11},   // (its longest kind whole, in French too)
 	{title = i18n.later("Status"), width = 10},
 	{title = i18n.later("File"), width = 18, weak = true},
 }

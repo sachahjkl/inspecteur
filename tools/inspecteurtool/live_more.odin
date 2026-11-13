@@ -425,6 +425,6 @@ live_app_window :: proc(l: ^Live) {
 	c := &l.c
 	check(l, cdp.key(c, "Escape") && cdp.key(c, "ctrl+2") && cdp.type_text(c, "inspecteur"), "Processes, filtered to Inspecteur")
 	if !check(l, cdp.wait_name(c, "win", READER_WAIT), "its row has the window's button") { _ = cdp.key(c, "Escape"); return }
-	check(l, cdp.click_name(c, "win") && wait_sway_title(l, "Inspecteur", true) && cdp.wait_name(c, "win", SESSION_WAIT), "clicked: its window is there and answers on")
+	check(l, cdp.click_name(c, "win") && wait_sway_title(l, "inspecteur", true) && cdp.wait_name(c, "win", SESSION_WAIT), "clicked: its window is there and answers on")
 	check(l, cdp.key(c, "Escape"), "Escape clears the filter")
 }

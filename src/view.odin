@@ -57,7 +57,7 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	page := ui.build_box({.Draw_Background}, "###page")
 	if ui.parent(page) {
 		build_title(app, em)
-		crash_bar.bar(&app.crash_bar, {name = "Inspecteur", version = APP_VERSION, repository = "sachahjkl/inspecteur"})
+		crash_bar.bar(&app.crash_bar, {name = "inspecteur", version = APP_VERSION, repository = "sachahjkl/inspecteur"})
 		ui.next({width = ui.fill(), height = ui.fill()})
 		if app.settings_open {
 			settings_build(app)
@@ -272,7 +272,7 @@ build_title :: proc(app: ^App, em: f32) {
 		ui.spacer(ui.px(em * 0.6))
 		if app.logo.ok { icon_box(app.logo, em * 1.7) } else { ui.icon(lucide.EYE, em * 1.7, ui.color("accent")) }
 		ui.next({width = ui.text_size(em * 0.4), height = ui.pct(1)})
-		ui.label("Inspecteur###apptitle")
+		ui.label("inspecteur###apptitle")
 		ui.spacer(ui.fill())
 		refresh_button(app, em)
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
@@ -338,8 +338,8 @@ build_filter :: proc(app: ^App, em: f32) {
 }
 
 FILTER_HINTS := [Tab]string{
-	.Mission_Control = "", .Processes = i18n.later("Filter processes..."), .Performance = "", .Services = i18n.later("Filter services..."), .Startup = i18n.later("Filter startup..."),
-	.Connections = i18n.later("Filter connections..."), .Information = "",
+	.Mission_Control = "", .Processes = i18n.later("Filter processes…"), .Performance = "", .Services = i18n.later("Filter services…"), .Startup = i18n.later("Filter startup…"),
+	.Connections = i18n.later("Filter connections…"), .Information = "",
 }
 
 // Whether the section has a table that the filter filters.
@@ -351,7 +351,7 @@ build_meters :: proc(app: ^App, em: f32) {
 	ui.hline(ui.fill())
 	ui.spacer(ui.px(em * 0.5))
 	// (the share of every logical processor, as the CPU % of the processes: "of 16 CPUs" as Linux counts them)
-	meter(app, "cpu", lucide.CPU, i18n.tr("CPU"), fmt.tprintf(i18n.tr(len(app.machine.core_total), "%.0f%% of %d CPUs", "%.0f%% of %d CPUs"), app.machine.cpu, len(app.machine.core_total)), app.machine.cpu / 100, em)
+	meter(app, "cpu", lucide.CPU, i18n.tr("CPU"), fmt.tprintf(i18n.tr(len(app.machine.core_total), "%s of %d CPUs", "%s of %d CPUs"), percent_text(f64(app.machine.cpu)), len(app.machine.core_total)), app.machine.cpu / 100, em)
 	mem := app.machine.mem.total > 0 ? f32(f64(mem_used(&app.machine)) / f64(app.machine.mem.total)) : 0
 	meter(app, "memory", lucide.LAYERS_2, i18n.tr("Memory"), fmt.tprintf(i18n.tr("%s of %s"), size_text(mem_used(&app.machine)), size_text(app.machine.mem.total)), mem, em)
 	ui.spacer(ui.px(em * 0.7))
@@ -416,8 +416,8 @@ build_footer :: proc(app: ^App, em: f32) {
 				ui.next({width = ui.fill(), height = ui.pct(1)})
 				ui.label_tip(fmt.tprintf("%s###msg", ui.text_shown(msg)))
 			}
-			counter(app, "f_cpu", lucide.CPU, fmt.tprintf("%.0f%%", app.machine.cpu), em)
-			counter(app, "f_mem", lucide.LAYERS_2, fmt.tprintf("%.0f%%", app.machine.mem.total > 0 ? 100 * f64(mem_used(&app.machine)) / f64(app.machine.mem.total) : 0), em)
+			counter(app, "f_cpu", lucide.CPU, percent_text(f64(app.machine.cpu)), em)
+			counter(app, "f_mem", lucide.LAYERS_2, percent_text(app.machine.mem.total > 0 ? 100 * f64(mem_used(&app.machine)) / f64(app.machine.mem.total) : 0), em)
 			counter(app, "f_procs", lucide.LAYOUT_LIST, fmt.tprintf("%d", len(app.sampler.procs)), em)
 			counter(app, "f_refresh", app.paused || app.held ? lucide.PAUSE : lucide.REFRESH_CW, refresh_text(app), em)
 		}
@@ -484,7 +484,7 @@ REFRESH_SPEEDS := [?]struct { name: string, ms: int }{{i18n.later("High: 0.5 s")
 refresh_text :: proc(app: ^App) -> string {
 	if app.paused { return i18n.tr("Paused") }
 	if app.held { return i18n.tr("Paused while Ctrl is held") }
-	return app.settings.refresh_ms % 1000 == 0 ? fmt.tprintf("%d s", app.settings.refresh_ms / 1000) : fmt.tprintf("%.1f s", f64(app.settings.refresh_ms) / 1000)
+	return app.settings.refresh_ms % 1000 == 0 ? fmt.tprintf("%d s", app.settings.refresh_ms / 1000) : fmt.tprintf("%s s", i18n.decimal(f64(app.settings.refresh_ms) / 1000, 1))
 }
 
 // Pauses the refresh, or resumes it (then a sample at once).
@@ -544,5 +544,5 @@ zoom_follow :: proc(app: ^App) {
 	if abs(z - app.settings.zoom) < 0.001 { return }
 	app.settings.zoom = z
 	pref_set(&app.prefs, ZOOM_PREF, fmt.tprintf("%.3f", z))
-	say(app, abs(z - 1) < 0.001 ? i18n.tr("Zoom %.0f %%") : i18n.tr("Zoom %.0f %% (Ctrl+0: 100 %%)"), z * 100)
+	if abs(z - 1) < 0.001 { say(app, i18n.tr("Zoom %s"), i18n.percent(f64(z))) } else { say(app, i18n.tr("Zoom %s (Ctrl+0: %s)"), i18n.percent(f64(z)), i18n.percent(1)) }
 }

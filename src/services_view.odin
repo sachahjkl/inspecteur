@@ -76,7 +76,7 @@ service_details_body :: proc(app: ^App, u: Service, selected: bool, d: ^Unit_Det
 			info := ""
 			if selected && d != nil && d.name == u.name && d.manager == s.manager {
 				parts := make([dynamic]string, context.temp_allocator)
-				if d.since > 0 { append(&parts, fmt.tprintf(i18n.tr("%s since %s"), u.active, started_text(app, d.since))) }
+				if d.since > 0 { append(&parts, fmt.tprintf(i18n.tr("%s since %s"), unit_word(u.active), started_text(app, d.since))) }
 				if d.tasks != DETAIL_UNKNOWN { append(&parts, fmt.tprintf(i18n.tr(int(d.tasks), "%d task", "%d tasks"), d.tasks)) }
 				if d.cpu_ns != DETAIL_UNKNOWN { append(&parts, fmt.tprintf(i18n.tr("CPU time %s"), cpu_time_text(d.cpu_ns))) }
 				if d.restarts > 0 { append(&parts, fmt.tprintf(i18n.tr(int(d.restarts), "restarted %d time", "restarted %d times"), d.restarts)) }
@@ -172,7 +172,7 @@ services_manager_choice :: proc(app: ^App, em: f32) {
 	sel := int(s.manager)
 	key := ui.command_shortcut(COMMANDS[.Service_Manager])
 	tips := [2]string{fmt.tprintf(i18n.tr("The system's services (%s)"), key), fmt.tprintf(i18n.tr("The user's services (%s)"), key)}
-	ui.next({width = ui.px(em * 10), height = ui.px(ui.dense(em * 2))})
+	ui.next({width = ui.px(segmented_width(labels[:], em, 10)), height = ui.px(ui.dense(em * 2))})
 	if ui.segmented("svc_manager", labels[:], &sel, tips[:]) { services_switch(app, Manager(sel)) }
 }
 
@@ -238,11 +238,11 @@ service_danger :: proc(app: ^App, u: Service) -> string {
 	if u.pid > 0 {
 		switch guard_of(app, u.pid) {
 		case .Display_Server:  return i18n.tr("It runs the desktop: the session ends with it.")
-		case .Self, .Ancestor: return i18n.tr("Inspecteur runs under it: Inspecteur ends with it.")
+		case .Self, .Ancestor: return i18n.tr("inspecteur runs under it: inspecteur ends with it.")
 		case .None:
 		}
 	}
-	for unit in app.own_units { if unit == u.name { return i18n.tr("Inspecteur runs in it: Inspecteur ends with it.") } }
+	for unit in app.own_units { if unit == u.name { return i18n.tr("inspecteur runs in it: inspecteur ends with it.") } }
 	return ""
 }
 

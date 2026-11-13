@@ -26,7 +26,7 @@ settings_keys :: proc(app: ^App) {
 	if prefs_page.escape_leaves(&app.settings_page) { app.settings_open = false }
 }
 
-// The General page shows where inspecteur says what it did and its language, then the licence (its page_foot):
+// The General page shows where inspecteur says what it did and its language (the licence has the toolkit's page):
 // general.menu and general.autostart are the installation's (the install puts the menu entry in place, and inspecteur has
 // no reason to start with the session), so no page shows them: the Installation page says where it is.
 @(private = "file")
@@ -62,13 +62,12 @@ settings_build :: proc(app: ^App) {
 settings_options :: proc(app: ^App) -> prefs_page.Page_Options {
 	return {
 		user = app, changed = settings_changed, preview = settings_preview, problem = settings_problem,
-		page_foot = settings_page_foot,
 		updater = app.updater, restart = proc(user: rawptr) { updates_restart((^App)(user)) },
 		pages = SETTINGS_PAGES[:], icon_font = app.icons, search_icon = lucide.SEARCH, reset_icon = lucide.ROTATE_CCW,
-		version = "Inspecteur " + APP_VERSION,
+		version = "inspecteur " + APP_VERSION,
 		file = prefs_file(),
 		themes = app.themes_file.all[:], themes_light = app.theme_shown.light, themes_file = &app.themes_file,
-		install = &app.install, diagnostics = &app.main,
+		licence = &app.licence, install = &app.install, diagnostics = &app.main,
 	}
 }
 
@@ -77,15 +76,9 @@ settings_options :: proc(app: ^App) -> prefs_page.Page_Options {
 settings_problem :: proc(user: rawptr, name: string) -> string {
 	app := (^App)(user)
 	if name == prefs_page.SYSTEM_TITLE_PREF && app.settings.system_title && !platform.system_title_available(app.main.win) {
-		return i18n.tr("This desktop draws no title bar for Inspecteur's window (GNOME): Inspecteur keeps its own.")
+		return i18n.tr("This desktop draws no title bar for inspecteur's window (GNOME): inspecteur keeps its own.")
 	}
 	return ""
-}
-
-// Under the General page's preferences: the licence.
-@(private = "file")
-settings_page_foot :: proc(user: rawptr, category: string, em: f32) {
-	if category == "general" { licence_section((^App)(user), em) }
 }
 
 // While a slider is held: what can follow it at once does (the refresh's period); the text size waits for the release

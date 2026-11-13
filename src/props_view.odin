@@ -143,10 +143,10 @@ props_general :: proc(app: ^App, p: ^Proc, em: f32) {
 		props_line(i18n.tr("Executable"), p.exe != "" ? p.exe : i18n.tr("Access denied (another user's process)"), em)
 		props_line(i18n.tr("Command line"), p.cmdline != "" ? p.cmdline : i18n.tr("none"), em)
 		props_line(i18n.tr("Working folder"), cwd, em)
-		props_line(i18n.tr("CPU"), fmt.tprintf(i18n.tr("%.1f%% of the machine"), p.cpu), em)
+		props_line(i18n.tr("CPU"), fmt.tprintf(i18n.tr("%s of the machine"), percent_text(f64(p.cpu), 1)), em)
 		props_line(i18n.tr("Memory"), fmt.tprintf(i18n.tr("%s private, %s resident (with the pages it shares with other processes)"), size_text(p.private), size_text(p.resident)), em)
 		if p.gpu_mem > 0 { props_line(i18n.tr("GPU memory"), size_text(p.gpu_mem), em) }
-		if p.gpu > 0 { props_line(i18n.tr("GPU"), fmt.tprintf(i18n.tr("%.0f%% of a GPU's time"), p.gpu), em) }
+		if p.gpu > 0 { props_line(i18n.tr("GPU"), fmt.tprintf(i18n.tr("%s of a GPU's time"), percent_text(f64(p.gpu))), em) }
 		props_line(i18n.tr("Threads"), fmt.tprintf("%d", p.threads), em)
 		props_line(i18n.tr("Disk"), !p.io_known ? i18n.tr("Access denied (another user's process)") : fmt.tprintf(i18n.tr("%s read, %s written since it started"), size_text(p.io_read), size_text(p.io_write)), em)
 	}
@@ -191,7 +191,7 @@ props_history :: proc(app: ^App, p: ^Proc, em: f32) {
 			}
 			ui.spacer(ui.px(em * 0.5))
 		}
-		graph("hist_cpu", i18n.tr("CPU"), &h.cpu, hue(app, HUE_CPU), 0, 5, proc(v: f32) -> string { return fmt.tprintf("%.1f%%", v) }, period, em)
+		graph("hist_cpu", i18n.tr("CPU"), &h.cpu, hue(app, HUE_CPU), 0, 5, proc(v: f32) -> string { return percent_text(f64(v), 1) }, period, em)
 		graph("hist_memory", i18n.tr("Private memory"), &h.memory, hue(app, HUE_MEMORY), 0, 16 * 1024 * 1024, proc(v: f32) -> string { return size_text(u64(v)) }, period, em)
 		if p.io_known {
 			graph("hist_disk", i18n.tr("Disk"), &h.disk, hue(app, HUE_DISK), 0, DISK_FLOOR, proc(v: f32) -> string { return fmt.tprintf("%s/s", size_text(u64(v))) }, period, em)
@@ -375,7 +375,7 @@ props_keys :: proc(app: ^App) {
 props_filter_field :: proc(app: ^App, em: f32) {
 	pp := &app.props
 	ui.next({width = ui.px(em * 14), height = ui.px(ui.dense(em * 2))})
-	res := ui.line_edit("###props_filter", &pp.filter, {placeholder = i18n.tr("Filter the list...")})
+	res := ui.line_edit("###props_filter", &pp.filter, {placeholder = i18n.tr("Filter the list…")})
 	pp.filter_key = res.box.key
 	tip_after(res, cmd_tip(.Props_Filter))
 	ui.spacer(ui.px(em * 0.6))

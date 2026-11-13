@@ -50,7 +50,7 @@ App :: struct {
 	theme_shown: ui.Theme_Shown,
 	themes_file: prefs_page.Themes_File,   // the toolkit's themes, then the user's own (themes.txt beside the preferences)
 	standard:    prefs_page.Standard_Watch,   // the toolkit's standard settings, applied as they change
-	licence:     Licence_View,      // who supports inspecteur (licence.odin): the settings' General page
+	licence:     prefs_page.Licence,   // who supports inspecteur (licence.odin): the settings' Licence page
 
 	demo:        ^Demo,             // not nil: every reading is the demo's (--demo: the pictures of the documentation)
 	own_pid:     i32,               // Inspecteur's (the first reading's, as the two below)
@@ -169,7 +169,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 
 	t_read := time.tick_now()
 	platform.set_app_id(APP_NAME)
-	if !host.host_open(&app.main, &app.shared, {title = "Inspecteur", size = WINDOW_SIZE, integrated_title = !app.settings.system_title}, view_build, app) {
+	if !host.host_open(&app.main, &app.shared, {title = "inspecteur", size = WINDOW_SIZE, integrated_title = !app.settings.system_title}, view_build, app) {
 		log.error("no window")
 		return 1
 	}

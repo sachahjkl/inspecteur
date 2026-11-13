@@ -19,6 +19,8 @@ size_text :: proc(n: u64, allocator := context.temp_allocator) -> string {
 	buf: [32]u8
 	digits := v < 10 ? 1 : 0
 	s := strconv.write_float(buf[:], v, 'f', digits, 64)
+	// (the language's decimal mark, in place: this runs for every row's sizes, so no formatting call of its own)
+	if mark := i18n.decimal_mark(); mark != '.' { for &c in buf { if c == '.' { c = mark } } }
 	if len(s) > 0 && s[0] == '+' { s = s[1:] }
 	return strings.concatenate({s, " ", units[u]}, allocator)
 }
@@ -43,25 +45,29 @@ count_text :: proc(n: int, one, many: string) -> string { return fmt.tprintf("%d
 // CPU time: "12.34 s", "3:05.20" (minutes), "2:03:05" (hours).
 cpu_time_text :: proc(ns: u64) -> string {
 	s := f64(ns) / 1e9
+	// (every number a person reads with the language's decimal mark: i18n.decimal, i18n.percent)
 	switch {
-	case s < 60:   return fmt.tprintf("%.2f s", s)
-	case s < 3600: return fmt.tprintf("%d:%05.2f", int(s) / 60, s - f64(int(s) / 60 * 60))
+	case s < 60:   return fmt.tprintf("%s s", i18n.decimal(s, 2))
+	case s < 3600: return i18n.decimal_marks(fmt.tprintf("%d:%05.2f", int(s) / 60, s - f64(int(s) / 60 * 60)))
 	}
 	return fmt.tprintf("%d:%02d:%02d", int(s) / 3600, (int(s) / 60) % 60, int(s) % 60)
 }
 
 mhz_text :: proc(mhz: f32) -> string {
 	if mhz <= 0 { return "–" }
-	if mhz >= 1000 { return fmt.tprintf("%.2f GHz", mhz / 1000) }
+	if mhz >= 1000 { return fmt.tprintf("%s GHz", i18n.decimal(f64(mhz) / 1000, 2)) }
 	return fmt.tprintf("%.0f MHz", mhz)
 }
+
+// A share of 0..100 as the language writes a percent: "34%" in English, "34 %" in French.
+percent_text :: proc(v: f64, decimals := 0) -> string { return i18n.percent(v / 100, decimals) }
 
 // A network rate in bits per second, as links are told ("12.4 Mbit/s").
 bits_text :: proc(bytes_per_s: f64) -> string {
 	b := bytes_per_s * 8
 	switch {
-	case b >= 1e9: return fmt.tprintf("%.1f Gbit/s", b / 1e9)
-	case b >= 1e6: return fmt.tprintf("%.1f Mbit/s", b / 1e6)
+	case b >= 1e9: return fmt.tprintf("%s Gbit/s", i18n.decimal(b / 1e9, 1))
+	case b >= 1e6: return fmt.tprintf("%s Mbit/s", i18n.decimal(b / 1e6, 1))
 	case b >= 1e3: return fmt.tprintf("%.0f kbit/s", b / 1e3)
 	}
 	return fmt.tprintf("%.0f bit/s", b)

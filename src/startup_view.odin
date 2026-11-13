@@ -20,9 +20,20 @@ build_startup :: proc(app: ^App, em: f32) {
 		on := 0
 		for it in s.list.items { if it.enabled { on += 1 } }
 		note = fmt.tprintf(i18n.tr(len(s.list.items), "%d item, %d on", "%d items, %d on"), len(s.list.items), on)
-		if s.list.problem != "" { note = fmt.tprintf("%s. %s", note, s.list.problem) }
 	}
 	section_bar(app, i18n.tr("Startup"), note, em, startup_actions)
+	// (what could not be read, on lines of its own under the bar: in the bar's one line, a long sentence was cut)
+	if !s.pending && s.list != nil && s.list.problem != "" {
+		ui.next({width = ui.fill(), height = ui.children_sum()})
+		if ui.row(.Start, {.Draw_Side_Bottom}, "###startup_problem") {
+			ui.spacer(ui.px(em * 0.8))
+			if ui.tags("weak") {
+				ui.next({width = ui.fill()})
+				ui.paragraph(fmt.tprintf("%s###startup_problem_text", s.list.problem))
+			}
+			ui.spacer(ui.px(em * 0.8))
+		}
+	}
 	ev := section_table_build(&s.rows, s.list != nil ? i18n.tr("Nothing starts with the session.") : "")
 	if ev.sorted { ui.table_apply(&s.rows.table, &s.rows.data, app.query) }
 	if ev.sorted || ev.resized || ev.moved { section_layout_save(&s.rows, &app.prefs, "startup") }

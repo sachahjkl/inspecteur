@@ -245,7 +245,7 @@ mission_health :: proc(app: ^App, em: f32) {
 		ui.spacer(ui.px(em * 0.6))
 		if ui.tags("weak") {
 			ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
-			ui.label(fmt.tprintf("%s###mc_health_cpu", fmt.tprintf(i18n.tr("CPU %.0f%%"), app.machine.cpu)))
+			ui.label(fmt.tprintf("%s###mc_health_cpu", fmt.tprintf(i18n.tr("CPU %s"), percent_text(f64(app.machine.cpu)))))
 		}
 		ui.spacer(ui.fill())
 		// (i): every finding, in its words
@@ -342,7 +342,7 @@ mission_busiest :: proc(app: ^App, em: f32, memory: bool) {
 	if len(top) > 0 { most = memory ? max(f32(procs[top[0]].private), 1) : max(procs[top[0]].cpu, 1) }
 	for i, k in top {
 		p := procs[i]
-		value := memory ? size_text(p.private) : fmt.tprintf("%.1f%%", p.cpu)
+		value := memory ? size_text(p.private) : percent_text(f64(p.cpu), 1)
 		share := memory ? f32(p.private) / most : p.cpu / most
 		if mission_line(app, fmt.tprintf("mc_%s_%d", memory ? "mem" : "cpu", k), p.name, fmt.tprintf(i18n.tr("PID %d"), p.pid), value, share, "", em, {kind = .Process, pid = p.pid, start = p.start}) {
 			processes_reveal(app, p.pid, p.start)
@@ -364,7 +364,7 @@ mission_services :: proc(app: ^App, em: f32) {
 	for u in s.list.units {
 		if k >= failed { break }
 		if u.active != "failed" { continue }
-		if mission_line(app, fmt.tprintf("mc_svc_%d", k), u.name, u.description, "failed", -1, "bad", em, {kind = .Service, name = u.name}) {
+		if mission_line(app, fmt.tprintf("mc_svc_%d", k), u.name, u.description, unit_word("failed"), -1, "bad", em, {kind = .Service, name = u.name}) {
 			mission_show_service(app, u.name)
 		}
 		k += 1

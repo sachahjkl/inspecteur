@@ -57,7 +57,7 @@ live_guards :: proc(l: ^Live) {
 	}
 	if !check(l, clicked && got == fmt.tprintf("inspecteur, PID %s", pid), "the row selected is Inspecteur's own process (%q)", got) { return }
 	check(l, cdp.key(c, "ctrl+p"), "Ctrl+P: Suspend")
-	check(l, cdp.wait_for(c, "Inspecteur does not suspend itself", SESSION_WAIT), "it is refused (%q)", footer(c))
+	check(l, cdp.wait_for(c, "inspecteur does not suspend itself", SESSION_WAIT), "it is refused (%q)", footer(c))
 	stopped := wait_state(l.program.pid, 'T', 500 * time.Millisecond)
 	if stopped { _ = linux.kill(linux.Pid(l.program.pid), .SIGCONT) }   // (the test's own child: resumed whatever happened)
 	check(l, !stopped, "Inspecteur still runs")
@@ -217,9 +217,9 @@ live_settings :: proc(l: ^Live) {
 	c := &l.c
 	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
 	check(l, cdp.key(c, "ctrl+,") && cdp.wait_for(c, "Appearance", SESSION_WAIT) && cdp.wait_for(c, "Updates", SESSION_WAIT), "Ctrl+,: the settings, their pages")
-	// General, its licence (the test's profile has none); clicked: the settings open on the page seen last (Installation,
-	// in live_install)
-	check(l, cdp.click_text(c, "General") && cdp.wait_for(c, "Unregistered", SESSION_WAIT), "the General page says the licence's state")
+	// the toolkit's Licence page (the test's profile has none); clicked: the settings open on the page seen last
+	// (Installation, in live_install)
+	check(l, cdp.click_text(c, "Licence") && cdp.wait_for(c, "Unregistered", SESSION_WAIT), "the Licence page says the licence's state")
 	check(l, cdp.click_text(c, "Appearance") && cdp.wait_for(c, "Light or dark", SESSION_WAIT), "the Appearance page")
 	// a theme's card: the window takes its colours at once
 	before := page_pixel(c)

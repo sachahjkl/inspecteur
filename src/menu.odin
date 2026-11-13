@@ -296,7 +296,7 @@ signal_selected :: proc(app: ^App, sig: process.Signal) {
 	#partial switch sig {
 	case .Stop:
 		for t in c.targets {
-			if guard_of(app, t.pid) != .None { say(app, i18n.tr("Not stopped: it is Inspecteur, runs it or draws the desktop, and nothing could resume it")); return }
+			if guard_of(app, t.pid) != .None { say(app, i18n.tr("Not stopped: it is inspecteur, runs it or draws the desktop, and nothing could resume it")); return }
 		}
 		send_signal(app, &c, sig)
 	case .Continue:
@@ -392,7 +392,7 @@ confirm_ask :: proc(app: ^App, c: Chosen, sig: process.Signal, tree := false) {
 	note := strings.builder_make(context.temp_allocator)
 	switch {
 	case server:     strings.write_string(&note, i18n.tr("It draws the desktop: the session ends with it, and every program of the session with it. "))
-	case inspecteur: strings.write_string(&note, i18n.tr("Inspecteur ends with it: it runs under it. "))
+	case inspecteur: strings.write_string(&note, i18n.tr("inspecteur ends with it: it runs under it. "))
 	}
 	switch {
 	case sig == .Kill && many: strings.write_string(&note, i18n.tr("They end at once, without the chance to save their work. End task asks them to end on their own."))

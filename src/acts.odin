@@ -138,19 +138,19 @@ signal_said :: proc(app: ^App, a: ^Act) {
 	if a.guarded {
 		switch a.guard {
 		case .None:
-		case .Self:           say(app, i18n.tr("Inspecteur does not suspend itself: nothing could resume it"))
-		case .Ancestor:       say(app, i18n.tr("%s runs Inspecteur: suspended, it would stop Inspecteur too"), a.name)
+		case .Self:           say(app, i18n.tr("inspecteur does not suspend itself: nothing could resume it"))
+		case .Ancestor:       say(app, i18n.tr("%s runs inspecteur: suspended, it would stop inspecteur too"), a.name)
 		case .Display_Server: say(app, i18n.tr("%s draws the desktop: suspended, it would freeze every window, this one too"), a.name)
 		}
 		return
 	}
 	// (a sentence per verb: a language words each its own way)
-	denied, failed := i18n.tr("%s is %s's: Inspecteur may not end it (only its owner, or %s, may)"), i18n.tr("%s cannot be ended (error %d)")
+	denied, failed := i18n.tr("%s is %s's: inspecteur may not end it (only its owner, or %s, may)"), i18n.tr("%s cannot be ended (error %d)")
 	#partial switch a.sig {
 	case .Stop:
-		denied, failed = i18n.tr("%s is %s's: Inspecteur may not suspend it (only its owner, or %s, may)"), i18n.tr("%s cannot be suspended (error %d)")
+		denied, failed = i18n.tr("%s is %s's: inspecteur may not suspend it (only its owner, or %s, may)"), i18n.tr("%s cannot be suspended (error %d)")
 	case .Continue:
-		denied, failed = i18n.tr("%s is %s's: Inspecteur may not resume it (only its owner, or %s, may)"), i18n.tr("%s cannot be resumed (error %d)")
+		denied, failed = i18n.tr("%s is %s's: inspecteur may not resume it (only its owner, or %s, may)"), i18n.tr("%s cannot be resumed (error %d)")
 	}
 	switch {
 	case a.result == .Denied:

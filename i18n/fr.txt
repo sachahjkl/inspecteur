@@ -28,29 +28,29 @@ fr Accès refusé : seul son propriétaire, ou %s, peut changer l'affinité de %
 en The affinity of %s cannot be changed
 fr L'affinité de %s ne peut pas être changée
 
-en Inspecteur does not suspend itself: nothing could resume it
-fr Inspecteur ne se suspend pas lui-même : rien ne pourrait le reprendre
+en inspecteur does not suspend itself: nothing could resume it
+fr inspecteur ne se suspend pas lui-même : rien ne pourrait le reprendre
 
-en %s runs Inspecteur: suspended, it would stop Inspecteur too
-fr %s exécute Inspecteur : suspendu, il arrêterait aussi Inspecteur
+en %s runs inspecteur: suspended, it would stop inspecteur too
+fr %s exécute inspecteur : suspendu, il arrêterait aussi inspecteur
 
 en %s draws the desktop: suspended, it would freeze every window, this one too
 fr %s dessine le bureau : suspendu, il figerait toutes les fenêtres, celle-ci aussi
 
-en %s is %s's: Inspecteur may not end it (only its owner, or %s, may)
-fr %s appartient à %s : Inspecteur ne peut pas le terminer (seul son propriétaire, ou %s, le peut)
+en %s is %s's: inspecteur may not end it (only its owner, or %s, may)
+fr %s appartient à %s : inspecteur ne peut pas le terminer (seul son propriétaire, ou %s, le peut)
 
 en %s cannot be ended (error %d)
 fr %s ne peut pas être terminé (erreur %d)
 
-en %s is %s's: Inspecteur may not suspend it (only its owner, or %s, may)
-fr %s appartient à %s : Inspecteur ne peut pas le suspendre (seul son propriétaire, ou %s, le peut)
+en %s is %s's: inspecteur may not suspend it (only its owner, or %s, may)
+fr %s appartient à %s : inspecteur ne peut pas le suspendre (seul son propriétaire, ou %s, le peut)
 
 en %s cannot be suspended (error %d)
 fr %s ne peut pas être suspendu (erreur %d)
 
-en %s is %s's: Inspecteur may not resume it (only its owner, or %s, may)
-fr %s appartient à %s : Inspecteur ne peut pas le reprendre (seul son propriétaire, ou %s, le peut)
+en %s is %s's: inspecteur may not resume it (only its owner, or %s, may)
+fr %s appartient à %s : inspecteur ne peut pas le reprendre (seul son propriétaire, ou %s, le peut)
 
 en %s cannot be resumed (error %d)
 fr %s ne peut pas être repris (erreur %d)
@@ -122,7 +122,7 @@ en The preferences cannot be written
 fr Les réglages ne peuvent pas être écrits
 
 en Read again
-fr Relire
+fr Actualiser
 
 en Command palette
 fr Palette de commandes
@@ -242,7 +242,7 @@ en Show or hide the summary of the machine
 fr Afficher ou masquer le résumé de la machine
 
 en Pin or unpin
-fr Épingler ou détacher
+fr Épingler ou désépingler
 
 en Mission Control: panels…
 fr Mission Control : panneaux…
@@ -368,7 +368,7 @@ en FIN wait 2
 fr Attente FIN 2
 
 en Time wait
-fr Attente de délai
+fr Fermeture en attente
 
 en Closed
 fr Fermée
@@ -442,39 +442,39 @@ en No line in the journal.
 fr Aucune ligne dans le journal.
 
 en The processors are %.0f%% busy. The busiest: %s.
-fr Les processeurs sont occupés à %.0f%%. Les plus actifs : %s.
+fr Les processeurs sont occupés à %.0f %%. Les plus actifs : %s.
 
 en Tasks waited for a processor %.0f%% of the last 10 seconds.
-fr Des tâches ont attendu un processeur %.0f%% des 10 dernières secondes.
+fr Des tâches ont attendu un processeur %.0f %% des 10 dernières secondes.
 
 en Tasks waited for memory %.0f%% of the last 10 seconds.
-fr Des tâches ont attendu la mémoire %.0f%% des 10 dernières secondes.
+fr Des tâches ont attendu la mémoire %.0f %% des 10 dernières secondes.
 
 en Tasks waited for the disks %.0f%% of the last 10 seconds.
-fr Des tâches ont attendu les disques %.0f%% des 10 dernières secondes.
+fr Des tâches ont attendu les disques %.0f %% des 10 dernières secondes.
 
 en The memory is %.0f%% in use (%s of %s). The largest: %s.
-fr La mémoire est utilisée à %.0f%% (%s sur %s). Les plus gros : %s.
+fr La mémoire est utilisée à %.0f %% (%s sur %s). Les plus gros : %s.
 
 en %s of the swap is in use: pages wait on the disk.
 fr %s du swap est utilisé : des pages attendent sur le disque.
 
 en The disk %s is busy %.0f%% of the time. Reading and writing the most: %s.
-fr Le disque %s est occupé %.0f%% du temps. Ceux qui lisent et écrivent le plus : %s.
+fr Le disque %s est occupé %.0f %% du temps. Ceux qui lisent et écrivent le plus : %s.
 
 en The GPU %s is %.0f%% busy.
-fr Le GPU %s est occupé à %.0f%%.
+fr Le GPU %s est occupé à %.0f %%.
 
 en The processor is hot: %.0f °C.
 fr Le processeur est chaud : %.0f °C.
 
-en The processor slowed for its heat %d time since Inspecteur started.
-en+ The processor slowed for its heat %d times since Inspecteur started.
-fr Le processeur a ralenti à cause de sa chaleur %d fois depuis le lancement d'Inspecteur.
-fr+ Le processeur a ralenti à cause de sa chaleur %d fois depuis le lancement d'Inspecteur.
+en The processor slowed for its heat %d time since inspecteur started.
+en+ The processor slowed for its heat %d times since inspecteur started.
+fr Le processeur a ralenti à cause de sa chaleur %d fois depuis le lancement d'inspecteur.
+fr+ Le processeur a ralenti à cause de sa chaleur %d fois depuis le lancement d'inspecteur.
 
 en Nothing stands out: the processors are %.0f%% busy and the memory has room.
-fr Rien ne ressort : les processeurs sont occupés à %.0f%% et la mémoire a de la place.
+fr Rien ne ressort : les processeurs sont occupés à %.0f %% et la mémoire a de la place.
 
 en none
 fr aucun
@@ -614,7 +614,7 @@ en PCI %s at %s
 fr PCI %s en %s
 
 en Graphics
-fr Graphismes
+fr Carte graphique
 
 en Disk
 fr Disque
@@ -646,8 +646,8 @@ fr %d×%d pixels logiques, %.0f Hz
 en Displays
 fr Écrans
 
-en %s; holds %d%% of its design capacity
-fr %s ; garde %d%% de sa capacité d'origine
+en %s; holds %s of its design capacity
+fr %s ; garde %s de sa capacité d'origine
 
 en Battery
 fr Batterie
@@ -692,7 +692,7 @@ en No entry is shown: another level, or another search, shows some.
 fr Aucune entrée affichée : un autre niveau, ou une autre recherche, en affiche.
 
 en All %d
-fr Tout %d
+fr Toutes %d
 
 en Warnings %d
 fr Avertissements %d
@@ -704,10 +704,10 @@ en Every entry (%s)
 fr Toutes les entrées (%s)
 
 en Warnings and worse (%s)
-fr Avertissements et pire (%s)
+fr Avertissements et erreurs (%s)
 
 en Errors and worse (%s)
-fr Erreurs et pire (%s)
+fr Erreurs et erreurs critiques (%s)
 
 en The entries of this boot (%s)
 fr Les entrées de ce démarrage (%s)
@@ -745,10 +745,10 @@ en The journal: every entry
 fr Le journal : toutes les entrées
 
 en The journal: warnings and worse
-fr Le journal : avertissements et pire
+fr Le journal : avertissements et erreurs
 
 en The journal: errors and worse
-fr Le journal : erreurs et pire
+fr Le journal : erreurs et erreurs critiques
 
 en The journal: this boot
 fr Le journal : ce démarrage
@@ -784,63 +784,6 @@ fr un service de l'utilisateur
 
 en in its state since %s
 fr dans cet état depuis %s
-
-en Licence registered: thank you
-fr Licence enregistrée : merci
-
-en Licence removed
-fr Licence retirée
-
-en This licence is not Inspecteur's.
-fr Cette licence n'est pas celle d'Inspecteur.
-
-en This key is not a valid licence of Inspecteur: check that it was copied whole.
-fr Cette clé n'est pas une licence valide d'Inspecteur : vérifiez qu'elle a été copiée en entier.
-
-en This build of Inspecteur accepts no licence yet.
-fr Cette version d'Inspecteur n'accepte encore aucune licence.
-
-en The licence file cannot be read.
-fr Le fichier de licence ne peut pas être lu.
-
-en The licence cannot be saved.
-fr La licence ne peut pas être enregistrée.
-
-en Licence
-fr Licence
-
-en Reading the licence…
-fr Lecture de la licence…
-
-en Registered to %s (%s). Thank you for supporting Inspecteur.
-fr Enregistrée au nom de %s (%s). Merci de soutenir Inspecteur.
-
-en Remove the licence
-fr Retirer la licence
-
-en Unregistered. Inspecteur is free; a licence supports its work.
-fr Non enregistré. Inspecteur est gratuit ; une licence soutient son travail.
-
-en The licence stored here is not valid: %s
-fr La licence enregistrée ici n'est pas valide : %s
-
-en Support Inspecteur: buy a licence
-fr Soutenir Inspecteur : acheter une licence
-
-en Paste a licence key
-fr Collez une clé de licence
-
-en Register
-fr Enregistrer
-
-en Choose a file…
-fr Choisir un fichier…
-
-en Choose a licence file
-fr Choisir un fichier de licence
-
-en inspecteur licence
-fr Licence d'inspecteur
 
 en CPU
 fr CPU
@@ -934,8 +877,8 @@ fr Utilisateur 1 (SIGUSR1)
 en User 2 (SIGUSR2)
 fr Utilisateur 2 (SIGUSR2)
 
-en Not stopped: it is Inspecteur, runs it or draws the desktop, and nothing could resume it
-fr Pas suspendu : c'est Inspecteur, il l'exécute ou dessine le bureau, et rien ne pourrait le reprendre
+en Not stopped: it is inspecteur, runs it or draws the desktop, and nothing could resume it
+fr Pas suspendu : c'est inspecteur, il l'exécute ou dessine le bureau, et rien ne pourrait le reprendre
 
 en The demo's processes are not the system's: nothing was sent
 fr Les processus de la démo ne sont pas ceux du système : rien n'a été envoyé
@@ -964,8 +907,8 @@ fr Terminer %s ?
 en It draws the desktop: the session ends with it, and every program of the session with it. 
 fr Il dessine le bureau : la session se termine avec lui, et tous les programmes de la session avec elle. 
 
-en Inspecteur ends with it: it runs under it. 
-fr Inspecteur se termine avec lui : il tourne sous lui. 
+en inspecteur ends with it: it runs under it. 
+fr inspecteur se termine avec lui : il tourne sous lui. 
 
 en They end at once, without the chance to save their work. End task asks them to end on their own.
 fr Ils s'arrêtent aussitôt, sans pouvoir enregistrer leur travail. Terminer la tâche leur demande de s'arrêter d'eux-mêmes.
@@ -1004,10 +947,10 @@ en Health
 fr Santé
 
 en Busiest: CPU
-fr Les plus actifs : CPU
+fr Top CPU
 
 en Busiest: memory
-fr Les plus gros : mémoire
+fr Top mémoire
 
 en %d of %d panels: drag a tab to move it
 fr %d panneaux sur %d : faites glisser un onglet pour le déplacer
@@ -1027,8 +970,8 @@ fr Sous tension
 en Healthy
 fr En forme
 
-en CPU %.0f%%
-fr CPU %.0f%%
+en CPU %s
+fr CPU %s
 
 en A click, or %s: why it is slow, in full.
 fr Un clic, ou %s : pourquoi c'est lent, en détail.
@@ -1107,8 +1050,8 @@ fr %s  en veille
 en Pressure
 fr Pression
 
-en %s waits %.1f%%
-fr %s : attente %.1f%%
+en %s waits %s
+fr %s : attente %s
 
 en %% Utilization of each logical processor over %s
 fr %% d'utilisation de chaque processeur logique sur %s
@@ -1143,10 +1086,10 @@ fr %.0f à %.0f °C
 en Slowed for its heat
 fr Ralenti par la chaleur
 
-en %d time since Inspecteur started
-en+ %d times since Inspecteur started
-fr %d fois depuis le lancement d'Inspecteur
-fr+ %d fois depuis le lancement d'Inspecteur
+en %d time since inspecteur started
+en+ %d times since inspecteur started
+fr %d fois depuis le lancement d'inspecteur
+fr+ %d fois depuis le lancement d'inspecteur
 
 en Utilization
 fr Utilisation
@@ -1161,7 +1104,7 @@ en Up time
 fr Temps d'activité
 
 en Threads
-fr Threads
+fr Fils
 
 en Open files
 fr Fichiers ouverts
@@ -1310,8 +1253,8 @@ fr %s, certaines
 en %s, some task
 fr %s, certaines tâches
 
-en %.1f%% over 10 s, %.1f%% over 60 s
-fr %.1f%% sur 10 s, %.1f%% sur 60 s
+en %s over 10 s, %s over 60 s
+fr %s sur 10 s, %s sur 60 s
 
 en %s, every task
 fr %s, toutes les tâches
@@ -1394,14 +1337,14 @@ fr processeurs %s
 en Working folder
 fr Dossier de travail
 
-en %.1f%% of the machine
-fr %.1f%% de la machine
+en %s of the machine
+fr %s de la machine
 
 en %s private, %s resident (with the pages it shares with other processes)
 fr %s privée, %s résidente (avec les pages qu'il partage avec d'autres processus)
 
-en %.0f%% of a GPU's time
-fr %.0f%% du temps d'un GPU
+en %s of a GPU's time
+fr %s du temps d'un GPU
 
 en %s read, %s written since it started
 fr %s lus, %s écrits depuis son lancement
@@ -1442,8 +1385,8 @@ fr Valeur
 en Affinity…
 fr Affinité…
 
-en Filter the list...
-fr Filtrer la liste...
+en Filter the list…
+fr Filtrer la liste…
 
 en The processes cannot be read (/proc)
 fr Les processus ne peuvent pas être lus (/proc)
@@ -1513,6 +1456,146 @@ fr Description
 
 en Load
 fr Chargement
+
+ctx systemd
+en active
+fr actif
+
+ctx systemd
+en inactive
+fr inactif
+
+ctx systemd
+en failed
+fr en échec
+
+ctx systemd
+en activating
+fr en démarrage
+
+ctx systemd
+en deactivating
+fr en arrêt
+
+ctx systemd
+en reloading
+fr en rechargement
+
+ctx systemd
+en maintenance
+fr en maintenance
+
+ctx systemd
+en running
+fr en cours
+
+ctx systemd
+en dead
+fr arrêté
+
+ctx systemd
+en exited
+fr terminé
+
+ctx systemd
+en waiting
+fr en attente
+
+ctx systemd
+en listening
+fr à l'écoute
+
+ctx systemd
+en mounted
+fr monté
+
+ctx systemd
+en plugged
+fr branché
+
+ctx systemd
+en elapsed
+fr écoulé
+
+ctx systemd
+en auto-restart
+fr redémarrage automatique
+
+ctx systemd
+en start
+fr démarrage
+
+ctx systemd
+en stop
+fr arrêt
+
+ctx systemd
+en enabled
+fr activé
+
+ctx systemd
+en enabled-runtime
+fr activé pour cette session
+
+ctx systemd
+en disabled
+fr désactivé
+
+ctx systemd
+en static
+fr statique
+
+ctx systemd
+en masked
+fr masqué
+
+ctx systemd
+en masked-runtime
+fr masqué pour cette session
+
+ctx systemd
+en linked
+fr lié
+
+ctx systemd
+en linked-runtime
+fr lié pour cette session
+
+ctx systemd
+en indirect
+fr indirect
+
+ctx systemd
+en generated
+fr généré
+
+ctx systemd
+en transient
+fr transitoire
+
+ctx systemd
+en alias
+fr alias
+
+ctx systemd
+en loaded
+fr chargé
+
+ctx systemd
+en not-found
+fr introuvable
+
+ctx systemd
+en error
+fr erreur
+
+ctx systemd
+en bad-setting
+fr réglage invalide
+
+ctx systemd
+en merged
+fr fusionné
 
 en %s is not among the system services
 fr %s n'est pas parmi les services du système
@@ -1610,11 +1693,11 @@ fr Masquer les détails
 en It runs the desktop: the session ends with it.
 fr Il fait tourner le bureau : la session se termine avec lui.
 
-en Inspecteur runs under it: Inspecteur ends with it.
-fr Inspecteur tourne sous lui : Inspecteur se termine avec lui.
+en inspecteur runs under it: inspecteur ends with it.
+fr inspecteur tourne sous lui : inspecteur se termine avec lui.
 
-en Inspecteur runs in it: Inspecteur ends with it.
-fr Inspecteur tourne dedans : Inspecteur se termine avec lui.
+en inspecteur runs in it: inspecteur ends with it.
+fr inspecteur tourne dedans : inspecteur se termine avec lui.
 
 en PID %d is not in the processes' last sample
 fr Le PID %d n'est pas dans la dernière mesure des processus
@@ -1623,13 +1706,19 @@ en Refresh
 fr Actualisation
 
 en How often the processes and the machine are read again, in milliseconds: a point of the Performance section's graphs each time. The title bar's refresh menu (Ctrl+Shift+R) changes it.
-fr L'intervalle de lecture des processus et de la machine, en millisecondes : un point des graphiques de la section Performances à chaque fois. Le menu d'actualisation de la barre de titre (Ctrl+Shift+R) le change.
+fr L'intervalle de lecture des processus et de la machine, en millisecondes : un point des graphiques de la section Performances à chaque fois. Le menu d'actualisation de la barre de titre (Ctrl+Maj+R) le change.
 
 en View
-fr Présentation
+fr Affichage
 
 en How the processes are listed: apps, the apps' groups and the background processes; tree, every process under its parent. Ctrl+T switches them.
-fr La présentation des processus : apps, les groupes des applications et les processus d'arrière-plan ; tree, chaque processus sous son parent. Ctrl+T passe de l'une à l'autre.
+fr L'affichage des processus : Applications, les groupes des applications et les processus d'arrière-plan ; Arborescence, chaque processus sous son parent. Ctrl+T passe de l'un à l'autre.
+
+en Apps
+fr Applications
+
+en Tree
+fr Arborescence
 
 en Summary
 fr Résumé
@@ -1641,7 +1730,7 @@ en Manager
 fr Gestionnaire
 
 en The services the Services section lists: the system's (system) or the user's (user). Its System and User buttons change it.
-fr Les services que liste la section Services : ceux du système (system) ou ceux de l'utilisateur (user). Ses boutons Système et Utilisateur le changent.
+fr Les services que liste la section Services : ceux du système ou ceux de l'utilisateur. Ses boutons Système et Utilisateur le changent.
 
 en Details
 fr Détails
@@ -1650,7 +1739,7 @@ en Show the selected service's details and its journal's last lines under the ta
 fr Afficher les détails du service sélectionné et les dernières lignes de son journal sous le tableau (Ctrl+I).
 
 en Journal boot
-fr Démarrages du journal
+fr Journal de ce démarrage
 
 en The details' journal shows this boot's entries alone; off: its last entries, from any boot. Alt+B switches it.
 fr Le journal des détails n'affiche que les entrées de ce démarrage ; désactivé : ses dernières entrées, de tout démarrage. Alt+B le bascule.
@@ -1659,13 +1748,19 @@ en Journal level
 fr Niveau du journal
 
 en The entries of the details' journal shown: all, warnings (and worse), errors (and worse). Alt+L goes through them.
-fr Les entrées affichées du journal des détails : all (toutes), warnings (avertissements et pire), errors (erreurs et pire). Alt+L passe de l'une à l'autre.
+fr Les entrées affichées du journal des détails : toutes, les avertissements et les erreurs, ou les erreurs seules (les erreurs critiques comptent avec les erreurs). Alt+L passe de l'un à l'autre.
+
+en All entries
+fr Toutes les entrées
+
+en Warnings and errors
+fr Avertissements et erreurs
 
 en Journal follow
 fr Suivi du journal
 
 en Read the details' journal again every 2 seconds while it is shown: new entries come in at the end. Alt+F switches it.
-fr Relire le journal des détails toutes les 2 secondes tant qu'il est affiché : les nouvelles entrées arrivent à la fin. Alt+F le bascule.
+fr Actualiser le journal des détails toutes les 2 secondes tant qu'il est affiché : les nouvelles entrées arrivent à la fin. Alt+F le bascule.
 
 en How often the sockets are read again while Connections or Mission Control is shown, in milliseconds. A reading goes through every process's open files: a longer period costs less.
 fr L'intervalle de lecture des sockets tant que Connexions ou Mission Control est affiché, en millisecondes. Une lecture parcourt les fichiers ouverts de chaque processus : un intervalle plus long coûte moins.
@@ -1706,20 +1801,20 @@ fr Mises à jour
 en Rendering
 fr Rendu
 
-en This desktop draws no title bar for Inspecteur's window (GNOME): Inspecteur keeps its own.
-fr Ce bureau ne dessine pas de barre de titre pour la fenêtre d'Inspecteur (GNOME) : Inspecteur garde la sienne.
+en This desktop draws no title bar for inspecteur's window (GNOME): inspecteur keeps its own.
+fr Ce bureau ne dessine pas de barre de titre pour la fenêtre d'inspecteur (GNOME) : inspecteur garde la sienne.
 
 en Autostart entry
-fr Entrée de démarrage automatique
+fr Démarrage auto
 
 en User service
-fr Service de l'utilisateur
+fr Service utilisateur
 
 en Command
 fr Commande
 
 en Status
-fr Statut
+fr État
 
 en File
 fr Fichier
@@ -1840,8 +1935,8 @@ fr Processus d'arrière-plan (%d)
 en Open while the filter finds some of its processes
 fr Ouvert tant que le filtre trouve certains de ses processus
 
-en CPU over the last %s: %.1f%% on average, %.1f%% at most
-fr CPU sur les dernières %s : %.1f%% en moyenne, %.1f%% au plus
+en CPU over the last %s: %s on average, %s at most
+fr CPU sur les dernières %s : %s en moyenne, %s au plus
 
 en Every process under its parent
 fr Chaque processus sous son parent
@@ -1852,22 +1947,22 @@ fr Applications et processus d'arrière-plan
 en Filter: type anywhere (Ctrl+F); Escape clears it
 fr Filtre : tapez n'importe où (Ctrl+F) ; Échap l'efface
 
-en Filter processes...
-fr Filtrer les processus...
+en Filter processes…
+fr Filtrer les processus…
 
-en Filter services...
-fr Filtrer les services...
+en Filter services…
+fr Filtrer les services…
 
-en Filter startup...
-fr Filtrer le démarrage...
+en Filter startup…
+fr Filtrer le démarrage…
 
-en Filter connections...
-fr Filtrer les connexions...
+en Filter connections…
+fr Filtrer les connexions…
 
-en %.0f%% of %d CPUs
-en+ %.0f%% of %d CPUs
-fr %.0f%% de %d processeur
-fr+ %.0f%% de %d processeurs
+en %s of %d CPUs
+en+ %s of %d CPUs
+fr %s de %d processeur
+fr+ %s de %d processeurs
 
 en %s of %s
 fr %s sur %s
@@ -1923,7 +2018,7 @@ en Paused while Ctrl is held
 fr En pause tant que Ctrl est enfoncée
 
 en Refresh paused: F5 reads again, Ctrl+Space resumes
-fr Actualisation en pause : F5 relit, Ctrl+Espace reprend
+fr Actualisation en pause : F5 actualise, Ctrl+Espace reprend
 
 en Refresh every %s
 fr Intervalle d'actualisation : %s
@@ -1941,16 +2036,16 @@ en Pause
 fr Pause
 
 en Read again now
-fr Relire maintenant
+fr Actualiser maintenant
 
 en Refresh every
 fr Intervalle d'actualisation
 
-en Zoom %.0f %%
-fr Zoom %.0f %%
+en Zoom %s
+fr Zoom %s
 
-en Zoom %.0f %% (Ctrl+0: 100 %%)
-fr Zoom %.0f %% (Ctrl+0 : 100 %%)
+en Zoom %s (Ctrl+0: %s)
+fr Zoom %s (Ctrl+0 : %s)
 
 en The window of %s comes to the front
 fr La fenêtre de %s passe au premier plan

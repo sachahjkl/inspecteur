@@ -27,7 +27,7 @@ summary_build :: proc(app: ^App, em: f32) {
 	m := &app.machine
 	tiles := make([dynamic]Tile, context.temp_allocator)
 	mem := m.mem.total > 0 ? f32(f64(mem_used(m)) / f64(m.mem.total)) : 0
-	append(&tiles, Tile{"cpu", i18n.tr("CPU"), fmt.tprintf("%.0f%%", m.cpu), {{&m.cpu_hist, hue(app, HUE_CPU), ""}}, 100, 0, m.cpu / 100, {.Cpu, 0}})
+	append(&tiles, Tile{"cpu", i18n.tr("CPU"), percent_text(f64(m.cpu)), {{&m.cpu_hist, hue(app, HUE_CPU), ""}}, 100, 0, m.cpu / 100, {.Cpu, 0}})
 	append(&tiles, Tile{"memory", i18n.tr("Memory"), size_text(mem_used(m)), {{&m.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, 0, mem, {.Memory, 0}})
 	busiest, active := 0, f32(0)
 	for d, i in m.disks { if d.active > active { busiest, active = i, d.active } }
@@ -39,7 +39,7 @@ summary_build :: proc(app: ^App, em: f32) {
 	}
 	if len(m.gpus) > 0 {
 		g := &m.gpus[0]
-		value := g.read.asleep ? i18n.tr("asleep") : g.read.has_util ? fmt.tprintf("%.0f%%", g.read.util) : "–"
+		value := g.read.asleep ? i18n.tr("asleep") : g.read.has_util ? percent_text(f64(g.read.util)) : "–"
 		append(&tiles, Tile{"gpu", i18n.tr("GPU"), value, {{&g.util_hist, hue(app, HUE_GPU), ""}}, 100, 0, g.read.has_util ? g.read.util / 100 : -1, {.Gpu, 0}})
 	}
 	if m.temp_count > 0 {
@@ -49,7 +49,7 @@ summary_build :: proc(app: ^App, em: f32) {
 	if m.has_pressure {
 		worst := pressure_worst(m)
 		p := m.pressure[worst].some10
-		append(&tiles, Tile{"pressure", fmt.tprintf(i18n.tr("Pressure, %s"), i18n.tr(PRESSURE_NAMES[worst])), fmt.tprintf("%.1f%%", p), pressure_series(app), 0, PRESSURE_FLOOR, p / SUMMARY_PRESSURE_FULL, {.Pressure, 0}})
+		append(&tiles, Tile{"pressure", fmt.tprintf(i18n.tr("Pressure, %s"), i18n.tr(PRESSURE_NAMES[worst])), percent_text(f64(p), 1), pressure_series(app), 0, PRESSURE_FLOOR, p / SUMMARY_PRESSURE_FULL, {.Pressure, 0}})
 	}
 
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * SUMMARY_EM)), bg = surface("bar")})

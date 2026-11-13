@@ -240,6 +240,54 @@ services_take :: proc(app: ^App, l: ^Service_List) {
 	services_rows(app)
 }
 
+// A word of systemd (a unit's active, sub, file or load state) in the language in use: the one table of the Services
+// section, its details and Mission Control. Its keys are systemd's own words, so the English shows them as systemd
+// says them; a word not in the table stays as it is.
+unit_word :: proc(word: string) -> string {
+	switch word {
+	// (active states)
+	case "active":          return i18n.tr("systemd", "active")
+	case "inactive":        return i18n.tr("systemd", "inactive")
+	case "failed":          return i18n.tr("systemd", "failed")
+	case "activating":      return i18n.tr("systemd", "activating")
+	case "deactivating":    return i18n.tr("systemd", "deactivating")
+	case "reloading":       return i18n.tr("systemd", "reloading")
+	case "maintenance":     return i18n.tr("systemd", "maintenance")
+	// (sub states)
+	case "running":         return i18n.tr("systemd", "running")
+	case "dead":            return i18n.tr("systemd", "dead")
+	case "exited":          return i18n.tr("systemd", "exited")
+	case "waiting":         return i18n.tr("systemd", "waiting")
+	case "listening":       return i18n.tr("systemd", "listening")
+	case "mounted":         return i18n.tr("systemd", "mounted")
+	case "plugged":         return i18n.tr("systemd", "plugged")
+	case "elapsed":         return i18n.tr("systemd", "elapsed")
+	case "auto-restart":    return i18n.tr("systemd", "auto-restart")
+	case "start":           return i18n.tr("systemd", "start")
+	case "stop":            return i18n.tr("systemd", "stop")
+	// (unit file states)
+	case "enabled":         return i18n.tr("systemd", "enabled")
+	case "enabled-runtime": return i18n.tr("systemd", "enabled-runtime")
+	case "disabled":        return i18n.tr("systemd", "disabled")
+	case "static":          return i18n.tr("systemd", "static")
+	case "masked":          return i18n.tr("systemd", "masked")
+	case "masked-runtime":  return i18n.tr("systemd", "masked-runtime")
+	case "linked":          return i18n.tr("systemd", "linked")
+	case "linked-runtime":  return i18n.tr("systemd", "linked-runtime")
+	case "indirect":        return i18n.tr("systemd", "indirect")
+	case "generated":       return i18n.tr("systemd", "generated")
+	case "transient":       return i18n.tr("systemd", "transient")
+	case "alias":           return i18n.tr("systemd", "alias")
+	// (load states)
+	case "loaded":          return i18n.tr("systemd", "loaded")
+	case "not-found":       return i18n.tr("systemd", "not-found")
+	case "error":           return i18n.tr("systemd", "error")
+	case "bad-setting":     return i18n.tr("systemd", "bad-setting")
+	case "merged":          return i18n.tr("systemd", "merged")
+	}
+	return word
+}
+
 // The rows again from the reading (of the manager shown only: a reading of the other one, asked before a switch, is not
 // shown).
 services_rows :: proc(app: ^App) {
@@ -248,17 +296,19 @@ services_rows :: proc(app: ^App) {
 	section_rows_reset(st, len(SERVICE_COLUMNS))
 	if s.list != nil && s.list.manager == s.manager {
 		for u in s.list.units {
-			state := u.sub != "" && u.sub != u.active ? strings.concatenate({u.active, " (", u.sub, ")"}, context.temp_allocator) : u.active
+			state := u.sub != "" && u.sub != u.active ? strings.concatenate({unit_word(u.active), " (", unit_word(u.sub), ")"}, context.temp_allocator) : unit_word(u.active)
+			file, load := unit_word(u.file), unit_word(u.load)
 			tone := ui.Table_Tone.Normal
 			if u.active == "failed" { tone = .Bad } else if u.active != "active" && u.active != "activating" && u.active != "reloading" { tone = .Dim }
 			pid := u.pid > 0 ? uint_text(u64(u.pid)) : ""
 			memory := u.memory != MEMORY_UNKNOWN && u.memory > 0 ? size_text(u.memory) : ""
-			section_row(st, name_id(u.name), strings.join({u.name, u.description, state, u.file, pid}, " ", context.temp_allocator), service_icon(app, u), tone)
+			// (the filter finds a row by the words shown and by systemd's own, which its documentation and journal use)
+			section_row(st, name_id(u.name), strings.join({u.name, u.description, state, file, u.active, u.sub, u.file, pid}, " ", context.temp_allocator), service_icon(app, u), tone)
 			ui.table_data_cell(&st.data, u.name)
 			ui.table_data_cell(&st.data, u.description)
 			ui.table_data_cell(&st.data, state)
-			ui.table_data_cell(&st.data, u.file)
-			ui.table_data_cell(&st.data, u.load)
+			ui.table_data_cell(&st.data, file)
+			ui.table_data_cell(&st.data, load)
 			ui.table_data_cell(&st.data, pid, f64(u.pid))
 			ui.table_data_cell(&st.data, memory, u.memory == MEMORY_UNKNOWN ? -1 : f64(u.memory))
 		}

@@ -80,7 +80,7 @@ diagnose :: proc(app: ^App) -> []Finding {
 	}
 	if m.throttled > m.throttled_before {
 		n := int(m.throttled - m.throttled_before)
-		add(&out, .Bad, i18n.tr(n, "The processor slowed for its heat %d time since Inspecteur started.", "The processor slowed for its heat %d times since Inspecteur started."), n)
+		add(&out, .Bad, i18n.tr(n, "The processor slowed for its heat %d time since inspecteur started.", "The processor slowed for its heat %d times since inspecteur started."), n)
 	}
 	if len(out) == 0 {
 		add(&out, .Fine, i18n.tr("Nothing stands out: the processors are %.0f%% busy and the memory has room."), m.cpu)
@@ -144,7 +144,7 @@ busiest :: proc(app: ^App, by: Busy_By) -> string {
 		if len(parts) == DIAG_TOP || busy_value(p, by) <= 0 { break }
 		shown: string
 		switch by {
-		case .Cpu:    shown = fmt.tprintf("%.0f%%", p.cpu)
+		case .Cpu:    shown = percent_text(f64(p.cpu))
 		case .Memory: shown = size_text(p.private)
 		case .Disk:   shown = fmt.tprintf("%s/s", size_text(u64(p.read_rate + p.write_rate)))
 		}

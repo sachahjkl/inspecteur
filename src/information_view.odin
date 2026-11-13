@@ -101,8 +101,8 @@ info_report :: proc(app: ^App) -> []Info_Group {
 
 	if s != nil {
 		for b in s.batteries {
-			v := fmt.tprintf("%d%%, %s", b.capacity, battery_status_text(b.status))
-			if b.health >= 0 { v = fmt.tprintf(i18n.tr("%s; holds %d%% of its design capacity"), v, b.health) }
+			v := fmt.tprintf("%s, %s", percent_text(f64(b.capacity)), battery_status_text(b.status))
+			if b.health >= 0 { v = fmt.tprintf(i18n.tr("%s; holds %s of its design capacity"), v, percent_text(f64(b.health))) }
 			if b.model != "" { v = fmt.tprintf("%s; %s", v, b.model) }
 			if b.technology != "" && b.technology != "Unknown" { v = fmt.tprintf("%s, %s", v, b.technology) }
 			add(&lines, b.name, v)
