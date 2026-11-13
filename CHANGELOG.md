@@ -3,6 +3,33 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.4.0] - 2026-11-13
+
+### Added
+- **The palette remembers what you choose**: its Recent group holds the commands you choose often and lately. A command chosen often stays near the top for weeks, and while you type it comes before an equal match.
+- **A report when Inspecteur crashes**: a crash writes a report and the log's last lines in Inspecteur's state folder (`~/.local/state/inspecteur`). The next start says where the report is. Nothing is sent anywhere.
+- **Each service has an icon**: its process's app when it has one, else your icon theme's icon for the service's name or its family (network, sound, Bluetooth, printing, disks, time, security, session...), else a glyph of that family.
+- **Send a signal**: a process's menu, and the palette, send SIGHUP, SIGINT, SIGQUIT, SIGTERM, SIGKILL, SIGSTOP, SIGCONT, SIGUSR1 or SIGUSR2 to the selected processes. A kill asks first. Inspecteur, what runs it and the display server are guarded as for End task and Suspend.
+- **Show its window**: an app's row, and a process of an app, has a window button that brings its window to the front. Its tooltip names the window; with several, each click shows the next one. The row's menu, the palette and Ctrl+Shift+W do it too. It works where the compositor lists the session's windows (wlr-foreign-toplevel: sway, Hyprland, niri...).
+- **A licence to support Inspecteur**: the settings' General page says to whom Inspecteur is registered, or links to buy a licence. It takes a key pasted or a licence file chosen, and checks it on the computer, with no network. A licence changes nothing of what Inspecteur does. The shop is not open yet.
+- **Settings exported and imported**: the settings' sidebar has Export… (JSON, TOML, INI or Inspecteur's own format) and Import…, to carry them to another computer.
+- **Your own themes**: the settings' Appearance page links to `themes.txt`, beside the preferences. A click makes the file, with its instructions, and opens it. A theme written there shows among the themes' cards and in the title bar's colours menu. A change to the file shows within two seconds.
+- **Inspecteur in French**: its sections, menus, buttons, tooltips, the command palette, the dialogs, the settings and the messages are in French, with a space before ":", ";", "?" and "!". The Language setting, on the settings' General page, chooses System, English or Français; System follows the system's language. A change takes effect at the next start. The settings' search finds a setting by its French words and by its English ones.
+
+### Changed
+- **Copied, as a notification**: a copy (a command line, a service, an address, the journal, the system's information) is confirmed by a desktop notification, or in the window where the desktop shows none.
+- **Dialogs and confirmations**: the affinity dialog and "Why is it slow?" open in the middle of the window. A dialog opens at its size and place, with no jump. A kill, the end of a process tree, a service's stop and a dump file are asked in one confirmation: a title strip with a close button, and the act's button in red, or in green when the act is safe and Enter confirms it.
+- **One look for every search**: the filter at the top of the sidebar is a band in a field's colour, as the command palette's search and the menus' are. Its hint stays while it has the keyboard. The theme's and the refresh's menus also filter their lines as you type, as the other menus do.
+- **More settings, on more pages**: besides the look (theme, density, rounding, animations, glow) and Inspecteur's own, the settings have pages for the text and its fonts, scrolling, input, delays and menus, rendering and where messages show. A technical setting is under a folded Advanced part; the search finds it. The text size goes from 10 to 24 pixels. The tables' stripes and lines are on a Tables page. The settings' sidebar can be resized, and keeps its width. The system's title bar is switched at once, with no restart. The look's settings have new names (`appearance.theme`, `appearance.mode`, `appearance.finish`, `appearance.font_size`, `appearance.zoom`, `window.system_title`): a theme, a text size or a zoom chosen before must be chosen again.
+
+### Fixed
+- **A name the filter finds is aligned with its row**: the lit name of an app or a process sat higher than the rest of its row.
+- **A scrollbar at the window's edge is easy to grab**: on Wayland the resize bands are around the window, not inside it, so a list's scrollbar at the right edge takes the pointer on its whole width.
+- **Clean edges and corners**: a box in a rounded corner (a title, a header, a menu's first line) takes that corner, and a corner too small to round is square. The Properties' title no longer covers the dialog's corner and rim, and a tab's line no longer runs into the rim. A menu is as wide as its widest line, and a tooltip in a menu shows over it.
+- **Pinning a process of an app pins its app**: Alt+P on a process listed under an app (a tab of a browser, a shell in a terminal) said it was pinned but showed it nowhere. It now pins the app, which the Pinned section shows.
+- **Inspecteur keeps reading while its window is hidden**: on another workspace, its samples and their history go on. They stopped until the window showed again.
+- **The window no longer freezes**: the processes and the machine each second, the Properties' lists, a signal, a priority or an affinity, the apps' icons, the install's state and the saved settings are read or written in the background. A process stuck in the kernel or a slow disk cannot stop the window, a column drag or a theme change. On Wayland with NVIDIA's driver, the window no longer freezes when the compositor holds back its frames.
+
 ## [0.3.0] - 2026-11-11
 
 ### Added
@@ -150,6 +177,7 @@ and the versions follow [semantic versioning](https://semver.org/).
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.4.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.4.0
 [0.3.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.3.0
 [0.1.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.1.0
 [0.2.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.2.0

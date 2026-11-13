@@ -13,7 +13,7 @@ import config "gt:config"
 import crash "gt:crash"
 import tk_log "gt:log"
 
-APP_VERSION :: "0.3.0"
+APP_VERSION :: "0.4.0"
 
 USAGE :: `inspecteur: what runs on this computer
 
