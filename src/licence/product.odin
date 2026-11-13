@@ -8,7 +8,7 @@ import licence "gt:licence"
 
 PRODUCT :: licence.Product{
 	name           = "inspecteur",
-	title          = "Inspecteur",
+	title          = "inspecteur",
 	version_tag    = "INSPECTEUR1",
 	sign_context   = "inspecteur-licence-v1\n",
 	file_extension = ".inspecteurlicence",
@@ -16,5 +16,5 @@ PRODUCT :: licence.Product{
 	public_key     = "",
 	// (the development pair: its seed is public on purpose, inspecteurtool's DEV_SEED; only a debug build accepts it)
 	dev_public_key = "AdStxVdn8FsJ4eil4es_IaBkqV0p0Vn1jV7sCbozGyA",
-	editions       = {0 = {id = "supporter", title = "Supporter"}, 1 = {id = "patron", title = "Patron"}},
+	editions       = {0 = {id = "supporter", title = "Supporter"}},
 }

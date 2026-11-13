@@ -848,8 +848,8 @@ fr Choisir un fichier…
 en Choose a licence file
 fr Choisir un fichier de licence
 
-en Inspecteur licence
-fr Licence d'Inspecteur
+en inspecteur licence
+fr Licence d'inspecteur
 
 en CPU
 fr CPU

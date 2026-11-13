@@ -21,12 +21,12 @@ EXIT_USAGE :: toolbox.EXIT_USAGE
 DEV_SEED :: "aW5zcGVjdGV1ci1kZXYtbGljZW5jZS1zZWVkLTAxISE"
 
 // The `licence` and `paddle` commands: inspecteur's licence (src/licence.odin), its development pair, its Paddle
-// catalogue. The amounts are the maintainer's to set: PLACEHOLDER until then (`paddle -amounts:supporter=...,patron=...`).
+// catalogue.
 LICENCE_TOOL :: toolbox.Licence_Tool{
 	product  = inspecteur_licence.PRODUCT,
 	dev_seed = DEV_SEED,
-	hint     = "Open Inspecteur's settings (Ctrl+,), the General page: choose this file, or paste the key there.",
-	paddle   = {name = "Inspecteur User Licence", description = "A personal, perpetual licence of Inspecteur, the task manager.", amounts = "", currency = "EUR"},
+	hint     = "Open inspecteur's settings (Ctrl+,), the General page: choose this file, or paste the key there.",
+	paddle   = {name = "inspecteur licence", description = "A personal, perpetual licence of inspecteur, the task manager.", amounts = "supporter=1500", currency = "EUR"},
 }
 
 main :: proc() {

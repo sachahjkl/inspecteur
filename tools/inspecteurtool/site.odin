@@ -51,27 +51,23 @@ site_project :: proc() -> tk_site.Project_Site {
 // The shop: inspecteur's licence (src/licence), sold through Paddle by the toolkit's licence Worker. Its pages (pricing,
 // thanks, terms, refunds, privacy, imprint) are the toolkit's templates, filled at each `site build`. What is empty is
 // the maintainer's to give once the shop is set up (gui_toolkit docs/licence.md, "What the maintainer does at the end"):
-// until the client token, the price ids and the Worker are there, the buttons say "Coming soon". The price is a
-// PLACEHOLDER until the maintainer sets it.
-@(rodata)
-SHOP_PRICES := [?]tk_site.Shop_Price{
-	{edition = "supporter", price_id = "", label = "Buy the Supporter licence"},
-	{edition = "patron", price_id = "", label = "Buy the Patron licence"},
-}
+// until the client token, the price id and the Worker are there, the button says "Coming soon".
 
 shop :: proc() -> tk_site.Shop {
 	return {
 		name           = "inspecteur",
-		product_title  = "Inspecteur User Licence",
-		price          = "<!-- PLACEHOLDER: the price, set by the maintainer -->Price to come",
-		price_note     = "Once. Taxes included.",
+		icon           = "../img/logo.png",
+		product_title  = "inspecteur licence",
+		price          = "15&nbsp;&euro;",
+		price_note     = "",
 		environment    = "sandbox",
 		client_token   = "",   // Paddle's client-side token: "" keeps the shop shut ("Coming soon")
-		prices         = SHOP_PRICES[:],
+		edition        = "supporter",
+		price_id       = "",   // what `inspecteurtool paddle -apply` prints ("": not made yet)
 		worker         = "",   // the licence Worker's address (gui_toolkit licence-worker/README.md)
 		thanks         = "https://inspecteur.froment.software/thanks/",
 		help           = REPOSITORY + "/issues",
-		register       = "Open Inspecteur's settings (Ctrl+,), the <strong>General</strong> page, <strong>Licence</strong>: paste the key, or choose the file.",
+		register       = "Open inspecteur's settings (Ctrl+,), the <strong>General</strong> page, <strong>Licence</strong>: paste the key, or choose the file.",
 		extension      = inspecteur_licence.PRODUCT.file_extension,
 		seller         = "Froment Software",
 		seller_url     = "https://froment.software",
