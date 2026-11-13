@@ -43,8 +43,7 @@ journal_build :: proc(app: ^App, v: ^Journal_View, name: string, manager: Manage
 	case len(d.journal) == 0: journal_note(d.journal_problem, em); return
 	case len(shown) == 0:     journal_note("No entry is shown: another level, or another search, shows some.", em); return
 	}
-	ids := make([]u64, len(shown), context.temp_allocator)
-	for &x, i in ids { x = journal_entry_id(d.journal[shown[i]]) }
+	ids := v.shown_ids[:]   // (made with them: journal_shown)
 	// (the newest entry in view: at another service, and as new entries come while the view was at the end)
 	newest := ids[len(ids) - 1]
 	if v.shown_for != name_id(name) {
@@ -76,18 +75,27 @@ journal_note :: proc(text: string, em: f32) {
 	}
 }
 
-// The indices of the entries the level and the search keep, the oldest first (temporary allocator).
+// The indices of the entries the level and the search keep, the oldest first (the view's: valid until the reading, the
+// level or the search changes). The counts of the levels are made with them (v.errors, v.warnings).
 journal_shown :: proc(app: ^App, v: ^Journal_View) -> []int {
 	d := v.details
 	if d == nil { return nil }
 	q := strings.to_lower(strings.trim_space(ui.field_string(&v.search)), context.temp_allocator)
-	out := make([dynamic]int, 0, len(d.journal), context.temp_allocator)
+	if v.shown_of == v.serial && v.shown_level == app.settings.journal_level && v.shown_query == q { return v.shown[:] }
+	v.shown_of, v.shown_level = v.serial, app.settings.journal_level
+	delete(v.shown_query)
+	v.shown_query = strings.clone(q)
+	clear(&v.shown)
+	clear(&v.shown_ids)
+	v.errors, v.warnings = 0, 0
 	for e, i in d.journal {
+		if e.priority <= 3 { v.errors += 1 } else if e.priority == 4 { v.warnings += 1 }
 		if !journal_level_keeps(app.settings.journal_level, e.priority) { continue }
 		if q != "" && !strings.contains(strings.to_lower(e.message, context.temp_allocator), q) && !strings.contains(strings.to_lower(e.ident, context.temp_allocator), q) { continue }
-		append(&out, i)
+		append(&v.shown, i)
+		append(&v.shown_ids, journal_entry_id(e))
 	}
-	return out[:]
+	return v.shown[:]
 }
 
 // An entry's identity in the list: the same entry read again keeps its row (and the selection).
@@ -105,10 +113,7 @@ journal_at_end :: proc(vl: ^ui.Virtual_List) -> bool {
 @(private = "file")
 journal_bar :: proc(app: ^App, v: ^Journal_View, shown: int, em: f32, in_window: bool) {
 	d := v.details
-	errors, warnings := 0, 0
-	for e in d.journal {
-		if e.priority <= 3 { errors += 1 } else if e.priority == 4 { warnings += 1 }
-	}
+	errors, warnings := v.errors, v.warnings   // (journal_shown counted them)
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.3))})
 	if ui.row(.Center, {}, "###svc_journal_bar") {
 		ui.spacer(ui.px(em * 0.8))
@@ -127,11 +132,9 @@ journal_bar :: proc(app: ^App, v: ^Journal_View, shown: int, em: f32, in_window:
 		if ui.segmented("svc_journal_boot", {"This boot", "Every boot"}, &boot, btips[:]) { journal_boot_set(app, boot == 0) }
 		ui.spacer(ui.px(em * 0.6))
 		follow := app.settings.journal_follow
-		ui.next({width = ui.px(em * 2.2), height = ui.px(ui.dense(em * 1.9)), font = app.icons})
-		sig: ui.Signal
-		if ui.tags(follow ? "accent_button" : "ghost_button") { sig = ui.button(fmt.tprintf("%s###svc_journal_follow", follow ? lucide.ARROW_DOWN : lucide.PAUSE)) }
-		if sig.clicked { journal_run_on(app, v, .Journal_Follow) }
-		tip_after(sig, follow ? fmt.tprintf("Following: new entries come in at the end (%s stops)", ui.command_shortcut(COMMANDS[.Journal_Follow])) : cmd_tip(.Journal_Follow))
+		ui.next({width = ui.px(em * 2.2), height = ui.px(ui.dense(em * 1.9))})
+		tip := follow ? fmt.tprintf("Following: new entries come in at the end (%s stops)", ui.command_shortcut(COMMANDS[.Journal_Follow])) : cmd_tip(.Journal_Follow)
+		if ui.icon_button("svc_journal_follow", follow ? lucide.ARROW_DOWN : lucide.PAUSE, tip = tip, intent = follow ? .Primary : .Neutral, face = follow ? .Raised : .Ghost).clicked { journal_run_on(app, v, .Journal_Follow) }
 		ui.spacer(ui.px(em * 0.6))
 		ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 1.9))})
 		res := ui.line_edit("###svc_journal_search", &v.search, fmt.tprintf("Search the journal (%s)", ui.command_shortcut(COMMANDS[.Journal_Search])))
@@ -142,8 +145,8 @@ journal_bar :: proc(app: ^App, v: ^Journal_View, shown: int, em: f32, in_window:
 			ui.next({width = ui.text_size(em * 0.4), height = ui.pct(1), text_pad = 0, font_size = em * 0.9})
 			ui.label(fmt.tprintf("%s###svc_journal_count", n))
 		}
-		if tool_button(app, "svc_journal_copy", lucide.COPY, cmd_tip(.Journal_Copy), len(d.journal) > 0, em) { journal_run_on(app, v, .Journal_Copy) }
-		if !in_window && tool_button(app, "svc_journal_window", lucide.EXTERNAL_LINK, cmd_tip(.Journal_Window), true, em) { journal_window_open(app, d.manager, d.name) }
+		if tool_button("svc_journal_copy", lucide.COPY, cmd_tip(.Journal_Copy), len(d.journal) > 0, em) { journal_run_on(app, v, .Journal_Copy) }
+		if !in_window && tool_button("svc_journal_window", lucide.EXTERNAL_LINK, cmd_tip(.Journal_Window), true, em) { journal_window_open(app, d.manager, d.name) }
 		ui.spacer(ui.px(em * 0.4))
 	}
 }
@@ -223,7 +226,7 @@ journal_entry_whole :: proc(app: ^App, e: Journal_Entry, em: f32) {
 				ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0})
 				ui.label(fmt.tprintf("%s  ·  %s###je_info", journal_time_text(app, e.usec, true), ui.text_shown(who)))
 			}
-			if tool_button(app, "svc_journal_copy_entry", lucide.CLIPBOARD_COPY, cmd_tip(.Journal_Copy_Entry), true, em) { platform.set_clipboard(app.main.win, journal_entry_text(app, e)); say(app, "Copied the entry") }
+			if tool_button("svc_journal_copy_entry", lucide.CLIPBOARD_COPY, cmd_tip(.Journal_Copy_Entry), true, em) { platform.set_clipboard(app.main.win, journal_entry_text(app, e)); copied(app, "Copied the entry") }
 			ui.spacer(ui.px(em * 0.4))
 		}
 		ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
@@ -244,10 +247,6 @@ journal_entry_whole :: proc(app: ^App, e: Journal_Entry, em: f32) {
 // "14:03:07", or with its date "2026-11-10 14:03:07", in local time.
 journal_time_text :: proc(app: ^App, usec: i64, date: bool) -> string {
 	if usec <= 0 { return "" }
-	if !app.tz_tried {
-		app.tz_tried = true
-		app.tz, _ = timezone.region_load("local")
-	}
 	dt, ok := time.time_to_datetime(time.unix(usec / 1_000_000, 0))
 	if !ok { return "" }
 	if app.tz != nil { dt = timezone.datetime_to_tz(dt, app.tz) }
@@ -321,11 +320,11 @@ journal_run_on :: proc(app: ^App, v: ^Journal_View, c: Cmd) {
 		shown := journal_shown(app, v)
 		for i in shown { strings.write_string(&b, journal_entry_text(app, d.journal[i])); strings.write_byte(&b, '\n') }
 		platform.set_clipboard(app.main.win, strings.to_string(b))
-		say(app, "Copied %s", count_text(len(shown), "entry", "entries"))
+		copied(app, fmt.tprintf("Copied %s", count_text(len(shown), "entry", "entries")))
 	case .Journal_Copy_Entry:
 		if e, ok := journal_selected(app, v); ok {
 			platform.set_clipboard(app.main.win, journal_entry_text(app, e))
-			say(app, "Copied the entry")
+			copied(app, "Copied the entry")
 		}
 	case .Journal_Window:
 		if d := v.details; d != nil { journal_window_open(app, d.manager, d.name) }
@@ -344,7 +343,7 @@ journal_views :: proc(app: ^App) -> []^Journal_View {
 journal_follow_tick :: proc(app: ^App) {
 	v := &app.services.pane
 	if app.tab != .Services || !app.settings.details || !app.settings.journal_follow || app.paused { return }
-	if time.tick_diff(v.next, time.tick_now()) < 0 || ui.worker_busy(&v.worker) { return }
+	if time.tick_diff(v.next, time.tick_now()) < 0 || journal_view_busy(v) { return }
 	v.next = time.tick_add(time.tick_now(), JOURNAL_FOLLOW_MS * time.Millisecond)
 	if u, ok := selected_service(app); ok { details_ask(app, u.name) }
 }

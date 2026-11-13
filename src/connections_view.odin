@@ -90,5 +90,5 @@ connection_copy :: proc(app: ^App) {
 	text := remote_text(s)
 	if text == "" { text = endpoint_text(s.local, s.lport, s.v6) }
 	platform.set_clipboard(app.main.win, text)
-	say(app, "Copied %s", text)
+	copied(app, "Copied", text)
 }

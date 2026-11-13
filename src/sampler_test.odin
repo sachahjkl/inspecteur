@@ -16,27 +16,26 @@ rates_are_differences_over_the_time :: proc(t: ^testing.T) {
 // A process is the pair (pid, start): the same pid with another start is a new process, which has no rates yet.
 @(test)
 a_pid_used_again_is_a_new_process :: proc(t: ^testing.T) {
-	d: Demo
-	s := Sampler{demo = &d}   // (the demo's facts: a pid it does not know is named by its comm)
+	s: Sampler   // (no facts: a process is named by its comm)
 	defer sampler_destroy(&s)
 	SECOND :: 1_000_000_000
-	procs_merge(&s, {{pid = 90001, start = 100, comm = "a", cpu_ns = 0, io_known = true}}, 0, 0, nil)
+	procs_merge(&s, {{pid = 90001, start = 100, comm = "a", cpu_ns = 0, io_known = true}}, nil, 0, 0, nil)
 	testing.expect_value(t, len(s.procs), 1)
-	procs_merge(&s, {{pid = 90001, start = 100, comm = "a", cpu_ns = SECOND / 2, io_read = 4096, io_known = true}}, 1, 4 * SECOND, nil)
+	procs_merge(&s, {{pid = 90001, start = 100, comm = "a", cpu_ns = SECOND / 2, io_read = 4096, io_known = true}}, nil, 1, 4 * SECOND, nil)
 	testing.expect_value(t, s.procs[0].cpu, 12.5)   // half a second of four
 	testing.expect_value(t, s.procs[0].read_rate, 4096.0)
-	procs_merge(&s, {{pid = 90001, start = 200, comm = "b", cpu_ns = 3 * SECOND, io_read = 99999, io_known = true}}, 1, 4 * SECOND, nil)
+	procs_merge(&s, {{pid = 90001, start = 200, comm = "b", cpu_ns = 3 * SECOND, io_read = 99999, io_known = true}}, nil, 1, 4 * SECOND, nil)
 	testing.expect_value(t, s.procs[0].name, "b")
 	testing.expect_value(t, s.procs[0].cpu, 0)
 	testing.expect_value(t, s.procs[0].read_rate, 0.0)
 	// a process that went stays ENDED_KEEP_NS, ended and at rest, then is gone; one whose io is not known has no rate
 	T :: i64(100 * SECOND)
-	procs_merge(&s, {{pid = 90002, start = 5, comm = "c", io_known = false}}, 1, 4 * SECOND, nil, now_ns = T)
+	procs_merge(&s, {{pid = 90002, start = 5, comm = "c", io_known = false}}, nil, 1, 4 * SECOND, nil, now_ns = T)
 	testing.expect_value(t, len(s.procs), 2)
 	testing.expect(t, s.procs[0].ended && s.procs[0].cpu == 0, "the process that went is kept, ended, its rates at 0")
 	testing.expect_value(t, s.procs[1].pid, i32(90002))
 	testing.expect(t, !s.procs[1].io_known)
-	procs_merge(&s, {{pid = 90002, start = 5, comm = "c", io_known = false}}, 1, 4 * SECOND, nil, now_ns = T + ENDED_KEEP_NS)
+	procs_merge(&s, {{pid = 90002, start = 5, comm = "c", io_known = false}}, nil, 1, 4 * SECOND, nil, now_ns = T + ENDED_KEEP_NS)
 	testing.expect_value(t, len(s.procs), 1)
 	testing.expect_value(t, s.procs[0].pid, i32(90002))
 }
@@ -44,14 +43,13 @@ a_pid_used_again_is_a_new_process :: proc(t: ^testing.T) {
 // A process that comes after the first sample is new (born_ns); those of the first sample were there before.
 @(test)
 a_process_that_comes_is_new :: proc(t: ^testing.T) {
-	d: Demo
-	s := Sampler{demo = &d}
+	s: Sampler
 	defer sampler_destroy(&s)
 	s.samples = 1
-	procs_merge(&s, {{pid = 90010, start = 1, comm = "old"}}, 0, 0, nil, now_ns = 10)
+	procs_merge(&s, {{pid = 90010, start = 1, comm = "old"}}, nil, 0, 0, nil, now_ns = 10)
 	testing.expect_value(t, s.procs[0].born_ns, i64(0))
 	s.samples = 2
-	procs_merge(&s, {{pid = 90010, start = 1, comm = "old"}, {pid = 90011, start = 2, comm = "new"}}, 1, 1, nil, now_ns = 20)
+	procs_merge(&s, {{pid = 90010, start = 1, comm = "old"}, {pid = 90011, start = 2, comm = "new"}}, nil, 1, 1, nil, now_ns = 20)
 	testing.expect_value(t, s.procs[0].born_ns, i64(0))
 	testing.expect_value(t, s.procs[1].born_ns, i64(20))
 }

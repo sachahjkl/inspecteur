@@ -13,7 +13,6 @@ package inspecteur
 // It reads nothing of its own: each section's reading (Mission Control asks every section to read while it is shown).
 
 import "core:fmt"
-import "core:slice"
 import "core:strings"
 import "gt:draw"
 import lucide "gt:lucide"
@@ -133,10 +132,10 @@ build_mission :: proc(app: ^App, em: f32) {
 @(private = "file")
 mission_bar_right :: proc(app: ^App, em: f32) {
 	if app.mission.menu == 0 { app.mission.menu = ui.key_from_string(0, "inspecteur_mission_panels") }
-	if tool_button(app, "mission_panels", lucide.LAYOUT_GRID, cmd_tip(.Mission_Panels), true, em) {
+	if tool_button("mission_panels", lucide.LAYOUT_GRID, cmd_tip(.Mission_Panels), true, em) {
 		ui.ctx_menu_open(app.mission.menu, ui.mouse_pos())
 	}
-	if tool_button(app, "mission_reset", lucide.ROTATE_CCW, cmd_tip(.Mission_Reset), true, em) { mission_reset(app) }
+	if tool_button("mission_reset", lucide.ROTATE_CCW, cmd_tip(.Mission_Reset), true, em) { mission_reset(app) }
 	ui.spacer(ui.px(em * 0.4))
 }
 
@@ -254,7 +253,7 @@ mission_health :: proc(app: ^App, em: f32) {
 		info: ui.Signal
 		if ui.tags("weak") { info = ui.signal(ui.build_box({.Clickable, .Draw_Text, .No_Text_Trunc, .Draw_Hot_Effects}, fmt.tprintf("%s###mc_health_info", lucide.INFO))) }
 		if info.clicked { app.diagnosis_open = true }
-		if ui.hovered_for(info, TIP_DELAY_S) {
+		if ui.hovered_for(info) {
 			if ui.tooltip() {
 				ui.next({width = ui.px(em * 24), height = ui.children_sum(), axis = .Y})
 				if ui.column(id = "###mc_health_tip") {
@@ -335,14 +334,9 @@ pulse_draw :: proc(b: ^ui.Box, user: rawptr, dc: ^draw.Context) {
 // The processes that use the most CPU (or private memory), each with its share as a bar; a click shows it in Processes.
 @(private = "file")
 mission_busiest :: proc(app: ^App, em: f32, memory: bool) {
-	order := make([dynamic]int, 0, len(app.sampler.procs), context.temp_allocator)
-	for p, i in app.sampler.procs { if !p.ended { append(&order, i) } }
+	// (ranked at the sample: ranking_make)
+	order := app.ranking.busiest[memory ? .Memory : .Cpu][:]
 	procs := app.sampler.procs[:]
-	if memory {
-		slice.sort_by(order[:], proc(a, b: int) -> bool { return the_app.sampler.procs[a].private > the_app.sampler.procs[b].private })
-	} else {
-		slice.sort_by(order[:], proc(a, b: int) -> bool { return the_app.sampler.procs[a].cpu > the_app.sampler.procs[b].cpu })
-	}
 	top := order[:min(len(order), MISSION_TOP)]
 	most := f32(1)
 	if len(top) > 0 { most = memory ? max(f32(procs[top[0]].private), 1) : max(procs[top[0]].cpu, 1) }
@@ -362,14 +356,12 @@ mission_services :: proc(app: ^App, em: f32) {
 	s := &app.services
 	if s.list == nil || s.list.manager != s.manager { mission_note("Reading…", em); return }
 	if s.list.problem != "" { mission_note(s.list.problem, em); return }
-	running, failed := 0, 0
-	for u in s.list.units {
-		if u.active == "active" && u.sub == "running" { running += 1 }
-		if u.active == "failed" { failed += 1 }
-	}
-	mission_note(fmt.tprintf("%s of the %s: %d running, %d failed", count_text(len(s.list.units), "service", "services"), s.manager == .System ? "system" : "user", running, failed), em)
+	// (counted when the list was read: services_take)
+	failed := s.list.failed
+	mission_note(fmt.tprintf("%s of the %s: %d running, %d failed", count_text(len(s.list.units), "service", "services"), s.manager == .System ? "system" : "user", s.list.running, failed), em)
 	k := 0
 	for u in s.list.units {
+		if k >= failed { break }
 		if u.active != "failed" { continue }
 		if mission_line(app, fmt.tprintf("mc_svc_%d", k), u.name, u.description, "failed", -1, "bad", em, {kind = .Service, name = u.name}) {
 			mission_show_service(app, u.name)
@@ -385,27 +377,15 @@ mission_services :: proc(app: ^App, em: f32) {
 mission_network :: proc(app: ^App, em: f32) {
 	m := &app.machine
 	c := &app.connections
-	listening, connected := 0, 0
-	Holder :: struct { pid: i32, start: u64, n: int }
-	holders := make(map[i32]Holder, 16, context.temp_allocator)
-	for so in c.sockets {
-		if so.state == .Listening { listening += 1 } else if so.state == .Established { connected += 1 }
-		if so.pid > 0 {
-			h := holders[so.pid]
-			h.pid, h.start, h.n = so.pid, so.start, h.n + 1
-			holders[so.pid] = h
-		}
-	}
-	mission_note(fmt.tprintf("%s now; %d listening, %d connected", bits_text(m.net_rate), listening, connected), em)
-	list := make([dynamic]Holder, 0, len(holders), context.temp_allocator)
-	for _, h in holders { append(&list, h) }
-	slice.sort_by(list[:], proc(a, b: Holder) -> bool { return a.n > b.n })
+	// (counted when the sockets were read: connections_count)
+	mission_note(fmt.tprintf("%s now; %d listening, %d connected", bits_text(m.net_rate), c.listening, c.connected), em)
+	list := c.holders[:]
 	most := len(list) > 0 ? f32(list[0].n) : 1
 	for h, k in list[:min(len(list), MISSION_TOP)] {
 		name := fmt.tprintf("PID %d", h.pid)
 		// (by its pid alone: a socket's process often comes with no start time)
 		start := h.start
-		for &q in app.sampler.procs { if q.pid == h.pid && !q.ended { name, start = q.name, q.start; break } }
+		if q := find_pid(&app.sampler, h.pid); q != nil && !q.ended { name, start = q.name, q.start }
 		if mission_line(app, fmt.tprintf("mc_net_%d", k), name, fmt.tprintf("PID %d", h.pid), count_text(h.n, "socket", "sockets"), f32(h.n) / most, "", em, {kind = .Process, pid = h.pid, start = start}) {
 			mission_show_connections(app, h.pid)
 		}
@@ -417,11 +397,12 @@ mission_network :: proc(app: ^App, em: f32) {
 mission_startup :: proc(app: ^App, em: f32) {
 	s := &app.startup
 	if s.list == nil { mission_note("Reading…", em); return }
-	on := 0
-	for it in s.list.items { if it.enabled { on += 1 } }
+	// (counted when the list was read: startup_posted)
+	on := s.list.on_count
 	mission_note(fmt.tprintf("%s, %d on", count_text(len(s.list.items), "item", "items"), on), em)
 	k := 0
 	for it in s.list.items {
+		if k >= on { break }
 		if !it.enabled { continue }
 		if mission_line(app, fmt.tprintf("mc_start_%d", k), it.name, it.command, it.status, -1, "", em, {kind = .Startup, name = it.name}) { tab_show(app, .Startup) }
 		k += 1
@@ -453,7 +434,7 @@ mission_system :: proc(app: ^App, em: f32) {
 				ui.label(fmt.tprintf("%s###k", f[0]))
 			}
 			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0})
-			label_tip(fmt.tprintf("%s###v", ui.text_shown(f[1])), f[1])
+			ui.label_tip(fmt.tprintf("%s###v", ui.text_shown(f[1])))
 		}
 	}
 	for g, i in info.gpus {
@@ -465,7 +446,7 @@ mission_system :: proc(app: ^App, em: f32) {
 				ui.label(fmt.tprintf("GPU %d###k", i))
 			}
 			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0})
-			label_tip(fmt.tprintf("%s###v", ui.text_shown(g.name)), g.name)
+			ui.label_tip(fmt.tprintf("%s###v", ui.text_shown(g.name)))
 		}
 	}
 	if mission_more(app, "mc_system_more", "Information", em) { tab_show(app, .Information) }
@@ -549,8 +530,7 @@ mission_line_menu :: proc(app: ^App, em: f32) {
 			if p == nil { ui.ctx_menu_close(); return }
 			if ui.menu_item("Show in Processes", icon = lucide.LAYOUT_LIST, icon_font = app.icons).clicked { processes_reveal(app, p.pid, p.start) }
 			if ui.menu_item(COMMANDS[.Properties].label, icon = COMMANDS[.Properties].icon, icon_font = app.icons).clicked {
-				app.props.demo = app.demo
-				props_open(&app.props, p.pid, p.start)
+				props_open(app, p.pid, p.start)
 			}
 			ui.menu_separator()
 			if ui.menu_item(COMMANDS[.Go_To_Service].label, icon = COMMANDS[.Go_To_Service].icon, enabled = p.unit != "", icon_font = app.icons).clicked { go_to_service(app, p) }

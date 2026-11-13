@@ -13,6 +13,7 @@ import "core:slice"
 import "core:strings"
 import desktop "gt:desktop"
 import "gt:render"
+import "gt:ui"
 import identity "identity"
 
 App_Entry :: struct {
@@ -188,23 +189,55 @@ Icon :: struct {
 // The pixels an app's icon is asked at: a row's icon is about 16 to 24 pixels; mipmaps take the larger one down.
 ICON_PX :: 32
 
-// The texture of an app's icon (a desktop entry's Icon=: a name in the person's icon theme, or a file), made the first
-// time it is asked; ok false when there is none (the row draws the generic icon).
+// The texture of an app's icon (a desktop entry's Icon=: a name in the person's icon theme, or a file); ok false when
+// there is none, or not yet (the row draws the generic icon). The first ask reads the theme on the chores (its folders
+// and its file, which can wait); the texture is made when the picture comes back (icon_done), and the rows redrawn.
 icon_of :: proc(app: ^App, name: string) -> Icon {
 	if name == "" { return {} }
 	// (Inspecteur's own row: its logo, whatever the icon theme has)
 	if name == identity.SLUG && app.logo.ok { return app.logo }
 	// (the demo's apps: icons of its own, the same on every machine; no theme is read)
 	if app.demo != nil { return demo_icon(name) }
-	if ic, done := app.app_icons[name]; done { return ic }
-	ic: Icon
-	if pic, ok := desktop.theme_icon(name, ICON_PX, context.temp_allocator); ok {
-		ic.tex = render.create_texture_rgba(&app.shared.r, pic.size.x, pic.size.y)
-		render.update_texture_rgba(&app.shared.r, ic.tex, 0, 0, pic.size.x, pic.size.y, pic.rgba)
-		ic.ok = true
-	}
-	app.app_icons[strings.clone(name)] = ic
-	return ic
+	if ic, asked := app.app_icons[name]; asked { return ic }
+	app.app_icons[strings.clone(name)] = {}
+	r := new(Icon_Reading)
+	r.name = strings.clone(name)
+	ui.task(&app.main.state, icon_work, icon_done, r, icon_lost)
+	return {}
+}
+
+// A theme's icon, read for a name.
+@(private = "file")
+Icon_Reading :: struct {
+	name: string,              // owned
+	pic:  desktop.File_Icon,   // its pixels (heap)
+	ok:   bool,
+}
+
+@(private = "file")
+icon_work :: proc(data: rawptr) {
+	r := (^Icon_Reading)(data)
+	r.pic, r.ok = desktop.theme_icon(r.name, ICON_PX)
+}
+
+@(private = "file")
+icon_done :: proc(data: rawptr, _: u64) {
+	r := (^Icon_Reading)(data)
+	defer icon_lost(r)
+	app := the_app
+	if app == nil || !r.ok { return }
+	ic := Icon{tex = render.create_texture_rgba(&app.shared.r, r.pic.size.x, r.pic.size.y), ok = true}
+	render.update_texture_rgba(&app.shared.r, ic.tex, 0, 0, r.pic.size.x, r.pic.size.y, r.pic.rgba)
+	if r.name in app.app_icons { app.app_icons[r.name] = ic } else { render.destroy_texture(&app.shared.r, ic.tex) }
+	app.main.settle = max(app.main.settle, 1)
+}
+
+@(private = "file")
+icon_lost :: proc(data: rawptr) {
+	r := (^Icon_Reading)(data)
+	if r.ok { desktop.file_icon_destroy(&r.pic) }
+	delete(r.name)
+	free(r)
 }
 
 icons_destroy :: proc(icons: ^map[string]Icon, r: ^render.Renderer) {

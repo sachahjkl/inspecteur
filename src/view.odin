@@ -239,12 +239,6 @@ tree_view_switch :: proc(app: ^App) {
 ////////////////////////////////
 // Pieces
 
-// An icon of Lucide, `width` wide.
-glyph :: proc(app: ^App, g: string, width: f32, fg: Maybe(ui.Color) = nil) {
-	ui.next({width = ui.px(width), height = ui.pct(1), font = app.icons, text_align = .Center, fg = fg})
-	ui.build_box({.Draw_Text, .No_Text_Trunc}, fmt.tprintf("%s###g%d", g, ui.parent_box().child_count))
-}
-
 // A thin vertical line between two things of a row (the columns' titles, the footer's counters).
 vrule :: proc(em: f32, height: f32 = 1.2) {
 	ui.spacer(ui.px(em * 0.35))
@@ -269,25 +263,19 @@ build_title :: proc(app: ^App, em: f32) {
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * TITLE_EM)), bg = surface("bar")})
 	if ui.title_bar("###titlebar", {.Draw_Background, .Draw_Side_Bottom}) {
 		ui.spacer(ui.px(em * 0.6))
-		if app.logo.ok { icon_box(app.logo, em * 1.7) } else { glyph(app, lucide.EYE, em * 1.7, ui.color("accent")) }
+		if app.logo.ok { icon_box(app.logo, em * 1.7) } else { ui.icon(lucide.EYE, em * 1.7, ui.color("accent")) }
 		ui.next({width = ui.text_size(em * 0.4), height = ui.pct(1)})
 		ui.label("Inspecteur###apptitle")
 		ui.spacer(ui.fill())
 		refresh_button(app, em)
-		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1), font = app.icons})
-		sig: ui.Signal
-		if ui.tags("ghost_button") { sig = ui.button(fmt.tprintf("%s###palette_button", lucide.COMMAND)) }
-		if sig.clicked { palette_open(app) }
-		tip_after(sig, cmd_tip(.Palette))
-		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1), font = app.icons})
-		if ui.tags("ghost_button") { sig = ui.button(fmt.tprintf("%s###help_button", lucide.KEYBOARD)) }
-		if sig.clicked { app.shortcuts_open = true }
-		tip_after(sig, cmd_tip(.Shortcuts))
+		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
+		if ui.icon_button("palette_button", lucide.COMMAND, tip = cmd_tip(.Palette)).clicked { palette_open(app) }
+		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
+		if ui.icon_button("help_button", lucide.KEYBOARD, tip = cmd_tip(.Shortcuts)).clicked { app.shortcuts_open = true }
 		theme_button(app, em)
-		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1), font = app.icons})
-		if ui.tags(app.settings_open ? "accent_button" : "ghost_button") { sig = ui.button(fmt.tprintf("%s###settings_button", lucide.SLIDERS_HORIZONTAL)) }
-		if sig.clicked { settings_toggle(app) }
-		tip_after(sig, cmd_tip(.Settings))
+		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
+		// (the settings shown: the button is held down)
+		if ui.icon_button("settings_button", lucide.SLIDERS_HORIZONTAL, tip = cmd_tip(.Settings), face = app.settings_open ? .Toggled : .Ghost).clicked { settings_toggle(app) }
 		ui.spacer(ui.px(em * 0.4))
 		_, _ = ui.window_buttons()
 	}
@@ -313,7 +301,7 @@ build_sidebar :: proc(app: ^App, em: f32) {
 				sig = ui.signal(ui.parent_box())
 				ui.spacer(ui.px(em * 0.6))
 				if !on { ui.push_tags("weak") }
-				glyph(app, TAB_ICONS[tab], em * 1.6, on ? ui.color("accent") : nil)
+				ui.icon(TAB_ICONS[tab], em * 1.6, on ? ui.color("accent") : nil)
 				ui.spacer(ui.px(em * 0.4))
 				ui.next({width = ui.fill(), height = ui.pct(1)})
 				ui.label(fmt.tprintf("%s###t", TAB_LABELS[tab]))
@@ -333,7 +321,7 @@ build_filter :: proc(app: ^App, em: f32) {
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * BAR_EM))})
 	if ui.row(.Center, {.Draw_Side_Bottom}, "###filter") {
 		ui.spacer(ui.px(em * 0.5))
-		if ui.tags("weak") { glyph(app, lucide.SEARCH, em * 1.6) }
+		if ui.tags("weak") { ui.icon(lucide.SEARCH, em * 1.6) }
 		ui.next({width = ui.fill(), height = ui.pct(1)})
 		if ui.tags("bare") {
 			res := ui.line_edit("###search", &app.search, FILTER_HINTS[tab_listed(app.tab) ? app.tab : .Processes])
@@ -374,7 +362,7 @@ meter :: proc(app: ^App, id, icon, title, value: string, used: f32, em: f32) {
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.7))})
 	if ui.row(.Center, {}, fmt.tprintf("###meter_%s", id)) {
 		ui.spacer(ui.px(em * 0.6))
-		if ui.tags("weak") { glyph(app, icon, em * 1.6) }
+		if ui.tags("weak") { ui.icon(icon, em * 1.6) }
 		ui.spacer(ui.px(em * 0.4))
 		ui.next({width = ui.fill(), height = ui.pct(1), axis = .Y})
 		if ui.column() {
@@ -426,7 +414,7 @@ build_footer :: proc(app: ^App, em: f32) {
 			}
 			if ui.tags("weak") {
 				ui.next({width = ui.fill(), height = ui.pct(1)})
-				label_tip(fmt.tprintf("%s###msg", ui.text_shown(msg)), msg)
+				ui.label_tip(fmt.tprintf("%s###msg", ui.text_shown(msg)))
 			}
 			counter(app, "f_cpu", lucide.CPU, fmt.tprintf("%.0f%%", app.machine.cpu), em)
 			counter(app, "f_mem", lucide.LAYERS_2, fmt.tprintf("%.0f%%", app.machine.mem.total > 0 ? 100 * f64(mem_used(&app.machine)) / f64(app.machine.mem.total) : 0), em)
@@ -443,20 +431,11 @@ counter :: proc(app: ^App, id, icon, value: string, em: f32) {
 	if ui.row(.Center, {}, fmt.tprintf("###%s", id)) {
 		vrule(em)
 		ui.spacer(ui.px(em * 0.3))
-		if ui.tags("weak") { glyph(app, icon, em * 1.5) }
+		if ui.tags("weak") { ui.icon(icon, em * 1.5) }
 		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = em * 0.3})
 		ui.label(fmt.tprintf("%s###v", value))
 		ui.spacer(ui.px(em * 0.4))
 	}
-}
-
-// A label that shows its whole text in a tooltip when it is cut and the pointer rests on it.
-label_tip :: proc(id_text, full: string) {
-	// (clickable: a box the pointer can be on; nothing under a label takes a click)
-	b := ui.build_box({.Draw_Text, .Clickable}, id_text)
-	b.cursor = .Arrow
-	sig := ui.signal(b)
-	if text_cut(b, full) { tip_after(sig, full) }
 }
 
 // Whether `text` is wider than the box shows it (as the last layout made the box).
@@ -475,11 +454,9 @@ THEME_MODE_KEYS := [ui.Theme_Mode]string{.System = "system", .Dark = "dark", .Li
 @(private = "file")
 theme_button :: proc(app: ^App, em: f32) {
 	if app.theme_menu == 0 { app.theme_menu = ui.key_from_string(0, "inspecteur_theme") }
-	ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1), font = app.icons})
-	sig: ui.Signal
-	if ui.tags("ghost_button") { sig = ui.button(fmt.tprintf("%s###theme", lucide.SUN_MOON)) }
+	ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
+	sig := ui.icon_button("theme", lucide.SUN_MOON, tip = fmt.tprintf("Colours: light or dark (%s), the theme", ui.command_shortcut(COMMANDS[.Light_Dark])), lit = ui.ctx_menu_is_open(app.theme_menu))
 	if sig.clicked { ui.ctx_menu_open_rect(app.theme_menu, sig.box.rect) }
-	tip_after(sig, fmt.tprintf("Colours: light or dark (%s), the theme", ui.command_shortcut(COMMANDS[.Light_Dark])))
 	if ui.ctx_menu(app.theme_menu) {
 		ui.menu_heading("Version")
 		for mode in ui.Theme_Mode {
@@ -520,7 +497,7 @@ refresh_pause :: proc(app: ^App, pause: bool) {
 		say(app, "Refresh paused: F5 reads again, Ctrl+Space resumes")
 	} else {
 		app.sample_extra = true
-		refresh(app)
+		sample_ask(app)
 		say(app, "Refresh every %s", refresh_text(app))
 	}
 }
@@ -542,13 +519,12 @@ refresh_menu_open :: proc(app: ^App) {
 
 @(private = "file")
 refresh_button :: proc(app: ^App, em: f32) {
-	ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1), font = app.icons})
-	sig: ui.Signal
-	if ui.tags("ghost_button") { sig = ui.button(fmt.tprintf("%s###refresh", app.paused ? lucide.PAUSE : lucide.REFRESH_CW)) }
+	ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
+	tip := fmt.tprintf("Refresh: %s. %s (%s), %s (%s)", app.paused ? "paused" : fmt.tprintf("every %s", refresh_text(app)),
+		COMMANDS[.Refresh_Speed].label, ui.command_shortcut(COMMANDS[.Refresh_Speed]), app.paused ? "Resume" : "Pause", ui.command_shortcut(COMMANDS[.Pause_Refresh]))
+	sig := ui.icon_button("refresh", app.paused ? lucide.PAUSE : lucide.REFRESH_CW, tip = tip, lit = app.refresh_menu != 0 && ui.ctx_menu_is_open(app.refresh_menu))
 	app.refresh_rect = sig.box.rect
 	if sig.clicked { refresh_menu_open(app) }
-	tip_after(sig, fmt.tprintf("Refresh: %s. %s (%s), %s (%s)", app.paused ? "paused" : fmt.tprintf("every %s", refresh_text(app)),
-		COMMANDS[.Refresh_Speed].label, ui.command_shortcut(COMMANDS[.Refresh_Speed]), app.paused ? "Resume" : "Pause", ui.command_shortcut(COMMANDS[.Pause_Refresh])))
 	if app.refresh_menu == 0 { return }
 	if ui.ctx_menu(app.refresh_menu) {
 		if ui.menu_item(app.paused ? "Resume" : "Pause", ui.command_shortcut(COMMANDS[.Pause_Refresh]), checked = app.paused).clicked { refresh_pause(app, !app.paused) }

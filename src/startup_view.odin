@@ -86,12 +86,13 @@ startup_toggle :: proc(app: ^App, on: bool) {
 startup_open :: proc(app: ^App) {
 	it, ok := selected_startup(app)
 	if !ok || it.path == "" { return }
-	if platform.reveal_in_folder(it.path) { say(app, "Opened the folder of %s", it.path) } else { say(app, "No file manager opens %s", it.path) }
+	ui.open(it.path, .Reveal)
+	say(app, "Opened the folder of %s", it.path)
 }
 
 startup_copy :: proc(app: ^App) {
 	it, ok := selected_startup(app)
 	if !ok || it.command == "" { return }
 	platform.set_clipboard(app.main.win, it.command)
-	say(app, "Copied the command of %s", it.name)
+	copied(app, fmt.tprintf("Copied the command of %s", it.name))
 }

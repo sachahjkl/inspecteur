@@ -300,8 +300,8 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Read_Again:       refresh_now(app)
 	case .Pause_Refresh:    refresh_pause(app, !app.paused)
 	case .Refresh_Speed:    refresh_menu_open(app)
-	case .Zoom_In:          ui.set_zoom(&app.main.state, ui.zoom(&app.main.state) * ui.ZOOM_STEP)
-	case .Zoom_Out:         ui.set_zoom(&app.main.state, ui.zoom(&app.main.state) / ui.ZOOM_STEP)
+	case .Zoom_In:          ui.set_zoom(&app.main.state, ui.zoom(&app.main.state) * ui.feel(&app.main.state).zoom_step)
+	case .Zoom_Out:         ui.set_zoom(&app.main.state, ui.zoom(&app.main.state) / ui.feel(&app.main.state).zoom_step)
 	case .Zoom_Reset:       ui.set_zoom(&app.main.state, 1)
 	case .Light_Dark:       light_dark_switch(app)
 	case .Setup:            setup_open(app)
@@ -418,12 +418,6 @@ mode_set :: proc(app: ^App, mode: ui.Theme_Mode) {
 
 // A tooltip after the pointer rests on `sig`: `text`.
 tip_after :: proc(sig: ui.Signal, text: string) {
-	if text == "" || !ui.hovered_for(sig, TIP_DELAY_S) { return }
-	if ui.tooltip() {
-		ui.next({width = ui.text_size(ui.font_size() * 0.6), height = ui.px(ui.dense(ui.font_size() * 1.8))})
-		ui.label(fmt.tprintf("%s###tip", text))
-	}
+	if text == "" || !ui.hovered_for(sig) { return }
+	if ui.tooltip() { ui.tooltip_text(text) }
 }
-
-// How long the pointer rests on a control before its tooltip shows.
-TIP_DELAY_S :: 0.4

@@ -21,26 +21,35 @@ Affinity :: struct {
 	count:  int,   // the logical processors of the machine
 }
 
-// Reads the process's affinity and opens the dialog; says why when it cannot be read.
+// Reads the process's affinity (acts.odin), then opens the dialog (affinity_show); says why when it cannot be read.
 affinity_open :: proc(app: ^App, p: ^Proc) {
+	if app.demo != nil {
+		all: process.Cpu_Set
+		for i in 0 ..< min(len(app.machine.core_total), process.CPU_SET_MAX) { process.cpu_set_put(&all, i) }
+		affinity_show(app, {p.pid, p.start}, p.name, all)
+		return
+	}
+	act := act_new(.Affinity_Read, p.name)
+	append(&act.targets, Target{p.pid, p.start})
+	act_start(app, act)
+}
+
+// The dialog, open on the processors of `set`.
+affinity_show :: proc(app: ^App, t: Target, name: string, set: process.Cpu_Set) {
 	a := &app.affinity
-	a.target = {p.pid, p.start}
-	a.name_len = copy(a.name[:], p.name)
+	a.target = t
+	a.name_len = copy(a.name[:], name)
 	a.count = min(len(app.machine.core_total), process.CPU_SET_MAX)
 	a.cpus = {}
-	if app.demo != nil {
-		for i in 0 ..< a.count { a.cpus[i] = true }
-	} else {
-		set, r, _ := process.affinity(p.pid, p.start)
-		#partial switch r {
-		case .Done:
-		case .Gone:   say(app, "%s has ended already", p.name); return
-		case .Denied: say(app, "Access denied: %s is another user's process", p.name); return
-		case:         say(app, "The affinity of %s cannot be read", p.name); return
-		}
-		for i in 0 ..< a.count { a.cpus[i] = process.cpu_set_has(set, i) }
-	}
+	for i in 0 ..< a.count { a.cpus[i] = process.cpu_set_has(set, i) }
 	a.open = true
+}
+
+// The processors of `set` among the first `count`, as a list ("0-3, 8").
+cpu_set_text :: proc(set: process.Cpu_Set, count: int) -> string {
+	cpus := make([]bool, count, context.temp_allocator)
+	for &c, i in cpus { c = process.cpu_set_has(set, i) }
+	return cpu_list_text(cpus)
 }
 
 // The processors chosen, in the toolkit's set.
@@ -60,12 +69,10 @@ affinity_apply :: proc(app: ^App) {
 	if n == 0 { say(app, "Choose at least one processor"); return }
 	a.open = false
 	if app.demo != nil { say(app, "The demo's processes are not the system's: nothing was changed"); return }
-	#partial switch r, _ := process.set_affinity(a.target.pid, a.target.start, set); r {
-	case .Done:   say(app, "%s runs on %s now", name, cpu_list_text(a.cpus[:a.count]))
-	case .Gone:   say(app, "%s has ended already", name)
-	case .Denied: say(app, "Access denied: only its owner, or %s, may change the affinity of %s", ADMIN, name)
-	case:         say(app, "The affinity of %s cannot be changed", name)
-	}
+	act := act_new(.Affinity_Set, name)
+	append(&act.targets, a.target)
+	act.set = set
+	act_start(app, act)
 }
 
 affinity_build :: proc(app: ^App, em: f32) {
@@ -118,9 +125,7 @@ affinity_build :: proc(app: ^App, em: f32) {
 				if ui.button("Cancel###affinity_cancel").clicked { a.open = false }
 				ui.spacer(ui.px(em * 0.6))
 				ui.next({width = ui.text_size(em * 1.2), height = ui.px(ui.dense(em * 2.2))})
-				if ui.tags("accent_button") {
-					if ui.button("Apply (Enter)###affinity_apply").clicked || ui.key_press(.Return) { affinity_apply(app) }
-				}
+				if ui.button("Apply (Enter)###affinity_apply", intent = .Primary).clicked || ui.key_press(.Return) { affinity_apply(app) }
 				ui.spacer(ui.px(pad))
 			}
 			ui.spacer(ui.px(pad))

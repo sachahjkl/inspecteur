@@ -124,7 +124,7 @@ info_text :: proc(groups: []Info_Group) -> string {
 
 build_information :: proc(app: ^App, em: f32) {
 	inf := &app.information
-	busy := ui.worker_busy(&inf.worker)
+	busy := information_busy(inf)
 	section_bar(app, "Information", busy && inf.data == nil ? "Reading…" : "This computer and its system", em, info_actions)
 	groups := info_report(app)
 	ui.next({width = ui.fill(), height = ui.fill()})
@@ -135,7 +135,7 @@ build_information :: proc(app: ^App, em: f32) {
 			ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.2))})
 			if ui.row(.Center, {}, fmt.tprintf("###head_%d", k)) {
 				ui.spacer(ui.px(em * 0.8))
-				glyph(app, g.icon, em * 1.6, ui.color("accent"))
+				ui.icon(g.icon, em * 1.6, ui.color("accent"))
 				ui.spacer(ui.px(em * 0.4))
 				ui.next({width = ui.text_size(), height = ui.pct(1), font_size = em * 1.15, text_pad = 0})
 				ui.label(fmt.tprintf("%s###title", g.title))
@@ -167,11 +167,11 @@ info_line :: proc(l: Info_Line, i: int, em: f32) {
 @(private = "file")
 info_actions :: proc(app: ^App, em: f32) {
 	cmd_button(app, "copy_all", lucide.COPY, .Info_Copy, em)
-	if tool_button(app, "read_again", lucide.REFRESH_CW, cmd_tip(.Read_Again), !ui.worker_busy(&app.information.worker), em) { refresh_now(app) }
+	if tool_button("read_again", lucide.REFRESH_CW, cmd_tip(.Read_Again), !information_busy(&app.information), em) { refresh_now(app) }
 }
 
 info_copy :: proc(app: ^App) {
 	text := info_text(info_report(app))
 	platform.set_clipboard(app.main.win, text)
-	say(app, "Copied the system's information (%d lines)", strings.count(text, "\n"))
+	copied(app, fmt.tprintf("Copied the system's information (%d lines)", strings.count(text, "\n")))
 }

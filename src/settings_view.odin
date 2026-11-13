@@ -24,15 +24,17 @@ settings_keys :: proc(app: ^App) {
 	if ui.key_press(.Escape) && !prefs_page.editing(&app.settings_page) { app.settings_open = false }
 }
 
-// The pages: the categories of the preferences (settings.odin), their order and their icons.
+// The pages, their order and their icons. A preference's group is the first segment of its name (settings.odin); the
+// view.* preferences are split over two pages, and update.auto has a page of its own, so those pages list their names.
 @(private = "file", rodata)
 SETTINGS_PAGES := [?]prefs_page.Page_Info{
-	{category = "appearance", title = "Appearance", icon = lucide.PALETTE},
+	{category = "appearance", title = "Appearance", icon = lucide.PALETTE, names = []string{"view.theme", "view.mode", "view.finish", "view.zebra", "view.rules", "view.font_size"}},
 	{category = "processes",  title = "Processes",  icon = lucide.LAYOUT_LIST},
 	{category = "services",   title = "Services",   icon = lucide.SETTINGS},
 	{category = "connections", title = "Connections", icon = lucide.GLOBE},
-	{category = "window",     title = "Window",     icon = lucide.APP_WINDOW},
-	{category = "updates",    title = "Updates",    icon = lucide.DOWNLOAD},
+	{category = "window",     title = "Window",     icon = lucide.APP_WINDOW, names = []string{"view.system_title"}},
+	{category = "updates",    title = "Updates",    icon = lucide.DOWNLOAD, names = []string{"update.auto"}},
+	{category = "general",    title = "General",    icon = lucide.BELL, names = []string{"general.messages"}},
 }
 
 @(private = "file", rodata)
@@ -52,7 +54,7 @@ settings_options :: proc(app: ^App) -> prefs_page.Options {
 		updater = app.updater, update_pref = "update.auto", restart = proc(user: rawptr) { updates_restart((^App)(user)) },
 		pages = SETTINGS_PAGES[:], icon_font = app.icons, search_icon = lucide.SEARCH, reset_icon = lucide.ROTATE_CCW,
 		version = "Inspecteur " + APP_VERSION,
-		foot = "prefs: ~/.config/inspecteur/prefs",
+		file = prefs_file(),
 	}
 }
 

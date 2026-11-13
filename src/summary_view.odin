@@ -67,7 +67,7 @@ summary_tile :: proc(app: ^App, t: Tile, em: f32) {
 	if ui.row(.Center, {.Clickable, .Draw_Hot_Effects, .Hot_Within}, fmt.tprintf("###sum_%s", t.id)) {
 		sig = ui.signal(ui.parent_box())
 		// the stripe: the colour of the load (green to red), or the accent for what has no scale
-		stripe := t.load >= 0 ? heat_hue(t.load, luminance(ui.color("background")) < HEAT_DARK_PAGE) : ui.color("accent")
+		stripe := t.load >= 0 ? heat_hue(t.load, ui.luminance(ui.color("background")) < HEAT_DARK_PAGE) : ui.color("accent")
 		ui.next({width = ui.px(max(3, em * 0.22)), height = ui.pct(0.6), bg = stripe})
 		ui.build_box({.Draw_Background}, "###stripe")
 		ui.spacer(ui.px(em * 0.5))

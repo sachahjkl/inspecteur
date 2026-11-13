@@ -193,7 +193,7 @@ live_kill :: proc(l: ^Live) -> bool {
 	if !select_child(l, pid) { return false }
 	if !check(l, cdp.key(c, "shift+Delete"), "Shift+Delete") { return false }
 	if !check(l, cdp.wait_for(c, fmt.tprintf("Kill sleep (PID %s)?", pid), SESSION_WAIT), "the kill is asked first, of PID %s", pid) { return false }
-	if !check(l, cdp.click_name(c, "kill_confirm"), "click Kill") { return false }
+	if !check(l, cdp.click_name(c, "confirm_act"), "click Kill") { return false }
 	state, err := os.process_wait(child, SESSION_WAIT)
 	reaped = err == nil && state.exited
 	check(l, reaped && state.exit_code == 9, "it ends by SIGKILL (exited %v, code %d)", state.exited, state.exit_code)

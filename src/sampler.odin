@@ -55,6 +55,7 @@ Proc_Facts :: struct {
 	scope:   string,   // the unit the service manager runs it in (Linux: its systemd unit, a scope or a service), "" none
 	user_unit: bool,   // that unit is the user's service manager's, not the system's
 	started: i64,      // when it started, unix seconds (0: unknown)
+	read:    bool,     // the reader read them (a process it had not seen); false: none were read
 }
 
 Proc :: struct {
@@ -87,24 +88,16 @@ Proc :: struct {
 	ended_ns:   i64,      // when it was first missing
 }
 
+// The window's processes. The system's are read off its thread (sample.odin); a reading becomes these (sampler_apply).
 Sampler :: struct {
 	procs:   [dynamic]Proc,   // sorted by pid
-	reader:  Proc_Reader,     // the system's (processes_linux.odin)
-	demo:    ^Demo,           // not nil: the processes are the demo's (demo.odin), not the system's
 	last_ns: i64,             // when the last sample was taken (monotonic)
 	samples: int,
-}
-
-sampler_init :: proc(s: ^Sampler, demo: ^Demo) -> bool {
-	s.demo = demo
-	if demo != nil { return true }
-	return proc_reader_init(&s.reader)
 }
 
 sampler_destroy :: proc(s: ^Sampler) {
 	for &p in s.procs { proc_free(&p) }
 	delete(s.procs)
-	if s.demo == nil { proc_reader_destroy(&s.reader) }
 	s^ = {}
 }
 
@@ -117,16 +110,14 @@ proc_free :: proc(p: ^Proc) {
 	free(p.hist)
 }
 
-// Reads every process again. `now_ns`: a monotonic clock. `d_total_ns`: the time of all the machine's processors since
-// the last sample (machine.odin): a process's CPU % is its share. `catalog`: matches each new process to an app (nil:
-// none). `history`: the sample is one of the period's, which the processes' histories get a point of.
-sample :: proc(s: ^Sampler, now_ns: i64, d_total_ns: u64, catalog: ^Catalog, history := true) {
-	dt := s.last_ns > 0 ? f64(now_ns - s.last_ns) / 1e9 : 0
-	s.last_ns = now_ns
+// The processes of a reading (sample.odin). `d_total_ns`: the time of all the machine's processors since the last
+// sample (machine.odin): a process's CPU % is its share. `catalog`: matches each new process to an app (nil: none).
+// The reading's `ask.history`: the sample is one of the period's, which the processes' histories get a point of.
+sampler_apply :: proc(s: ^Sampler, r: ^Reading, d_total_ns: u64, catalog: ^Catalog) {
+	dt := s.last_ns > 0 ? f64(r.now_ns - s.last_ns) / 1e9 : 0
+	s.last_ns = r.now_ns
 	s.samples += 1
-	counters := make([dynamic]Proc_Counters, 0, len(s.procs) + 64, context.temp_allocator)
-	if s.demo != nil { demo_procs_read(s.demo, now_ns, &counters) } else { procs_read(&s.reader, &counters) }
-	procs_merge(s, counters[:], dt, d_total_ns, catalog, history, now_ns)
+	procs_merge(s, r.procs[:], r.facts[:], dt, d_total_ns, catalog, r.ask.history, r.now_ns)
 }
 
 // How long a process that ended keeps its row (in red, fading: table_view.odin), its rates at 0.
@@ -145,11 +136,12 @@ proc_ended :: proc(p: ^Proc, now_ns: i64) -> bool {
 }
 
 // The processes from a reading (sorted by pid): those already known keep what was learnt of them and get their rates;
-// a new one (a new pid, or a pid with another start) is learnt.
-procs_merge :: proc(s: ^Sampler, counters: []Proc_Counters, dt: f64, d_total_ns: u64, catalog: ^Catalog, history := true, now_ns: i64 = 0) {
+// a new one (a new pid, or a pid with another start) is learnt from its facts (`facts`, beside `counters`: those the
+// reader read; none, or not read: its command name alone).
+procs_merge :: proc(s: ^Sampler, counters: []Proc_Counters, facts: []Proc_Facts, dt: f64, d_total_ns: u64, catalog: ^Catalog, history := true, now_ns: i64 = 0) {
 	next := make([dynamic]Proc, 0, len(counters))
 	old := 0
-	for c in counters {
+	for c, i in counters {
 		for old < len(s.procs) && s.procs[old].pid < c.pid {
 			if proc_ended(&s.procs[old], now_ns) { append(&next, s.procs[old]) }
 			old += 1
@@ -164,7 +156,7 @@ procs_merge :: proc(s: ^Sampler, counters: []Proc_Counters, dt: f64, d_total_ns:
 				proc_free(&s.procs[old])
 				old += 1
 			}
-			f := s.demo != nil ? demo_proc_facts(s.demo, c) : proc_facts(&s.reader, c)
+			f := i < len(facts) && facts[i].read ? facts[i] : Proc_Facts{}
 			proc_learn(&p, c, f, catalog)
 			// (the processes of the first sample were there before: only those that come after are new)
 			if s.samples > 1 { p.born_ns = now_ns }

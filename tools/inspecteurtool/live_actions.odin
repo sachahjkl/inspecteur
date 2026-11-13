@@ -121,7 +121,7 @@ live_group_kill :: proc(l: ^Live) {
 	if !check(l, ok && selected_row_name(c) == label, "the row selected is the group (%q)", selected_row_name(c)) { return }
 	if !check(l, cdp.key(c, "shift+Delete"), "Shift+Delete") { return }
 	if !check(l, cdp.wait_for(c, fmt.tprintf("Kill %s (2 processes)?", name), SESSION_WAIT), "the kill of the 2 processes is asked") { return }
-	if !check(l, cdp.click_name(c, "kill_confirm"), "click Kill") { return }
+	if !check(l, cdp.click_name(c, "confirm_act"), "click Kill") { return }
 	ps, werr := os.process_wait(child, SESSION_WAIT)
 	reaped = werr == nil && ps.exited
 	check(l, reaped && ps.exit_code == 9, "the group's first process ends by SIGKILL (code %d)", ps.exit_code)
@@ -253,7 +253,11 @@ live_mission :: proc(l: ^Live) {
 // One Inspecteur at a time: a second start with --section hands it to this one, which shows it, and ends.
 live_one_copy :: proc(l: ^Live) {
 	c := &l.c
-	p, err := os.process_start({command = {PROGRAM, "--section", "startup"}, env = l.session.env})
+	// (the session's whole environment: its display, its runtime folder, its homes, where the first one is found)
+	env := make([dynamic]string, context.temp_allocator)
+	append(&env, ..l.session.sway.env)
+	append(&env, ..l.session.env)
+	p, err := os.process_start({command = {PROGRAM, "--section", "startup"}, env = env[:]})
 	if !check(l, err == nil, "a second start, --section startup") { return }
 	st, werr := os.process_wait(p, SESSION_WAIT)
 	check(l, werr == nil && st.exited && st.exit_code == 0, "it ends at once, handed over (%v)", st.exit_code)

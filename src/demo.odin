@@ -120,7 +120,7 @@ DEMO_APPS := [?][4]string{
 @(private = "file")
 DEMO_ICONS := [?]struct { name, glyph: string, tint: [4]f32 }{
 	{"demo:browser", lucide.GLOBE, {0.85, 0.42, 0.16, 1}},
-	{"demo:mail", lucide.SEND_HORIZONTAL, {0.18, 0.47, 0.85, 1}},
+	{"demo:mail", lucide.SEND_HORIZONAL, {0.18, 0.47, 0.85, 1}},
 	{"demo:terminal", lucide.TERMINAL, {0.22, 0.24, 0.27, 1}},
 	{"demo:image", lucide.IMAGE, {0.45, 0.38, 0.30, 1}},
 	{"demo:files", lucide.FOLDER, {0.24, 0.55, 0.85, 1}},
@@ -145,13 +145,19 @@ demo_seconds :: proc(d: ^Demo) -> f64 { return time.duration_seconds(time.since(
 
 // The minute before the start, read a second at a time: the Performance section's graphs and the processes' are full at
 // once (the pictures of the documentation are not a minute long to make).
-demo_preroll :: proc(d: ^Demo, m: ^Machine, s: ^Sampler, c: ^Catalog, now_ns: i64) {
+// It runs before the sampling's job starts, on the window's thread: the demo's readings are made up, they call nothing.
+demo_preroll :: proc(d: ^Demo, app: ^App, now_ns: i64) {
+	m := &app.machine
 	for i in 0 ..< HISTORY_POINTS {
 		back := HISTORY_POINTS - i
 		d.shift = -f64(back)
 		at := now_ns - i64(back) * 1_000_000_000
-		machine_sample(m, at, false)
-		sample(s, at, m.d_total_ns, c)
+		r := new(Reading)
+		reading_make(&app.sampling, r, {history = true}, at)
+		reading_keep(app, r)
+		machine_apply(m, r)
+		sampler_apply(&app.sampler, r, m.d_total_ns, &app.catalog)
+		reading_free(r)
 		// (the GPUs: their thread reads every GPU_PERIOD; here a point every two seconds of the minute)
 		if i % 2 == 0 {
 			snap: Gpu_Snapshot
@@ -432,18 +438,18 @@ demo_info_read :: proc(s: ^Info_Static) {
 	_ = a
 }
 
-// (the window's thread: the Properties of a demo process)
-demo_props_read :: proc(d: ^Demo, p: ^Props, a: mem.Allocator) {
+// (a task of the chores: the Properties of a demo process; constants alone)
+demo_props_read :: proc(d: ^Demo, pid: i32, p: ^Props_Data, a: mem.Allocator) {
 	proc_of :: proc(pid: i32) -> (Demo_Proc, bool) {
 		for q in DEMO_PROCS { if q.pid == pid { return q, true } }
 		return {}, false
 	}
-	q, ok := proc_of(p.pid)
+	q, ok := proc_of(pid)
 	if !ok { p.cwd_read, p.list_read = .Gone, .Gone; return }
 	if q.user != DEMO_USER { p.cwd_read, p.list_read = .Denied, .Denied; return }
 	p.cwd, p.cwd_read, p.list_read = "/home/alex", .Read, .Read
 	p.cpus = fmt.aprintf("0-%d", DEMO_LOGICAL - 1, allocator = a)
-	switch p.tab {
+	switch p.read_tab {
 	case .General, .History:
 	case .Threads:
 		for k in 0 ..< int(q.threads) {

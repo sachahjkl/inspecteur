@@ -21,7 +21,7 @@ props_build :: proc(app: ^App, em: f32) {
 		// (its keys inside it: an open dialog holds the keys, the code built outside it gets none)
 		if !app.menu.confirm.open && !app.affinity.open && !ui.ctx_menu_any_open() { props_keys(app) }
 		p := find_proc(&app.sampler, pp.pid, pp.start)
-		if pp.tab != pp.read_tab && p != nil { props_read(pp) }   // (a tab shown is read at once)
+		if p != nil && !pp.gone && (pp.data == nil || pp.tab != pp.data.read_tab) { props_read(app) }   // (a tab shown is read at once)
 		ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
 		if ui.column(id = "###props") {
 			props_title(app, p, em)
@@ -65,11 +65,13 @@ props_slice :: proc(labels: ^[Props_Tab]string) -> []string { return (cast([^]st
 props_title :: proc(app: ^App, p: ^Proc, em: f32) {
 	// (on the bars' darker surface, a line under it: the title and its facts apart from the tabs; the dialog's corners
 	// and rim kept, as the toolkit's strip across a dialog's top draws it)
-	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 3)), bg = surface("bar"), radius = em * ui.DIALOG_RADIUS_EM})
+	app.props.title_bg = surface("bar")
+	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 3)), radius = em * ui.DIALOG_RADIUS_EM})
 	if ui.row(.Center, {}, "###props_title") {
 		ui.parent_box().custom = ui.dialog_top_draw
+		ui.parent_box().custom_user = &app.props.title_bg
 		ui.spacer(ui.px(em))
-		glyph(app, lucide.INFO, em * 1.8, ui.color("accent"))
+		ui.icon(lucide.INFO, em * 1.8, ui.color("accent"))
 		ui.spacer(ui.px(em * 0.4))
 		name := p != nil ? p.name : "?"
 		ui.next({width = ui.text_size(), height = ui.pct(1), font_size = em * 1.25, text_pad = 0})
@@ -78,11 +80,8 @@ props_title :: proc(app: ^App, p: ^Proc, em: f32) {
 			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = em * 0.6})
 			ui.label(fmt.tprintf("PID %d%s###props_pid", app.props.pid, p != nil ? fmt.tprintf("  ·  %s", state_text(p.state)) : ""))
 		}
-		ui.next({width = ui.px(em * 2.2), height = ui.px(em * 2.2), font = app.icons})
-		sig: ui.Signal
-		if ui.tags("ghost_button") { sig = ui.button(fmt.tprintf("%s###props_close", lucide.X)) }
-		if sig.clicked { app.props.open = false }
-		tip_after(sig, cmd_tip(.Props_Close))
+		ui.next({width = ui.px(em * 2.2), height = ui.px(em * 2.2)})
+		if ui.icon_button("###props_close", lucide.X, face = .Ghost, tip = cmd_tip(.Props_Close)).clicked { app.props.open = false }
 		ui.spacer(ui.px(em * 0.6))
 	}
 }
@@ -121,12 +120,15 @@ props_general :: proc(app: ^App, p: ^Proc, em: f32) {
 	if ui.scroll_y("###general") {
 		ui.spacer(ui.px(em * 0.8))
 		parent := "none"
-		for &q in app.sampler.procs { if q.pid == p.ppid { parent = fmt.tprintf("%s (PID %d)", q.name, q.pid) } }
-		cwd := pp.cwd
-		switch pp.cwd_read {
-		case .Read:
-		case .Denied: cwd = "Access denied (another user's process)"
-		case .Gone:   cwd = "unknown"
+		if q := find_pid(&app.sampler, p.ppid); q != nil { parent = fmt.tprintf("%s (PID %d)", q.name, q.pid) }
+		cwd, cpus := "…", ""
+		if d := pp.data; d != nil && d.read_tab == .General {
+			cwd, cpus = d.cwd, d.cpus
+			switch d.cwd_read {
+			case .Read:
+			case .Denied: cwd = "Access denied (another user's process)"
+			case .Gone:   cwd = "unknown"
+			}
 		}
 		props_line("Name", p.name, em)
 		props_line("PID", fmt.tprintf("%d", p.pid), em)
@@ -134,7 +136,7 @@ props_general :: proc(app: ^App, p: ^Proc, em: f32) {
 		props_line("User", p.user != "" ? p.user : "unknown", em)
 		props_line("State", state_text(p.state), em)
 		props_line("Priority", priority_text(p.nice), em)
-		props_line("Affinity", pp.cpus != "" ? fmt.tprintf("processors %s", pp.cpus) : "unknown", em)
+		props_line("Affinity", cpus != "" ? fmt.tprintf("processors %s", cpus) : "unknown", em)
 		props_line("Started", started_text(app, p.started), em)
 		props_line("Executable", p.exe != "" ? p.exe : "Access denied (another user's process)", em)
 		props_line("Command line", p.cmdline != "" ? p.cmdline : "none", em)
@@ -197,8 +199,11 @@ props_history :: proc(app: ^App, p: ^Proc, em: f32) {
 
 // A list of the dialog: its titles, then its rows (only those in view are built). `cell` gives a row's cells' texts.
 @(private = "file")
-props_list :: proc(app: ^App, id: string, state: Read_State, titles: []string, widths: []f32, count: int, cell: proc(app: ^App, row, col: int) -> string, em: f32) {
-	switch state {
+props_list :: proc(app: ^App, id: string, titles: []string, widths: []f32, count: proc(d: ^Props_Data) -> int, cell: proc(app: ^App, row, col: int) -> string, em: f32) {
+	pp := &app.props
+	d := pp.data
+	if d == nil || d.read_tab != pp.tab { return }   // (its reading comes)
+	switch d.list_read {
 	case .Denied: props_note(fmt.tprintf("Access denied: another user's process. Only its owner, or %s, may read it.", ADMIN), em); return
 	case .Gone:   props_note("The process has ended.", em); return
 	case .Read:
@@ -213,16 +218,26 @@ props_list :: proc(app: ^App, id: string, state: Read_State, titles: []string, w
 			}
 		}
 	}
-	// (the rows the filter keeps: a row whose cells hold its text)
-	q := strings.to_lower(ui.field_string(&app.props.filter), context.temp_allocator)
-	shown := make([dynamic]int, 0, count, context.temp_allocator)
-	for i in 0 ..< count {
-		keep := q == ""
-		for k := 0; !keep && k < len(titles); k += 1 { keep = strings.contains(strings.to_lower(cell(app, i, k), context.temp_allocator), q) }
-		if keep { append(&shown, i) }
+	// (the rows the filter keeps, a row whose cells hold its text: made again when the reading, the tab or the filter
+	// changes, not at each frame)
+	n := count(d)
+	q := strings.to_lower(ui.field_string(&pp.filter), context.temp_allocator)
+	if pp.shown_of != pp.serial || pp.shown_tab != pp.tab || pp.shown_query != q {
+		pp.shown_of, pp.shown_tab = pp.serial, pp.tab
+		delete(pp.shown_query)
+		pp.shown_query = strings.clone(q)
+		clear(&pp.shown)
+		clear(&pp.shown_ids)
+		for i in 0 ..< n {
+			keep := q == ""
+			for k := 0; !keep && k < len(titles); k += 1 { keep = strings.contains(strings.to_lower(cell(app, i, k), context.temp_allocator), q) }
+			if keep {
+				append(&pp.shown, i)
+				append(&pp.shown_ids, u64(i) + 1)
+			}
+		}
 	}
-	ids := make([]u64, len(shown), context.temp_allocator)
-	for &v, i in ids { v = u64(shown[i]) + 1 }
+	shown, ids := pp.shown[:], pp.shown_ids[:]
 	vl := &app.props_lists[app.props.tab]
 	rows_look(app, vl)
 	ui.next({width = ui.fill(), height = ui.fill()})
@@ -249,16 +264,15 @@ props_list :: proc(app: ^App, id: string, state: Read_State, titles: []string, w
 	if len(shown) == 0 {
 		if ui.tags("weak") {
 			ui.next({width = ui.fill(), height = ui.px(em * 3)})
-			if ui.style({text_align = .Center}) { ui.label(count == 0 ? "None###empty" : fmt.tprintf("Nothing matches “%s”.###empty", ui.text_shown(q))) }
+			if ui.style({text_align = .Center}) { ui.label(n == 0 ? "None###empty" : fmt.tprintf("Nothing matches “%s”.###empty", ui.text_shown(q))) }
 		}
 	}
 }
 
 @(private = "file")
 props_threads :: proc(app: ^App, em: f32) {
-	pp := &app.props
-	props_list(app, "threads", pp.list_read, {"TID", "Name", "State", "CPU time", "Nice"}, {7, 0, 8, 8, 5}, len(pp.threads), proc(app: ^App, row, col: int) -> string {
-		t := app.props.threads[row]
+	props_list(app, "threads", {"TID", "Name", "State", "CPU time", "Nice"}, {7, 0, 8, 8, 5}, proc(d: ^Props_Data) -> int { return len(d.threads) }, proc(app: ^App, row, col: int) -> string {
+		t := app.props.data.threads[row]
 		switch col {
 		case 0: return fmt.tprintf("%d", t.tid)
 		case 1: return t.name
@@ -271,27 +285,24 @@ props_threads :: proc(app: ^App, em: f32) {
 
 @(private = "file")
 props_files :: proc(app: ^App, em: f32) {
-	pp := &app.props
-	props_list(app, "files", pp.list_read, {"FD", "What it is open on"}, {5, 0}, len(pp.files), proc(app: ^App, row, col: int) -> string {
-		f := app.props.files[row]
+	props_list(app, "files", {"FD", "What it is open on"}, {5, 0}, proc(d: ^Props_Data) -> int { return len(d.files) }, proc(app: ^App, row, col: int) -> string {
+		f := app.props.data.files[row]
 		return col == 0 ? fmt.tprintf("%d", f.fd) : f.target
 	}, em)
 }
 
 @(private = "file")
 props_modules :: proc(app: ^App, em: f32) {
-	pp := &app.props
-	props_list(app, "modules", pp.list_read, {"File mapped", "Size"}, {0, 8}, len(pp.modules), proc(app: ^App, row, col: int) -> string {
-		m := app.props.modules[row]
+	props_list(app, "modules", {"File mapped", "Size"}, {0, 8}, proc(d: ^Props_Data) -> int { return len(d.modules) }, proc(app: ^App, row, col: int) -> string {
+		m := app.props.data.modules[row]
 		return col == 0 ? m.path : size_text(m.size)
 	}, em)
 }
 
 @(private = "file")
 props_env :: proc(app: ^App, em: f32) {
-	pp := &app.props
-	props_list(app, "environment", pp.list_read, {"Name", "Value"}, {16, 0}, len(pp.env), proc(app: ^App, row, col: int) -> string {
-		v := app.props.env[row]
+	props_list(app, "environment", {"Name", "Value"}, {16, 0}, proc(d: ^Props_Data) -> int { return len(d.env) }, proc(app: ^App, row, col: int) -> string {
+		v := app.props.data.env[row]
 		eq := strings.index_byte(v, '=')
 		if eq < 0 { return col == 0 ? v : "" }
 		return col == 0 ? v[:eq] : v[eq + 1:]
@@ -323,14 +334,14 @@ props_actions :: proc(app: ^App, p: ^Proc, em: f32) {
 			if ui.tags("weak") {
 				msg := ui.now_ms() < app.status_until ? app.status : ""
 				ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0, font_size = em * 0.9})
-				label_tip(fmt.tprintf("%s###props_msg", ui.text_shown(msg)), msg)
+				ui.label_tip(fmt.tprintf("%s###props_msg", ui.text_shown(msg)))
 			}
 			stopped := p.state == .Stopped
-			if props_button(app, "props_suspend", stopped ? lucide.PLAY : lucide.SQUARE, stopped ? "Resume" : "Suspend", .Props_Suspend, em, "accent_button") { props_suspend(app) }
+			if props_button(app, "props_suspend", stopped ? lucide.PLAY : lucide.SQUARE, stopped ? "Resume" : "Suspend", .Props_Suspend, em, .Primary) { props_suspend(app) }
 			ui.spacer(ui.px(em * 0.4))
-			if props_button(app, "props_end", lucide.X, "End task", .Props_End_Task, em, "warn_button") { props_signal(app, false) }
+			if props_button(app, "props_end", lucide.X, "End task", .Props_End_Task, em, .Warning) { props_signal(app, false) }
 			ui.spacer(ui.px(em * 0.4))
-			if props_button(app, "props_kill", lucide.ZAP, "Kill…", .Props_Kill, em, "danger_button") { props_signal(app, true) }
+			if props_button(app, "props_kill", lucide.ZAP, "Kill…", .Props_Kill, em, .Danger) { props_signal(app, true) }
 		} else {
 			ui.spacer(ui.fill())
 		}
@@ -338,16 +349,10 @@ props_actions :: proc(app: ^App, p: ^Proc, em: f32) {
 	}
 }
 
-// A button of the foot: its icon and its label; its tooltip says its key.
+// A button of the foot: its icon and its label, its colour as strong as what it does (`intent`); its tooltip says its key.
 @(private = "file")
-// `variant`: the button's colours, "" the plain one (the toolkit's accent_button, warn_button, danger_button), as strong as what it does.
-props_button :: proc(app: ^App, id, icon, label: string, c: Cmd, em: f32, variant := "") -> bool {
-	ui.next({height = ui.px(ui.dense(em * 2.1))})
-	if variant != "" { ui.push_tags(variant) }
-	sig := ui.button_icon(id, icon, label)
-	if variant != "" { ui.pop_tags() }
-	tip_after(sig, fmt.tprintf("%s (%s)", label, ui.command_shortcut(COMMANDS[c])))
-	return sig.clicked
+props_button :: proc(app: ^App, id, icon, label: string, c: Cmd, em: f32, intent := ui.Intent.Neutral) -> bool {
+	return ui.button_icon(id, icon, label, intent = intent, height = ui.dense(em * 2.1), tip = fmt.tprintf("%s (%s)", label, ui.command_shortcut(COMMANDS[c]))).clicked
 }
 
 // The keys of the dialog (the Properties group of commands.odin). While its filter has the keyboard and some text, the

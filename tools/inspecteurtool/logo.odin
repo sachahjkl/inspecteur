@@ -4,11 +4,11 @@ package inspecteurtool
 // held over a running machine: a metal ring around dark glass, a handle down to the right, and in the glass the line
 // of a load graph, bright, with a soft area under it. Small sizes drop the area and the glint and draw a simpler,
 // thicker line (detail_for), so the mark still reads at 16 px.
-// assets/logo.png (1024 px), the sizes the program, its desktop entry and the site embed, and .project/image.png.
+// assets/logo.png (1024 px), the sizes the program, its desktop entry and the site embed, and .project/image.png
+// (inspecteurtool logo: the toolkit's logo command).
 
-import "core:fmt"
-import "core:os"
 import paint "gt:paint"
+import toolbox "gt:toolbox"
 
 LOGO_DIR    :: "assets"
 LOGO_MASTER :: 1024
@@ -114,28 +114,13 @@ logo_render :: proc(size: int) -> paint.Canvas {
 	return c
 }
 
-PROJECT_IMAGE      :: ".project/image.png"
-PROJECT_IMAGE_SIZE :: 512
+// What the logo command writes (toolbox.write_logo): assets/logo.png, the sizes, .project/image.png.
+@(rodata)
+LOGO_SIZE_LIST := LOGO_SIZES
 
-run_logo :: proc(args: []string) -> int {
-	_ = os.make_directory_all(LOGO_DIR)
-	master := logo_render(LOGO_MASTER)
-	defer paint.canvas_destroy(&master)
-	path := fmt.tprintf("%s/logo.png", LOGO_DIR)
-	if !paint.write_png(master, path) { fmt.eprintfln("inspecteurtool: %s cannot be written", path); return 1 }
-	fmt.printfln("wrote %s", path)
-	for size in LOGO_SIZES {
-		c := logo_render(size)
-		defer paint.canvas_destroy(&c)
-		p := fmt.tprintf("%s/logo_%d.png", LOGO_DIR, size)
-		if !paint.write_png(c, p) { fmt.eprintfln("inspecteurtool: %s cannot be written", p); return 1 }
-		fmt.printfln("wrote %s", p)
+logo :: proc() -> toolbox.Logo {
+	return {
+		render = proc(size: int, user: rawptr) -> paint.Canvas { return logo_render(size) },
+		dir = LOGO_DIR, master = LOGO_MASTER, sizes = LOGO_SIZE_LIST[:], project_image = true,
 	}
-	// the project's picture: what the repository and opencode's sessions of it show
-	project := logo_render(PROJECT_IMAGE_SIZE)
-	defer paint.canvas_destroy(&project)
-	_ = os.make_directory_all(".project")
-	if !paint.write_png(project, PROJECT_IMAGE) { fmt.eprintfln("inspecteurtool: %s cannot be written", PROJECT_IMAGE); return 1 }
-	fmt.printfln("wrote %s", PROJECT_IMAGE)
-	return 0
 }

@@ -120,7 +120,7 @@ live_services :: proc(l: ^Live) {
 	if !select_unit(l, service) { return }
 	if !check(l, cdp.key(c, "Delete"), "Delete: Stop") { return }
 	if !check(l, cdp.wait_for(c, fmt.tprintf("Stop %s?", service), SESSION_WAIT), "the stop is asked first") { return }
-	if !check(l, cdp.click_name(c, "kill_confirm"), "click Stop") { return }
+	if !check(l, cdp.click_name(c, "confirm_act"), "click Stop") { return }
 	check(l, cdp.wait_for(c, fmt.tprintf("Stopped %s", service), SESSION_WAIT), "the footer says it stopped (%q)", footer(c))
 	check(l, !wait_unit(service, "active", 2 * time.Second), "the manager says it is not active")
 	check(l, cdp.key(c, "Escape"), "Escape clears the filter")
@@ -327,18 +327,13 @@ wait_named_prefix :: proc(c: ^cdp.Client, name, prefix: string) -> bool {
 
 prefs_path :: proc(l: ^Live) -> string { return fmt.tprintf("%s/config/inspecteur/prefs", l.dir) }
 
-// swaymsg on the session's sway (its socket in the runtime folder).
+// swaymsg on the session's sway (its IPC socket).
 @(private = "file")
 swaymsg :: proc(l: ^Live, args: ..string) -> (out: string, ok: bool) {
 	code: int
-	run := fmt.tprintf("%s/run", l.dir)
-	sock := ""
-	if fis, err := os.read_all_directory_by_path(run, context.temp_allocator); err == nil {
-		for fi in fis { if strings.has_prefix(fi.name, "sway-ipc.") { sock = fmt.tprintf("%s/%s", run, fi.name) } }
-	}
-	if sock == "" { return }
+	if l.sway.ipc == "" { return }
 	cmd := make([dynamic]string, context.temp_allocator)
-	append(&cmd, "swaymsg", "-s", sock)
+	append(&cmd, "swaymsg", "-s", l.sway.ipc)
 	append(&cmd, ..args)
 	out, code = toolbox.capture(cmd[:])
 	return out, code == 0

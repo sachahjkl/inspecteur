@@ -84,7 +84,7 @@ run_shots :: proc(args: []string) -> int {
 		cdp.key(&c, "shift+Delete")
 		if need(cdp.wait_for(&c, "Kill 3 processes?", SESSION_WAIT), "no confirmation of the kill of three", &failed) { shot(&c, out, "kill_confirm", &failed) }
 		cdp.key(&c, "Escape")
-		cdp.wait_name(&c, "kill_title", SESSION_WAIT, gone = true)
+		cdp.wait_name(&c, "confirm_act", SESSION_WAIT, gone = true)
 		click_at(&c, 15, 0)
 	}
 

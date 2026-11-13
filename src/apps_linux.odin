@@ -6,11 +6,10 @@ package inspecteur
 import "core:os"
 import "core:strings"
 import desktop "gt:desktop"
+import "gt:platform"
 
 catalog_load :: proc(c: ^Catalog) {
-	home := os.get_env("XDG_DATA_HOME", context.temp_allocator)
-	if home == "" { home = strings.concatenate({os.get_env("HOME", context.temp_allocator), "/.local/share"}, context.temp_allocator) }
-	append(&c.dirs, strings.clone(home))
+	append(&c.dirs, platform.user_dir(.Data, ""))
 	dirs := os.get_env("XDG_DATA_DIRS", context.temp_allocator)
 	if dirs == "" { dirs = "/usr/local/share:/usr/share" }
 	for d in strings.split(dirs, ":", context.temp_allocator) {

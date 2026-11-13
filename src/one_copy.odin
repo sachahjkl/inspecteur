@@ -20,7 +20,7 @@ import "gt:ui"
 one_copy_acquire :: proc(tab: Tab, asked: bool) -> (forwarded: bool, owner: instance.Owner, owns: bool) {
 	token := platform.activation_token_from_env(context.temp_allocator)
 	message := fmt.tprintf("%s\n%s", asked ? TAB_LABELS[tab] : "", token)
-	cfg := instance.Config{name = instance.key("inspecteur", platform.config_dir(context.temp_allocator)), identity = process.executable_path(), wait_ms = ONE_COPY_WAIT_MS}
+	cfg := instance.Config{name = instance.key("inspecteur", platform.user_dir(.Config, "", context.temp_allocator)), identity = process.executable_path(), wait_ms = ONE_COPY_WAIT_MS}
 	outcome, o := instance.acquire(cfg, transmute([]byte)message)
 	switch outcome {
 	case .Forwarded:      return true, {}, false

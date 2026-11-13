@@ -360,8 +360,7 @@ cpu_page :: proc(app: ^App, em: f32) {
 			captioned_graph(app, "cpu_temp", fmt.tprintf("Temperature (%s)", temp_label(&m.temps[0])), {{&m.temp_hist, hue(app, HUE_HEAT), ""}}, TEMP_TOP, celsius_top, em, ui.px(em * SMALL_GRAPH_EM))
 		}
 	}
-	threads: i32
-	for p in app.sampler.procs { threads += p.threads }
+	threads := app.ranking.threads   // (summed at the sample)
 	caches := make([dynamic]Stat, context.temp_allocator)
 	for size, level in m.info.cache {
 		if size > 0 { append(&caches, Stat{fmt.tprintf("L%d cache", level + 1), size_text(size)}) }

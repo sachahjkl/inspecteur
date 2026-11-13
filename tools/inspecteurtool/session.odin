@@ -1,10 +1,11 @@
 package inspecteurtool
 
-// A session nobody sees, for `live`, `shots` and `bench`: a sway with no screen (headless, pixman) in a runtime
-// directory of its own, and inspecteur started in it with its own configuration and data folders (its preferences, its
-// desktop entry when a test installs it), no session bus (but for live's services, see session_start) and the DevTools
-// server on a port. The person's desktop is not touched. (/proc is the machine's: inspecteur lists every process, and
-// only reads them; the tests signal only the processes they start.) The install's dialog is not offered unless a test asks for it.
+// A session nobody sees, for `live`, `shots` and `bench`: the toolkit's sway with no screen (toolbox.sway_start: its
+// own runtime directory and sockets, no session bus), and inspecteur started in it with its own configuration, data and
+// state folders (its preferences, its desktop entry when a test installs it), no session bus (but for live's services,
+// see session_start) and the DevTools server on a port. The person's desktop is not touched. (/proc is the machine's:
+// inspecteur lists every process, and only reads them; the tests signal only the processes they start.) The install's
+// dialog is not offered unless a test asks for it.
 
 import "core:fmt"
 import "core:os"
@@ -17,23 +18,22 @@ SESSION_WAIT :: 8 * time.Second
 // The first connection to the window: on a CI runner a debug build drawn by lavapipe, with fontconfig making its cache,
 // takes longer than any later step, so it gets its own limit.
 WINDOW_START_WAIT :: 60 * time.Second
-// A row that a section's reader thread brings (a service over D-Bus, a socket found by a scan of every process): on a
-// slow runner a reading can take longer than SESSION_WAIT.
+// A row that a section's reader brings (a service over D-Bus, a socket found by a scan of every process): on a slow
+// runner a reading can take longer than SESSION_WAIT.
 READER_WAIT :: 30 * time.Second
 SESSION_POLL :: 50 * time.Millisecond
 // (inspecteur floats at a size of its own, as on a desktop: the pictures have its real proportions)
-SWAY_CONFIG :: "output HEADLESS-1 resolution 1600x1000\nxwayland disable\nfor_window [app_id=\"inspecteur\"] floating enable, resize set 1180 740, move position center\n"
+SWAY_CONFIG :: "for_window [app_id=\"inspecteur\"] floating enable, resize set 1180 740, move position center\n"
 
 Session :: struct {
-	dir:     string,     // absolute: run/, config/, the logs
-	port:    int,        // the window's DevTools port
-	env:     []string,   // inspecteur's
-	sway:    os.Process,
+	sway:    toolbox.Sway,
+	dir:     string,       // the sway's folder (absolute): run/, config/, the logs
+	port:    int,          // the window's DevTools port
+	env:     []string,     // what inspecteur gets over the session's (owned)
 	program: os.Process,
-	up:      bool,       // sway runs (session_stop stops it)
-	output:  string,     // inspecteur's standard output and error (a file)
-	started: time.Time,  // just before inspecteur was started
-	command: []string,   // inspecteur's command line (program_restart)
+	output:  string,       // inspecteur's standard output and error (a file; owned)
+	started: time.Time,    // just before inspecteur was started
+	command: []string,     // inspecteur's command line (program_restart; owned)
 }
 
 // Starts sway and inspecteur in `dir` (made anew) with `args`. `renderer`: sway's (pixman: the CPU, anywhere; vulkan: the
@@ -43,89 +43,47 @@ Session :: struct {
 // `before`: writes what inspecteur reads at its start in the session's folders (live: a desktop entry of its own).
 // `why` says what failed.
 session_start :: proc(s: ^Session, dir: string, port: int, args: []string = nil, renderer := "pixman", user_bus := false, setup := false, own_cache := false, before: proc(dir: string) = nil) -> (why: string) {
-	cwd, _ := os.get_working_directory(context.temp_allocator)
-	s.dir = strings.clone(fmt.tprintf("%s/%s", cwd, dir))
+	// (a Ctrl+C or a timeout's signal stops sway and inspecteur with the tool)
+	toolbox.guard_groups()
 	s.port = port
-	_ = os.remove_all(s.dir)
-	run := fmt.tprintf("%s/run", s.dir)
-	for d in ([]string{run, fmt.tprintf("%s/config/inspecteur", s.dir), fmt.tprintf("%s/data", s.dir)}) {
-		if os.make_directory_all(d) != nil { return fmt.tprintf("%s cannot be made", d) }
-	}
-	_ = os.chmod(run, {.Read_User, .Write_User, .Execute_User})   // (a runtime directory is the user's alone)
+	why = toolbox.sway_start(&s.sway, dir, {config = SWAY_CONFIG, renderer = renderer, homes = true, cache = own_cache})
+	s.dir = s.sway.dir
+	if why != "" { return }
+	prefs_dir := fmt.tprintf("%s/config/inspecteur", s.dir)
+	if err := os.make_directory_all(prefs_dir); err != nil && err != .Exist { return fmt.tprintf("%s cannot be made", prefs_dir) }
 	if before != nil { before(s.dir) }   // (what the test puts in the session's folders before inspecteur reads them)
-	conf := fmt.tprintf("%s/sway.conf", s.dir)
-	_ = os.write_entire_file(conf, SWAY_CONFIG)
 
-	sway_env := toolbox.env_with({"WAYLAND_DISPLAY", "DISPLAY", "DBUS_SESSION_BUS_ADDRESS", "SWAYSOCK"},
-		fmt.tprintf("XDG_RUNTIME_DIR=%s", run), "WLR_BACKENDS=headless", fmt.tprintf("WLR_RENDERER=%s", renderer), "WLR_LIBINPUT_NO_DEVICES=1")
-	log, lerr := os.open(fmt.tprintf("%s/sway.log", s.dir), {.Write, .Create, .Trunc})
-	if lerr != nil { return "the log cannot be written" }
-	// (a group of its own: NixOS's sway is a wrapper, and its real sway and swaybg must end with it)
-	sway, serr := toolbox.start_group({"sway", "--unsupported-gpu", "-c", conf}, sway_env, log)
-	os.close(log)
-	if serr != nil { return "sway does not start (is it on the PATH? nix develop has it)" }
-	s.sway, s.up = sway, true
-	socket := ""
-	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
-	for socket == "" && time.tick_diff(time.tick_now(), deadline) > 0 {
-		if fis, err := os.read_all_directory_by_path(run, context.temp_allocator); err == nil {
-			for fi in fis { if strings.has_prefix(fi.name, "wayland-") && !strings.has_suffix(fi.name, ".lock") { socket = strings.clone(fi.name, context.temp_allocator) } }
-		}
-		if socket == "" { time.sleep(SESSION_POLL) }
-	}
-	if socket == "" { return fmt.tprintf("sway made no Wayland socket (%s/sway.log)", s.dir) }
-
-	// (no XDG_CURRENT_DESKTOP: nothing is the person's desktop's. A cache of
-	// its own only when asked: an empty one makes fontconfig build its cache again at each start, which bench would
-	// count as inspecteur's)
-	env := toolbox.env_with({"WAYLAND_DISPLAY", "DISPLAY", "DBUS_SESSION_BUS_ADDRESS", "XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME", "XDG_CURRENT_DESKTOP"},
-		fmt.tprintf("XDG_RUNTIME_DIR=%s", run), fmt.tprintf("WAYLAND_DISPLAY=%s", socket),
-		fmt.tprintf("XDG_CONFIG_HOME=%s/config", s.dir), fmt.tprintf("XDG_STATE_HOME=%s/state", s.dir),
-		fmt.tprintf("XDG_DATA_HOME=%s/data", s.dir), fmt.tprintf("TOOLKIT_DEVTOOLS=%d", port))
-	bus := user_bus_address()
 	extra := make([dynamic]string, context.temp_allocator)
-	if user_bus && bus != "" { append(&extra, fmt.tprintf("DBUS_SESSION_BUS_ADDRESS=%s", bus)) }
-	// (what the program writes in the cache stays in the session: a dump file)
-	if own_cache { append(&extra, fmt.tprintf("XDG_CACHE_HOME=%s/cache", s.dir)) }
-	s.env = make([]string, len(env) + len(extra))
-	for e, i in env { s.env[i] = strings.clone(e) }
-	for e, i in extra { s.env[len(env) + i] = strings.clone(e) }
+	append(&extra, fmt.tprintf("TOOLKIT_DEVTOOLS=%d", port))
+	if bus := user_bus_address(); user_bus && bus != "" { append(&extra, fmt.tprintf("DBUS_SESSION_BUS_ADDRESS=%s", bus)) }
+	s.env = make([]string, len(extra))
+	for e, i in extra { s.env[i] = strings.clone(e) }
 	s.output = strings.clone(fmt.tprintf("%s/inspecteur.log", s.dir))
-	out, oerr := os.open(s.output, {.Write, .Create, .Trunc})
-	if oerr != nil { return "the log cannot be written" }
 	command := make([dynamic]string, context.temp_allocator)
 	append(&command, PROGRAM)
 	if !setup { append(&command, "--pref", "setup.choice=standalone") }
+	// (a finished act is said in the window: a notification of the system would reach the person's desktop)
+	append(&command, "--pref", "general.messages=window")
 	append(&command, ..args)
 	s.command = make([]string, len(command))
 	for a, i in command { s.command[i] = strings.clone(a) }
 	s.started = time.now()
-	p, err := os.process_start({command = s.command, env = s.env, stdout = out, stderr = out})
-	os.close(out)
-	if err != nil { return fmt.tprintf("%s does not start", PROGRAM) }
-	s.program = p
-	return ""
+	s.program, why = toolbox.sway_program(&s.sway, s.command, s.env, s.output)
+	return
 }
 
 // Closes inspecteur's window (it ends as the person's would) and starts it again in the same session and folders: what
 // it kept is read again. `c` is then the new window's connection. False: it did not end with 0, or did not come back.
+// (The new run's output replaces the first's in s.output.)
 program_restart :: proc(s: ^Session, c: ^cdp.Client) -> bool {
 	_ = cdp.send(c, "Browser.close")
 	cdp.close(c)
-	state, err := os.process_wait(s.program, SESSION_WAIT)
-	if err != nil || !state.exited {
-		_ = os.process_kill(s.program)   // (the process this session started)
-		_, _ = os.process_wait(s.program, SESSION_WAIT)
-		s.program = {}
-		return false
-	}
+	state, ended := toolbox.sway_wait(&s.sway, s.program, SESSION_WAIT)
 	s.program = {}
-	if state.exit_code != 0 { return false }
-	out, oerr := os.open(s.output, {.Write, .Append})
-	if oerr != nil { return false }
-	p, perr := os.process_start({command = s.command, env = s.env, stdout = out, stderr = out})
-	os.close(out)
-	if perr != nil { return false }
+	// (one that did not end is stopped with the session)
+	if !ended || !state.exited || state.exit_code != 0 { return false }
+	p, why := toolbox.sway_program(&s.sway, s.command, s.env, s.output)
+	if why != "" { return false }
 	s.program = p
 	ok: bool
 	c^, ok = window_connect(s)
@@ -141,8 +99,8 @@ user_bus_address :: proc() -> string {
 	return ""
 }
 
-// Ends inspecteur (its window closed over the protocol, killed after SESSION_WAIT) and sway. `exit_code` is
-// inspecteur's (-1: it was killed).
+// Ends inspecteur (its window closed over the protocol; stopped with the session after SESSION_WAIT) and sway.
+// `exit_code` is inspecteur's (-1: it was stopped).
 session_stop :: proc(s: ^Session) -> (exit_code: int) {
 	exit_code = -1
 	if s.program.handle != 0 {
@@ -151,28 +109,20 @@ session_stop :: proc(s: ^Session) -> (exit_code: int) {
 			_ = cdp.send(&c, "Browser.close")
 			cdp.close(&c)
 		}
-		if state, err := os.process_wait(s.program, SESSION_WAIT); err == nil && state.exited {
-			exit_code = state.exit_code
-		} else {
-			_ = os.process_kill(s.program)   // (the process this session started)
-			_, _ = os.process_wait(s.program, SESSION_WAIT)
-		}
+		if state, ended := toolbox.sway_wait(&s.sway, s.program, SESSION_WAIT); ended && state.exited { exit_code = state.exit_code }
 		s.program = {}
 	}
-	if s.up {
-		toolbox.stop_group(s.sway)
-		s.up = false
-	}
+	toolbox.sway_stop(&s.sway)
 	for e in s.env { delete(e) }
 	delete(s.env)
 	for a in s.command { delete(a) }
 	delete(s.command)
-	delete(s.dir)
 	delete(s.output)
+	s^ = {}
 	return
 }
 
-// A connection to the window's DevTools server, tried until SESSION_WAIT.
+// A connection to the window's DevTools server, tried until WINDOW_START_WAIT.
 window_connect :: proc(s: ^Session) -> (c: cdp.Client, ok: bool) {
 	deadline := time.tick_add(time.tick_now(), WINDOW_START_WAIT)
 	for time.tick_diff(time.tick_now(), deadline) > 0 {

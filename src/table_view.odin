@@ -54,25 +54,8 @@ heat_hue :: proc(heat: f32, dark := false) -> ui.Color {
 	f := h - f32(i)
 	angle := HEAT_HUES[i] + (HEAT_HUES[i + 1] - HEAT_HUES[i]) * f
 	values := dark ? HEAT_VALUES_DARK : HEAT_VALUES_LIGHT
-	return hsv_color(angle, dark ? HEAT_SATURATION_DARK : HEAT_SATURATION_LIGHT, values[i] + (values[i + 1] - values[i]) * f)
-}
-
-// A colour of a hue (degrees), a saturation and a value in sRGB, as a linear colour.
-hsv_color :: proc(hue, sat, value: f32) -> ui.Color {
-	h := math.mod(hue, 360) / 60
-	c := value * sat
-	x := c * (1 - abs(math.mod(h, 2) - 1))
-	r, g, b: f32
-	switch {
-	case h < 1: r, g, b = c, x, 0
-	case h < 2: r, g, b = x, c, 0
-	case h < 3: r, g, b = 0, c, x
-	case h < 4: r, g, b = 0, x, c
-	case h < 5: r, g, b = x, 0, c
-	case:       r, g, b = c, 0, x
-	}
-	m := value - c
-	return draw.srgb(r + m, g + m, b + m, 1)
+	c := ui.hsv_to_srgb(math.mod(angle, 360) / 360, dark ? HEAT_SATURATION_DARK : HEAT_SATURATION_LIGHT, values[i] + (values[i + 1] - values[i]) * f)
+	return draw.srgb(c.r, c.g, c.b, 1)
 }
 
 // A row that comes flashes green and fades in BORN_FLASH_NS; one whose process ended is red, fading out until the sampler
@@ -106,21 +89,14 @@ row_tint :: proc(app: ^App, r: Row, now: i64) -> (tint: Maybe(ui.Color)) {
 // `heat` (1: red) over the page `page`.
 heat_colors :: proc(heat: f32, page: ui.Color) -> (bg, fg, border: ui.Color) {
 	h := clamp(heat, 0, 1)
-	dark := luminance(page) < HEAT_DARK_PAGE
+	dark := ui.luminance(page) < HEAT_DARK_PAGE
 	hue := heat_hue(h, dark)
 	least := dark ? HEAT_MIX_MIN_DARK : HEAT_MIX_MIN_LIGHT
-	bg = lerp_color(page, hue, least + (HEAT_MIX_MAX - least) * h)
+	bg = page + (hue - page) * (least + (HEAT_MIX_MAX - least) * h)
 	bg.a = 1
-	fg = luminance(bg) > HEAT_TEXT_LUMINANCE ? HEAT_TEXT_DARK : HEAT_TEXT_LIGHT
+	fg = ui.luminance(bg) > HEAT_TEXT_LUMINANCE ? HEAT_TEXT_DARK : HEAT_TEXT_LIGHT
 	border = {bg.r * HEAT_BORDER_SHADE, bg.g * HEAT_BORDER_SHADE, bg.b * HEAT_BORDER_SHADE, 1}
 	return
-}
-
-// The relative luminance of a linear colour.
-luminance :: proc(c: ui.Color) -> f32 { return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b }
-
-lerp_color :: proc(a, b: ui.Color, t: f32) -> ui.Color {
-	return {a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t, a.a + (b.a - a.a) * t}
 }
 
 build_processes :: proc(app: ^App, em: f32) {
@@ -172,26 +148,21 @@ build_bar :: proc(app: ^App, em: f32) {
 			counts := fmt.tprintf("%s, %s", count_text(app.table.shown_apps, "app", "apps"), count_text(app.table.shown_background, "background process", "background processes"))
 			if app.table.tree { counts = fmt.tprintf("%s, as a tree", count_text(app.table.shown_tree, "process", "processes")) }
 			ui.next({width = ui.fill(), height = ui.pct(1)})
-			label_tip(fmt.tprintf("%s###counts", counts), counts)
+			ui.label_tip(fmt.tprintf("%s###counts", ui.text_shown(counts)))
 		}
 	}
 }
 
-// A flat button with an icon of Lucide; its tooltip says what it does and its key. A button that cannot act now is
-// greyed (its tooltip still says what it would do).
-tool_button :: proc(app: ^App, id, icon, tip: string, enabled: bool, em: f32) -> bool {
-	sig: ui.Signal
-	if ui.disabled(!enabled) {
-		ui.next({width = ui.px(em * 2.2), height = ui.px(ui.dense(em * 2)), font = app.icons})
-		if ui.tags("ghost_button") { sig = ui.button(fmt.tprintf("%s###%s", icon, id)) }
-	}
-	tip_after(sig, tip)
-	return sig.clicked && enabled
+// A button of a toolbar: the toolkit's icon button (a ghost, its tooltip saying what it does and its key) at the bars'
+// size. A button that cannot act now is greyed (its tooltip still says what it would do).
+tool_button :: proc(id, icon, tip: string, enabled: bool, em: f32) -> bool {
+	ui.next({width = ui.px(em * 2.2), height = ui.px(ui.dense(em * 2))})
+	return ui.icon_button(id, icon, tip = tip, disabled = !enabled).clicked && enabled
 }
 
 // The button of a command: greyed when it cannot act; clicked, it runs.
 cmd_button :: proc(app: ^App, id, icon: string, c: Cmd, em: f32) {
-	if tool_button(app, id, icon, cmd_tip(c), cmd_can(app, c), em) { cmd_run(app, c) }
+	if tool_button(id, icon, cmd_tip(c), cmd_can(app, c), em) { cmd_run(app, c) }
 }
 
 // The columns' titles (the toolkit's header: a click sorts, again reverses, a third gives none; a title dragged sideways
@@ -371,7 +342,7 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 		if ic.ok {
 			icon_box(ic, em * ICON_EM, app.icons)
 		} else if ui.tags("weak") {
-			glyph(app, r.kind == .App ? lucide.APP_WINDOW : lucide.SQUARE_TERMINAL, em * ICON_EM)
+			ui.icon(r.kind == .App ? lucide.APP_WINDOW : lucide.SQUARE_TERMINAL, em * ICON_EM)
 		}
 		ui.spacer(ui.px(em * 0.5))
 		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
@@ -385,11 +356,8 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 		// its app's window, a click away (an app's row, or a process of an app with a window)
 		if list := windows_of(app, row_entry(app, r)); len(list) > 0 {
 			ui.spacer(ui.px(em * 0.3))
-			ui.next({width = ui.px(em * 1.6), height = ui.px(em * 1.4), font = app.icons, font_size = em * 0.9, text_pad = 0, text_align = .Center})
-			sig: ui.Signal
-			if ui.tags("ghost_button") { sig = ui.button(fmt.tprintf("%s###win", lucide.APP_WINDOW)) }
-			if sig.clicked { window_show(app, row_entry(app, r)) }
-			tip_after(sig, fmt.tprintf("%s (%s)", window_tip(list), ui.command_shortcut(COMMANDS[.Show_Window])))
+			ui.next({width = ui.px(em * 1.6), height = ui.px(em * 1.4), font_size = em * 0.9, text_pad = 0})
+			if ui.icon_button("win", lucide.APP_WINDOW, tip = fmt.tprintf("%s (%s)", window_tip(list), ui.command_shortcut(COMMANDS[.Show_Window]))).clicked { window_show(app, row_entry(app, r)) }
 		}
 		ui.spacer(ui.fill())
 	}
@@ -430,7 +398,7 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 @(private = "file")
 cpu_graph_cell :: proc(app: ^App, r: Row, page: ui.Color, em: f32) -> (tip: string) {
 	d := ui.frame_new(Cpu_Graph_Draw)
-	d.dark = luminance(page) < HEAT_DARK_PAGE
+	d.dark = ui.luminance(page) < HEAT_DARK_PAGE
 	d.scale = ui.scale()
 	buf: [CPU_GRAPH_POINTS]f32
 	#partial switch r.kind {
@@ -452,8 +420,7 @@ cpu_graph_cell :: proc(app: ^App, r: Row, page: ui.Color, em: f32) -> (tip: stri
 	w := app.table.layout.width[int(Column.CPU_Graph)]
 	ui.next({width = w == 0 ? ui.fill() : ui.px(em * w), height = ui.pct(1)})
 	box := ui.custom(fmt.tprintf("###c%d", int(Column.CPU_Graph)), cpu_graph_draw, d, {.Clip})
-	m := ui.mouse_pos()
-	if d.count > 0 && m.x >= box.rect.min.x && m.x < box.rect.max.x && m.y >= box.rect.min.y && m.y < box.rect.max.y {
+	if d.count > 0 && ui.pointer_on(box) {
 		sum, top: f32
 		for v in d.values[:d.count] { sum += v; top = max(top, v) }
 		tip = fmt.tprintf("CPU over the last %s: %.1f%% on average, %.1f%% at most", span_text(d.count, app.settings.refresh_ms), sum / f32(d.count), top)
@@ -499,10 +466,6 @@ cpu_graph_draw :: proc(b: ^ui.Box, user: rawptr, dc: ^draw.Context) {
 // When a process started (unix seconds): its time today, else its date and time (local time).
 started_text :: proc(app: ^App, started: i64) -> string {
 	if started <= 0 { return "" }
-	if !app.tz_tried {
-		app.tz_tried = true
-		app.tz, _ = timezone.region_load("local")
-	}
 	at := time.unix(started, 0)
 	when_dt, ok := time.time_to_datetime(at)
 	now_dt, nok := time.time_to_datetime(time.now())

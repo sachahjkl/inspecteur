@@ -8,6 +8,7 @@ import "core:fmt"
 import "core:os"
 import "core:strings"
 import "core:time"
+import "gt:platform"
 import process "gt:process"
 
 // What the confirmation says of how the dump is written.
@@ -18,9 +19,7 @@ process_dump :: proc(pid: i32, start: u64, name: string) -> (path: string, why: 
 	gcore := program_in_path("gcore")
 	if gcore == "" { return "", "gcore is not installed: it comes with gdb" }
 	if s, ok := process.process_start_time(pid); !ok || s != start { return "", "the process has ended" }
-	cache := os.get_env("XDG_CACHE_HOME", context.temp_allocator)
-	if cache == "" { cache = fmt.tprintf("%s/.cache", os.get_env("HOME", context.temp_allocator)) }
-	dir := fmt.tprintf("%s/inspecteur/dumps", cache)
+	dir := fmt.tprintf("%s/dumps", platform.user_dir(.Cache, APP_NAME, context.temp_allocator))
 	_ = os.make_directory_all(dir)
 	y, mo, d := time.date(time.now())
 	h, mi, sec := time.clock_from_time(time.now())

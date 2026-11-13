@@ -1,15 +1,17 @@
 package inspecteur
 
 // The Connections section's model: the TCP and UDP sockets of the machine, IPv4 and IPv6, each with the process that
-// holds it when the user may know it. The reading is the system's (connections_linux.odin: sockets_read); it runs on a
-// thread of its own (the toolkit's ui.Worker), and only while the section is shown: telling each socket's process costs some
-// milliseconds.
+// holds it when the user may know it. The reading is the system's (connections_linux.odin: sockets_read); it runs in a
+// tasks.Job on the toolkit's chores, whose reading comes back to the window by ui.post, and only while the section is
+// shown: telling each socket's process costs some milliseconds.
 
 import "core:net"
+import "core:slice"
 import "core:strconv"
 import "core:strings"
 import "core:time"
 import lucide "gt:lucide"
+import tasks "gt:tasks"
 import "gt:ui"
 
 Proto :: enum u8 { TCP, UDP }
@@ -41,11 +43,14 @@ Socket :: struct {
 }
 
 Connections :: struct {
-	worker:  ui.Worker,
-	reader:  Socket_Reader,     // the thread's own (connections_linux.odin)
+	job:     tasks.Job,
+	reader:  Socket_Reader,     // the job's own (connections_linux.odin)
 	demo:    ^Demo,             // not nil: the sockets are the demo's
-	shared:  [dynamic]Socket,   // the thread's last reading, under the worker's mutex
-	sockets: [dynamic]Socket,   // the window's copy
+	state:   ^ui.State,         // the window a reading is posted to
+	sockets: [dynamic]Socket,   // the window's
+	// what Mission Control says of them, counted when a reading comes (connections_posted)
+	listening, connected: int,
+	holders: [dynamic]Socket_Holder,   // the processes that hold sockets, the most first
 	rows:    Section_Table,
 	read:    bool,              // a reading came at least once
 	menu:    ui.Key,
@@ -65,39 +70,64 @@ connections_init :: proc(c: ^Connections, app: ^App) {
 	section_table_init(&c.rows, app, CONN_COLUMNS[:])
 	section_layout_load(&c.rows.table, &app.prefs, "connections")
 	c.demo = app.demo
-	ui.worker_start(&c.worker, connections_job, c, app.main.win)
+	c.state = &app.main.state
+	c.job = {work = connections_work, data = c}
 }
 
+// After the chores stopped (no reading runs).
 connections_destroy :: proc(c: ^Connections) {
-	ui.worker_stop(&c.worker)
 	socket_reader_destroy(&c.reader)
-	delete(c.shared)
 	delete(c.sockets)
+	delete(c.holders)
 	section_table_destroy(&c.rows)
 }
 
 @(private = "file")
-connections_job :: proc(w: ^ui.Worker) {
-	c := (^Connections)(w.user)
-	list := make([dynamic]Socket, context.temp_allocator)
-	if c.demo != nil { demo_sockets_read(c.demo, &list) } else { sockets_read(&c.reader, &list) }
-	ui.worker_lock(w)
-	clear(&c.shared)
-	append(&c.shared, ..list[:])
-	ui.worker_unlock(w)
-	ui.worker_published(w)
+connections_work :: proc(data: rawptr) {
+	c := (^Connections)(data)
+	list := new([dynamic]Socket)
+	if c.demo != nil { demo_sockets_read(c.demo, list) } else { sockets_read(&c.reader, list) }
+	if !ui.post(c.state, connections_posted, list) {
+		delete(list^)
+		free(list)
+	}
 }
 
-// The window's turn: a new reading becomes the rows.
-connections_take :: proc(app: ^App) {
-	c := &app.connections
-	if !ui.worker_take(&c.worker) { return }
-	ui.worker_lock(&c.worker)
-	clear(&c.sockets)
-	append(&c.sockets, ..c.shared[:])
-	ui.worker_unlock(&c.worker)
+// On the window's thread: a new reading becomes the rows.
+@(private = "file")
+connections_posted :: proc(data: rawptr, _: u64) {
+	list := (^[dynamic]Socket)(data)
+	defer free(list)
+	if the_app == nil { delete(list^); return }
+	c := &the_app.connections
+	delete(c.sockets)
+	c.sockets = list^
 	c.read = true
-	connections_rows(app)
+	connections_count(c)
+	connections_rows(the_app)
+}
+
+// A process and how many sockets it holds.
+Socket_Holder :: struct { pid: i32, start: u64, n: int }
+
+// The sockets that listen, those connected, and their holders, the most first.
+@(private = "file")
+connections_count :: proc(c: ^Connections) {
+	c.listening, c.connected = 0, 0
+	clear(&c.holders)
+	at := make(map[i32]int, 16, context.temp_allocator)
+	for so in c.sockets {
+		if so.state == .Listening { c.listening += 1 } else if so.state == .Established { c.connected += 1 }
+		if so.pid <= 0 { continue }
+		i, seen := at[so.pid]
+		if !seen {
+			i = len(c.holders)
+			at[so.pid] = i
+			append(&c.holders, Socket_Holder{pid = so.pid, start = so.start})
+		}
+		c.holders[i].n += 1
+	}
+	slice.sort_by(c.holders[:], proc(a, b: Socket_Holder) -> bool { return a.n > b.n })
 }
 
 // The rows again from the sockets.
@@ -184,13 +214,13 @@ connections_shown :: proc(app: ^App) -> bool {
 
 // A reading now (the section shown, F5), the next one a period later.
 connections_ask :: proc(app: ^App) {
-	ui.worker_ask(&app.connections.worker)
+	tasks.ask(ui.chores(), &app.connections.job)
 	app.connections.next = time.tick_add(time.tick_now(), time.Duration(app.settings.connections_ms) * time.Millisecond)
 }
 
 // Each turn of the loop (not while the refresh is paused): a reading when one is due and they are shown.
 connections_tick :: proc(app: ^App) {
-	if !connections_shown(app) || ui.worker_busy(&app.connections.worker) { return }
+	if !connections_shown(app) || tasks.busy(ui.chores(), &app.connections.job) { return }
 	if time.tick_diff(app.connections.next, time.tick_now()) >= 0 { connections_ask(app) }
 }
 

@@ -122,9 +122,9 @@ Net :: struct {
 	rx_hist, tx_hist: History,
 }
 
+// The window's machine. The system's counters are read off its thread (sample.odin); a reading becomes these
+// (machine_apply).
 Machine :: struct {
-	reader:     Machine_Reader,    // the system's (machine_linux.odin)
-	demo:       ^Demo,             // not nil: the machine is the demo's (demo.odin)
 	// the CPU
 	total_ns, idle_ns: u64,        // all processors' time at the last sample
 	d_total_ns: u64,               // since the sample before (the processes' CPU % is their share of it)
@@ -165,16 +165,10 @@ Machine :: struct {
 	samples:    int,
 }
 
-machine_init :: proc(m: ^Machine, demo: ^Demo) {
-	m.demo = demo
-	if demo == nil { machine_reader_init(&m.reader) }
-	devices_list(m)
-	gpu_start(&m.gpu, demo)
-}
+machine_init :: proc(m: ^Machine, demo: ^Demo) { gpu_start(&m.gpu, demo) }
 
 machine_destroy :: proc(m: ^Machine) {
 	gpu_stop(&m.gpu)
-	if m.demo == nil { machine_reader_destroy(&m.reader) }
 	delete(m.core_total)
 	delete(m.core_idle)
 	delete(m.core_cpu)
@@ -209,25 +203,26 @@ net_free :: proc(n: ^Net) {
 
 mem_used :: proc(m: ^Machine) -> u64 { return m.mem.total - min(m.mem.available, m.mem.total) }
 
-// Reads the machine again. `cpu_shown`: the CPU's page is on the screen (its frequency is read, its details once).
-// `history`: the sample is one of the period's, which the graphs get a point of (not one made sooner, after a signal).
-machine_sample :: proc(m: ^Machine, now_ns: i64, cpu_shown: bool, history := true) {
-	dt := m.last_ns > 0 ? f64(now_ns - m.last_ns) / 1e9 : 0
-	m.last_ns = now_ns
+// The machine of a reading (sample.odin): its devices when they were listed, its counters, the CPU's details and
+// frequencies when they were read. The reading's `ask.history`: the sample is one of the period's, which the graphs get a
+// point of (not one made sooner, after a signal).
+machine_apply :: proc(m: ^Machine, r: ^Reading) {
+	dt := m.last_ns > 0 ? f64(r.now_ns - m.last_ns) / 1e9 : 0
+	m.last_ns = r.now_ns
 	m.samples += 1
-	if m.samples % DEVICES_EVERY == 0 { devices_list(m) }
-	c: Machine_Counters
-	if m.demo != nil { demo_machine_read(m.demo, now_ns, &c) } else { machine_read(&m.reader, &c) }
-	machine_take(m, c, dt, history)
-	gpus_sample(m, history)
-	if cpu_shown {
-		if !m.info_read {
-			m.info_read = true
-			m.info = m.demo != nil ? demo_cpu_info() : cpu_info_read()
-			if m.info.logical == 0 { m.info.logical = len(m.core_total) }
-		}
-		resize(&m.core_mhz, len(m.core_total))
-		m.mhz = m.demo != nil ? demo_cpu_mhz(m.demo, m.core_mhz[:]) : cpu_mhz_now(m.core_mhz[:])
+	if r.listed { devices_merge(m, r.disks[:], r.nets[:]) }
+	machine_take(m, r.machine, dt, r.ask.history)
+	gpus_sample(m, r.ask.history)
+	if r.info_read {
+		delete(m.info.model)
+		m.info, m.info_read = r.info, true
+		r.info.model = ""   // (the machine's now)
+		if m.info.logical == 0 { m.info.logical = len(m.core_total) }
+	}
+	if r.mhz_read {
+		resize(&m.core_mhz, len(r.core_mhz))
+		copy(m.core_mhz[:], r.core_mhz[:])
+		m.mhz = r.mhz
 	}
 }
 
@@ -312,13 +307,6 @@ busy_percent :: proc(total0, idle0, total1, idle1: u64) -> f32 {
 }
 
 // The disks and the interfaces listed again: those listed before keep their history and their counters.
-devices_list :: proc(m: ^Machine) {
-	disks := make([dynamic]Disk_Info, context.temp_allocator)
-	nets := make([dynamic]Net_Info, context.temp_allocator)
-	if m.demo != nil { demo_devices(m.demo, &disks, &nets) } else { disks_list(&disks); nets_list(&nets) }
-	devices_merge(m, disks[:], nets[:])
-}
-
 devices_merge :: proc(m: ^Machine, disks: []Disk_Info, nets: []Net_Info) {
 	for &d in m.disks { d.listed = false }
 	for info in disks {

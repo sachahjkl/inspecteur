@@ -5,6 +5,7 @@ package inspecteur
 // the window is built again. Between two samples, with no input, nothing runs.
 
 import "core:fmt"
+import "core:log"
 import "core:strings"
 import "core:time"
 import "core:time/datetime"
@@ -48,9 +49,12 @@ App :: struct {
 	theme_shown: ui.Theme_Shown,
 
 	demo:        ^Demo,             // not nil: every reading is the demo's (--demo: the pictures of the documentation)
+	own_pid:     i32,               // Inspecteur's (the first reading's, as the two below)
 	display_server: i32,            // the pid of the compositor that shows the window (session_linux.odin), 0: unknown
 	own_units:   []string,          // the units Inspecteur runs in, the outermost first (session_linux.odin; owned)
+	sampling:    Sampling,          // the readings of the machine and the processes, off the window's thread (sample.odin)
 	sampler:     Sampler,
+	ranking:     Ranking,           // the busiest processes, made at each sample (diagnosis.odin)
 	machine:     Machine,           // the CPU, the memory, the disks, the network, the GPUs (machine.odin, gpu.odin)
 	catalog:     Catalog,
 	app_icons:   map[string]Icon,   // the apps' icons by name (apps.odin)
@@ -86,12 +90,13 @@ App :: struct {
 	update_serial: int,             // the updater's state last said
 	installed_copy: bool,           // this copy is the installed one: it updates itself (update.auto)
 	restart:     bool,              // at the end, the new program starts (an update in place)
+	closing:     bool,              // the window closed: what the chores posted is freed, not shown
 	journal_windows: [dynamic]^Journal_Window,   // the journals in windows of their own (journal_window.odin)
+	journals_closed: [dynamic]^Journal_Window,   // closed, freed once their reading is done
 	mission_windows: [dynamic]^Mission_Window,   // Mission Control's panels in windows of their own (mission_window.odin)
 	windows:     [dynamic]App_Window,   // the apps' windows, read at each sample (window_list.odin)
 	one_copy:    ^instance.Server,  // the name of the one Inspecteur that runs, served (one_copy.odin)
-	tz:          ^datetime.TZ_Region,   // local time, for the processes' start (loaded when first needed)
-	tz_tried:    bool,
+	tz:          ^datetime.TZ_Region,   // local time, for the processes' start (the first reading's; nil: UTC)
 	search:      ui.Text_Field,
 	search_key:  ui.Key,
 	vl:          ui.Virtual_List,   // the rows (vl.sel: the selected row)
@@ -100,8 +105,9 @@ App :: struct {
 	sample_extra: bool,             // the next sample comes sooner than the period (after an action): no point of the graphs
 	props:       Props,             // the Properties dialog (props.odin, props_view.odin)
 	affinity:    Affinity,          // the affinity dialog (affinity_view.odin)
-	dump:        Dump,              // a dump file written on a thread of its own (dump.odin)
+	dump:        Dump,              // a dump file written by a task of the chores (dump.odin)
 	props_lists: [Props_Tab]ui.Virtual_List,
+	announcer:   ui.Announcer,      // what a finished act says (copied)
 	status:      string,            // a message for the status bar (owned), until status_until (ui clock, ms)
 	status_until: f64,
 	// what the samples and the frames cost (--first-frame prints it at the end: the tools measure the program)
@@ -117,6 +123,7 @@ Run_Options :: struct {
 	setup:       bool,   // --setup: the install's dialog open
 	owner:       instance.Owner,   // the one Inspecteur's name, this start's (one_copy_acquire)
 	owns:        bool,
+	last_crash:  string,   // the report of the last run, which crashed or was killed ("": it ended cleanly)
 }
 
 // The App of the process (a call posted from another thread finds it).
@@ -134,19 +141,14 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	if opts.demo {
 		demo_init(&demo)
 		app.demo = &demo
-		app.props.demo = &demo
 	}
 	defer if opts.demo { demo_destroy(&demo) }
 
-	// the processes before the window: its first frame shows them
+	// the processes are read while the window opens: its first frame shows them (sampling_attach)
 	t_main := time.tick_now()
-	if !sampler_init(&app.sampler, app.demo) {
-		fmt.eprintln("inspecteur: the processes cannot be read (/proc)")
-		return 1
-	}
-	if app.demo != nil { demo_catalog(&app.catalog) } else { catalog_load(&app.catalog) }
 	machine_init(&app.machine, app.demo)
-	if app.demo != nil { demo_preroll(app.demo, &app.machine, &app.sampler, &app.catalog, time.tick_now()._nsec) }
+	sampling_init(&app.sampling, app.demo)
+	if app.demo != nil { demo_preroll(app.demo, app, time.tick_now()._nsec) }
 	table_layout_load(&app.table, app.settings)
 	app.table.tree = app.settings.tree
 	pins_load(&app.table, app.settings.pinned)
@@ -154,18 +156,25 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	app.vl.multi = true   // (Ctrl and Shift clicks, Ctrl+A: End task and Kill act on every row marked)
 	app.tab = opts.tab
 	app.cpu_grid = config.string_of(&app.prefs, "performance.cpu_view") == "logical"
-	refresh(app)
+	sample_ask(app)
 
 	t_read := time.tick_now()
 	platform.set_app_id(APP_NAME)
 	if !host.host_open(&app.main, &app.shared, {title = "Inspecteur", size = WINDOW_SIZE, integrated_title = !app.settings.system_title}, view_build, app) {
-		fmt.eprintln("inspecteur: no window")
+		log.error("no window")
 		return 1
 	}
 	// (from here the program ends through the loop's end, which stops the writer)
 	config.user_writer_start(&app.prefs_writer, &app.prefs, prefs_file())
 	h := &app.main
 	win := h.win
+	app.announcer.window = win
+	app.announcer.state = &app.main.state   // (a command runs between builds too: its toast goes to this window)
+	if opts.last_crash != "" {
+		log.warnf("the last run ended without its clean end: %s", opts.last_crash)
+		ui.announce(&app.announcer, .Bad, "Inspecteur ended without warning last time", fmt.tprintf("Its report: %s", opts.last_crash))
+	}
+	sampling_attach(app, &h.state)
 	app.icons, _ = font.load_embedded(&app.shared.fonts, lucide.DATA)
 	if img, ok := platform.clipboard_image_decode("image/png", identity.ICONS[4].png, context.temp_allocator); ok {
 		app.logo.tex = render.create_texture_rgba(&app.shared.r, img.size.x, img.size.y)
@@ -180,19 +189,14 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	h.params = app_params
 	app.devtools = devtools.start_from_env(win, "inspecteur")
 	h.before_input = proc(h: ^host.Host) { app := (^App)(h.user); devtools.service(app.devtools, &h.state, &app.shared.r) }
-	if app.demo == nil {
-		app.display_server = display_server_pid()
-		app.own_units = own_units()
-	}
 	connections_init(&app.connections, app)
 	information_init(&app.information, app)
 	services_init(&app.services, app)
 	startup_init(&app.startup, app)
-	dump_init(&app.dump, app)
 	mission_init(app)
 	section_first_show(app)
-	if opts.setup { setup_open(app) } else { setup_offer(app) }
-	updates_start(app)
+	if opts.setup { setup_open(app) }
+	setup_offer(app, offer = !opts.setup)   // (and then the updates)
 	if opts.owns { one_copy_serve(app, opts.owner) }
 
 	t_window := time.tick_now()
@@ -208,12 +212,11 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	}
 	for !platform.is_closed(win) {
 		windows_wait(app)
-		if !app.paused && !app.held && time.tick_diff(app.next_sample, time.tick_now()) >= 0 { refresh(app) }
+		if !app.paused && !app.held && time.tick_diff(app.next_sample, time.tick_now()) >= 0 { sample_ask(app) }
 		if !app.paused && !app.held {
 			services_tick(app)
 			connections_tick(app)
 		}
-		sections_take(app)
 		updates_follow(app)
 		t_frame := time.tick_now()
 		host.host_frame(h)
@@ -232,7 +235,12 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 		fmt.printfln("costs: %d samples, %.2f ms each; %d frames, %.2f ms each", app.refreshes, mean(app.refresh_time, app.refreshes), app.frames, mean(app.frame_time, app.frames))
 	}
 	if app.demo == nil { pref_set(&app.prefs, "view.placement", platform.placement_text(platform.get_placement(win))) }
-	if !config.user_writer_stop(&app.prefs_writer, &app.prefs) { fmt.eprintln("inspecteur: the preferences cannot be written") }
+	if !config.user_writer_stop(&app.prefs_writer, &app.prefs) { log.error("the preferences cannot be written") }
+	// (what the chores still run ends first: their work reads and writes what is freed below; what they posted is taken,
+	// so that it is freed with the rest)
+	app.closing = true
+	ui.chores_stop()
+	ui.drain_posts(&h.state)
 	devtools.stop(app.devtools)
 	one_copy_stop(app)
 	journal_windows_close(app)
@@ -246,7 +254,6 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	information_destroy(&app.information)
 	services_destroy(&app.services)
 	startup_destroy(&app.startup)
-	dump_destroy(&app.dump)
 	delete(app.query)
 	icons_destroy(&app.app_icons, &app.shared.r)
 	if app.logo.ok { render.destroy_texture(&app.shared.r, app.logo.tex) }
@@ -257,6 +264,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	table_destroy(&app.table)
 	catalog_destroy(&app.catalog)
 	sampler_destroy(&app.sampler)
+	ranking_destroy(&app.ranking)
+	sampling_destroy(&app.sampling)
 	machine_destroy(&app.machine)
 	if app.tz != nil { timezone.region_destroy(app.tz) }
 	delete(app.status)
@@ -269,35 +278,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	settings_free(&app.settings)
 	config.prefs_destroy(&app.prefs)
 	// (an update in place: the new program, once this one has let go of the window)
-	if app.restart && !setup.launch(process.executable_path(), nil) { fmt.eprintln("inspecteur: the new program does not start") }
+	if app.restart && !setup.launch(process.executable_path(), nil) { log.error("the new program does not start") }
 	return 0
-}
-
-// A new sample, its groups and its rows; the next one is due a period later.
-refresh :: proc(app: ^App) {
-	now := time.tick_now()
-	// (a sample sooner than the period, after an action, gives the graphs no point: their span stays the period's)
-	history := !app.sample_extra
-	machine_sample(&app.machine, now._nsec, app.tab == .Performance && app.device.kind == .Cpu, history = history)
-	app.sample_extra = false
-	sample(&app.sampler, now._nsec, app.machine.d_total_ns, &app.catalog, history)
-	gpu := gpu_procs(&app.machine)
-	for &p in app.sampler.procs {
-		use := gpu[p.pid]
-		p.gpu_mem, p.gpu = use.bytes, use.util
-	}
-	// (the GPUs' numbers are read while they are shown: a GPU that may sleep is let go otherwise. The summary's tile does
-	// not ask for them: it would keep a laptop's GPU awake whenever Processes is shown; a GPU that is always on is read
-	// anyway)
-	gpu_want(&app.machine.gpu, app.tab == .Performance || app.table.layout.shown[int(Column.GPU_Memory)] || app.table.layout.shown[int(Column.GPU)])
-	table_group(&app.table, app.sampler.procs[:])
-	app_windows_read(app)
-	rows_again(app)
-	app.next_sample = time.tick_add(now, time.Duration(app.settings.refresh_ms) * time.Millisecond)
-	if app.props.open { props_tick(&app.props, find_proc(&app.sampler, app.props.pid, app.props.start) != nil) }
-	app.refresh_time += time.tick_since(now)
-	app.refreshes += 1
-	app.main.settle = max(app.main.settle, 1)
 }
 
 // The rows again (a sample, a sort, the filter, a group opened), the same process selected when it is still shown.
@@ -314,7 +296,7 @@ rows_again :: proc(app: ^App) {
 	}
 }
 
-// Shows a section; one that reads on a thread of its own is read now.
+// Shows a section; one that reads off the window's thread is read now.
 tab_show :: proc(app: ^App, tab: Tab) {
 	if app.tab == tab { return }
 	app.tab = tab
@@ -337,23 +319,13 @@ section_first_show :: proc(app: ^App) {
 
 // F5: the processes and the section shown, read again now.
 refresh_now :: proc(app: ^App) {
-	refresh(app)
+	sample_ask(app)
 	#partial switch app.tab {
 	case .Information: information_ask(&app.information)
 	case .Services:    services_ask(app)
 	case .Startup:     startup_ask(app)
 	}
 	say(app, "Read again")
-}
-
-// What the sections' threads have published since the last frame becomes their rows.
-sections_take :: proc(app: ^App) {
-	connections_take(app)
-	information_take(&app.information)
-	services_take(app)
-	details_take(app)
-	startup_take(app)
-	dump_take(app)
 }
 
 selected_id :: proc(app: ^App) -> u64 {
@@ -377,9 +349,10 @@ row_process :: proc(app: ^App, r: Row) -> (p: ^Proc, ok: bool) {
 	return
 }
 
-// The milliseconds until the next sample (at least 1; max(int) while the refresh is paused or Ctrl is held).
+// The milliseconds until the next sample (at least 1; max(int) while the refresh is paused or Ctrl is held, or while a
+// reading is under way: it wakes the window when it is in).
 until_sample :: proc(app: ^App) -> int {
-	if app.paused || app.held { return max(int) }   // (Ctrl's release wakes the window)
+	if app.paused || app.held || app.sampling.asked { return max(int) }   // (Ctrl's release wakes the window)
 	return max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), app.next_sample))) + 1, 1)
 }
 
@@ -396,6 +369,14 @@ window_params :: proc(h: ^host.Host, bp: ^ui.Build_Params, app: ^App) {
 	bp.inactive = !h.win.active
 	// (the toolkit's zoom: Ctrl+wheel, Ctrl+=, Ctrl+-, Ctrl+0; zoom_follow keeps it)
 	bp.base = ui.Style{pref = {.X = ui.text_size(), .Y = ui.px(26)}, font = app.shared.font, font_size = app.settings.font_size, text_pad = 6, cursor = .Arrow}
+}
+
+// Says that something was copied (a finished act): the toolkit's announcement, where general.messages says (the
+// system's notifications by default, a toast of the window where the system shows none). What is under way stays in
+// the status bar (say).
+copied :: proc(app: ^App, title: string, body := "") {
+	app.announcer.mode = prefs_page.messages_mode(&app.prefs)
+	ui.announce(&app.announcer, .Good, title, body)
 }
 
 // Shows a message in the status bar for a few seconds.

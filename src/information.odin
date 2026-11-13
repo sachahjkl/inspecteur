@@ -1,12 +1,13 @@
 package inspecteur
 
 // The Information section's model: what the system is. What does not change while the program runs (the system, the
-// computer, the processor, the GPUs, the file systems, the screens, the batteries) is read on a thread of its own
+// computer, the processor, the GPUs, the file systems, the screens, the batteries) is read in a job of the chores
 // (information_linux.odin: info_read) when the section is first shown, and again on F5: a file system on a network that
 // does not answer must not stop the window. What changes (the uptime, the memory, the network's addresses) comes from the
 // last sample of Performance (machine.odin) when the section is built.
 
 import "core:mem/virtual"
+import tasks "gt:tasks"
 import "gt:ui"
 
 Info_Gpu :: struct { name, vendor, ids, driver, slot: string, named: bool }   // named: the device's own name is known
@@ -28,21 +29,21 @@ Info_Static :: struct {
 }
 
 Information :: struct {
-	worker: ui.Worker,
+	job:    tasks.Job,
 	demo:   ^Demo,          // not nil: the system is the demo's
-	shared: ^Info_Static,   // the thread's last reading, under the worker's mutex (taken by the window)
+	state:  ^ui.State,      // the window a reading is posted to
 	data:   ^Info_Static,   // the window's
 	asked:  bool,
 }
 
 information_init :: proc(inf: ^Information, app: ^App) {
 	inf.demo = app.demo
-	ui.worker_start(&inf.worker, information_job, inf, app.main.win)
+	inf.state = &app.main.state
+	inf.job = {work = information_work, data = inf}
 }
 
+// After the chores stopped (no reading runs).
 information_destroy :: proc(inf: ^Information) {
-	ui.worker_stop(&inf.worker)
-	info_free(inf.shared)
 	info_free(inf.data)
 }
 
@@ -56,30 +57,30 @@ info_free :: proc(s: ^Info_Static) {
 // Asks for a reading (the first time the section is shown, and on F5).
 information_ask :: proc(inf: ^Information) {
 	inf.asked = true
-	ui.worker_ask(&inf.worker)
+	tasks.ask(ui.chores(), &inf.job)
 }
 
-// The window's turn: a new reading replaces the last.
-information_take :: proc(inf: ^Information) {
-	if !ui.worker_take(&inf.worker) { return }
-	ui.worker_lock(&inf.worker)
-	old := inf.data
-	inf.data, inf.shared = inf.shared, nil
-	ui.worker_unlock(&inf.worker)
-	info_free(old)
-}
+// Whether a reading is asked or under way.
+information_busy :: proc(inf: ^Information) -> bool { return tasks.busy(ui.chores(), &inf.job) }
 
 @(private = "file")
-information_job :: proc(w: ^ui.Worker) {
-	inf := (^Information)(w.user)
+information_work :: proc(data: rawptr) {
+	inf := (^Information)(data)
 	s := new(Info_Static)
-	context.allocator = virtual.arena_allocator(&s.arena)
-	if inf.demo != nil { demo_info_read(s) } else { info_read(s) }
-	ui.worker_lock(w)
-	old := inf.shared
-	inf.shared = s
-	ui.worker_unlock(w)
-	info_free(old)
-	ui.worker_published(w)
+	{
+		context.allocator = virtual.arena_allocator(&s.arena)
+		if inf.demo != nil { demo_info_read(s) } else { info_read(s) }
+	}
+	if !ui.post(inf.state, information_posted, s) { info_free(s) }
+}
+
+// On the window's thread: a new reading replaces the last.
+@(private = "file")
+information_posted :: proc(data: rawptr, _: u64) {
+	s := (^Info_Static)(data)
+	if the_app == nil { info_free(s); return }
+	inf := &the_app.information
+	info_free(inf.data)
+	inf.data = s
 }
 

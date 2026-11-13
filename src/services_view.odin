@@ -83,10 +83,10 @@ service_details_body :: proc(app: ^App, u: Service, selected: bool, d: ^Unit_Det
 				info = strings.join(parts[:], "  ·  ", context.temp_allocator)
 			}
 			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0})
-			label_tip(fmt.tprintf("%s###svc_details_info", ui.text_shown(info)), info)
+			ui.label_tip(fmt.tprintf("%s###svc_details_info", ui.text_shown(info)))
 		}
 		cmd_button(app, "svc_file", lucide.FILE_TEXT, .Service_Open_File, em)
-		tool := tool_button(app, "svc_details_close", lucide.X, fmt.tprintf("Hide the details (%s)", ui.command_shortcut(COMMANDS[.Service_Details])), true, em)
+		tool := tool_button("svc_details_close", lucide.X, fmt.tprintf("Hide the details (%s)", ui.command_shortcut(COMMANDS[.Service_Details])), true, em)
 		if tool { service_details_switch(app) }
 		ui.spacer(ui.px(em * 0.4))
 	}
@@ -110,12 +110,13 @@ service_details_switch :: proc(app: ^App) {
 service_open_file :: proc(app: ^App) {
 	d := app.services.pane.details
 	if d == nil || d.file == "" { return }
-	if platform.open_path(d.file) { say(app, "Opened %s", d.file) } else { say(app, "No program opens %s", d.file) }
+	ui.open(d.file, .Path)
+	say(app, "Opened %s", d.file)
 }
 
 // Each period while the section is shown (refresh calls it at each sample).
 services_tick :: proc(app: ^App) {
-	if app.tab == .Services && time.tick_diff(app.services.next, time.tick_now()) >= 0 && !ui.worker_busy(&app.services.worker) { services_ask(app) }
+	if app.tab == .Services && time.tick_diff(app.services.next, time.tick_now()) >= 0 && !services_busy(app) { services_ask(app) }
 	journal_follow_tick(app)
 }
 
@@ -257,5 +258,5 @@ service_copy :: proc(app: ^App) {
 	u, ok := selected_service(app)
 	if !ok { return }
 	platform.set_clipboard(app.main.win, u.name)
-	say(app, "Copied %s", u.name)
+	copied(app, "Copied", u.name)
 }

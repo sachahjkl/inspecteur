@@ -2,13 +2,15 @@ package inspecteur
 
 // The Startup section's model: what starts with the user's session, whether it is on, and turning it on or off. The
 // system's side is startup_linux.odin (the XDG autostart entries and the user's systemd services that the session's
-// targets want): startup_read lists, startup_set_enabled turns one on or off. Both run on a thread of their own
-// (the toolkit's ui.Worker): they read files and ask the user's service manager. The list is read when the section is shown, on F5
-// and after a change.
+// targets want): startup_read lists, startup_set_enabled turns one on or off. Both run in a tasks.Job on the toolkit's
+// chores, whose reading comes back to the window by ui.post: they read files and ask the user's service manager. The list
+// is read when the section is shown, on F5 and after a change.
 
 import "core:mem/virtual"
 import "core:strings"
+import "core:sync"
 import lucide "gt:lucide"
+import tasks "gt:tasks"
 import "gt:ui"
 
 Startup_Kind :: enum u8 { Autostart, User_Service }
@@ -40,9 +42,10 @@ Startup_List :: struct {
 	on:      bool,
 	name:    string,
 	failure: string,
+	on_count: int,     // the items on (counted when the window takes it)
 }
 
-// What the window asks the thread (under the worker's mutex).
+// What the window asks the job (under the startup's mutex).
 @(private = "file")
 Startup_Ask :: struct {
 	change: bool,
@@ -55,11 +58,12 @@ Startup_Ask :: struct {
 }
 
 Startup :: struct {
-	worker:  ui.Worker,
-	bus:     Startup_Bus,      // the thread's own (startup_linux.odin)
+	job:     tasks.Job,
+	bus:     Startup_Bus,      // the job's own (startup_linux.odin)
 	demo:    ^Demo,            // not nil: the items are the demo's
-	ask:     Startup_Ask,      // under the worker's mutex
-	shared:  ^Startup_List,
+	state:   ^ui.State,        // the window a reading is posted to
+	mutex:   sync.Mutex,
+	ask:     Startup_Ask,      // under the mutex
 	list:    ^Startup_List,    // the window's
 	rows:    Section_Table,
 	menu:    ui.Key,
@@ -79,13 +83,13 @@ startup_init :: proc(s: ^Startup, app: ^App) {
 	section_table_init(&s.rows, app, STARTUP_COLUMNS[:])
 	section_layout_load(&s.rows.table, &app.prefs, "startup")
 	s.demo = app.demo
-	ui.worker_start(&s.worker, startup_job, s, app.main.win)
+	s.state = &app.main.state
+	s.job = {work = startup_work, data = s}
 }
 
+// After the chores stopped (no reading runs).
 startup_destroy :: proc(s: ^Startup) {
-	ui.worker_stop(&s.worker)
 	startup_bus_close(&s.bus)
-	startup_list_free(s.shared)
 	startup_list_free(s.list)
 	section_table_destroy(&s.rows)
 }
@@ -101,23 +105,23 @@ startup_list_free :: proc(l: ^Startup_List) {
 startup_ask :: proc(app: ^App, change := false, item := Startup_Item{}, on := false) {
 	s := &app.startup
 	s.asked = true
-	ui.worker_lock(&s.worker)
+	sync.lock(&s.mutex)
 	if change {
 		s.ask.change, s.ask.on, s.ask.kind = true, on, item.kind
 		s.ask.id_len = copy(s.ask.id[:], item.id)
 		s.ask.name_len = copy(s.ask.name[:], item.name)
 	}
-	ui.worker_unlock(&s.worker)
-	ui.worker_ask(&s.worker)
+	sync.unlock(&s.mutex)
+	tasks.ask(ui.chores(), &s.job)
 }
 
 @(private = "file")
-startup_job :: proc(w: ^ui.Worker) {
-	s := (^Startup)(w.user)
-	ui.worker_lock(w)
+startup_work :: proc(data: rawptr) {
+	s := (^Startup)(data)
+	sync.lock(&s.mutex)
 	ask := s.ask
 	s.ask.change = false
-	ui.worker_unlock(w)
+	sync.unlock(&s.mutex)
 	l := new(Startup_List)
 	// (the reading's texts in its arena; the bus's connection keeps the heap: it outlives the reading)
 	a := virtual.arena_allocator(&l.arena)
@@ -128,25 +132,19 @@ startup_job :: proc(w: ^ui.Worker) {
 		l.failure = strings.clone(s.demo != nil ? DEMO_REFUSED : startup_set_enabled(&s.bus, ask.kind, string(ask.id[:ask.id_len]), ask.on), a)
 	}
 	l.problem = strings.clone(s.demo != nil ? demo_startup_read(s.demo, &l.items, a) : startup_read(&s.bus, &l.items, a), a)
-	ui.worker_lock(w)
-	old := s.shared
-	s.shared = l
-	ui.worker_unlock(w)
-	startup_list_free(old)
-	ui.worker_published(w)
+	if !ui.post(s.state, startup_posted, l) { startup_list_free(l) }
 }
 
-// The window's turn: a new reading becomes the rows; what a change came to is said.
-startup_take :: proc(app: ^App) {
+// On the window's thread: a new reading becomes the rows; what a change came to is said.
+@(private = "file")
+startup_posted :: proc(data: rawptr, _: u64) {
+	l := (^Startup_List)(data)
+	app := the_app
+	if app == nil { startup_list_free(l); return }
 	s := &app.startup
-	if !ui.worker_take(&s.worker) { return }
-	ui.worker_lock(&s.worker)
-	old := s.list
-	s.list, s.shared = s.shared, nil
-	ui.worker_unlock(&s.worker)
-	startup_list_free(old)
-	l := s.list
-	if l == nil { return }
+	startup_list_free(s.list)
+	s.list = l
+	for it in l.items { if it.enabled { l.on_count += 1 } }
 	if l.changed {
 		s.pending = false
 		if l.failure == "" {

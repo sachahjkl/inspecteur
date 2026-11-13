@@ -24,17 +24,22 @@ odin run tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/insp
 |---|---|
 | `build [release]` | the toolkit's text library (when its sources changed), then `build/inspecteur` |
 | `test` | the unit tests of `src` |
-| `check` | `odin check -vet` of the program and the tool, the tests, THIRD-PARTY-NOTICES up to date, a release build |
+| `check` | `odin check -vet` of the program and of the tool, the ui scopes (`toolbox.check_scopes`), the tests, the changelog's fragments, THIRD-PARTY-NOTICES up to date, a release build |
 | `live [--keep]` | the real program in a headless sway, driven over the DevTools protocol (310 checks); its pictures stay in `build/live` |
 | `shots [--out folder]` | the pictures of the documentation, the program's own frames, of the demo's made-up machine |
 | `bench [seconds]` | a release build in a headless sway that draws on the GPU: the time to the first frame, the CPU use at rest, then with Services and with Connections shown |
 | `logo` | `assets/logo*.png` and `.project/image.png`, drawn by the toolkit's paint package |
 | `desktop_files <prefix>` | the desktop entry and the icons under `<prefix>/share`: what the Nix package installs |
-| `notices [--check]` | THIRD-PARTY-NOTICES: the licences of what the program embeds and links (gui_toolkit and its attributions, Roboto, Inconsolata, Lucide, wgpu-native, the text library's crates from `cargo metadata`, procedural macros left out); `--check` fails when it is not up to date |
-| `package [version]`, `notes <version>`, `ship <version>` | the release's archive (the program, LICENSE, THIRD-PARTY-NOTICES, README, CHANGELOG) and its SHA-256; the changelog's section; the release itself from a clean `master`, the fragments assembled (gui_toolkit's `gt:release` and `gt:changelog`) |
+| `notices [--check]` | THIRD-PARTY-NOTICES (the toolkit's `notices_command`): the licences of what the program embeds and links (gui_toolkit and its attributions, Roboto, Inconsolata, Lucide, Odin's core library, wgpu-native, the text library's crates from `cargo metadata`); `--check` fails when it is not up to date |
+| `site build <site> <out>`, `check`, `card` | the site's pages (gui_toolkit's `gt:site`) |
+| `package [version]`, `notes <version>`, `ship <patch\|minor\|major\|x.y.z>` | the release's archive (the program, LICENSE, THIRD-PARTY-NOTICES, README, CHANGELOG) and its SHA-256; the changelog's section; the release itself from a clean `master`, the fragments assembled (gui_toolkit's `gt:release` and `gt:changelog`) |
 | `changelog new <type> <subject> <text>`, `check`, `preview` | a fragment of `changelog.d/`; all of them well formed (`check` runs it); what the next version brings |
 
 `GT=<folder>` builds against another checkout of gui_toolkit.
+
+The commands are given to the toolkit's dispatcher (`toolbox.tool_main`); `changelog`, `site`, `logo`, `notices`,
+`package`, `notes` and `ship` are the toolkit's own commands over the project (`toolbox.Project`, `tools/inspecteurtool/build.odin`).
+`live`, `shots` and `bench` run in the toolkit's headless sway (`toolbox.sway_start`).
 
 The headless sway of `live` and `shots` draws on the CPU (pixman): inspecteur then draws with Mesa's software Vulkan.
 `bench` uses sway's Vulkan renderer, so that inspecteur draws on the GPU as on a desktop.

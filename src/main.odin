@@ -7,8 +7,11 @@ package inspecteur
 
 import "core:fmt"
 import "core:os"
+import "core:strings"
 import ascii "gt:ascii"
 import config "gt:config"
+import crash "gt:crash"
+import tk_log "gt:log"
 
 APP_VERSION :: "0.3.0"
 
@@ -75,7 +78,7 @@ run :: proc(all_args: []string) -> int {
 			forwarded, opts.owner, opts.owns = one_copy_acquire(opts.tab, asked)
 			if forwarded { return 0 }
 		}
-		return app_run(&prefs, opts)
+		return app_run_kept(&prefs, opts)
 	case "install":   return cmd_install()
 	case "uninstall": return cmd_uninstall()
 	case "status":    return cmd_status()
@@ -95,4 +98,24 @@ run :: proc(all_args: []string) -> int {
 	}
 	fmt.eprint(USAGE)
 	return 2
+}
+
+// The window's run, with its log (gt:log, in the state folder) and its crash reports (gt:crash): a crash leaves a report,
+// which the next start says (Run_Options.last_crash). Nothing is sent anywhere.
+app_run_kept :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
+	logger := tk_log.install({program = APP_NAME, echo = true})
+	code: int
+	{
+		context.logger = logger
+		crash.install({program = APP_NAME, version = APP_VERSION, log_tail = {tk_log.tail, logger.data}})
+		crash.begin_session()
+		o := opts
+		last, crashed := crash.last_report(context.temp_allocator)
+		if crashed { o.last_crash = strings.clone(last) }
+		code = app_run(prefs, o)
+		delete(o.last_crash)
+		crash.end_session()
+	}
+	tk_log.close(logger)
+	return code
 }

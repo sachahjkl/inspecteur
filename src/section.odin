@@ -89,7 +89,7 @@ row_icon_lead :: proc(t: ^ui.Table, row: int, size: f32) {
 	if ic.ok {
 		icon_box(ic, size, app.icons)
 	} else if icon.glyph != "" {
-		if ui.tags("weak") { glyph(app, icon.glyph, size) }
+		if ui.tags("weak") { ui.icon(icon.glyph, size) }
 	} else {
 		ui.spacer(ui.px(size))
 	}
@@ -116,7 +116,7 @@ section_bar :: proc(app: ^App, title, note: string, em: f32, actions: proc(app: 
 		ui.spacer(ui.px(em * 0.8))
 		if ui.tags("weak") {
 			ui.next({width = ui.fill(), height = ui.pct(1)})
-			label_tip(fmt.tprintf("%s###counts", ui.text_shown(note)), note)
+			ui.label_tip(fmt.tprintf("%s###counts", ui.text_shown(note)))
 		}
 		if right != nil {
 			right(app, em)

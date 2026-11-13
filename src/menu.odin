@@ -20,7 +20,6 @@ package inspecteur
 // display server ends the session: it is asked first.
 
 import "core:fmt"
-import "core:os"
 import "core:slice"
 import "core:strings"
 import process "gt:process"
@@ -28,7 +27,6 @@ import "core:time"
 import "gt:platform"
 import "gt:ui"
 
-CONFIRM_WIDTH_EM :: 29
 // After a signal, the next sample comes this soon: the row goes as the process ends.
 SAMPLE_AFTER_SIGNAL :: 300 * time.Millisecond
 
@@ -58,13 +56,10 @@ Confirm :: struct {
 	unit:    string,            // owned
 	title:   string,            // owned: "Kill sleep (PID 1234)?"
 	note:    string,            // owned: what comes of it
-	lines:   [dynamic]string,   // owned: the processes it acts on, a line each ("sleep, PID 1234")
+	lines:   [dynamic]string,   // owned: the processes it acts on, a line each ("sleep, PID 1234"; the dialog shows the first)
 	verb:    string,            // the confirming button's label
 	enter_confirms: bool,       // Enter confirms; else Enter cancels (a kill, the end of the session or of Inspecteur)
 }
-
-// The processes a confirmation lists, at most (then "and n more").
-CONFIRM_LINES_MAX :: 8
 
 chosen_free :: proc(c: ^Chosen) {
 	delete(c.targets)
@@ -187,7 +182,8 @@ search_online :: proc(app: ^App) {
 	name := p.name
 	if r, ok := selected_row(app); ok && r.kind == .App { name = app.catalog.entries[app.table.groups[r.index].entry].name }
 	url := strings.concatenate({SEARCH_URL, url_query(fmt.tprintf("%s process", name))}, context.temp_allocator)
-	if platform.open_url(url) { say(app, "Searched the web for %s", name) } else { say(app, "No browser opens %s", url) }
+	ui.open(url, .Url)
+	say(app, "Searched the web for %s", name)
 }
 
 // The search engine a search online asks (the query follows).
@@ -269,13 +265,14 @@ row_menu_items :: proc(app: ^App) {
 // The executable's folder in the file manager.
 open_location :: proc(app: ^App, p: ^Proc) {
 	if p.exe == "" { return }
-	if platform.reveal_in_folder(p.exe) { say(app, "Opened the folder of %s", p.exe) } else { say(app, "No file manager opens %s", p.exe) }
+	ui.open(p.exe, .Reveal)
+	say(app, "Opened the folder of %s", p.exe)
 }
 
 copy_command :: proc(app: ^App, p: ^Proc) {
 	if p.cmdline == "" { return }
 	platform.set_clipboard(app.main.win, p.cmdline)
-	say(app, "Copied the command line of %s", p.name)
+	copied(app, fmt.tprintf("Copied the command line of %s", p.name))
 }
 
 // The signals the row's menu sends (Send a signal), each by its name and its number's.
@@ -338,26 +335,20 @@ suspend_selected :: proc(app: ^App) {
 	suspend_or_resume(app, p)
 }
 
+// Its state is read when the act runs (acts.odin), not the last sample's: the process may have been resumed since.
 suspend_or_resume :: proc(app: ^App, p: ^Proc) {
-	c := Chosen{name = fmt.tprintf("%s (PID %d)", p.name, p.pid)}
-	append(&c.targets, Target{p.pid, p.start})
-	defer delete(c.targets)
-	// (the state now, not the last sample's: the process may have been resumed since)
-	state := app.demo != nil ? p.state : proc_state_now(p.pid, p.start)
-	if state == .Stopped { send_signal(app, &c, .Continue); return }
-	switch guard_of(app, p.pid) {
-	case .None:           send_signal(app, &c, .Stop)
-	case .Self:           say(app, "Inspecteur does not suspend itself: nothing could resume it")
-	case .Ancestor:       say(app, "%s runs Inspecteur: suspended, it would stop Inspecteur too", c.name)
-	case .Display_Server: say(app, "%s draws the desktop: suspended, it would freeze every window, this one too", c.name)
-	}
+	if app.demo != nil { say(app, "The demo's processes are not the system's: nothing was sent"); return }
+	a := act_new(.Suspend, fmt.tprintf("%s (PID %d)", p.name, p.pid))
+	append(&a.targets, Target{p.pid, p.start})
+	a.guard = guard_of(app, p.pid)
+	act_start(app, a)
 }
 
 // What a process is to Inspecteur: itself, a process it runs under, the display server, or none of them.
 Guard :: enum u8 { None, Self, Ancestor, Display_Server }
 
 guard_of :: proc(app: ^App, pid: i32) -> Guard {
-	own := i32(os.get_pid())
+	own := app.own_pid
 	if pid == own { return .Self }
 	if app.display_server > 0 && pid == app.display_server { return .Display_Server }
 	// (the line of parents, as the last sample has it)
@@ -387,18 +378,15 @@ confirm_ask :: proc(app: ^App, c: Chosen, sig: process.Signal, tree := false) {
 	for t in c.targets { append(&m.chosen.targets, t) }
 	m.chosen.name = strings.clone(c.name)
 	server, inspecteur := false, false
-	for t, i in c.targets {
+	for t in c.targets {
 		switch guard_of(app, t.pid) {
 		case .Display_Server:  server = true
 		case .Self, .Ancestor: inspecteur = true
 		case .None:
 		}
-		if i < CONFIRM_LINES_MAX {
-			p := find_proc(&app.sampler, t.pid, t.start)
-			append(&m.lines, p != nil ? fmt.aprintf("%s, PID %d", p.name, p.pid) : fmt.aprintf("PID %d", t.pid))
-		}
+		p := find_proc(&app.sampler, t.pid, t.start)
+		append(&m.lines, p != nil ? fmt.aprintf("%s, PID %d", p.name, p.pid) : fmt.aprintf("PID %d", t.pid))
 	}
-	if len(c.targets) > CONFIRM_LINES_MAX { append(&m.lines, fmt.aprintf("and %d more", len(c.targets) - CONFIRM_LINES_MAX)) }
 	many := len(c.targets) > 1
 	verb := sig == .Kill ? "Kill" : "End"
 	m.verb = tree ? "End tree" : verb
@@ -434,55 +422,12 @@ confirm_service :: proc(app: ^App, action: Service_Action, unit, danger: string)
 	m.open = true
 }
 
+// The toolkit's confirmation: each process by its name and pid (what Kill acts on is seen before it acts).
 @(private = "file")
 confirm_build :: proc(app: ^App, em: f32) {
 	m := &app.menu.confirm
-	w := em * CONFIRM_WIDTH_EM
-	if ui.modal("kill", w, &m.open) {
-		pad := em * 1.2
-		if ui.style({width = ui.px(w)}) {
-			ui.spacer(ui.px(pad))
-			ui.next({width = ui.px(w), height = ui.children_sum()})
-			if ui.row() {
-				ui.spacer(ui.px(pad))
-				ui.next({width = ui.px(w - 2 * pad), height = ui.children_sum(), axis = .Y})
-				if ui.column() {
-					ui.next({width = ui.fill(), font_size = em * 1.15})
-					ui.paragraph(fmt.tprintf("%s###kill_title", ui.text_shown(m.title)))
-					ui.spacer(ui.px(em * 0.4))
-					if ui.tags("weak") {
-						ui.next({width = ui.fill()})
-						ui.paragraph(fmt.tprintf("%s###kill_text", m.note))
-					}
-					// (each process by its name and pid: what Kill acts on is seen before it acts)
-					if len(m.lines) > 1 {
-						ui.spacer(ui.px(em * 0.5))
-						for l, i in m.lines {
-							ui.next({width = ui.fill(), height = ui.px(em * 1.5), text_pad = em * 0.6})
-							ui.label(fmt.tprintf("%s###kill_line_%d", ui.text_shown(l), i))
-						}
-					}
-					ui.spacer(ui.px(em * 1.1))
-					ui.next({width = ui.fill(), height = ui.children_sum()})
-					if ui.row() {
-						ui.spacer(ui.fill())
-						ui.next({width = ui.text_size(em * 1.2), height = ui.px(ui.dense(em * 2.2))})
-						cancel := ui.button(fmt.tprintf("Cancel%s###kill_cancel", m.enter_confirms ? "" : " (Enter)"))
-						if cancel.clicked || (!m.enter_confirms && ui.key_press(.Return)) { m.open = false }
-						ui.spacer(ui.px(em * 0.6))
-						ui.next({width = ui.text_size(em * 1.2), height = ui.px(ui.dense(em * 2.2))})
-						if ui.tags("danger_button") {
-							if ui.button(fmt.tprintf("%s%s###kill_confirm", m.verb, m.enter_confirms ? " (Enter)" : "")).clicked || (m.enter_confirms && ui.key_press(.Return)) {
-								m.open = false
-								confirm_act(app)
-							}
-						}
-					}
-				}
-			}
-			ui.spacer(ui.px(pad))
-		}
-	}
+	answer := ui.confirm("kill", &m.open, {title = m.title, note = m.note, lines = m.lines[:], act = m.verb, enter_confirms = m.enter_confirms})
+	if answer == .Confirmed { confirm_act(app) }
 }
 
 // What the confirmation was asked for, done.
@@ -496,52 +441,18 @@ confirm_act :: proc(app: ^App) {
 	}
 }
 
-// Sends `sig` to each process chosen that is still that process; says what came of it.
+// Sends `sig` to each process chosen that is still that process (acts.odin); what came of it is said when it is done.
 send_signal :: proc(app: ^App, c: ^Chosen, sig: process.Signal) {
 	if app.demo != nil { say(app, "The demo's processes are not the system's: nothing was sent"); return }
-	sent := 0
-	refused: process.Act_Result
-	errno := 0
-	owner := ""
+	a := act_new(.Signal, c.name)
+	a.sig = sig
 	for t in c.targets {
 		p := find_proc(&app.sampler, t.pid, t.start)
 		if p == nil { continue }
-		#partial switch r, e := process.signal_process(t.pid, t.start, sig); r {
-		case .Done: sent += 1
-		case .Gone:   // (it ended in between)
-		case:
-			refused, errno = r, e
-			owner = p.user
-		}
+		append(&a.targets, t)
+		append(&a.owners, p.user)
 	}
-	verb := "end"
-	#partial switch sig {
-	case .Stop:     verb = "suspend"
-	case .Continue: verb = "resume"
-	}
-	switch {
-	case refused == .Denied:
-		say(app, "%s is %s's: Inspecteur may not %s it (only its owner, or %s, may)", c.name, owner, verb, ADMIN)
-	case refused != .Done:
-		say(app, "%s cannot be %s (error %d)", c.name, verb == "end" ? "ended" : fmt.tprintf("%sed", verb), errno)
-	case sent > 0:
-		#partial switch sig {
-		case .Kill:     say(app, "Killed %s", c.name)
-		case .Stop:     say(app, "Suspended %s", c.name)
-		case .Continue: say(app, "Resumed %s", c.name)
-		case:           say(app, "Asked %s to end", c.name)
-		}
-	case:
-		say(app, "%s has ended already", c.name)
-	}
-	if sent > 0 {
-		// (the rows say it at once: a suspended process is shown suspended before the next sample)
-		#partial switch sig {
-		case .Stop, .Continue:
-			for t in c.targets { if p := find_proc(&app.sampler, t.pid, t.start); p != nil { p.state = sig == .Stop ? .Stopped : .Sleeping } }
-		}
-		sample_soon(app)
-	}
+	act_start(app, a)
 }
 
 // The next sample comes soon: the rows show what an action did.
@@ -553,8 +464,7 @@ sample_soon :: proc(app: ^App) {
 // Opens the Properties of the selected row's process (an app's: its first process).
 props_selected :: proc(app: ^App) {
 	if p := selected_proc(app); p != nil {
-		app.props.demo = app.demo
-		props_open(&app.props, p.pid, p.start)
+		props_open(app, p.pid, p.start)
 	}
 }
 
@@ -569,18 +479,10 @@ default_action :: proc(app: ^App) {
 // needs the administrator (PRIORITY_DENIED).
 set_priority :: proc(app: ^App, p: ^Proc, nice: i8) {
 	if app.demo != nil { say(app, "The demo's processes are not the system's: nothing was changed"); return }
-	#partial switch r, _ := process.set_priority(p.pid, p.start, int(nice)); r {
-	case .Gone:
-		say(app, "%s has ended already", p.name)
-	case .Done:
-		say(app, "%s (PID %d) now runs at %s", p.name, p.pid, priority_text(nice))
-		p.nice = nice
-		sample_soon(app)
-	case .Denied:
-		say(app, "Access denied: %s", PRIORITY_DENIED)
-	case:
-		say(app, "The priority of %s cannot be changed", p.name)
-	}
+	a := act_new(.Priority, fmt.tprintf("%s (PID %d)", p.name, p.pid))
+	append(&a.targets, Target{p.pid, p.start})
+	a.nice = nice
+	act_start(app, a)
 }
 
 // One step of PRIORITIES up (-1: a higher priority) or down (+1) from the process's nice value.

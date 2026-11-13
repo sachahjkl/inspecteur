@@ -37,9 +37,9 @@ live_marks :: proc(l: ^Live) {
 	if !check(l, cdp.key(c, "shift+Delete") && cdp.wait_for(c, "Kill 2 processes?", SESSION_WAIT), "Shift+Delete asks to kill 2 processes") { return }
 	lines := [2]string{line_text(c, 0), line_text(c, 1)}
 	want := [2]string{fmt.tprintf("sleep, PID %s", pa), fmt.tprintf("sleep, PID %s", pb)}
-	mine := (lines == want || lines == [2]string{want[1], want[0]}) && len(cdp.find_name(c, "kill_line_2")) == 0
+	mine := (lines == want || lines == [2]string{want[1], want[0]}) && len(cdp.find_name(c, "confirm_line_2")) == 0
 	if !check(l, mine, "it lists the two of them and nothing else (%v)", lines) { cdp.key(c, "Escape"); return }
-	if !check(l, cdp.click_name(c, "kill_confirm"), "click Kill") { return }
+	if !check(l, cdp.click_name(c, "confirm_act"), "click Kill") { return }
 	sa, ea := os.process_wait(a, SESSION_WAIT)
 	sb, eb := os.process_wait(b, SESSION_WAIT)
 	reaped_a, reaped_b = ea == nil && sa.exited, eb == nil && sb.exited
@@ -71,10 +71,10 @@ live_end_tree :: proc(l: ^Live) {
 	if !check(l, cdp.key(c, "ctrl+Delete") && cdp.wait_for(c, fmt.tprintf("End sh (PID %s) and 2 processes under it?", ps), SESSION_WAIT), "Ctrl+Delete asks to end the shell and the 2 under it") { return }
 	got := [3]string{line_text(c, 0), line_text(c, 1), line_text(c, 2)}
 	want := []string{fmt.tprintf("sleep, PID %d", pid_a), fmt.tprintf("sleep, PID %d", pid_b), fmt.tprintf("sh, PID %s", ps)}
-	mine := len(cdp.find_name(c, "kill_line_3")) == 0
+	mine := len(cdp.find_name(c, "confirm_line_3")) == 0
 	for w in want { if !(got[0] == w || got[1] == w || got[2] == w) { mine = false } }
 	if !check(l, mine, "it lists those three and nothing else (%v)", got) { cdp.key(c, "Escape"); return }
-	if !check(l, cdp.click_name(c, "kill_confirm"), "click End tree") { return }
+	if !check(l, cdp.click_name(c, "confirm_act"), "click End tree") { return }
 	state, werr := os.process_wait(sh, SESSION_WAIT)
 	reaped = werr == nil && state.exited
 	check(l, reaped, "the shell ends (code %d)", state.exit_code)
@@ -119,7 +119,7 @@ live_affinity_dump :: proc(l: ^Live) {
 
 	if !select_child(l, pid) { return }
 	if !check(l, cdp.key(c, "ctrl+shift+d") && cdp.wait_for(c, fmt.tprintf("Create a dump file of sleep (PID %s)?", pid), SESSION_WAIT), "Ctrl+Shift+D asks first") { return }
-	if !check(l, cdp.click_name(c, "kill_confirm"), "Create") { return }
+	if !check(l, cdp.click_name(c, "confirm_act"), "Create") { return }
 	deadline := time.tick_add(time.tick_now(), 4 * SESSION_WAIT)
 	said := ""
 	for time.tick_diff(time.tick_now(), deadline) > 0 && said == "" {
@@ -139,7 +139,7 @@ live_affinity_dump :: proc(l: ^Live) {
 // The text of the confirmation's line `i` ("" when there is none).
 @(private = "file")
 line_text :: proc(c: ^cdp.Client, i: int) -> string {
-	boxes := cdp.find_name(c, fmt.tprintf("kill_line_%d", i))
+	boxes := cdp.find_name(c, fmt.tprintf("confirm_line_%d", i))
 	return len(boxes) > 0 ? boxes[0].text : ""
 }
 

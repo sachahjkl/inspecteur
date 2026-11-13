@@ -2,14 +2,17 @@ package inspecteur
 
 // The Services section's model: the services of the system's service manager or of the user's, their state, whether
 // they start by themselves, their main process and memory. The system's side is services_linux.odin (systemd over
-// D-Bus): services_read lists, service_act starts, stops, restarts, enables or disables. Both run on a thread of their
-// own (the toolkit's ui.Worker): a call to the manager can wait for an authorization for seconds. The list is read while the
-// section is shown, every services.refresh_ms, and at once after an action.
+// D-Bus): services_read lists, service_act starts, stops, restarts, enables or disables. Both run in a tasks.Job on the
+// toolkit's chores, whose reading comes back to the window by ui.post: a call to the manager can wait for an
+// authorization for seconds. The list is read while the section is shown, every services.refresh_ms, and at once after
+// an action.
 
 import "core:mem/virtual"
 import "core:strings"
+import "core:sync"
 import "core:time"
 import lucide "gt:lucide"
+import tasks "gt:tasks"
 import "gt:ui"
 
 Manager :: enum u8 { System, User }
@@ -49,9 +52,10 @@ Service_List :: struct {
 	action:  Service_Action,
 	unit:    string,
 	failure: string,   // "" when it was done
+	running, failed: int,   // the units that run, those that failed (counted when the window takes it)
 }
 
-// What the window asks the thread (under the worker's mutex).
+// What the window asks the job (under the services' mutex).
 @(private = "file")
 Service_Ask :: struct {
 	manager: Manager,
@@ -112,11 +116,12 @@ Services :: struct {
 	pane:         Journal_View,      // the details' pane: the selected service's details and journal (journal.odin)
 	select_name:  string,            // owned: a service to select once a reading lists it (Go to service)
 	details_for:  u64,               // the service the pane was asked for (its name's id)
-	worker:  ui.Worker,
-	bus:     Service_Bus,      // the thread's own (services_linux.odin)
+	job:     tasks.Job,
+	bus:     Service_Bus,      // the job's own (services_linux.odin)
 	demo:    ^Demo,            // not nil: the services are the demo's
-	ask:     Service_Ask,      // under the worker's mutex
-	shared:  ^Service_List,    // the thread's last reading, under the worker's mutex
+	state:   ^ui.State,        // the window a reading is posted to
+	mutex:   sync.Mutex,
+	ask:     Service_Ask,      // under the mutex
 	list:    ^Service_List,    // the window's
 	rows:    Section_Table,
 	manager: Manager,          // the one shown
@@ -140,16 +145,16 @@ services_init :: proc(s: ^Services, app: ^App) {
 	section_layout_load(&s.rows.table, &app.prefs, "services")
 	s.manager = app.settings.manager
 	s.demo = app.demo
-	ui.worker_start(&s.worker, services_job, s, app.main.win)
-	journal_view_init(&s.pane, app.demo, app.main.win)
+	s.state = &app.main.state
+	s.job = {work = services_work, data = s}
+	journal_view_init(&s.pane, app.demo, &app.main.state)
 }
 
+// After the chores stopped (no reading runs).
 services_destroy :: proc(s: ^Services) {
-	ui.worker_stop(&s.worker)
 	service_bus_close(&s.bus)
 	journal_view_destroy(&s.pane)
 	delete(s.select_name)
-	service_list_free(s.shared)
 	service_list_free(s.list)
 	section_table_destroy(&s.rows)
 }
@@ -164,24 +169,27 @@ service_list_free :: proc(l: ^Service_List) {
 // Asks for a reading of the manager shown, after `action` on `unit` when there is one.
 services_ask :: proc(app: ^App, action := Service_Action.None, unit := "") {
 	s := &app.services
-	ui.worker_lock(&s.worker)
+	sync.lock(&s.mutex)
 	s.ask.manager = s.manager
 	if action != .None {
 		s.ask.action = action
 		s.ask.unit_len = copy(s.ask.unit[:], unit)
 	}
-	ui.worker_unlock(&s.worker)
-	ui.worker_ask(&s.worker)
+	sync.unlock(&s.mutex)
+	tasks.ask(ui.chores(), &s.job)
 	s.next = time.tick_add(time.tick_now(), time.Duration(app.settings.services_ms) * time.Millisecond)
 }
 
+// Whether a reading is asked or under way.
+services_busy :: proc(app: ^App) -> bool { return tasks.busy(ui.chores(), &app.services.job) }
+
 @(private = "file")
-services_job :: proc(w: ^ui.Worker) {
-	s := (^Services)(w.user)
-	ui.worker_lock(w)
+services_work :: proc(data: rawptr) {
+	s := (^Services)(data)
+	sync.lock(&s.mutex)
 	ask := s.ask
 	s.ask.action = .None
-	ui.worker_unlock(w)
+	sync.unlock(&s.mutex)
 	l := new(Service_List)
 	// (the reading's texts in its arena; the bus's connections keep the heap: they outlive the reading)
 	a := virtual.arena_allocator(&l.arena)
@@ -193,12 +201,14 @@ services_job :: proc(w: ^ui.Worker) {
 		l.failure = strings.clone(s.demo != nil ? DEMO_REFUSED : service_act(&s.bus, ask.manager, ask.action, l.unit), a)
 	}
 	l.problem = strings.clone(s.demo != nil ? demo_services_read(s.demo, ask.manager, &l.units, a) : services_read(&s.bus, ask.manager, &l.units, a), a)
-	ui.worker_lock(w)
-	old := s.shared
-	s.shared = l
-	ui.worker_unlock(w)
-	service_list_free(old)
-	ui.worker_published(w)
+	if !ui.post(s.state, services_posted, l) { service_list_free(l) }
+}
+
+@(private = "file")
+services_posted :: proc(data: rawptr, _: u64) {
+	l := (^Service_List)(data)
+	if the_app == nil { service_list_free(l); return }
+	services_take(the_app, l)
 }
 
 // Asks for the details of the service `name` of the manager shown (its unit, its journal), for the pane.
@@ -206,20 +216,16 @@ details_ask :: proc(app: ^App, name: string) {
 	journal_view_ask(&app.services.pane, app.services.manager, name, app.settings.journal_boot)
 }
 
-// The window's turn: the details read become the pane's.
-details_take :: proc(app: ^App) { journal_view_take(&app.services.pane) }
-
-// The window's turn: a new reading becomes the rows; what an action came to is said.
-services_take :: proc(app: ^App) {
+// A new reading becomes the rows; what an action came to is said.
+@(private = "file")
+services_take :: proc(app: ^App, l: ^Service_List) {
 	s := &app.services
-	if !ui.worker_take(&s.worker) { return }
-	ui.worker_lock(&s.worker)
-	old := s.list
-	s.list, s.shared = s.shared, nil
-	ui.worker_unlock(&s.worker)
-	service_list_free(old)
-	l := s.list
-	if l == nil { return }
+	service_list_free(s.list)
+	s.list = l
+	for u in l.units {
+		if u.active == "active" && u.sub == "running" { l.running += 1 }
+		if u.active == "failed" { l.failed += 1 }
+	}
 	if l.action != .None {
 		s.pending = .None
 		// (the manager queued a job, which takes some time: its outcome shows at a reading soon after)

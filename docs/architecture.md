@@ -6,23 +6,28 @@ Inspecteur is one program in [Odin](https://odin-lang.org) on [gui_toolkit](http
 ## The window's thread, and the readers' threads
 
 ```
-inspecteur ─ the window's thread (app.odin)
-               sleeps in the toolkit's wait until input, the next sample, or a reader's result
-               a sample: the machine (machine.odin) -> the processes (sampler.odin) -> groups (processes.odin) -> rows
+inspecteur ─ the window's thread (app.odin): no system call
+               sleeps in the toolkit's wait until input, the next sample, or a reading posted to it
+               a reading taken: the machine (machine.odin) -> the processes (sampler.odin) -> groups (processes.odin)
+               -> rows, and the busiest processes ranked (diagnosis.odin)
+           ─ the toolkit's chores (gt:tasks, ui.chores): the sample (sample.odin), every reader of a section
+             (Services, Startup, Connections, Information, a service's details and journal), the Properties' reads,
+             the acts on processes (acts.odin), a dump file, the apps' icons, the setup's facts
            ─ the GPUs' thread (gpu.odin): every 2 s
-           ─ a thread per section that reads something slow (ui.Worker): Services, Startup, Connections, Information,
-             a service's details and journal, a dump file
 ```
 
-A sample reads about 200 processes in 7 to 8 ms. It runs on the window's thread: a second thread would cost more in
-locks and copies than it saves. Between two samples, with no input, nothing runs. In a window the user is not in, the
-filter's caret neither shows nor blinks (`Build_Params.inactive`): at rest, one frame per sample.
+Nothing that touches the system runs on the window's thread: a file of `/proc` of a process stuck in the kernel, a call
+to systemd that waits for polkit, a file system on a network that does not answer would freeze the window. A reader is a
+`tasks.Job` on the toolkit's chores (or a `ui.task` for a single act): its work reads into a new reading of its own and
+posts it (`ui.post`), and the window takes it at the start of its next build. The sample (sample.odin) asks one reading
+at a time: the window asks the next once it took the last. The first is asked before the window opens and read while
+it opens; the first frame waits for it, two seconds at most. A section reads only while it is shown (Information: when
+it is first shown, and on F5): the other sections cost nothing.
 
-What can wait for a long time runs on a thread of its own, the toolkit's `ui.Worker`: a call to systemd that waits for
-polkit, a file system on a network that does not answer, the scan of every process's descriptors. The window asks
-(`ui.worker_ask`); the thread reads into a new reading of its own, swaps it in under the worker's mutex, and wakes the
-window (`platform.wake`), which takes it at its next turn. A section reads only while it is shown (Information: when it
-is first shown, and on F5): the other sections cost nothing.
+What a frame shows is made when its data changes, not at each frame: the journal's entries a level and a search keep,
+the Properties' rows a filter keeps, the busiest processes, the counts of Mission Control. Between two samples, with no
+input, nothing runs. In a window the user is not in, the filter's caret neither shows nor blinks
+(`Build_Params.inactive`): at rest, one frame per sample.
 
 ## The system and the views
 
@@ -174,7 +179,7 @@ Wayland the compositor, the peer of `$WAYLAND_DISPLAY`'s socket: `SO_PEERCRED`):
 window. Ending the display server, Inspecteur or what it runs under is asked first, and Enter cancels the question of a
 kill. Suspend or resume reads the process's state at that moment, not the last sample's.
 
-A dump file (`dump_linux.odin`) is gdb's `gcore` of the process, written on a thread of its own into
+A dump file (`dump_linux.odin`) is gdb's `gcore` of the process, written by a task of the chores into
 `$XDG_CACHE_HOME/inspecteur/dumps`, asked first: it holds whatever the process had in memory. Without gcore, or when the
 kernel does not let a user read another process's memory (`kernel.yama.ptrace_scope`), the footer says so.
 

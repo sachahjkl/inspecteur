@@ -44,7 +44,7 @@ startup_conn :: proc(b: ^Startup_Bus) -> ^dbus.Conn {
 // The user's autostart folder ($XDG_CONFIG_HOME/autostart).
 @(private = "file")
 autostart_user_dir :: proc() -> string {
-	return strings.concatenate({platform.config_dir(context.temp_allocator), "/autostart"}, context.temp_allocator)
+	return strings.concatenate({platform.user_dir(.Config, "", context.temp_allocator), "/autostart"}, context.temp_allocator)
 }
 
 // The system's autostart folders, the first one first.

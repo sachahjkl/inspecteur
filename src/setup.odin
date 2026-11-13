@@ -13,10 +13,12 @@ package inspecteur
 //   inspecteur --setup     the window, the dialog open (the palette: Install…)
 
 import "core:fmt"
+import "core:strings"
 import desktop "gt:desktop"
 import "gt:platform"
 import "gt:render"
 import setup "gt:setup"
+import "gt:ui"
 import identity "identity"
 
 // What inspecteur needs from the system on NixOS, by nixpkgs attribute: what it links (glibc; libgcc_s is in
@@ -40,12 +42,50 @@ setup_config :: proc() -> setup.Config {
 	return setup.Config{identity = id, version = APP_VERSION, install_folder = APP_NAME, icons = identity.ICONS[:]}
 }
 
+// What the setup's facts say at a start (setup.facts reads the install's files: a task of the chores).
+@(private = "file")
+Setup_Facts :: struct {
+	choice:     string,   // owned: setup.choice
+	offer:      bool,     // the dialog has something to do
+	running_it: bool,     // this program is the installed copy
+	exe:        string,   // owned: this program
+}
+
 // At a start with the window: the dialog when there is something to do, unless the user answered for this version or
-// kept this copy standalone. Never in the demo, nor for the Nix package's copy (setup.wanted).
-setup_offer :: proc(app: ^App) {
+// kept this copy standalone; then the updates (updates_start: they need to know which copy runs). Never in the demo, nor
+// for the Nix package's copy (setup.wanted).
+setup_offer :: proc(app: ^App, offer: bool) {
 	if app.demo != nil { return }
-	cfg := setup_config()
-	if setup.wanted(setup.facts(cfg), APP_VERSION, app.settings.setup_choice) { setup.open(&app.setup, cfg) }
+	f := new(Setup_Facts)
+	f^ = {choice = strings.clone(app.settings.setup_choice), offer = offer}
+	ui.task(&app.main.state, setup_facts_work, setup_facts_done, f, setup_facts_free)
+}
+
+@(private = "file")
+setup_facts_work :: proc(data: rawptr) {
+	f := (^Setup_Facts)(data)
+	facts := setup.facts(setup_config())
+	f.offer = f.offer && setup.wanted(facts, APP_VERSION, f.choice)
+	f.running_it = facts.running_it
+	f.exe = strings.clone(facts.running)
+}
+
+@(private = "file")
+setup_facts_done :: proc(data: rawptr, _: u64) {
+	f := (^Setup_Facts)(data)
+	defer setup_facts_free(f)
+	app := the_app
+	if app == nil || app.closing { return }
+	if f.offer && !app.setup.open { setup.open(&app.setup, setup_config()) }
+	updates_start(app, f.running_it, f.exe)
+}
+
+@(private = "file")
+setup_facts_free :: proc(data: rawptr) {
+	f := (^Setup_Facts)(data)
+	delete(f.choice)
+	delete(f.exe)
+	free(f)
 }
 
 setup_open :: proc(app: ^App) { setup.open(&app.setup, setup_config()) }

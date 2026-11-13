@@ -52,7 +52,8 @@ live_performance :: proc(l: ^Live) {
 
 	// one graph per logical processor
 	cores := logical_processors()
-	check(l, cdp.click_text(c, "Logical processors"), "the per-processor view")
+	// (the view's own key: the words "Logical processors" are also a line of the details)
+	check(l, cdp.key(c, "ctrl+g"), "the per-processor view")
 	check(l, cdp.wait_name(c, fmt.tprintf("core_%d", cores - 1), SESSION_WAIT), "a graph for each of the %d logical processors", cores)
 	check(l, !cdp.wait_name(c, fmt.tprintf("core_%d", cores), 300 * time.Millisecond), "and no more")
 	share = wait_drawn(c, "core_0")

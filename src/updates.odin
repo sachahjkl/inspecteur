@@ -7,8 +7,10 @@ package inspecteur
 // next start, or at once from the settings' Restart now. A copy from the Nix store is left to Nix; the demo checks nothing.
 
 import "core:fmt"
-import process "gt:process"
+import "core:log"
+import "core:strings"
 import "gt:platform"
+import "gt:ui"
 import setup "gt:setup"
 import update "gt:update"
 import inspecteur_update "update"
@@ -16,12 +18,13 @@ import inspecteur_update "update"
 // The folder of the latest release's files: its manifest (update-<platform>.json and .sig) and its program.
 UPDATE_FOLDER :: "https://github.com/sachahjkl/inspecteur/releases/latest/download/"
 
-updates_start :: proc(app: ^App) {
-	if app.demo != nil { return }
-	app.installed_copy = setup.facts(setup_config()).running_it
+// Once the setup's facts are read (setup_offer): `installed`, this program is the installed copy; `exe`, its path.
+updates_start :: proc(app: ^App, installed: bool, exe: string) {
+	if app.demo != nil || app.updater != nil { return }
+	app.installed_copy = installed
 	app.updater = update.updater_start({
 		product = inspecteur_update.PRODUCT, folder = UPDATE_FOLDER, current = APP_VERSION,
-		exe = process.executable_path(), user_agent = fmt.tprintf("inspecteur/%s", APP_VERSION),
+		exe = exe, user_agent = fmt.tprintf("inspecteur/%s", APP_VERSION),
 		// (the updater's thread: the loop wakes, and updates_follow reads the state)
 		news = proc(user: rawptr) { platform.wake((^App)(user).main.win) }, user = app,
 	})
@@ -44,10 +47,26 @@ updates_follow :: proc(app: ^App) {
 	app.main.settle = max(app.main.settle, FRAMES_AFTER_INPUT)   // (the settings show the state)
 	// (said when asked, or when there is something to know: not each check that found nothing)
 	if st.asked || st.phase == .Installed || st.phase == .Available { say(app, "%s", update.status_words(st)) }
-	// (the installed copy: its manifest says the new version)
+	// (the installed copy: its manifest says the new version; written by a task of the chores)
 	if st.phase == .Installed {
-		if ok, why := setup.updated(setup_config(), st.version); !ok { fmt.eprintfln("inspecteur: the update is in place, but %s", why) }
+		version := new(string)
+		version^ = strings.clone(st.version)
+		ui.task(&app.main.state, manifest_work, nil, version, version_free)
 	}
+}
+
+// The installed copy's manifest gets the new version (`data`: a ^string, owned).
+@(private = "file")
+manifest_work :: proc(data: rawptr) {
+	defer version_free(data)
+	if ok, why := setup.updated(setup_config(), (^string)(data)^); !ok { log.errorf("the update is in place, but %s", why) }
+}
+
+@(private = "file")
+version_free :: proc(data: rawptr) {
+	v := (^string)(data)
+	delete(v^)
+	free(v)
 }
 
 // The new program takes over: started once this one has ended.

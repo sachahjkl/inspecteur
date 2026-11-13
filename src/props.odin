@@ -3,8 +3,9 @@ package inspecteur
 // The Properties of one process: its details, its threads, its open files, its modules, its environment (the system's:
 // props_linux.odin). Only the tab shown is read: when the dialog opens, when another tab is shown, and again every
 // PROPS_REFRESH_MS while the process lives (its threads, its files, its maps move). Once the process is gone, nothing is
-// read: the dialog says it ended. A list the user may not read (another user's process) says "Access denied". The
-// strings of a reading are in an arena, emptied at the next.
+// read: the dialog says it ended. A list the user may not read (another user's process) says "Access denied". A reading
+// runs on the chores (a file of /proc can make a read wait) and comes back at a next build; its strings are in its
+// arena, freed when the next one replaces it.
 
 import "core:mem/virtual"
 import "core:strings"
@@ -40,28 +41,41 @@ Module_Row :: struct {
 // What came of reading a list: read, refused (another user's process), or the process is gone.
 Read_State :: enum u8 { Read, Denied, Gone }
 
+// A reading of one tab: its texts and its lists in its arena.
+Props_Data :: struct {
+	arena:     virtual.Arena,
+	read_tab:  Props_Tab,      // the tab it is of
+	cwd:       string,
+	cwd_read:  Read_State,
+	threads:   [dynamic]Thread_Row,
+	files:     [dynamic]File_Row,
+	modules:   [dynamic]Module_Row,
+	env:       [dynamic]string,
+	list_read: Read_State,     // what came of reading the list of the tab (Threads to Environment)
+	cpus:      string,         // the General tab's: the processors it may run on ("0-3, 8"), "" unknown
+}
+
 Props :: struct {
 	open:     bool,
 	pid:      i32,
 	start:    u64,
 	tab:      Props_Tab,
 	size:     [2]f32,   // the dialog's size, as the user left it (modal_sized)
-	demo:     ^Demo,
-	arena:    virtual.Arena,
-	read_tab: Props_Tab,   // the tab of the last reading
+	data:     ^Props_Data,   // the last reading (nil: none yet)
+	serial:   int,           // counts the readings taken (the filter's rows follow it)
 	read_at:  time.Tick,
+	reading:  bool,        // a reading is under way (its result comes at a next build: props_done)
 	gone:     bool,        // the process ended: nothing more is read
-	cwd:      string,
-	cwd_read: Read_State,
-	threads:  [dynamic]Thread_Row,
-	files:    [dynamic]File_Row,
-	modules:  [dynamic]Module_Row,
-	env:      [dynamic]string,
-	list_read: Read_State,  // what came of reading the list of the tab read (Threads to Environment)
-	nice_sel: int,          // the priority menu's choice (PRIORITIES)
-	cpus:     string,       // the General tab's: the processors it may run on ("0-3, 8"), "" unknown (in the arena)
+	nice_sel: int,         // the priority menu's choice (PRIORITIES)
 	filter:   ui.Text_Field,   // the filter of the lists (Ctrl+F)
 	filter_key: ui.Key,
+	// the rows the filter keeps, made again when the reading, the tab or the filter changes (props_view.odin)
+	shown:      [dynamic]int,
+	shown_ids:  [dynamic]u64,   // their ids in the list
+	shown_of:   int,       // the reading they are of (serial)
+	shown_tab:  Props_Tab,
+	shown_query: string,   // owned
+	title_bg:   ui.Color,  // the title strip's colour (ui.dialog_top_draw reads it while the frame is drawn)
 }
 
 // A priority offered (PRIORITIES, the system's: system_linux.odin): its name and its value as a nice value (-20 the
@@ -69,53 +83,110 @@ Props :: struct {
 Priority :: struct { name: string, nice: i8 }
 
 props_destroy :: proc(p: ^Props) {
-	virtual.arena_destroy(&p.arena)
+	props_data_free(p.data)
 	ui.field_destroy(&p.filter)
-	delete(p.threads)
-	delete(p.files)
-	delete(p.modules)
-	delete(p.env)
+	delete(p.shown)
+	delete(p.shown_ids)
+	delete(p.shown_query)
 }
 
-props_open :: proc(p: ^Props, pid: i32, start: u64) {
+@(private = "file")
+props_data_free :: proc(d: ^Props_Data) {
+	if d == nil { return }
+	virtual.arena_destroy(&d.arena)
+	free(d)
+}
+
+props_open :: proc(app: ^App, pid: i32, start: u64) {
+	p := &app.props
 	p.open, p.pid, p.start, p.tab, p.gone = true, pid, start, .General, false
+	props_data_free(p.data)
+	p.data = nil
+	p.serial += 1
 	ui.field_clear(&p.filter)
-	props_read(p)
+	props_read(app)
 }
 
 // At each sample while the dialog is open: `alive` says whether the process is still there. The tab shown is read
 // again when another tab is shown or every PROPS_REFRESH_MS.
-props_tick :: proc(p: ^Props, alive: bool) {
+props_tick :: proc(app: ^App, alive: bool) {
+	p := &app.props
 	if !p.open || p.gone { return }
 	if !alive { p.gone = true; return }
-	if p.tab != p.read_tab || time.duration_milliseconds(time.tick_since(p.read_at)) >= PROPS_REFRESH_MS { props_read(p) }
+	if p.data == nil || p.tab != p.data.read_tab || time.duration_milliseconds(time.tick_since(p.read_at)) >= PROPS_REFRESH_MS { props_read(app) }
 }
 
-// Reads the tab shown (the General tab's working folder, or a list).
-props_read :: proc(p: ^Props) {
-	free_all(virtual.arena_allocator(&p.arena))
-	clear(&p.threads)
-	clear(&p.files)
-	clear(&p.modules)
-	clear(&p.env)
-	p.cwd, p.cpus = "", ""
-	p.read_tab, p.read_at = p.tab, time.tick_now()
-	a := virtual.arena_allocator(&p.arena)
-	if p.demo != nil { demo_props_read(p.demo, p, a); return }
-	switch p.tab {
+// What a reading is asked for, and what it read.
+@(private = "file")
+Props_Reading :: struct {
+	pid:   i32,
+	start: u64,
+	tab:   Props_Tab,
+	demo:  ^Demo,
+	data:  ^Props_Data,
+}
+
+// Reads the tab shown (the General tab's working folder, or a list) on the chores; none while one is under way (the
+// next tick asks again).
+props_read :: proc(app: ^App) {
+	p := &app.props
+	if p.reading { return }
+	p.reading = true
+	p.read_at = time.tick_now()
+	r := new(Props_Reading)
+	r^ = {pid = p.pid, start = p.start, tab = p.tab, demo = app.demo, data = new(Props_Data)}
+	ui.task(&app.main.state, props_work, props_done, r, props_lost)
+}
+
+@(private = "file")
+props_work :: proc(data: rawptr) {
+	r := (^Props_Reading)(data)
+	d := r.data
+	d.read_tab = r.tab
+	a := virtual.arena_allocator(&d.arena)
+	d.threads = make([dynamic]Thread_Row, a)
+	d.files = make([dynamic]File_Row, a)
+	d.modules = make([dynamic]Module_Row, a)
+	d.env = make([dynamic]string, a)
+	if r.demo != nil { demo_props_read(r.demo, r.pid, d, a); return }
+	switch r.tab {
 	case .General:
-		p.cwd, p.cwd_read = proc_cwd(p.pid, p.start, a)
-		if set, r, _ := process.affinity(p.pid, p.start); r == .Done {
+		d.cwd, d.cwd_read = proc_cwd(r.pid, r.start, a)
+		if set, res, _ := process.affinity(r.pid, r.start); res == .Done {
 			cpus := make([dynamic]bool, context.temp_allocator)
 			for i in 0 ..< process.CPU_SET_MAX { append(&cpus, process.cpu_set_has(set, i)) }
-			p.cpus = strings.clone(cpu_list_text(cpus[:]), a)
+			d.cpus = strings.clone(cpu_list_text(cpus[:]), a)
 		}
 	case .History:     // (the sampler's: Proc.hist)
-	case .Threads:     p.list_read = proc_threads(p.pid, p.start, &p.threads, a)
-	case .Files:       p.list_read = proc_files(p.pid, p.start, &p.files, a)
-	case .Modules:     p.list_read = proc_modules(p.pid, p.start, &p.modules, a)
-	case .Environment: p.list_read = proc_environment(p.pid, p.start, &p.env, a)
+	case .Threads:     d.list_read = proc_threads(r.pid, r.start, &d.threads, a)
+	case .Files:       d.list_read = proc_files(r.pid, r.start, &d.files, a)
+	case .Modules:     d.list_read = proc_modules(r.pid, r.start, &d.modules, a)
+	case .Environment: d.list_read = proc_environment(r.pid, r.start, &d.env, a)
 	}
+}
+
+// The reading becomes the dialog's, when it is still of the process shown.
+@(private = "file")
+props_done :: proc(data: rawptr, _: u64) {
+	r := (^Props_Reading)(data)
+	defer free(r)
+	app := the_app
+	if app == nil { props_data_free(r.data); return }
+	p := &app.props
+	p.reading = false
+	if !p.open || p.pid != r.pid || p.start != r.start { props_data_free(r.data); return }
+	props_data_free(p.data)
+	p.data = r.data
+	p.serial += 1
+	// (the tab changed while it was read: the one shown now)
+	if p.tab != p.data.read_tab && !p.gone { props_read(app) }
+}
+
+@(private = "file")
+props_lost :: proc(data: rawptr) {
+	r := (^Props_Reading)(data)
+	props_data_free(r.data)
+	free(r)
 }
 
 // The priority menu's line of a nice value: the one at or below it.

@@ -48,8 +48,8 @@ journal_window_open :: proc(app: ^App, manager: Manager, name: string) {
 	w.partial_redraw = true
 	ui.set_rounding(&w.state, ROUNDING)
 	platform.set_dark_title(w.win, !app.theme_shown.light)
-	// (its readings wake the main window's loop, which the loop waits on)
-	journal_view_init(&w.view, app.demo, app.main.win)
+	// (its readings are posted to its own window: its build takes them)
+	journal_view_init(&w.view, app.demo, &w.state)
 	journal_view_ask(&w.view, manager, name, app.settings.journal_boot)
 	w.view.next = time.tick_add(time.tick_now(), JOURNAL_FOLLOW_MS * time.Millisecond)
 	append(&app.journal_windows, w)
@@ -69,7 +69,7 @@ journal_window_build :: proc(h: ^host.Host, size: host.Vec2) {
 		ui.next({width = ui.fill(), height = ui.px(ui.dense(em * TITLE_EM)), bg = surface("bar")})
 		if ui.title_bar("###titlebar", {.Draw_Background, .Draw_Side_Bottom}) {
 			ui.spacer(ui.px(em * 0.6))
-			glyph(app, lucide.SCROLL_TEXT, em * 1.4, ui.color("accent"))
+			ui.icon(lucide.SCROLL_TEXT, em * 1.4, ui.color("accent"))
 			ui.spacer(ui.px(em * 0.4))
 			ui.next({width = ui.text_size(em * 0.4), height = ui.pct(1)})
 			ui.label(fmt.tprintf("%s###jw_title", ui.text_shown(w.name)))
@@ -134,32 +134,43 @@ windows_wait :: proc(app: ^App) {
 	host.hosts_wait(hosts[:])
 }
 
-// After the main window's frame: each journal's window, its reading taken, followed, built; a closed one goes.
+// After the main window's frame: each journal's window followed, built; a closed one goes once its reading is done (the
+// reading's job holds its view until then).
 journal_windows_frame :: proc(app: ^App) {
 	for i := len(app.journal_windows) - 1; i >= 0; i -= 1 {
 		w := app.journal_windows[i]
 		if platform.is_closed(w.win) {
 			ordered_remove(&app.journal_windows, i)
-			journal_window_free(w)
+			append(&app.journals_closed, w)
 			continue
 		}
-		if journal_view_take(&w.view) { w.settle = max(w.settle, 1) }
-		if app.settings.journal_follow && !app.paused && time.tick_diff(w.view.next, time.tick_now()) >= 0 && !ui.worker_busy(&w.view.worker) {
+		if journal_view_taken(&w.view) { w.settle = max(w.settle, 1) }
+		if app.settings.journal_follow && !app.paused && time.tick_diff(w.view.next, time.tick_now()) >= 0 && !journal_view_busy(&w.view) {
 			w.view.next = time.tick_add(time.tick_now(), JOURNAL_FOLLOW_MS * time.Millisecond)
 			journal_view_ask(&w.view, w.manager, w.name, app.settings.journal_boot)
 		}
 		host.host_frame(&w.window)
 	}
+	for i := len(app.journals_closed) - 1; i >= 0; i -= 1 {
+		w := app.journals_closed[i]
+		if journal_view_busy(&w.view) { continue }
+		unordered_remove(&app.journals_closed, i)
+		journal_window_free(w)
+	}
 }
 
-// At the end: every journal's window closed.
+// At the end, once the chores stopped: every journal's window closed.
 journal_windows_close :: proc(app: ^App) {
 	for w in app.journal_windows { journal_window_free(w) }
+	for w in app.journals_closed { journal_window_free(w) }
 	delete(app.journal_windows)
+	delete(app.journals_closed)
 }
 
 @(private = "file")
 journal_window_free :: proc(w: ^Journal_Window) {
+	// (a reading posted and not taken yet: taken now, so that the view frees it)
+	ui.drain_posts(&w.state)
 	journal_view_destroy(&w.view)
 	host.host_close(&w.window)
 	delete(w.name)

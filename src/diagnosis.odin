@@ -82,31 +82,59 @@ diagnose :: proc(app: ^App) -> []Finding {
 	return out[:]
 }
 
-@(private = "file")
+// A measure the processes are ranked by.
 Busy_By :: enum u8 { Cpu, Memory, Disk }
+
+// The processes ranked: the BUSIEST_KEEP that use the most of each measure (indices into the sampler's processes, the
+// most first; those that ended left out), and the threads of them all. Made at each sample (sample_take), so that a
+// view reads them at each frame without a pass over every process.
+Ranking :: struct {
+	busiest: [Busy_By][dynamic]int,
+	threads: i32,
+}
+
+// The processes kept of each ranking: Mission Control's lists are the longest.
+BUSIEST_KEEP :: 8
+
+busy_value :: proc(p: ^Proc, by: Busy_By) -> f64 {
+	switch by {
+	case .Cpu:    return f64(p.cpu)
+	case .Memory: return f64(p.private)
+	case .Disk:   return p.read_rate + p.write_rate
+	}
+	return 0
+}
+
+ranking_make :: proc(app: ^App) {
+	r := &app.ranking
+	r.threads = 0
+	for p in app.sampler.procs { r.threads += p.threads }
+	order := make([dynamic]int, 0, len(app.sampler.procs), context.temp_allocator)
+	for by in Busy_By {
+		clear(&order)
+		for &p, i in app.sampler.procs { if !p.ended { append(&order, i) } }
+		context.user_index = int(by)
+		// (the measure through the context: a procedure literal takes nothing from its scope)
+		slice.sort_by(order[:], proc(a, b: int) -> bool {
+			measure := Busy_By(context.user_index)
+			return busy_value(&the_app.sampler.procs[a], measure) > busy_value(&the_app.sampler.procs[b], measure)
+		})
+		clear(&r.busiest[by])
+		append(&r.busiest[by], ..order[:min(len(order), BUSIEST_KEEP)])
+	}
+}
+
+ranking_destroy :: proc(r: ^Ranking) {
+	for &l in r.busiest { delete(l) }
+}
 
 // The DIAG_TOP busiest processes by `by`, "name (value)" apart by commas; "none" when no process uses any.
 @(private = "file")
 busiest :: proc(app: ^App, by: Busy_By) -> string {
-	value :: proc(p: ^Proc, by: Busy_By) -> f64 {
-		switch by {
-		case .Cpu:    return f64(p.cpu)
-		case .Memory: return f64(p.private)
-		case .Disk:   return p.read_rate + p.write_rate
-		}
-		return 0
-	}
-	order := make([dynamic]^Proc, context.temp_allocator)
-	for &p in app.sampler.procs { if !p.ended && value(&p, by) > 0 { append(&order, &p) } }
-	slice.sort_by(order[:], proc(a, b: ^Proc) -> bool { return a.cpu > b.cpu })
-	switch by {
-	case .Cpu:
-	case .Memory: slice.sort_by(order[:], proc(a, b: ^Proc) -> bool { return a.private > b.private })
-	case .Disk:   slice.sort_by(order[:], proc(a, b: ^Proc) -> bool { return a.read_rate + a.write_rate > b.read_rate + b.write_rate })
-	}
-	if len(order) == 0 { return "none" }
 	parts := make([dynamic]string, context.temp_allocator)
-	for p in order[:min(DIAG_TOP, len(order))] {
+	for i in app.ranking.busiest[by] {
+		p := &app.sampler.procs[i]
+		if len(parts) == DIAG_TOP || busy_value(p, by) <= 0 { break }
 		shown: string
 		switch by {
 		case .Cpu:    shown = fmt.tprintf("%.0f%%", p.cpu)
@@ -115,6 +143,7 @@ busiest :: proc(app: ^App, by: Busy_By) -> string {
 		}
 		append(&parts, fmt.tprintf("%s (%s)", p.name, shown))
 	}
+	if len(parts) == 0 { return "none" }
 	return join_comma(parts[:])
 }
 
