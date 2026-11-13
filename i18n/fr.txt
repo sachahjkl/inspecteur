@@ -1,0 +1,1946 @@
+# The texts in fr (docs/i18n.md). Written by the i18n command: a translation left empty is the English.
+language fr
+
+en %s has ended already
+fr %s est déjà terminé
+
+en %s now runs at %s
+fr %s tourne maintenant en %s
+
+en Access denied: %s
+fr Accès refusé : %s
+
+en The priority of %s cannot be changed
+fr La priorité de %s ne peut pas être changée
+
+en Access denied: %s is another user's process
+fr Accès refusé : %s est un processus d'un autre utilisateur
+
+en The affinity of %s cannot be read
+fr L'affinité de %s ne peut pas être lue
+
+en %s runs on %s now
+fr %s tourne maintenant sur %s
+
+en Access denied: only its owner, or %s, may change the affinity of %s
+fr Accès refusé : seul son propriétaire, ou %s, peut changer l'affinité de %s
+
+en The affinity of %s cannot be changed
+fr L'affinité de %s ne peut pas être changée
+
+en Inspecteur does not suspend itself: nothing could resume it
+fr Inspecteur ne se suspend pas lui-même : rien ne pourrait le reprendre
+
+en %s runs Inspecteur: suspended, it would stop Inspecteur too
+fr %s exécute Inspecteur : suspendu, il arrêterait aussi Inspecteur
+
+en %s draws the desktop: suspended, it would freeze every window, this one too
+fr %s dessine le bureau : suspendu, il figerait toutes les fenêtres, celle-ci aussi
+
+en %s is %s's: Inspecteur may not end it (only its owner, or %s, may)
+fr %s appartient à %s : Inspecteur ne peut pas le terminer (seul son propriétaire, ou %s, le peut)
+
+en %s cannot be ended (error %d)
+fr %s ne peut pas être terminé (erreur %d)
+
+en %s is %s's: Inspecteur may not suspend it (only its owner, or %s, may)
+fr %s appartient à %s : Inspecteur ne peut pas le suspendre (seul son propriétaire, ou %s, le peut)
+
+en %s cannot be suspended (error %d)
+fr %s ne peut pas être suspendu (erreur %d)
+
+en %s is %s's: Inspecteur may not resume it (only its owner, or %s, may)
+fr %s appartient à %s : Inspecteur ne peut pas le reprendre (seul son propriétaire, ou %s, le peut)
+
+en %s cannot be resumed (error %d)
+fr %s ne peut pas être repris (erreur %d)
+
+en Killed %s
+fr Arrêt forcé de %s
+
+en Suspended %s
+fr %s suspendu
+
+en Resumed %s
+fr %s repris
+
+en Asked %s to end
+fr Fin demandée à %s
+
+en %s (PID %d)
+fr %s (PID %d)
+
+en Choose at least one processor
+fr Choisissez au moins un processeur
+
+en The demo's processes are not the system's: nothing was changed
+fr Les processus de la démo ne sont pas ceux du système : rien n'a été changé
+
+en Affinity of %s (PID %d)
+fr Affinité de %s (PID %d)
+
+en The logical processors it may run on: each of its threads runs on these alone.
+fr Les processeurs logiques sur lesquels il peut tourner : chacun de ses threads tourne sur eux seuls.
+
+en CPU %d
+fr CPU %d
+
+en All
+fr Tous
+
+en None
+fr Aucun
+
+en Cancel
+fr Annuler
+
+en Apply (Enter)
+fr Appliquer (Entrée)
+
+en Mission Control
+fr Mission Control
+
+en Processes
+fr Processus
+
+en Performance
+fr Performances
+
+en Services
+fr Services
+
+en Startup
+fr Démarrage
+
+en Connections
+fr Connexions
+
+en Information
+fr Informations
+
+en Inspecteur ended without warning last time
+fr Inspecteur s'est arrêté sans prévenir la dernière fois
+
+en Its report: %s
+fr Son rapport : %s
+
+en The preferences cannot be written
+fr Les réglages ne peuvent pas être écrits
+
+en Read again
+fr Relire
+
+en Command palette
+fr Palette de commandes
+
+en Window
+fr Fenêtre
+
+en Keyboard shortcuts
+fr Raccourcis clavier
+
+en Filter
+fr Filtrer
+
+en Clear the filter
+fr Effacer le filtre
+
+en Pause or resume the refresh
+fr Suspendre ou reprendre l'actualisation
+
+en Refresh speed…
+fr Vitesse d'actualisation…
+
+en Zoom in
+fr Zoom avant
+
+en Zoom out
+fr Zoom arrière
+
+en Zoom: 100 %
+fr Zoom : 100 %
+
+en Light or dark
+fr Clair ou sombre
+
+en Install…
+fr Installer…
+
+en Settings
+fr Réglages
+
+en Check for updates
+fr Rechercher des mises à jour
+
+en Why is it slow?
+fr Pourquoi est-ce lent ?
+
+en Sections
+fr Sections
+
+en Next section
+fr Section suivante
+
+en Previous section
+fr Section précédente
+
+en End task
+fr Terminer la tâche
+
+en Kill…
+fr Forcer l'arrêt…
+
+en End process tree…
+fr Terminer l'arborescence…
+
+en Select all
+fr Tout sélectionner
+
+en Suspend or resume
+fr Suspendre ou reprendre
+
+en Properties
+fr Propriétés
+
+en Open file location
+fr Ouvrir l'emplacement du fichier
+
+en Copy command line
+fr Copier la ligne de commande
+
+en Open the group, or Properties
+fr Ouvrir le groupe, ou Propriétés
+
+en Open the group
+fr Ouvrir le groupe
+
+en Close the group
+fr Fermer le groupe
+
+en Raise the priority
+fr Augmenter la priorité
+
+en Lower the priority
+fr Baisser la priorité
+
+en Set affinity…
+fr Définir l'affinité…
+
+en Send a signal
+fr Envoyer un signal
+
+en Show its window
+fr Afficher sa fenêtre
+
+en Go to service
+fr Aller au service
+
+en Create dump file…
+fr Créer un fichier d'image mémoire…
+
+en Search online
+fr Rechercher en ligne
+
+en Process tree or apps
+fr Arborescence des processus ou applications
+
+en Columns…
+fr Colonnes…
+
+en Show or hide the summary of the machine
+fr Afficher ou masquer le résumé de la machine
+
+en Pin or unpin
+fr Épingler ou détacher
+
+en Mission Control: panels…
+fr Mission Control : panneaux…
+
+en Mission Control: the layout as at first
+fr Mission Control : la disposition d'origine
+
+en One graph per logical processor
+fr Un graphique par processeur logique
+
+en Next device
+fr Périphérique suivant
+
+en Previous device
+fr Périphérique précédent
+
+en Start
+fr Démarrer
+
+en Stop
+fr Arrêter
+
+en Restart
+fr Redémarrer
+
+en Enable
+fr Activer
+
+en Disable
+fr Désactiver
+
+en Open in Processes
+fr Ouvrir dans Processus
+
+en Copy name
+fr Copier le nom
+
+en Details and journal
+fr Détails et journal
+
+en Open unit file
+fr Ouvrir le fichier d'unité
+
+en System or user services
+fr Services du système ou de l'utilisateur
+
+en Search the journal
+fr Rechercher dans le journal
+
+en Journal: all, warnings, errors
+fr Journal : tout, avertissements, erreurs
+
+en Journal: this boot or every boot
+fr Journal : ce démarrage ou tous les démarrages
+
+en Follow the journal
+fr Suivre le journal
+
+en Copy the journal's entries shown
+fr Copier les entrées affichées du journal
+
+en Copy the journal's entry
+fr Copier l'entrée du journal
+
+en The journal in its own window
+fr Le journal dans sa propre fenêtre
+
+en Enable or disable
+fr Activer ou désactiver
+
+en Copy command
+fr Copier la commande
+
+en Copy address
+fr Copier l'adresse
+
+en Copy all
+fr Tout copier
+
+en Filter the list
+fr Filtrer la liste
+
+en Next tab
+fr Onglet suivant
+
+en Previous tab
+fr Onglet précédent
+
+en Close
+fr Fermer
+
+en Checking for updates…
+fr Recherche de mises à jour…
+
+en Light colours: %s has no light version, %s has
+fr Couleurs claires : %s n'a pas de version claire, %s en a une
+
+en Dark colours: %s has no dark version, %s has
+fr Couleurs sombres : %s n'a pas de version sombre, %s en a une
+
+en Light colours
+fr Couleurs claires
+
+en Dark colours
+fr Couleurs sombres
+
+en Colours as the system's
+fr Couleurs comme celles du système
+
+en Established
+fr Établie
+
+en SYN sent
+fr SYN envoyé
+
+en SYN received
+fr SYN reçu
+
+en FIN wait 1
+fr Attente FIN 1
+
+en FIN wait 2
+fr Attente FIN 2
+
+en Time wait
+fr Attente de délai
+
+en Closed
+fr Fermée
+
+en Close wait
+fr Attente de fermeture
+
+en Last ACK
+fr Dernier ACK
+
+en Listening
+fr À l'écoute
+
+en Closing
+fr Fermeture
+
+en Open
+fr Ouverte
+
+en Connected
+fr Connectée
+
+en Process
+fr Processus
+
+en PID
+fr PID
+
+en Protocol
+fr Protocole
+
+en Local address
+fr Adresse locale
+
+en Remote address
+fr Adresse distante
+
+en State
+fr État
+
+en %d socket, %d listening or open
+en+ %d sockets, %d listening or open
+fr %d socket, %d à l'écoute ou ouverts
+fr+ %d sockets, %d à l'écoute ou ouverts
+
+en Reading…
+fr Lecture…
+
+en No socket.
+fr Aucun socket.
+
+en PID %d has ended already
+fr Le PID %d est déjà terminé
+
+en PID %d has ended
+fr Le PID %d est terminé
+
+en Copied
+fr Copié
+
+en Enabled
+fr Activé
+
+en Disabled
+fr Désactivé
+
+en Static
+fr Statique
+
+en No line in the journal.
+fr Aucune ligne dans le journal.
+
+en The processors are %.0f%% busy. The busiest: %s.
+fr Les processeurs sont occupés à %.0f%%. Les plus actifs : %s.
+
+en Tasks waited for a processor %.0f%% of the last 10 seconds.
+fr Des tâches ont attendu un processeur %.0f%% des 10 dernières secondes.
+
+en Tasks waited for memory %.0f%% of the last 10 seconds.
+fr Des tâches ont attendu la mémoire %.0f%% des 10 dernières secondes.
+
+en Tasks waited for the disks %.0f%% of the last 10 seconds.
+fr Des tâches ont attendu les disques %.0f%% des 10 dernières secondes.
+
+en The memory is %.0f%% in use (%s of %s). The largest: %s.
+fr La mémoire est utilisée à %.0f%% (%s sur %s). Les plus gros : %s.
+
+en %s of the swap is in use: pages wait on the disk.
+fr %s du swap est utilisé : des pages attendent sur le disque.
+
+en The disk %s is busy %.0f%% of the time. Reading and writing the most: %s.
+fr Le disque %s est occupé %.0f%% du temps. Ceux qui lisent et écrivent le plus : %s.
+
+en The GPU %s is %.0f%% busy.
+fr Le GPU %s est occupé à %.0f%%.
+
+en The processor is hot: %.0f °C.
+fr Le processeur est chaud : %.0f °C.
+
+en The processor slowed for its heat %d time since Inspecteur started.
+en+ The processor slowed for its heat %d times since Inspecteur started.
+fr Le processeur a ralenti à cause de sa chaleur %d fois depuis le lancement d'Inspecteur.
+fr+ Le processeur a ralenti à cause de sa chaleur %d fois depuis le lancement d'Inspecteur.
+
+en Nothing stands out: the processors are %.0f%% busy and the memory has room.
+fr Rien ne ressort : les processeurs sont occupés à %.0f%% et la mémoire a de la place.
+
+en none
+fr aucun
+
+en The demo's processes are not the system's: no dump was written
+fr Les processus de la démo ne sont pas ceux du système : aucune image mémoire n'a été écrite
+
+en A dump is being written already
+fr Une image mémoire est déjà en cours d'écriture
+
+en Writing a dump of %s…
+fr Écriture d'une image mémoire de %s…
+
+en No dump: %s
+fr Pas d'image mémoire : %s
+
+en Wrote the dump %s
+fr Image mémoire écrite : %s
+
+en gdb's gcore writes it into ~/.cache/inspecteur/dumps.
+fr gcore de gdb l'écrit dans ~/.cache/inspecteur/dumps.
+
+en gcore is not installed: it comes with gdb
+fr gcore n'est pas installé : il est fourni avec gdb
+
+en the process has ended
+fr le processus est terminé
+
+en the process ended while it was read
+fr le processus s'est terminé pendant sa lecture
+
+en the kernel lets only a process's parents or root read its memory (kernel.yama.ptrace_scope = %s)
+fr le noyau ne laisse que les parents d'un processus ou root lire sa mémoire (kernel.yama.ptrace_scope = %s)
+
+en gcore could not read it
+fr gcore n'a pas pu le lire
+
+ctx unit
+en B
+fr o
+
+ctx unit
+en KB
+fr Ko
+
+ctx unit
+en MB
+fr Mo
+
+ctx unit
+en GB
+fr Go
+
+ctx unit
+en TB
+fr To
+
+en %d day, %d h %d min
+en+ %d days, %d h %d min
+fr %d jour, %d h %d min
+fr+ %d jours, %d h %d min
+
+en %d second
+en+ %d seconds
+fr %d seconde
+fr+ %d secondes
+
+en %d minute
+en+ %d minutes
+fr %d minute
+fr+ %d minutes
+
+en %s GPU (card%d)
+fr GPU %s (card%d)
+
+en Display controller
+fr Contrôleur d'affichage
+
+en Operating system
+fr Système d'exploitation
+
+en Kernel
+fr Noyau
+
+en Architecture
+fr Architecture
+
+en Computer name
+fr Nom de l'ordinateur
+
+en Up for
+fr Allumé depuis
+
+en Desktop
+fr Bureau
+
+en Session
+fr Session
+
+en Computer
+fr Ordinateur
+
+en Motherboard
+fr Carte mère
+
+en Firmware
+fr Micrologiciel
+
+en System
+fr Système
+
+en Model
+fr Modèle
+
+en Cores
+fr Cœurs
+
+en Processor
+fr Processeur
+
+en Installed
+fr Installée
+
+en Available now
+fr Disponible maintenant
+
+en Swap
+fr Swap
+
+en Memory
+fr Mémoire
+
+en PCI %s at %s, driver %s
+fr PCI %s en %s, pilote %s
+
+en PCI %s at %s
+fr PCI %s en %s
+
+en Graphics
+fr Graphismes
+
+en Disk
+fr Disque
+
+en %s free of %s (%s, %s)
+fr %s libres sur %s (%s, %s)
+
+en Storage
+fr Stockage
+
+en up
+fr actif
+
+en down
+fr inactif
+
+en Network
+fr Réseau
+
+en Screen
+fr Écran
+
+en This window's screen
+fr L'écran de cette fenêtre
+
+en %d×%d logical pixels, %.0f Hz
+fr %d×%d pixels logiques, %.0f Hz
+
+en Displays
+fr Écrans
+
+en %s; holds %d%% of its design capacity
+fr %s ; garde %d%% de sa capacité d'origine
+
+en Battery
+fr Batterie
+
+en %d core
+en+ %d cores
+fr %d cœur
+fr+ %d cœurs
+
+en %d logical processor
+en+ %d logical processors
+fr %d processeur logique
+fr+ %d processeurs logiques
+
+en %s, %d sockets
+fr %s, %d sockets
+
+en charging
+fr en charge
+
+en discharging
+fr en décharge
+
+en full
+fr pleine
+
+en not charging
+fr pas en charge
+
+en This computer and its system
+fr Cet ordinateur et son système
+
+en Copied the system's information (%d lines)
+en+ Copied the system's information (%d lines)
+fr Informations du système copiées (%d ligne)
+fr+ Informations du système copiées (%d lignes)
+
+en Select a service: its journal shows here.
+fr Sélectionnez un service : son journal s'affiche ici.
+
+en No entry is shown: another level, or another search, shows some.
+fr Aucune entrée affichée : un autre niveau, ou une autre recherche, en affiche.
+
+en All %d
+fr Tout %d
+
+en Warnings %d
+fr Avertissements %d
+
+en Errors %d
+fr Erreurs %d
+
+en Every entry (%s)
+fr Toutes les entrées (%s)
+
+en Warnings and worse (%s)
+fr Avertissements et pire (%s)
+
+en Errors and worse (%s)
+fr Erreurs et pire (%s)
+
+en The entries of this boot (%s)
+fr Les entrées de ce démarrage (%s)
+
+en The last entries, from any boot (%s)
+fr Les dernières entrées, de tout démarrage (%s)
+
+en This boot
+fr Ce démarrage
+
+en Every boot
+fr Tous les démarrages
+
+en Following: new entries come in at the end (%s stops)
+fr Suivi : les nouvelles entrées arrivent à la fin (%s l'arrête)
+
+en Search the journal (%s)
+fr Rechercher dans le journal (%s)
+
+en %d entry
+en+ %d entries
+fr %d entrée
+fr+ %d entrées
+
+en %d of %d
+fr %d sur %d
+
+en %s, process %d
+fr %s, processus %d
+
+en Copied the entry
+fr Entrée copiée
+
+en The journal: every entry
+fr Le journal : toutes les entrées
+
+en The journal: warnings and worse
+fr Le journal : avertissements et pire
+
+en The journal: errors and worse
+fr Le journal : erreurs et pire
+
+en The journal: this boot
+fr Le journal : ce démarrage
+
+en The journal: every boot
+fr Le journal : tous les démarrages
+
+en Following the journal: new entries come in at the end
+fr Suivi du journal : les nouvelles entrées arrivent à la fin
+
+en The journal is not read again
+fr Le journal n'est plus relu
+
+en Copied %d entry
+en+ Copied %d entries
+fr %d entrée copiée
+fr+ %d entrées copiées
+
+en %s: journal
+fr %s : journal
+
+en No window for the journal: the renderer refused it
+fr Pas de fenêtre pour le journal : le moteur de rendu l'a refusée
+
+en The journal of %s in its own window
+fr Le journal de %s dans sa propre fenêtre
+
+en a system service
+fr un service du système
+
+en a user service
+fr un service de l'utilisateur
+
+en in its state since %s
+fr dans cet état depuis %s
+
+en Licence registered: thank you
+fr Licence enregistrée : merci
+
+en Licence removed
+fr Licence retirée
+
+en This licence is not Inspecteur's.
+fr Cette licence n'est pas celle d'Inspecteur.
+
+en This key is not a valid licence of Inspecteur: check that it was copied whole.
+fr Cette clé n'est pas une licence valide d'Inspecteur : vérifiez qu'elle a été copiée en entier.
+
+en This build of Inspecteur accepts no licence yet.
+fr Cette version d'Inspecteur n'accepte encore aucune licence.
+
+en The licence file cannot be read.
+fr Le fichier de licence ne peut pas être lu.
+
+en The licence cannot be saved.
+fr La licence ne peut pas être enregistrée.
+
+en Licence
+fr Licence
+
+en Reading the licence…
+fr Lecture de la licence…
+
+en Registered to %s (%s). Thank you for supporting Inspecteur.
+fr Enregistrée au nom de %s (%s). Merci de soutenir Inspecteur.
+
+en Remove the licence
+fr Retirer la licence
+
+en Unregistered. Inspecteur is free; a licence supports its work.
+fr Non enregistré. Inspecteur est gratuit ; une licence soutient son travail.
+
+en The licence stored here is not valid: %s
+fr La licence enregistrée ici n'est pas valide : %s
+
+en Support Inspecteur: buy a licence
+fr Soutenir Inspecteur : acheter une licence
+
+en Paste a licence key
+fr Collez une clé de licence
+
+en Register
+fr Enregistrer
+
+en Choose a file…
+fr Choisir un fichier…
+
+en Choose a licence file
+fr Choisir un fichier de licence
+
+en Inspecteur licence
+fr Licence d'Inspecteur
+
+en CPU
+fr CPU
+
+en I/O
+fr E/S
+
+en Removable
+fr Amovible
+
+en Tunnel
+fr Tunnel
+
+en Virtual
+fr Virtuel
+
+en %s (%d processes)
+en+ %s (%d processes)
+fr %s (%d processus)
+fr+ %s (%d processus)
+
+en %s (%d instances)
+en+ %s (%d instances)
+fr %s (%d instance)
+fr+ %s (%d instances)
+
+en %d processes
+en+ %d processes
+fr %d processus
+fr+ %d processus
+
+en %s and %d process under it
+en+ %s and %d processes under it
+fr %s et %d processus sous lui
+fr+ %s et %d processus sous lui
+
+en Searched the web for %s
+fr Recherche de %s sur le web
+
+en Create
+fr Créer
+
+en Create a dump file of %s?
+fr Créer un fichier d'image mémoire de %s ?
+
+en Its memory is written to a file of %s at most: anything it held, passwords and documents too. %s
+fr Sa mémoire est écrite dans un fichier de %s au plus : tout ce qu'il contenait, mots de passe et documents compris. %s
+
+en Resume
+fr Reprendre
+
+en Suspend
+fr Suspendre
+
+en Unpin
+fr Détacher
+
+en Pin
+fr Épingler
+
+en Opened the folder of %s
+fr Dossier de %s ouvert
+
+en Copied the command line of %s
+fr Ligne de commande de %s copiée
+
+en Hang up (SIGHUP)
+fr Raccrocher (SIGHUP)
+
+en Interrupt (SIGINT)
+fr Interrompre (SIGINT)
+
+en Quit (SIGQUIT)
+fr Quitter (SIGQUIT)
+
+en Terminate (SIGTERM)
+fr Terminer (SIGTERM)
+
+en Kill (SIGKILL)…
+fr Forcer l'arrêt (SIGKILL)…
+
+en Stop (SIGSTOP)
+fr Suspendre (SIGSTOP)
+
+en Continue (SIGCONT)
+fr Continuer (SIGCONT)
+
+en User 1 (SIGUSR1)
+fr Utilisateur 1 (SIGUSR1)
+
+en User 2 (SIGUSR2)
+fr Utilisateur 2 (SIGUSR2)
+
+en Not stopped: it is Inspecteur, runs it or draws the desktop, and nothing could resume it
+fr Pas suspendu : c'est Inspecteur, il l'exécute ou dessine le bureau, et rien ne pourrait le reprendre
+
+en The demo's processes are not the system's: nothing was sent
+fr Les processus de la démo ne sont pas ceux du système : rien n'a été envoyé
+
+en %s, PID %d
+fr %s, PID %d
+
+en PID %d
+fr PID %d
+
+en End tree
+fr Terminer l'arborescence
+
+en Kill
+fr Forcer l'arrêt
+
+en End
+fr Terminer
+
+en Kill %s?
+fr Forcer l'arrêt de %s ?
+
+en End %s?
+fr Terminer %s ?
+
+en It draws the desktop: the session ends with it, and every program of the session with it. 
+fr Il dessine le bureau : la session se termine avec lui, et tous les programmes de la session avec elle. 
+
+en Inspecteur ends with it: it runs under it. 
+fr Inspecteur se termine avec lui : il tourne sous lui. 
+
+en They end at once, without the chance to save their work. End task asks them to end on their own.
+fr Ils s'arrêtent aussitôt, sans pouvoir enregistrer leur travail. Terminer la tâche leur demande de s'arrêter d'eux-mêmes.
+
+en It ends at once, without the chance to save its work. End task asks it to end on its own.
+fr Il s'arrête aussitôt, sans pouvoir enregistrer son travail. Terminer la tâche lui demande de s'arrêter de lui-même.
+
+en Each is asked to end.
+fr Il est demandé à chacun de s'arrêter.
+
+en It is asked to end.
+fr Il lui est demandé de s'arrêter.
+
+en Stop %s?
+fr Arrêter %s ?
+
+en Restart %s?
+fr Redémarrer %s ?
+
+en It stops, and its processes end; what needs it may stop too.
+fr Il s'arrête, et ses processus se terminent ; ce qui en dépend peut s'arrêter aussi.
+
+en It stops, its processes end, and it starts again.
+fr Il s'arrête, ses processus se terminent, et il redémarre.
+
+en %s runs at the highest priority offered already
+fr %s tourne déjà à la plus haute priorité proposée
+
+en %s runs at the lowest priority offered already
+fr %s tourne déjà à la plus basse priorité proposée
+
+en Machine
+fr Machine
+
+en Health
+fr Santé
+
+en Busiest: CPU
+fr Les plus actifs : CPU
+
+en Busiest: memory
+fr Les plus gros : mémoire
+
+en %d of %d panels: drag a tab to move it
+fr %d panneaux sur %d : faites glisser un onglet pour le déplacer
+
+en %s closed: the panels' menu brings it back
+fr %s fermé : le menu des panneaux le fait revenir
+
+en Panels
+fr Panneaux
+
+en Struggling
+fr En difficulté
+
+en Under strain
+fr Sous tension
+
+en Healthy
+fr En forme
+
+en CPU %.0f%%
+fr CPU %.0f%%
+
+en A click, or %s: why it is slow, in full.
+fr Un clic, ou %s : pourquoi c'est lent, en détail.
+
+en %d service of the system: %d running, %d failed
+en+ %d services of the system: %d running, %d failed
+fr %d service du système : %d en cours, %d en échec
+fr+ %d services du système : %d en cours, %d en échec
+
+en %d service of the user: %d running, %d failed
+en+ %d services of the user: %d running, %d failed
+fr %d service de l'utilisateur : %d en cours, %d en échec
+fr+ %d services de l'utilisateur : %d en cours, %d en échec
+
+en No service failed.
+fr Aucun service en échec.
+
+en %s now; %d listening, %d connected
+fr %s maintenant ; %d à l'écoute, %d connectés
+
+en %d socket
+en+ %d sockets
+fr %d socket
+fr+ %d sockets
+
+en %d item, %d on
+en+ %d items, %d on
+fr %d élément, %d actifs
+fr+ %d éléments, %d actifs
+
+en %s, kernel %s
+fr %s, noyau %s
+
+en GPU %d
+fr GPU %d
+
+en Show in Processes
+fr Afficher dans Processus
+
+en Show its connections
+fr Afficher ses connexions
+
+en Show in Services
+fr Afficher dans Services
+
+en Show its process
+fr Afficher son processus
+
+en Show in Startup
+fr Afficher dans Démarrage
+
+en No window for %s: the renderer refused it
+fr Pas de fenêtre pour %s : le moteur de rendu l'a refusée
+
+en Overall
+fr Global
+
+en Logical processors
+fr Processeurs logiques
+
+en One graph for all the processors (%s)
+fr Un graphique pour tous les processeurs (%s)
+
+en One graph per logical processor (%s)
+fr Un graphique par processeur logique (%s)
+
+en Disk %d (%s)
+fr Disque %d (%s)
+
+en %s  S: %s R: %s
+fr %s  E : %s R : %s
+
+en %s  asleep
+fr %s  en veille
+
+en Pressure
+fr Pression
+
+en %s waits %.1f%%
+fr %s : attente %.1f%%
+
+en %% Utilization of each logical processor over %s
+fr %% d'utilisation de chaque processeur logique sur %s
+
+en % Utilization
+fr % d'utilisation
+
+en Temperature (%s)
+fr Température (%s)
+
+en L%d cache
+fr Cache L%d
+
+en Base speed
+fr Vitesse de base
+
+en Maximum speed
+fr Vitesse maximale
+
+en Sockets
+fr Sockets
+
+en Load average
+fr Charge moyenne
+
+en Core temperatures
+fr Températures des cœurs
+
+en %.0f to %.0f °C
+fr %.0f à %.0f °C
+
+en Slowed for its heat
+fr Ralenti par la chaleur
+
+en %d time since Inspecteur started
+en+ %d times since Inspecteur started
+fr %d fois depuis le lancement d'Inspecteur
+fr+ %d fois depuis le lancement d'Inspecteur
+
+en Utilization
+fr Utilisation
+
+en Speed
+fr Vitesse
+
+en Temperature
+fr Température
+
+en Up time
+fr Temps d'activité
+
+en Threads
+fr Threads
+
+en Open files
+fr Fichiers ouverts
+
+en Memory usage
+fr Utilisation de la mémoire
+
+en Memory composition
+fr Composition de la mémoire
+
+en In use
+fr Utilisée
+
+en Cache, given back when needed
+fr Cache, rendu au besoin
+
+en Free
+fr Libre
+
+en Available
+fr Disponible
+
+en Committed
+fr Allouée
+
+en Total
+fr Total
+
+en Files cached
+fr Fichiers en cache
+
+en Disk buffers
+fr Tampons des disques
+
+en Kernel, reclaimable
+fr Noyau, récupérable
+
+en Shared memory
+fr Mémoire partagée
+
+en To be written
+fr À écrire
+
+en Active time
+fr Temps d'activité du disque
+
+en Transfer rate
+fr Débit de transfert
+
+en Read
+fr Lecture
+
+en Write
+fr Écriture
+
+en Read speed
+fr Vitesse de lecture
+
+en Write speed
+fr Vitesse d'écriture
+
+en Capacity
+fr Capacité
+
+en Type
+fr Type
+
+en Mounted on
+fr Monté sur
+
+en nothing
+fr rien
+
+en Throughput
+fr Débit
+
+en Receive
+fr Réception
+
+en Send
+fr Envoi
+
+en %s\nand %d more
+fr %s\net %d de plus
+
+en Adapter
+fr Carte
+
+en connected
+fr connecté
+
+en not connected
+fr non connecté
+
+en Link speed
+fr Vitesse du lien
+
+en unknown
+fr inconnu
+
+en MAC address
+fr Adresse MAC
+
+en Dedicated memory usage
+fr Utilisation de la mémoire dédiée
+
+en This GPU is asleep: the system turned it off while nothing uses it. Reading it would wake it.
+fr Ce GPU est en veille : le système l'a éteint tant que rien ne l'utilise. Le lire le réveillerait.
+
+en This GPU's numbers come with NVIDIA's driver library (libnvidia-ml), not found or not answering.
+fr Les chiffres de ce GPU viennent de la bibliothèque du pilote NVIDIA (libnvidia-ml), introuvable ou muette.
+
+en This GPU's driver tells no utilization without %s.
+fr Le pilote de ce GPU ne donne aucune utilisation sans %s.
+
+en Dedicated memory
+fr Mémoire dédiée
+
+en Power
+fr Puissance
+
+en Vendor
+fr Fabricant
+
+en asleep
+fr en veille
+
+en awake
+fr éveillé
+
+en Clock
+fr Fréquence
+
+en Driver version
+fr Version du pilote
+
+en the time tasks waited for a resource
+fr le temps d'attente des tâches pour une ressource
+
+en % of the time some task waited, over 10 s
+fr % du temps où une tâche a attendu, sur 10 s
+
+en %s, some
+fr %s, certaines
+
+en %s, some task
+fr %s, certaines tâches
+
+en %.1f%% over 10 s, %.1f%% over 60 s
+fr %.1f%% sur 10 s, %.1f%% sur 60 s
+
+en %s, every task
+fr %s, toutes les tâches
+
+en %s is pinned over the others
+fr %s est épinglé au-dessus des autres
+
+en %s is unpinned
+fr %s est détaché
+
+en Name
+fr Nom
+
+en Parent PID
+fr PID parent
+
+en User
+fr Utilisateur
+
+en CPU, 30 s
+fr CPU, 30 s
+
+en Private memory
+fr Mémoire privée
+
+en Resident
+fr Résidente
+
+en GPU
+fr GPU
+
+en GPU memory
+fr Mémoire GPU
+
+en Disk read
+fr Lecture disque
+
+en Disk write
+fr Écriture disque
+
+en Started
+fr Lancé
+
+en Command line
+fr Ligne de commande
+
+en Executable
+fr Exécutable
+
+en General
+fr Général
+
+en History
+fr Historique
+
+en Modules
+fr Modules
+
+en Environment
+fr Environnement
+
+en The process has ended.
+fr Le processus est terminé.
+
+en Access denied (another user's process)
+fr Accès refusé (processus d'un autre utilisateur)
+
+en Parent
+fr Parent
+
+en Priority
+fr Priorité
+
+en Affinity
+fr Affinité
+
+en processors %s
+fr processeurs %s
+
+en Working folder
+fr Dossier de travail
+
+en %.1f%% of the machine
+fr %.1f%% de la machine
+
+en %s private, %s resident (with the pages it shares with other processes)
+fr %s privée, %s résidente (avec les pages qu'il partage avec d'autres processus)
+
+en %.0f%% of a GPU's time
+fr %.0f%% du temps d'un GPU
+
+en %s read, %s written since it started
+fr %s lus, %s écrits depuis son lancement
+
+en Its history starts at the next samples.
+fr Son historique commence aux prochaines mesures.
+
+en %s, top %s
+fr %s, maximum %s
+
+en Access denied: another user's process. Only its owner, or %s, may read it.
+fr Accès refusé : processus d'un autre utilisateur. Seul son propriétaire, ou %s, peut le lire.
+
+en Nothing matches “%s”.
+fr Rien ne correspond à « %s ».
+
+en TID
+fr TID
+
+en CPU time
+fr Temps CPU
+
+en FD
+fr FD
+
+en What it is open on
+fr Ce sur quoi il est ouvert
+
+en File mapped
+fr Fichier projeté
+
+en Size
+fr Taille
+
+en Value
+fr Valeur
+
+en Affinity…
+fr Affinité…
+
+en Filter the list...
+fr Filtrer la liste...
+
+en The processes cannot be read (/proc)
+fr Les processus ne peuvent pas être lus (/proc)
+
+en Running
+fr En cours
+
+en Sleeping
+fr En sommeil
+
+en Disk wait
+fr Attente disque
+
+en Suspended
+fr Suspendu
+
+en Traced
+fr Tracé
+
+en Zombie
+fr Zombie
+
+en Dead
+fr Mort
+
+en Idle
+fr Inactif
+
+en Starting %s…
+fr Démarrage de %s…
+
+en Stopping %s…
+fr Arrêt de %s…
+
+en Restarting %s…
+fr Redémarrage de %s…
+
+en Enabling %s…
+fr Activation de %s…
+
+en Disabling %s…
+fr Désactivation de %s…
+
+en Started %s
+fr %s démarré
+
+en Stopped %s
+fr %s arrêté
+
+en Restarted %s
+fr %s redémarré
+
+en Enabled %s
+fr %s activé
+
+en Disabled %s
+fr %s désactivé
+
+en Warnings
+fr Avertissements
+
+en Errors
+fr Erreurs
+
+en Description
+fr Description
+
+en Load
+fr Chargement
+
+en %s is not among the system services
+fr %s n'est pas parmi les services du système
+
+en %s is not among the user services
+fr %s n'est pas parmi les services de l'utilisateur
+
+en The system's service manager cannot be reached.
+fr Le gestionnaire de services du système est injoignable.
+
+en The user's service manager cannot be reached (no session bus).
+fr Le gestionnaire de services de l'utilisateur est injoignable (pas de bus de session).
+
+en systemd does not list its units
+fr systemd ne liste pas ses unités
+
+en the service manager cannot be reached
+fr le gestionnaire de services est injoignable
+
+en the service manager did not answer
+fr le gestionnaire de services n'a pas répondu
+
+en the service manager did not reload
+fr le gestionnaire de services ne s'est pas rechargé
+
+en not allowed: %s (a system service needs an administrator's permission)
+fr non autorisé : %s (un service du système demande l'autorisation d'un administrateur)
+
+en access denied
+fr accès refusé
+
+en journalctl cannot be run: the journal is not read
+fr journalctl ne peut pas être lancé : le journal n'est pas lu
+
+en journalctl failed
+fr journalctl a échoué
+
+en No entry of this boot that this user may read.
+fr Aucune entrée de ce démarrage que cet utilisateur peut lire.
+
+en No entry in the journal that this user may read.
+fr Aucune entrée du journal que cet utilisateur peut lire.
+
+en Waiting for the service manager…
+fr En attente du gestionnaire de services…
+
+en %d service, %d running
+en+ %d services, %d running
+fr %d service, %d en cours
+fr+ %d services, %d en cours
+
+en No service.
+fr Aucun service.
+
+en No service selected
+fr Aucun service sélectionné
+
+en %s since %s
+fr %s depuis %s
+
+en %d task
+en+ %d tasks
+fr %d tâche
+fr+ %d tâches
+
+en CPU time %s
+fr Temps CPU %s
+
+en restarted %d time
+en+ restarted %d times
+fr redémarré %d fois
+fr+ redémarré %d fois
+
+en Hide the details (%s)
+fr Masquer les détails (%s)
+
+en The selected service's details and journal
+fr Les détails et le journal du service sélectionné
+
+en Details hidden
+fr Détails masqués
+
+en Opened %s
+fr %s ouvert
+
+en The system's services (%s)
+fr Les services du système (%s)
+
+en The user's services (%s)
+fr Les services de l'utilisateur (%s)
+
+en Hide the details
+fr Masquer les détails
+
+en It runs the desktop: the session ends with it.
+fr Il fait tourner le bureau : la session se termine avec lui.
+
+en Inspecteur runs under it: Inspecteur ends with it.
+fr Inspecteur tourne sous lui : Inspecteur se termine avec lui.
+
+en Inspecteur runs in it: Inspecteur ends with it.
+fr Inspecteur tourne dedans : Inspecteur se termine avec lui.
+
+en PID %d is not in the processes' last sample
+fr Le PID %d n'est pas dans la dernière mesure des processus
+
+en How often the processes and the machine are read again, in milliseconds: a point of the Performance section's graphs each time. The title bar's refresh menu (Ctrl+Shift+R) changes it.
+fr L'intervalle de lecture des processus et de la machine, en millisecondes : un point des graphiques de la section Performances à chaque fois. Le menu d'actualisation de la barre de titre (Ctrl+Shift+R) le change.
+
+en How the processes are listed: apps, the apps' groups and the background processes; tree, every process under its parent. Ctrl+T switches them.
+fr La présentation des processus : apps, les groupes des applications et les processus d'arrière-plan ; tree, chaque processus sous son parent. Ctrl+T passe de l'une à l'autre.
+
+en Show the summary of the machine over the Processes table: CPU, memory, disks, network, GPU, temperature and pressure, each with its last minute. Ctrl+B shows or hides it.
+fr Afficher le résumé de la machine au-dessus du tableau des processus : CPU, mémoire, disques, réseau, GPU, température et pression, chacun avec sa dernière minute. Ctrl+B l'affiche ou le masque.
+
+en The services the Services section lists: the system's (system) or the user's (user). Its System and User buttons change it.
+fr Les services que liste la section Services : ceux du système (system) ou ceux de l'utilisateur (user). Ses boutons Système et Utilisateur le changent.
+
+en Show the selected service's details and its journal's last lines under the table (Ctrl+I).
+fr Afficher les détails du service sélectionné et les dernières lignes de son journal sous le tableau (Ctrl+I).
+
+en The details' journal shows this boot's entries alone; off: its last entries, from any boot. Alt+B switches it.
+fr Le journal des détails n'affiche que les entrées de ce démarrage ; désactivé : ses dernières entrées, de tout démarrage. Alt+B le bascule.
+
+en The entries of the details' journal shown: all, warnings (and worse), errors (and worse). Alt+L goes through them.
+fr Les entrées affichées du journal des détails : all (toutes), warnings (avertissements et pire), errors (erreurs et pire). Alt+L passe de l'une à l'autre.
+
+en Read the details' journal again every 2 seconds while it is shown: new entries come in at the end. Alt+F switches it.
+fr Relire le journal des détails toutes les 2 secondes tant qu'il est affiché : les nouvelles entrées arrivent à la fin. Alt+F le bascule.
+
+en How often the sockets are read again while Connections or Mission Control is shown, in milliseconds. A reading goes through every process's open files: a longer period costs less.
+fr L'intervalle de lecture des sockets tant que Connexions ou Mission Control est affiché, en millisecondes. Une lecture parcourt les fichiers ouverts de chaque processus : un intervalle plus long coûte moins.
+
+en How often the services are read again while their section is shown, in milliseconds.
+fr L'intervalle de lecture des services tant que leur section est affichée, en millisecondes.
+
+en Shade every second row of the tables: a line of numbers reads across.
+fr Griser une ligne sur deux des tableaux : une ligne de nombres se lit d'un bout à l'autre.
+
+en Draw a thin line under each row of the tables.
+fr Tracer un fin trait sous chaque ligne des tableaux.
+
+en Appearance
+fr Apparence
+
+en Tables
+fr Tableaux
+
+en Scrolling
+fr Défilement
+
+en Input
+fr Saisie
+
+en Delays and menus
+fr Délais et menus
+
+en Updates
+fr Mises à jour
+
+en Rendering
+fr Rendu
+
+en This desktop draws no title bar for Inspecteur's window (GNOME): Inspecteur keeps its own.
+fr Ce bureau ne dessine pas de barre de titre pour la fenêtre d'Inspecteur (GNOME) : Inspecteur garde la sienne.
+
+en Autostart entry
+fr Entrée de démarrage automatique
+
+en User service
+fr Service de l'utilisateur
+
+en Command
+fr Commande
+
+en Status
+fr Statut
+
+en File
+fr Fichier
+
+en Enabled %s: it starts with the session
+fr %s activé : il démarre avec la session
+
+en Disabled %s: it no longer starts with the session
+fr %s désactivé : il ne démarre plus avec la session
+
+en Not in this desktop
+fr Pas dans ce bureau
+
+en The user's service manager cannot be reached (no session bus): its services are not listed.
+fr Le gestionnaire de services de l'utilisateur est injoignable (pas de bus de session) : ses services ne sont pas listés.
+
+en The user's service manager does not list its services.
+fr Le gestionnaire de services de l'utilisateur ne liste pas ses services.
+
+en Masked
+fr Masqué
+
+en the user's service manager cannot be reached
+fr le gestionnaire de services de l'utilisateur est injoignable
+
+en not an autostart entry
+fr pas une entrée de démarrage automatique
+
+en its file is gone
+fr son fichier a disparu
+
+en cannot remove %s
+fr impossible de supprimer %s
+
+en cannot write %s
+fr impossible d'écrire %s
+
+en Changing…
+fr Modification…
+
+en Nothing starts with the session.
+fr Rien ne démarre avec la session.
+
+en Copied the command of %s
+fr Commande de %s copiée
+
+en Pressure, %s
+fr Pression, %s
+
+en %s: %s. Show it in Performance
+fr %s : %s. L'afficher dans Performances
+
+en The summary of the machine is shown
+fr Le résumé de la machine est affiché
+
+en The summary of the machine is hidden
+fr Le résumé de la machine est masqué
+
+en High (-10)
+fr Haute (-10)
+
+en Above normal (-5)
+fr Supérieure à la normale (-5)
+
+en Normal (0)
+fr Normale (0)
+
+en Below normal (5)
+fr Inférieure à la normale (5)
+
+en Low (10)
+fr Basse (10)
+
+en Idle (19)
+fr Inactive (19)
+
+en Nice
+fr Nice
+
+en only root may raise a priority, or change another user's process
+fr seul root peut augmenter une priorité, ou changer le processus d'un autre utilisateur
+
+en nice %d
+fr nice %d
+
+en %d app
+en+ %d apps
+fr %d application
+fr+ %d applications
+
+en %d background process
+en+ %d background processes
+fr %d processus d'arrière-plan
+fr+ %d processus d'arrière-plan
+
+en %d process, as a tree
+en+ %d processes, as a tree
+fr %d processus, en arborescence
+fr+ %d processus, en arborescence
+
+en No process matches “%s”.
+fr Aucun processus ne correspond à « %s ».
+
+en %s, %d process
+en+ %s, %d processes
+fr %s, %d processus
+fr+ %s, %d processus
+
+en Apps (%d)
+fr Applications (%d)
+
+en Pinned (%d)
+fr Épinglés (%d)
+
+en Background processes (%d)
+fr Processus d'arrière-plan (%d)
+
+en Open while the filter finds some of its processes
+fr Ouvert tant que le filtre trouve certains de ses processus
+
+en CPU over the last %s: %.1f%% on average, %.1f%% at most
+fr CPU sur les dernières %s : %.1f%% en moyenne, %.1f%% au plus
+
+en Every process under its parent
+fr Chaque processus sous son parent
+
+en Apps and background processes
+fr Applications et processus d'arrière-plan
+
+en Filter: type anywhere (Ctrl+F); Escape clears it
+fr Filtre : tapez n'importe où (Ctrl+F) ; Échap l'efface
+
+en Filter processes...
+fr Filtrer les processus...
+
+en Filter services...
+fr Filtrer les services...
+
+en Filter startup...
+fr Filtrer le démarrage...
+
+en Filter connections...
+fr Filtrer les connexions...
+
+en %.0f%% of %d CPUs
+en+ %.0f%% of %d CPUs
+fr %.0f%% de %d processeur
+fr+ %.0f%% de %d processeurs
+
+en %s of %s
+fr %s sur %s
+
+en Selected: %s, PID %d
+fr Sélection : %s, PID %d
+
+en Selected: %d rows
+fr Sélection : %d lignes
+
+en Selected: %s, %d process
+en+ Selected: %s, %d processes
+fr Sélection : %s, %d processus
+fr+ Sélection : %s, %d processus
+
+en As the system
+fr Comme le système
+
+en Dark
+fr Sombre
+
+en Light
+fr Clair
+
+en Colours: light or dark (%s), the theme
+fr Couleurs : clair ou sombre (%s), le thème
+
+en Version
+fr Version
+
+en Switch light and dark
+fr Basculer entre clair et sombre
+
+en Theme
+fr Thème
+
+en High: 0.5 s
+fr Rapide : 0,5 s
+
+en Normal: 1 s
+fr Normale : 1 s
+
+en Low: 2 s
+fr Lente : 2 s
+
+en Very low: 5 s
+fr Très lente : 5 s
+
+en Paused
+fr En pause
+
+en Paused while Ctrl is held
+fr En pause tant que Ctrl est enfoncée
+
+en Refresh paused: F5 reads again, Ctrl+Space resumes
+fr Actualisation en pause : F5 relit, Ctrl+Espace reprend
+
+en Refresh every %s
+fr Intervalle d'actualisation : %s
+
+en Refresh every %s: the graphs span %s
+fr Intervalle d'actualisation : %s ; les graphiques couvrent %s
+
+en Refresh: paused. %s (%s), Resume (%s)
+fr Actualisation : en pause. %s (%s), Reprendre (%s)
+
+en Refresh: every %s. %s (%s), Pause (%s)
+fr Actualisation : intervalle de %s. %s (%s), Pause (%s)
+
+en Pause
+fr Pause
+
+en Read again now
+fr Relire maintenant
+
+en Refresh every
+fr Intervalle d'actualisation
+
+en Zoom %.0f %%
+fr Zoom %.0f %%
+
+en Zoom %.0f %% (Ctrl+0: 100 %%)
+fr Zoom %.0f %% (Ctrl+0 : 100 %%)
+
+en The window of %s comes to the front
+fr La fenêtre de %s passe au premier plan
+
+en That window has closed
+fr Cette fenêtre s'est fermée
+
+en Show its window: %s
+fr Afficher sa fenêtre : %s
+
+en Show its windows (%d), one after the other
+en+ Show its windows (%d), one after the other
+fr Afficher ses fenêtres (%d), l'une après l'autre
+fr+ Afficher ses fenêtres (%d), l'une après l'autre

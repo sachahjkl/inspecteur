@@ -52,6 +52,10 @@ run_check :: proc(args: []string) -> int {
 	for e in problems { fmt.eprintfln("inspecteurtool check: %s", e) }
 	if len(problems) > 0 { return 1 }
 	fmt.printfln("changelog: %d fragments, well formed", fragments)
+	if why := toolbox.i18n_catalogue({"src"}, "i18n/fr.txt", "fr", check = true); why != "" {
+		fmt.eprintfln("inspecteurtool check: %s", why)
+		return 1
+	}
 	if why := toolbox.third_party_notices(p, toolbox.NOTICES_FILE, check_only = true); why != "" {
 		fmt.eprintfln("inspecteurtool check: %s", why)
 		return 1

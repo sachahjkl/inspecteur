@@ -11,6 +11,7 @@ import "gt:platform"
 import prefs_page "gt:prefs_page"
 import "gt:ui"
 import lucide "gt:lucide"
+import i18n "gt:i18n"
 
 settings_toggle :: proc(app: ^App) {
 	app.settings_open = !app.settings_open
@@ -36,18 +37,18 @@ GENERAL_NAMES := [?]string{prefs_page.MESSAGES_PREF, prefs_page.LANGUAGE_PREF}
 // GENERAL_NAMES, set when the program starts.)
 @(private = "file")
 SETTINGS_PAGES := [?]prefs_page.Page_Info{
-	{category = "general",     title = "General",          icon = lucide.SLIDERS_HORIZONTAL, names = GENERAL_NAMES[:]},
-	{category = "appearance",  title = "Appearance",       icon = lucide.PALETTE},
-	{category = "window",      title = "Window",           icon = lucide.APP_WINDOW},
-	{category = "view",        title = "Tables",           icon = lucide.TABLE},
-	{category = "processes",   title = "Processes",        icon = lucide.LAYOUT_LIST},
-	{category = "services",    title = "Services",         icon = lucide.SETTINGS},
-	{category = "connections", title = "Connections",      icon = lucide.GLOBE},
-	{category = "scrolling",   title = "Scrolling",        icon = lucide.MOUSE},
-	{category = "input",       title = "Input",            icon = lucide.KEYBOARD},
-	{category = "timing",      title = "Delays and menus", icon = lucide.TIMER},
-	{category = "update",      title = "Updates",          icon = lucide.DOWNLOAD},
-	{category = "rendering",   title = "Rendering",        icon = lucide.MONITOR},
+	{category = "general",     title = i18n.later("General"),          icon = lucide.SLIDERS_HORIZONTAL, names = GENERAL_NAMES[:]},
+	{category = "appearance",  title = i18n.later("Appearance"),       icon = lucide.PALETTE},
+	{category = "window",      title = i18n.later("Window"),           icon = lucide.APP_WINDOW},
+	{category = "view",        title = i18n.later("Tables"),           icon = lucide.TABLE},
+	{category = "processes",   title = i18n.later("Processes"),        icon = lucide.LAYOUT_LIST},
+	{category = "services",    title = i18n.later("Services"),         icon = lucide.SETTINGS},
+	{category = "connections", title = i18n.later("Connections"),      icon = lucide.GLOBE},
+	{category = "scrolling",   title = i18n.later("Scrolling"),        icon = lucide.MOUSE},
+	{category = "input",       title = i18n.later("Input"),            icon = lucide.KEYBOARD},
+	{category = "timing",      title = i18n.later("Delays and menus"), icon = lucide.TIMER},
+	{category = "update",      title = i18n.later("Updates"),          icon = lucide.DOWNLOAD},
+	{category = "rendering",   title = i18n.later("Rendering"),        icon = lucide.MONITOR},
 }
 
 // The page, as large as the body.
@@ -75,7 +76,7 @@ settings_options :: proc(app: ^App) -> prefs_page.Options {
 settings_problem :: proc(user: rawptr, name: string) -> string {
 	app := (^App)(user)
 	if name == prefs_page.SYSTEM_TITLE_PREF && app.settings.system_title && !platform.system_title_available(app.main.win) {
-		return "This desktop draws no title bar for Inspecteur's window (GNOME): Inspecteur keeps its own."
+		return i18n.tr("This desktop draws no title bar for Inspecteur's window (GNOME): Inspecteur keeps its own.")
 	}
 	return ""
 }

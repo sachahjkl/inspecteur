@@ -14,6 +14,7 @@ import "core:time/timezone"
 import lucide "gt:lucide"
 import "gt:platform"
 import "gt:ui"
+import i18n "gt:i18n"
 
 // Syslog's levels, by priority: the word the pane shows and the colour's tag ("" the text's own).
 @(rodata)
@@ -34,14 +35,14 @@ JOURNAL_LEVEL_TAGS := [8]string{"bad", "bad", "bad", "bad", "warn", "", "", "wea
 journal_build :: proc(app: ^App, v: ^Journal_View, name: string, manager: Manager, wanted: bool, em: f32, in_window := false) {
 	d := v.details
 	if !wanted || d == nil || d.name != name || d.manager != manager {
-		journal_note(!wanted ? "Select a service: its journal shows here." : "Reading…", em)
+		journal_note(!wanted ? i18n.tr("Select a service: its journal shows here.") : i18n.tr("Reading…"), em)
 		return
 	}
 	shown := journal_shown(app, v)
 	journal_bar(app, v, len(shown), em, in_window)
 	switch {
 	case len(d.journal) == 0: journal_note(d.journal_problem, em); return
-	case len(shown) == 0:     journal_note("No entry is shown: another level, or another search, shows some.", em); return
+	case len(shown) == 0:     journal_note(i18n.tr("No entry is shown: another level, or another search, shows some."), em); return
 	}
 	ids := v.shown_ids[:]   // (made with them: journal_shown)
 	// (the newest entry in view: at another service, and as new entries come while the view was at the end)
@@ -118,30 +119,30 @@ journal_bar :: proc(app: ^App, v: ^Journal_View, shown: int, em: f32, in_window:
 	if ui.row(.Center, {}, "###svc_journal_bar") {
 		ui.spacer(ui.px(em * 0.8))
 		// (in the order of Journal_Level)
-		labels := [3]string{fmt.tprintf("All %d", len(d.journal)), fmt.tprintf("Warnings %d", warnings + errors), fmt.tprintf("Errors %d", errors)}
+		labels := [3]string{fmt.tprintf(i18n.tr("All %d"), len(d.journal)), fmt.tprintf(i18n.tr("Warnings %d"), warnings + errors), fmt.tprintf(i18n.tr("Errors %d"), errors)}
 		key := ui.command_shortcut(COMMANDS[.Journal_Level])
-		tips := [3]string{fmt.tprintf("Every entry (%s)", key), fmt.tprintf("Warnings and worse (%s)", key), fmt.tprintf("Errors and worse (%s)", key)}
+		tips := [3]string{fmt.tprintf(i18n.tr("Every entry (%s)"), key), fmt.tprintf(i18n.tr("Warnings and worse (%s)"), key), fmt.tprintf(i18n.tr("Errors and worse (%s)"), key)}
 		sel := int(app.settings.journal_level)
 		ui.next({width = ui.px(em * 21), height = ui.px(ui.dense(em * 1.9))})
 		if ui.segmented("svc_journal_level", labels[:], &sel, tips[:]) { journal_level_set(app, Journal_Level(sel)) }
 		ui.spacer(ui.px(em * 0.6))
 		boot := app.settings.journal_boot ? 0 : 1
 		bkey := ui.command_shortcut(COMMANDS[.Journal_Boot])
-		btips := [2]string{fmt.tprintf("The entries of this boot (%s)", bkey), fmt.tprintf("The last entries, from any boot (%s)", bkey)}
+		btips := [2]string{fmt.tprintf(i18n.tr("The entries of this boot (%s)"), bkey), fmt.tprintf(i18n.tr("The last entries, from any boot (%s)"), bkey)}
 		ui.next({width = ui.px(em * 12), height = ui.px(ui.dense(em * 1.9))})
-		if ui.segmented("svc_journal_boot", {"This boot", "Every boot"}, &boot, btips[:]) { journal_boot_set(app, boot == 0) }
+		if ui.segmented("svc_journal_boot", {i18n.tr("This boot"), i18n.tr("Every boot")}, &boot, btips[:]) { journal_boot_set(app, boot == 0) }
 		ui.spacer(ui.px(em * 0.6))
 		follow := app.settings.journal_follow
 		ui.next({width = ui.px(em * 2.2), height = ui.px(ui.dense(em * 1.9))})
-		tip := follow ? fmt.tprintf("Following: new entries come in at the end (%s stops)", ui.command_shortcut(COMMANDS[.Journal_Follow])) : cmd_tip(.Journal_Follow)
+		tip := follow ? fmt.tprintf(i18n.tr("Following: new entries come in at the end (%s stops)"), ui.command_shortcut(COMMANDS[.Journal_Follow])) : cmd_tip(.Journal_Follow)
 		if ui.icon_button("svc_journal_follow", follow ? lucide.ARROW_DOWN : lucide.PAUSE, tip = tip, intent = follow ? .Primary : .Neutral, face = follow ? .Raised : .Ghost).clicked { journal_run_on(app, v, .Journal_Follow) }
 		ui.spacer(ui.px(em * 0.6))
 		ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 1.9))})
-		res := ui.line_edit("###svc_journal_search", &v.search, fmt.tprintf("Search the journal (%s)", ui.command_shortcut(COMMANDS[.Journal_Search])))
+		res := ui.line_edit("###svc_journal_search", &v.search, fmt.tprintf(i18n.tr("Search the journal (%s)"), ui.command_shortcut(COMMANDS[.Journal_Search])))
 		v.search_key = res.box.key
 		ui.spacer(ui.px(em * 0.4))
 		if ui.tags("weak") {
-			n := shown == len(d.journal) ? count_text(shown, "entry", "entries") : fmt.tprintf("%d of %d", shown, len(d.journal))
+			n := shown == len(d.journal) ? fmt.tprintf(i18n.tr(shown, "%d entry", "%d entries"), shown) : fmt.tprintf(i18n.tr("%d of %d"), shown, len(d.journal))
 			ui.next({width = ui.text_size(em * 0.4), height = ui.pct(1), text_pad = 0, font_size = em * 0.9})
 			ui.label(fmt.tprintf("%s###svc_journal_count", n))
 		}
@@ -222,11 +223,11 @@ journal_entry_whole :: proc(app: ^App, e: Journal_Entry, em: f32) {
 			if tag != "" { ui.pop_tags() }
 			ui.spacer(ui.px(em * 0.8))
 			if ui.tags("weak") {
-				who := e.pid > 0 ? fmt.tprintf("%s, process %d", e.ident, e.pid) : e.ident
+				who := e.pid > 0 ? fmt.tprintf(i18n.tr("%s, process %d"), e.ident, e.pid) : e.ident
 				ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0})
 				ui.label(fmt.tprintf("%s  ·  %s###je_info", journal_time_text(app, e.usec, true), ui.text_shown(who)))
 			}
-			if tool_button("svc_journal_copy_entry", lucide.CLIPBOARD_COPY, cmd_tip(.Journal_Copy_Entry), true, em) { platform.set_clipboard(app.main.win, journal_entry_text(app, e)); announce(app, "Copied the entry") }
+			if tool_button("svc_journal_copy_entry", lucide.CLIPBOARD_COPY, cmd_tip(.Journal_Copy_Entry), true, em) { platform.set_clipboard(app.main.win, journal_entry_text(app, e)); announce(app, i18n.tr("Copied the entry")) }
 			ui.spacer(ui.px(em * 0.4))
 		}
 		ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
@@ -268,7 +269,7 @@ journal_level_set :: proc(app: ^App, l: Journal_Level) {
 		v.vl.sel = -1
 		ui.vlist_scroll_to(&v.vl, max(f32))
 	}
-	say(app, "The journal: %s", l == .All ? "every entry" : l == .Warnings ? "warnings and worse" : "errors and worse")
+	say(app, l == .All ? i18n.tr("The journal: every entry") : l == .Warnings ? i18n.tr("The journal: warnings and worse") : i18n.tr("The journal: errors and worse"))
 }
 
 journal_boot_set :: proc(app: ^App, boot: bool) {
@@ -281,7 +282,7 @@ journal_boot_set :: proc(app: ^App, boot: bool) {
 		w.view.shown_for = 0
 		journal_view_ask(&w.view, w.manager, w.name, boot)
 	}
-	say(app, boot ? "The journal: this boot" : "The journal: every boot")
+	say(app, boot ? i18n.tr("The journal: this boot") : i18n.tr("The journal: every boot"))
 }
 
 // Whether a command of the journal can act now on the pane's: the pane is shown, with entries for Copy.
@@ -312,7 +313,7 @@ journal_run_on :: proc(app: ^App, v: ^Journal_View, c: Cmd) {
 		app.settings.journal_follow = !app.settings.journal_follow
 		pref_set(&app.prefs, "services.journal_follow", app.settings.journal_follow ? "true" : "false")
 		for w in journal_views(app) { w.next = time.tick_now() }
-		say(app, app.settings.journal_follow ? "Following the journal: new entries come in at the end" : "The journal is not read again")
+		say(app, app.settings.journal_follow ? i18n.tr("Following the journal: new entries come in at the end") : i18n.tr("The journal is not read again"))
 	case .Journal_Copy:
 		d := v.details
 		if d == nil { return }
@@ -320,11 +321,11 @@ journal_run_on :: proc(app: ^App, v: ^Journal_View, c: Cmd) {
 		shown := journal_shown(app, v)
 		for i in shown { strings.write_string(&b, journal_entry_text(app, d.journal[i])); strings.write_byte(&b, '\n') }
 		platform.set_clipboard(app.main.win, strings.to_string(b))
-		announce(app, fmt.tprintf("Copied %s", count_text(len(shown), "entry", "entries")))
+		announce(app, fmt.tprintf(i18n.tr(len(shown), "Copied %d entry", "Copied %d entries"), len(shown)))
 	case .Journal_Copy_Entry:
 		if e, ok := journal_selected(app, v); ok {
 			platform.set_clipboard(app.main.win, journal_entry_text(app, e))
-			announce(app, "Copied the entry")
+			announce(app, i18n.tr("Copied the entry"))
 		}
 	case .Journal_Window:
 		if d := v.details; d != nil { journal_window_open(app, d.manager, d.name) }

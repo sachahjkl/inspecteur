@@ -18,6 +18,7 @@ import "core:time/datetime"
 import "core:time/timezone"
 import tasks "gt:tasks"
 import "gt:ui"
+import i18n "gt:i18n"
 
 // How long the first frame waits for the first reading (a reading takes some milliseconds; a stuck one does not hold
 // the window: its rows come when it ends).
@@ -142,7 +143,7 @@ sample_take :: proc(app: ^App) {
 	defer reading_free(r)
 	s.asked = false
 	t0 := time.tick_now()
-	if r.failed && app.sampler.samples == 0 { say(app, "The processes cannot be read (/proc)") }
+	if r.failed && app.sampler.samples == 0 { say(app, i18n.tr("The processes cannot be read (/proc)")) }
 	reading_keep(app, r)
 	machine_apply(&app.machine, r)
 	sampler_apply(&app.sampler, r, app.machine.d_total_ns, &app.catalog)

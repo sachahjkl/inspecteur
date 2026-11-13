@@ -11,24 +11,25 @@ import "core:time"
 import lucide "gt:lucide"
 import "gt:platform"
 import "gt:ui"
+import i18n "gt:i18n"
 
 build_services :: proc(app: ^App, em: f32) {
 	s := &app.services
 	if s.rows.table.query != app.query { ui.table_apply(&s.rows.table, &s.rows.data, app.query) }
-	note := "Reading…"
+	note := i18n.tr("Reading…")
 	if s.pending != .None {
-		note = "Waiting for the service manager…"
+		note = i18n.tr("Waiting for the service manager…")
 	} else if s.list != nil && s.list.manager == s.manager {
 		running := 0
 		for u in s.list.units { if u.active == "active" && u.sub == "running" { running += 1 } }
-		note = fmt.tprintf("%s, %d running", count_text(len(s.list.units), "service", "services"), running)
+		note = fmt.tprintf(i18n.tr(len(s.list.units), "%d service, %d running", "%d services, %d running"), len(s.list.units), running)
 	}
-	section_bar(app, "Services", note, em, services_actions, services_manager_choice)
+	section_bar(app, i18n.tr("Services"), note, em, services_actions, services_manager_choice)
 	empty := ""
-	if s.list != nil && s.list.manager == s.manager { empty = s.list.problem != "" ? s.list.problem : "No service." }
+	if s.list != nil && s.list.manager == s.manager { empty = s.list.problem != "" ? s.list.problem : i18n.tr("No service.") }
 	ev := section_table_build(&s.rows, empty)
 	if ev.sorted { ui.table_apply(&s.rows.table, &s.rows.data, app.query) }
-	if ev.sorted || ev.resized || ev.moved { section_layout_save(&s.rows.table, &app.prefs, "services") }
+	if ev.sorted || ev.resized || ev.moved { section_layout_save(&s.rows, &app.prefs, "services") }
 	section_header_menu(&s.rows, ev, "services", em)
 	if ev.activated && cmd_can(app, .Service_Open) { service_reveal(app) }
 	if ev.menu { services_menu_open(app, ev.menu_at) }
@@ -67,7 +68,7 @@ service_details_body :: proc(app: ^App, u: Service, selected: bool, d: ^Unit_Det
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.2))})
 	if ui.row(.Center, {}, "###svc_details_head") {
 		ui.spacer(ui.px(em * 0.8))
-		title := selected ? u.name : "No service selected"
+		title := selected ? u.name : i18n.tr("No service selected")
 		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
 		ui.label(fmt.tprintf("%s###svc_details_name", ui.text_shown(title)))
 		ui.spacer(ui.px(em * 0.8))
@@ -75,10 +76,10 @@ service_details_body :: proc(app: ^App, u: Service, selected: bool, d: ^Unit_Det
 			info := ""
 			if selected && d != nil && d.name == u.name && d.manager == s.manager {
 				parts := make([dynamic]string, context.temp_allocator)
-				if d.since > 0 { append(&parts, fmt.tprintf("%s since %s", u.active, started_text(app, d.since))) }
-				if d.tasks != DETAIL_UNKNOWN { append(&parts, count_text(int(d.tasks), "task", "tasks")) }
-				if d.cpu_ns != DETAIL_UNKNOWN { append(&parts, fmt.tprintf("CPU time %s", cpu_time_text(d.cpu_ns))) }
-				if d.restarts > 0 { append(&parts, fmt.tprintf("restarted %s", count_text(int(d.restarts), "time", "times"))) }
+				if d.since > 0 { append(&parts, fmt.tprintf(i18n.tr("%s since %s"), u.active, started_text(app, d.since))) }
+				if d.tasks != DETAIL_UNKNOWN { append(&parts, fmt.tprintf(i18n.tr(int(d.tasks), "%d task", "%d tasks"), d.tasks)) }
+				if d.cpu_ns != DETAIL_UNKNOWN { append(&parts, fmt.tprintf(i18n.tr("CPU time %s"), cpu_time_text(d.cpu_ns))) }
+				if d.restarts > 0 { append(&parts, fmt.tprintf(i18n.tr(int(d.restarts), "restarted %d time", "restarted %d times"), d.restarts)) }
 				if d.file != "" { append(&parts, d.file) }
 				info = strings.join(parts[:], "  ·  ", context.temp_allocator)
 			}
@@ -86,7 +87,7 @@ service_details_body :: proc(app: ^App, u: Service, selected: bool, d: ^Unit_Det
 			ui.label_tip(fmt.tprintf("%s###svc_details_info", ui.text_shown(info)))
 		}
 		cmd_button(app, "svc_file", lucide.FILE_TEXT, .Service_Open_File, em)
-		tool := tool_button("svc_details_close", lucide.X, fmt.tprintf("Hide the details (%s)", ui.command_shortcut(COMMANDS[.Service_Details])), true, em)
+		tool := tool_button("svc_details_close", lucide.X, fmt.tprintf(i18n.tr("Hide the details (%s)"), ui.command_shortcut(COMMANDS[.Service_Details])), true, em)
 		if tool { service_details_switch(app) }
 		ui.spacer(ui.px(em * 0.4))
 	}
@@ -103,7 +104,7 @@ service_details_switch :: proc(app: ^App) {
 	pref_set(&app.prefs, "services.details", app.settings.details ? "true" : "false")
 	app.services.details_for = 0
 	tab_show(app, .Services)
-	say(app, app.settings.details ? "The selected service's details and journal" : "Details hidden")
+	say(app, app.settings.details ? i18n.tr("The selected service's details and journal") : i18n.tr("Details hidden"))
 }
 
 // The selected service's unit file, opened (the person's text editor).
@@ -111,7 +112,7 @@ service_open_file :: proc(app: ^App) {
 	d := app.services.pane.details
 	if d == nil || d.file == "" { return }
 	ui.open(d.file, .Path)
-	say(app, "Opened %s", d.file)
+	say(app, i18n.tr("Opened %s"), d.file)
 }
 
 // Each period while the section is shown (refresh calls it at each sample).
@@ -167,10 +168,10 @@ services_actions :: proc(app: ^App, em: f32) {
 @(private = "file")
 services_manager_choice :: proc(app: ^App, em: f32) {
 	s := &app.services
-	labels := [2]string{MANAGER_LABELS[.System], MANAGER_LABELS[.User]}
+	labels := [2]string{i18n.tr(MANAGER_LABELS[.System]), i18n.tr(MANAGER_LABELS[.User])}
 	sel := int(s.manager)
 	key := ui.command_shortcut(COMMANDS[.Service_Manager])
-	tips := [2]string{fmt.tprintf("The system's services (%s)", key), fmt.tprintf("The user's services (%s)", key)}
+	tips := [2]string{fmt.tprintf(i18n.tr("The system's services (%s)"), key), fmt.tprintf(i18n.tr("The user's services (%s)"), key)}
 	ui.next({width = ui.px(em * 10), height = ui.px(ui.dense(em * 2))})
 	if ui.segmented("svc_manager", labels[:], &sel, tips[:]) { services_switch(app, Manager(sel)) }
 }
@@ -210,7 +211,7 @@ services_menu :: proc(app: ^App, em: f32) {
 		cmd_item(app, .Service_Copy)
 		cmd_item(app, .Service_Open_File)
 		ui.menu_separator()
-		cmd_item(app, .Service_Details, app.settings.details ? "Hide the details" : "Details and journal")
+		cmd_item(app, .Service_Details, app.settings.details ? i18n.tr("Hide the details") : i18n.tr("Details and journal"))
 	}
 }
 
@@ -229,7 +230,7 @@ service_do :: proc(app: ^App, action: Service_Action) {
 service_act_now :: proc(app: ^App, action: Service_Action, unit: string) {
 	if app.services.pending != .None { return }
 	app.services.pending = action
-	say(app, "%s %s…", SERVICE_ACTION_DOING[action], unit)
+	say(app, i18n.tr(SERVICE_ACTION_DOING[action]), unit)
 	services_ask(app, action, unit)
 }
 
@@ -238,12 +239,12 @@ service_act_now :: proc(app: ^App, action: Service_Action, unit: string) {
 service_danger :: proc(app: ^App, u: Service) -> string {
 	if u.pid > 0 {
 		switch guard_of(app, u.pid) {
-		case .Display_Server:  return "It runs the desktop: the session ends with it."
-		case .Self, .Ancestor: return "Inspecteur runs under it: Inspecteur ends with it."
+		case .Display_Server:  return i18n.tr("It runs the desktop: the session ends with it.")
+		case .Self, .Ancestor: return i18n.tr("Inspecteur runs under it: Inspecteur ends with it.")
 		case .None:
 		}
 	}
-	for unit in app.own_units { if unit == u.name { return "Inspecteur runs in it: Inspecteur ends with it." } }
+	for unit in app.own_units { if unit == u.name { return i18n.tr("Inspecteur runs in it: Inspecteur ends with it.") } }
 	return ""
 }
 
@@ -251,12 +252,12 @@ service_reveal :: proc(app: ^App) {
 	u, ok := selected_service(app)
 	if !ok || u.pid <= 0 { return }
 	p := find_pid(&app.sampler, u.pid)
-	if p == nil || !processes_reveal(app, p.pid, p.start) { say(app, "PID %d is not in the processes' last sample", u.pid) }
+	if p == nil || !processes_reveal(app, p.pid, p.start) { say(app, i18n.tr("PID %d is not in the processes' last sample"), u.pid) }
 }
 
 service_copy :: proc(app: ^App) {
 	u, ok := selected_service(app)
 	if !ok { return }
 	platform.set_clipboard(app.main.win, u.name)
-	announce(app, "Copied", u.name)
+	announce(app, i18n.tr("Copied"), u.name)
 }

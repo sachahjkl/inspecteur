@@ -9,17 +9,18 @@ import "core:strings"
 import lucide "gt:lucide"
 import "gt:platform"
 import "gt:ui"
+import i18n "gt:i18n"
 
 build_connections :: proc(app: ^App, em: f32) {
 	c := &app.connections
 	if c.rows.table.query != app.query { ui.table_apply(&c.rows.table, &c.rows.data, app.query) }
 	listening := 0
 	for s in c.sockets { if socket_listens(s) { listening += 1 } }
-	note := c.read ? fmt.tprintf("%s, %d listening or open", count_text(len(c.sockets), "socket", "sockets"), listening) : "Reading…"
-	section_bar(app, "Connections", note, em, connections_actions)
-	ev := section_table_build(&c.rows, c.read ? "No socket." : "")
+	note := c.read ? fmt.tprintf(i18n.tr(len(c.sockets), "%d socket, %d listening or open", "%d sockets, %d listening or open"), len(c.sockets), listening) : i18n.tr("Reading…")
+	section_bar(app, i18n.tr("Connections"), note, em, connections_actions)
+	ev := section_table_build(&c.rows, c.read ? i18n.tr("No socket.") : "")
 	if ev.sorted { ui.table_apply(&c.rows.table, &c.rows.data, app.query) }
-	if ev.sorted || ev.resized || ev.moved { section_layout_save(&c.rows.table, &app.prefs, "connections") }
+	if ev.sorted || ev.resized || ev.moved { section_layout_save(&c.rows, &app.prefs, "connections") }
 	section_header_menu(&c.rows, ev, "connections", em)
 	if ev.activated && cmd_can(app, .Socket_Open) { connection_reveal(app) }
 	if ev.menu { connections_menu_open(app, ev.menu_at) }
@@ -70,18 +71,18 @@ connection_signal :: proc(app: ^App, kill: bool) {
 	s, ok := selected_socket(app)
 	if !ok || s.pid <= 0 { return }
 	p := find_proc(&app.sampler, s.pid, s.start)
-	if p == nil { say(app, "PID %d has ended already", s.pid); return }
+	if p == nil { say(app, i18n.tr("PID %d has ended already"), s.pid); return }
 	c: Chosen
 	defer chosen_free(&c)
 	append(&c.targets, Target{p.pid, p.start})
-	c.name = strings.clone(fmt.tprintf("%s (PID %d)", p.name, p.pid))
+	c.name = strings.clone(fmt.tprintf(i18n.tr("%s (PID %d)"), p.name, p.pid))
 	if kill { confirm_ask(app, c, .Kill) } else { signal_or_confirm(app, &c, .Terminate) }
 }
 
 connection_reveal :: proc(app: ^App) {
 	s, ok := selected_socket(app)
 	if !ok || s.pid <= 0 { return }
-	if !processes_reveal(app, s.pid, s.start) { say(app, "PID %d has ended", s.pid) }
+	if !processes_reveal(app, s.pid, s.start) { say(app, i18n.tr("PID %d has ended"), s.pid) }
 }
 
 connection_copy :: proc(app: ^App) {
@@ -90,5 +91,5 @@ connection_copy :: proc(app: ^App) {
 	text := remote_text(s)
 	if text == "" { text = endpoint_text(s.local, s.lport, s.v6) }
 	platform.set_clipboard(app.main.win, text)
-	announce(app, "Copied", text)
+	announce(app, i18n.tr("Copied"), text)
 }

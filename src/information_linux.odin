@@ -10,6 +10,7 @@ import "core:os"
 import "core:strconv"
 import "core:strings"
 import "core:sys/linux"
+import i18n "gt:i18n"
 
 // The lists of PCI devices' names, where the systems keep them.
 PCI_IDS_PATHS :: [?]string{"/run/current-system/sw/share/hwdata/pci.ids", "/usr/share/hwdata/pci.ids", "/usr/share/misc/pci.ids", "/usr/share/pci.ids"}
@@ -113,7 +114,7 @@ gpus_find :: proc(s: ^Info_Static) {
 		vendor_name, device_name := pci_names(ids_text, vendor, device)
 		if vendor_name == "" { vendor_name = pci_vendor_known(vendor) }
 		name := strings.trim_space(strings.join({vendor_name, device_name}, " ", context.temp_allocator))
-		if name == "" { name = "Display controller" }
+		if name == "" { name = i18n.tr("Display controller") }
 		append(&s.gpus, Info_Gpu{
 			name = strings.clone(name, a), vendor = strings.clone(vendor_name, a), named = device_name != "", ids = strings.clone(fmt.tprintf("%s:%s", vendor, device), a),
 			driver = strings.clone(driver, a), slot = strings.clone(fi.name, a),

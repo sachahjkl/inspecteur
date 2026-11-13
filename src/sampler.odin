@@ -11,6 +11,7 @@ package inspecteur
 
 import "core:strings"
 import "gt:ui"
+import i18n "gt:i18n"
 
 // The points of a process's history (its graphs in Properties: 5 minutes at the default period), and the last of them
 // its CPU cell's graph shows (30 s).
@@ -27,8 +28,8 @@ Proc_History :: struct {
 Proc_State :: enum u8 { Unknown, Running, Sleeping, Disk_Wait, Stopped, Traced, Zombie, Dead, Idle }
 
 PROC_STATE_TEXT := [Proc_State]string{
-	.Unknown = "?", .Running = "Running", .Sleeping = "Sleeping", .Disk_Wait = "Disk wait", .Stopped = "Suspended",
-	.Traced = "Traced", .Zombie = "Zombie", .Dead = "Dead", .Idle = "Idle",
+	.Unknown = "?", .Running = i18n.later("Running"), .Sleeping = i18n.later("Sleeping"), .Disk_Wait = i18n.later("Disk wait"), .Stopped = i18n.later("Suspended"),
+	.Traced = i18n.later("Traced"), .Zombie = i18n.later("Zombie"), .Dead = i18n.later("Dead"), .Idle = i18n.later("Idle"),
 }
 
 // What the system says of one process at a sample. The platform's reader fills it; `comm` is in the temporary allocator.
@@ -231,7 +232,7 @@ rate_of :: proc(before, after: u64, dt: f64) -> f64 {
 }
 
 // A process's state as words.
-state_text :: proc(state: Proc_State) -> string { return PROC_STATE_TEXT[state] }
+state_text :: proc(state: Proc_State) -> string { return i18n.tr(PROC_STATE_TEXT[state]) }
 
 // The process (pid, start) of the last sample, nil when it is not there.
 find_proc :: proc(s: ^Sampler, pid: i32, start: u64) -> ^Proc {

@@ -17,6 +17,7 @@ import "core:strings"
 import "gt:draw"
 import lucide "gt:lucide"
 import "gt:ui"
+import i18n "gt:i18n"
 
 Mission_Panel :: enum u32 { Machine = 1, Health, Cpu, Memory, Services, Network, Startup, System }
 
@@ -26,10 +27,10 @@ MISSION_NAMES := [Mission_Panel]string{
 	.Services = "services", .Network = "network", .Startup = "startup", .System = "system",
 }
 
-@(rodata)
+// (not rodata: i18n.later runs when the program starts)
 MISSION_TITLES := [Mission_Panel]string{
-	.Machine = "Machine", .Health = "Health", .Cpu = "Busiest: CPU", .Memory = "Busiest: memory",
-	.Services = "Services", .Network = "Network", .Startup = "Startup", .System = "System",
+	.Machine = i18n.later("Machine"), .Health = i18n.later("Health"), .Cpu = i18n.later("Busiest: CPU"), .Memory = i18n.later("Busiest: memory"),
+	.Services = i18n.later("Services"), .Network = i18n.later("Network"), .Startup = i18n.later("Startup"), .System = i18n.later("System"),
 }
 
 // The layout at first: the machine across the top; under it the health and the busiest processes; under them the
@@ -99,7 +100,7 @@ mission_reset :: proc(app: ^App) {
 	ui.dock_parse(&app.mission.dock, MISSION_DEFAULT, mission_id_of, app)
 	mission_save(app, &app.mission.dock)
 	tab_show(app, .Mission_Control)
-	say(app, "Mission Control: the layout as at first")
+	say(app, i18n.tr("Mission Control: the layout as at first"))
 }
 
 mission_panels_open :: proc(app: ^App) {
@@ -112,17 +113,17 @@ build_mission :: proc(app: ^App, em: f32) {
 	d := &app.mission.dock
 	shown := 0
 	for p in Mission_Panel { if ui.dock_has(d, u32(p)) { shown += 1 } }
-	section_bar(app, "Mission Control", fmt.tprintf("%d of %d panels: drag a tab to move it", shown, len(Mission_Panel)), em, nil, mission_bar_right)
+	section_bar(app, i18n.tr("Mission Control"), fmt.tprintf(i18n.tr("%d of %d panels: drag a tab to move it"), shown, len(Mission_Panel)), em, nil, mission_bar_right)
 	ui.next({width = ui.fill(), height = ui.fill()})
 	ui.dock_begin(d, "###mission", {
-		title = proc(user: rawptr, panel: u32) -> string { return MISSION_TITLES[Mission_Panel(panel)] },
+		title = proc(user: rawptr, panel: u32) -> string { return i18n.tr(MISSION_TITLES[Mission_Panel(panel)]) },
 		on_save = mission_save, user = app, close_buttons = true, windows = true,
 	})
 	for p in Mission_Panel {
 		if ui.dock_panel(d, u32(p)) { mission_panel(app, p, em) }
 	}
 	res := ui.dock_end(d)
-	if res.closed != ui.DOCK_NO_PANEL { say(app, "%s closed: the panels' menu brings it back", MISSION_TITLES[Mission_Panel(res.closed)]) }
+	if res.closed != ui.DOCK_NO_PANEL { say(app, i18n.tr("%s closed: the panels' menu brings it back"), i18n.tr(MISSION_TITLES[Mission_Panel(res.closed)])) }
 	if res.windowed != ui.DOCK_NO_PANEL { app.mission.to_window = Mission_Panel(res.windowed) }
 	mission_menu(app, em)
 	mission_line_menu(app, em)
@@ -146,10 +147,10 @@ mission_menu :: proc(app: ^App, em: f32) {
 	if app.mission.menu == 0 { return }
 	d := &app.mission.dock
 	if ui.ctx_menu(app.mission.menu, em * MISSION_MENU_EM) {
-		ui.menu_heading("Panels")
+		ui.menu_heading(i18n.tr("Panels"))
 		for p in Mission_Panel {
 			on := ui.dock_has(d, u32(p))
-			if ui.menu_item(MISSION_TITLES[p], checked = on).clicked {
+			if ui.menu_item(i18n.tr(MISSION_TITLES[p]), checked = on).clicked {
 				if on {
 					ui.dock_close(d, u32(p))
 				} else {
@@ -160,7 +161,7 @@ mission_menu :: proc(app: ^App, em: f32) {
 			}
 		}
 		ui.menu_separator()
-		if ui.menu_item(COMMANDS[.Mission_Reset].label).clicked { mission_reset(app) }
+		if ui.menu_item(cmd_label(.Mission_Reset)).clicked { mission_reset(app) }
 	}
 }
 
@@ -216,10 +217,10 @@ mission_machine :: proc(app: ^App, em: f32) {
 	if ui.row(id = "###mc_graphs") {
 		ui.spacer(ui.px(em * 0.8))
 		ui.next({width = ui.fill(), height = ui.pct(1), axis = .Y})
-		if ui.column(id = "###mc_cpu") { captioned_graph(app, "mc_cpu_graph", "CPU", {{&m.cpu_hist, hue(app, HUE_CPU), ""}}, 100, percent_top, em, ui.fill()) }
+		if ui.column(id = "###mc_cpu") { captioned_graph(app, "mc_cpu_graph", i18n.tr("CPU"), {{&m.cpu_hist, hue(app, HUE_CPU), ""}}, 100, percent_top, em, ui.fill()) }
 		ui.spacer(ui.px(em * 0.8))
 		ui.next({width = ui.fill(), height = ui.pct(1), axis = .Y})
-		if ui.column(id = "###mc_mem") { captioned_graph(app, "mc_mem_graph", "Memory", {{&m.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, percent_top, em, ui.fill()) }
+		if ui.column(id = "###mc_mem") { captioned_graph(app, "mc_mem_graph", i18n.tr("Memory"), {{&m.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, percent_top, em, ui.fill()) }
 		ui.spacer(ui.px(em * 0.8))
 	}
 	ui.spacer(ui.px(em * 0.4))
@@ -234,7 +235,7 @@ mission_health :: proc(app: ^App, em: f32) {
 	worst := Finding_Level.Fine
 	for f in findings { worst = max(worst, f.level) }
 	tag := worst == .Bad ? "bad" : worst == .Warn ? "warn" : "good"
-	word := worst == .Bad ? "Struggling" : worst == .Warn ? "Under strain" : "Healthy"
+	word := worst == .Bad ? i18n.tr("Struggling") : worst == .Warn ? i18n.tr("Under strain") : i18n.tr("Healthy")
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.2)), axis = .X, cross = .Center})
 	if ui.row(.Center, {}, "###mc_health_head") {
 		ui.spacer(ui.px(em * 0.8))
@@ -245,7 +246,7 @@ mission_health :: proc(app: ^App, em: f32) {
 		ui.spacer(ui.px(em * 0.6))
 		if ui.tags("weak") {
 			ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
-			ui.label(fmt.tprintf("CPU %.0f%%###mc_health_cpu", app.machine.cpu))
+			ui.label(fmt.tprintf("%s###mc_health_cpu", fmt.tprintf(i18n.tr("CPU %.0f%%"), app.machine.cpu)))
 		}
 		ui.spacer(ui.fill())
 		// (i): every finding, in its words
@@ -263,7 +264,7 @@ mission_health :: proc(app: ^App, em: f32) {
 					}
 					if ui.tags("weak") {
 						ui.next({width = ui.fill()})
-						if ui.style({text_pad = em * 0.3}) { ui.paragraph(fmt.tprintf("A click, or %s: why it is slow, in full.###more", ui.command_shortcut(COMMANDS[.Diagnose]))) }
+						if ui.style({text_pad = em * 0.3}) { ui.paragraph(fmt.tprintf("%s###more", fmt.tprintf(i18n.tr("A click, or %s: why it is slow, in full."), ui.command_shortcut(COMMANDS[.Diagnose])))) }
 					}
 				}
 			}
@@ -344,7 +345,7 @@ mission_busiest :: proc(app: ^App, em: f32, memory: bool) {
 		p := procs[i]
 		value := memory ? size_text(p.private) : fmt.tprintf("%.1f%%", p.cpu)
 		share := memory ? f32(p.private) / most : p.cpu / most
-		if mission_line(app, fmt.tprintf("mc_%s_%d", memory ? "mem" : "cpu", k), p.name, fmt.tprintf("PID %d", p.pid), value, share, "", em, {kind = .Process, pid = p.pid, start = p.start}) {
+		if mission_line(app, fmt.tprintf("mc_%s_%d", memory ? "mem" : "cpu", k), p.name, fmt.tprintf(i18n.tr("PID %d"), p.pid), value, share, "", em, {kind = .Process, pid = p.pid, start = p.start}) {
 			processes_reveal(app, p.pid, p.start)
 		}
 	}
@@ -354,11 +355,12 @@ mission_busiest :: proc(app: ^App, em: f32, memory: bool) {
 @(private = "file")
 mission_services :: proc(app: ^App, em: f32) {
 	s := &app.services
-	if s.list == nil || s.list.manager != s.manager { mission_note("Reading…", em); return }
+	if s.list == nil || s.list.manager != s.manager { mission_note(i18n.tr("Reading…"), em); return }
 	if s.list.problem != "" { mission_note(s.list.problem, em); return }
 	// (counted when the list was read: services_take)
 	failed := s.list.failed
-	mission_note(fmt.tprintf("%s of the %s: %d running, %d failed", count_text(len(s.list.units), "service", "services"), s.manager == .System ? "system" : "user", s.list.running, failed), em)
+	n := len(s.list.units)
+	mission_note(fmt.tprintf(s.manager == .System ? i18n.tr(n, "%d service of the system: %d running, %d failed", "%d services of the system: %d running, %d failed") : i18n.tr(n, "%d service of the user: %d running, %d failed", "%d services of the user: %d running, %d failed"), n, s.list.running, failed), em)
 	k := 0
 	for u in s.list.units {
 		if k >= failed { break }
@@ -369,7 +371,7 @@ mission_services :: proc(app: ^App, em: f32) {
 		k += 1
 		if k >= MISSION_TOP { break }
 	}
-	if failed == 0 { mission_note("No service failed.", em) }
+	if failed == 0 { mission_note(i18n.tr("No service failed."), em) }
 }
 
 // The network: its rate, the sockets that listen and those connected; the processes with the most sockets.
@@ -378,15 +380,15 @@ mission_network :: proc(app: ^App, em: f32) {
 	m := &app.machine
 	c := &app.connections
 	// (counted when the sockets were read: connections_count)
-	mission_note(fmt.tprintf("%s now; %d listening, %d connected", bits_text(m.net_rate), c.listening, c.connected), em)
+	mission_note(fmt.tprintf(i18n.tr("%s now; %d listening, %d connected"), bits_text(m.net_rate), c.listening, c.connected), em)
 	list := c.holders[:]
 	most := len(list) > 0 ? f32(list[0].n) : 1
 	for h, k in list[:min(len(list), MISSION_TOP)] {
-		name := fmt.tprintf("PID %d", h.pid)
+		name := fmt.tprintf(i18n.tr("PID %d"), h.pid)
 		// (by its pid alone: a socket's process often comes with no start time)
 		start := h.start
 		if q := find_pid(&app.sampler, h.pid); q != nil && !q.ended { name, start = q.name, q.start }
-		if mission_line(app, fmt.tprintf("mc_net_%d", k), name, fmt.tprintf("PID %d", h.pid), count_text(h.n, "socket", "sockets"), f32(h.n) / most, "", em, {kind = .Process, pid = h.pid, start = start}) {
+		if mission_line(app, fmt.tprintf("mc_net_%d", k), name, fmt.tprintf(i18n.tr("PID %d"), h.pid), fmt.tprintf(i18n.tr(h.n, "%d socket", "%d sockets"), h.n), f32(h.n) / most, "", em, {kind = .Process, pid = h.pid, start = start}) {
 			mission_show_connections(app, h.pid)
 		}
 	}
@@ -396,10 +398,10 @@ mission_network :: proc(app: ^App, em: f32) {
 @(private = "file")
 mission_startup :: proc(app: ^App, em: f32) {
 	s := &app.startup
-	if s.list == nil { mission_note("Reading…", em); return }
+	if s.list == nil { mission_note(i18n.tr("Reading…"), em); return }
 	// (counted when the list was read: startup_posted)
 	on := s.list.on_count
-	mission_note(fmt.tprintf("%s, %d on", count_text(len(s.list.items), "item", "items"), on), em)
+	mission_note(fmt.tprintf(i18n.tr(len(s.list.items), "%d item, %d on", "%d items, %d on"), len(s.list.items), on), em)
 	k := 0
 	for it in s.list.items {
 		if k >= on { break }
@@ -415,14 +417,14 @@ mission_startup :: proc(app: ^App, em: f32) {
 mission_system :: proc(app: ^App, em: f32) {
 	m := &app.machine
 	info := app.information.data
-	if info == nil { mission_note("Reading…", em); return }
+	if info == nil { mission_note(i18n.tr("Reading…"), em); return }
 	facts := [][2]string{
-		{"Computer", info.hostname},
-		{"System", fmt.tprintf("%s, kernel %s", info.os_name, info.kernel)},
-		{"Processor", info.cpu.model},
-		{"Memory", size_text(m.mem.total)},
-		{"Up for", uptime_text(m.uptime)},
-		{"Desktop", info.desktop},
+		{i18n.tr("Computer"), info.hostname},
+		{i18n.tr("System"), fmt.tprintf(i18n.tr("%s, kernel %s"), info.os_name, info.kernel)},
+		{i18n.tr("Processor"), info.cpu.model},
+		{i18n.tr("Memory"), size_text(m.mem.total)},
+		{i18n.tr("Up for"), uptime_text(m.uptime)},
+		{i18n.tr("Desktop"), info.desktop},
 	}
 	for f, i in facts {
 		if f[1] == "" { continue }
@@ -443,13 +445,13 @@ mission_system :: proc(app: ^App, em: f32) {
 			ui.spacer(ui.px(em * 0.8))
 			if ui.tags("weak") {
 				ui.next({width = ui.px(em * 7), height = ui.pct(1), text_pad = 0})
-				ui.label(fmt.tprintf("GPU %d###k", i))
+				ui.label(fmt.tprintf("%s###k", fmt.tprintf(i18n.tr("GPU %d"), i)))
 			}
 			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0})
 			ui.label_tip(fmt.tprintf("%s###v", ui.text_shown(g.name)))
 		}
 	}
-	if mission_more(app, "mc_system_more", "Information", em) { tab_show(app, .Information) }
+	if mission_more(app, "mc_system_more", i18n.tr("Information"), em) { tab_show(app, .Information) }
 }
 
 // A line of a list panel: its name, a faint detail, its value at the right, a bar of its share (-1: none), in the
@@ -528,28 +530,28 @@ mission_line_menu :: proc(app: ^App, em: f32) {
 		case .Process:
 			p := find_proc(&app.sampler, line.pid, line.start)
 			if p == nil { ui.ctx_menu_close(); return }
-			if ui.menu_item("Show in Processes", icon = lucide.LAYOUT_LIST, icon_font = app.icons).clicked { processes_reveal(app, p.pid, p.start) }
-			if ui.menu_item(COMMANDS[.Properties].label, icon = COMMANDS[.Properties].icon, icon_font = app.icons).clicked {
+			if ui.menu_item(i18n.tr("Show in Processes"), icon = lucide.LAYOUT_LIST, icon_font = app.icons).clicked { processes_reveal(app, p.pid, p.start) }
+			if ui.menu_item(cmd_label(.Properties), icon = COMMANDS[.Properties].icon, icon_font = app.icons).clicked {
 				props_open(app, p.pid, p.start)
 			}
 			ui.menu_separator()
-			if ui.menu_item(COMMANDS[.Go_To_Service].label, icon = COMMANDS[.Go_To_Service].icon, enabled = p.unit != "", icon_font = app.icons).clicked { go_to_service(app, p) }
-			if ui.menu_item("Show its connections", icon = lucide.GLOBE, icon_font = app.icons).clicked { mission_show_connections(app, p.pid) }
+			if ui.menu_item(cmd_label(.Go_To_Service), icon = COMMANDS[.Go_To_Service].icon, enabled = p.unit != "", icon_font = app.icons).clicked { go_to_service(app, p) }
+			if ui.menu_item(i18n.tr("Show its connections"), icon = lucide.GLOBE, icon_font = app.icons).clicked { mission_show_connections(app, p.pid) }
 			ui.menu_separator()
-			if ui.menu_item(COMMANDS[.Open_Location].label, icon = COMMANDS[.Open_Location].icon, enabled = p.exe != "", icon_font = app.icons).clicked { open_location(app, p) }
-			if ui.menu_item(COMMANDS[.Copy_Command].label, icon = COMMANDS[.Copy_Command].icon, enabled = p.cmdline != "", icon_font = app.icons).clicked { copy_command(app, p) }
+			if ui.menu_item(cmd_label(.Open_Location), icon = COMMANDS[.Open_Location].icon, enabled = p.exe != "", icon_font = app.icons).clicked { open_location(app, p) }
+			if ui.menu_item(cmd_label(.Copy_Command), icon = COMMANDS[.Copy_Command].icon, enabled = p.cmdline != "", icon_font = app.icons).clicked { copy_command(app, p) }
 		case .Service:
 			u, found := mission_service(app, line.name)
 			if !found { ui.ctx_menu_close(); return }
-			if ui.menu_item("Show in Services", icon = lucide.SETTINGS, icon_font = app.icons).clicked { mission_show_service(app, line.name) }
+			if ui.menu_item(i18n.tr("Show in Services"), icon = lucide.SETTINGS, icon_font = app.icons).clicked { mission_show_service(app, line.name) }
 			q := u.pid > 0 ? find_pid(&app.sampler, u.pid) : nil
-			if ui.menu_item("Show its process", icon = lucide.LAYOUT_LIST, enabled = q != nil, icon_font = app.icons).clicked { processes_reveal(app, q.pid, q.start) }
-			if ui.menu_item(COMMANDS[.Service_Details].label, icon = COMMANDS[.Service_Details].icon, icon_font = app.icons).clicked {
+			if ui.menu_item(i18n.tr("Show its process"), icon = lucide.LAYOUT_LIST, enabled = q != nil, icon_font = app.icons).clicked { processes_reveal(app, q.pid, q.start) }
+			if ui.menu_item(cmd_label(.Service_Details), icon = COMMANDS[.Service_Details].icon, icon_font = app.icons).clicked {
 				mission_show_service(app, line.name)
 				if !app.settings.details { service_details_switch(app) }
 			}
 		case .Startup:
-			if ui.menu_item("Show in Startup", icon = lucide.POWER, icon_font = app.icons).clicked { tab_show(app, .Startup) }
+			if ui.menu_item(i18n.tr("Show in Startup"), icon = lucide.POWER, icon_font = app.icons).clicked { tab_show(app, .Startup) }
 		}
 	}
 }

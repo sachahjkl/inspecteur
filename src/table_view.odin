@@ -13,6 +13,7 @@ import "core:time"
 import "core:time/timezone"
 import "gt:render"
 import "gt:ui"
+import i18n "gt:i18n"
 
 // The indent of a group's process, the chevron's and the icon's width, in ems.
 INDENT_EM  :: 1.6
@@ -142,11 +143,11 @@ build_bar :: proc(app: ^App, em: f32) {
 		vrule(em)
 		ui.spacer(ui.px(em * 0.3))
 		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
-		ui.label("Processes###bar_title")
+		ui.label(fmt.tprintf("%s###bar_title", i18n.tr("Processes")))
 		ui.spacer(ui.px(em * 0.8))
 		if ui.tags("weak") {
-			counts := fmt.tprintf("%s, %s", count_text(app.table.shown_apps, "app", "apps"), count_text(app.table.shown_background, "background process", "background processes"))
-			if app.table.tree { counts = fmt.tprintf("%s, as a tree", count_text(app.table.shown_tree, "process", "processes")) }
+			counts := fmt.tprintf("%s, %s", fmt.tprintf(i18n.tr(app.table.shown_apps, "%d app", "%d apps"), app.table.shown_apps), fmt.tprintf(i18n.tr(app.table.shown_background, "%d background process", "%d background processes"), app.table.shown_background))
+			if app.table.tree { counts = fmt.tprintf(i18n.tr(app.table.shown_tree, "%d process, as a tree", "%d processes, as a tree"), app.table.shown_tree) }
 			ui.next({width = ui.fill(), height = ui.pct(1)})
 			ui.label_tip(fmt.tprintf("%s###counts", ui.text_shown(counts)))
 		}
@@ -247,7 +248,7 @@ build_rows :: proc(app: ^App, em: f32) {
 	if len(t.rows) == 0 && t.query != "" {
 		if ui.tags("weak") {
 			ui.next({width = ui.fill(), height = ui.px(em * 5)})
-			if ui.style({text_align = .Center}) { ui.label(fmt.tprintf("No process matches “%s”.###empty", ui.text_shown(ui.field_string(&app.search)))) }
+			if ui.style({text_align = .Center}) { ui.label(fmt.tprintf("%s###empty", fmt.tprintf(i18n.tr("No process matches “%s”."), ui.text_shown(ui.field_string(&app.search))))) }
 		}
 	}
 }
@@ -259,10 +260,10 @@ row_label :: proc(app: ^App, r: Row) -> string {
 	#partial switch r.kind {
 	case .Process:
 		p := app.sampler.procs[r.index]
-		return fmt.tprintf("%s, PID %d", ui.text_shown(p.name), p.pid)
+		return fmt.tprintf(i18n.tr("%s, PID %d"), ui.text_shown(p.name), p.pid)
 	case .App:
 		g := app.table.groups[r.index]
-		return fmt.tprintf("%s, %s", ui.text_shown(app.catalog.entries[g.entry].name), count_text(g.count, "process", "processes"))
+		return fmt.tprintf(i18n.tr(g.count, "%s, %d process", "%s, %d processes"), ui.text_shown(app.catalog.entries[g.entry].name), g.count)
 	}
 	return ""
 }
@@ -273,9 +274,9 @@ build_section :: proc(app: ^App, r: Row, em: f32) {
 	ui.spacer(ui.px(em * 0.8))
 	text: string
 	switch r.index {
-	case SECTION_APPS:   text = fmt.tprintf("Apps (%d)###sec", t.shown_apps)
-	case SECTION_PINNED: text = fmt.tprintf("Pinned (%d)###sec_pin", t.shown_pinned)
-	case:                text = fmt.tprintf("Background processes (%d)###sec", t.shown_background)
+	case SECTION_APPS:   text = fmt.tprintf("%s###sec", fmt.tprintf(i18n.tr("Apps (%d)"), t.shown_apps))
+	case SECTION_PINNED: text = fmt.tprintf("%s###sec_pin", fmt.tprintf(i18n.tr("Pinned (%d)"), t.shown_pinned))
+	case:                text = fmt.tprintf("%s###sec", fmt.tprintf(i18n.tr("Background processes (%d)"), t.shown_background))
 	}
 	ui.next({width = ui.fill(), height = ui.pct(1), font_size = em * 0.92, fg = ui.color("accent")})
 	ui.label(text)
@@ -333,7 +334,7 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 				chev := ui.build_box({.Clickable, .Draw_Text, .No_Text_Trunc}, fmt.tprintf("%s###chev", open ? lucide.CHEVRON_DOWN : lucide.CHEVRON_RIGHT))
 				csig := ui.signal(chev)
 				if csig.clicked && t.query == "" { group_toggle(app, r) }
-				tip_after(csig, t.query != "" ? "Open while the filter finds some of its processes" : open ? cmd_tip(.Close_Group) : cmd_tip(.Open_Group))
+				tip_after(csig, t.query != "" ? i18n.tr("Open while the filter finds some of its processes") : open ? cmd_tip(.Close_Group) : cmd_tip(.Open_Group))
 			}
 		} else {
 			ui.spacer(ui.px(em * CHEVRON_EM))
@@ -423,7 +424,7 @@ cpu_graph_cell :: proc(app: ^App, r: Row, page: ui.Color, em: f32) -> (tip: stri
 	if d.count > 0 && ui.pointer_on(box) {
 		sum, top: f32
 		for v in d.values[:d.count] { sum += v; top = max(top, v) }
-		tip = fmt.tprintf("CPU over the last %s: %.1f%% on average, %.1f%% at most", span_text(d.count, app.settings.refresh_ms), sum / f32(d.count), top)
+		tip = fmt.tprintf(i18n.tr("CPU over the last %s: %.1f%% on average, %.1f%% at most"), span_text(d.count, app.settings.refresh_ms), sum / f32(d.count), top)
 	}
 	return
 }

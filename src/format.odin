@@ -6,15 +6,16 @@ import "core:fmt"
 import "core:strconv"
 import "core:strings"
 import ascii "gt:ascii"
+import i18n "gt:i18n"
 
 // "1.5 GB", "320 MB", "12 KB", "0 B": a size in powers of 1024, as most system monitors show it.
 size_text :: proc(n: u64, allocator := context.temp_allocator) -> string {
-	UNITS :: [?]string{"B", "KB", "MB", "GB", "TB"}
+	// (French writes octets: "Mo", "Go")
+	units := [?]string{i18n.tr("unit", "B"), i18n.tr("unit", "KB"), i18n.tr("unit", "MB"), i18n.tr("unit", "GB"), i18n.tr("unit", "TB")}
 	v := f64(n)
 	u := 0
-	for v >= 1024 && u < len(UNITS) - 1 { v /= 1024; u += 1 }
-	units := UNITS
-	if u == 0 { return strings.concatenate({uint_text(n), " B"}, allocator) }
+	for v >= 1024 && u < len(units) - 1 { v /= 1024; u += 1 }
+	if u == 0 { return strings.concatenate({uint_text(n), " ", units[0]}, allocator) }
 	buf: [32]u8
 	digits := v < 10 ? 1 : 0
 	s := strconv.write_float(buf[:], v, 'f', digits, 64)
@@ -36,7 +37,7 @@ uint_text :: proc(n: u64, allocator := context.temp_allocator) -> string {
 // A name in lower case for the catalog's keys (ASCII: names and ids, not prose).
 key_of :: proc(name: string, allocator := context.temp_allocator) -> string { return ascii.lower(name, allocator) }
 
-// "1 app", "3 apps".
+// "1 app", "3 apps": English only (the window counts with i18n.tr(n, one, other)).
 count_text :: proc(n: int, one, many: string) -> string { return fmt.tprintf("%d %s", n, n == 1 ? one : many) }
 
 // CPU time: "12.34 s", "3:05.20" (minutes), "2:03:05" (hours).
@@ -77,7 +78,7 @@ duration_words :: proc(seconds: f64) -> string {
 	s := i64(seconds)
 	days, hours, minutes := s / 86400, (s / 3600) % 24, (s / 60) % 60
 	switch {
-	case days > 0:    return fmt.tprintf("%s, %d h %d min", count_text(int(days), "day", "days"), hours, minutes)
+	case days > 0:    return fmt.tprintf(i18n.tr(int(days), "%d day, %d h %d min", "%d days, %d h %d min"), days, hours, minutes)
 	case hours > 0:   return fmt.tprintf("%d h %d min", hours, minutes)
 	case minutes > 0: return fmt.tprintf("%d min", minutes)
 	}
@@ -88,8 +89,8 @@ duration_words :: proc(seconds: f64) -> string {
 span_text :: proc(points, period_ms: int) -> string {
 	s := points * period_ms / 1000
 	switch {
-	case s < 120:    return fmt.tprintf("%d seconds", s)
-	case s % 60 == 0: return fmt.tprintf("%d minutes", s / 60)
+	case s < 120:    return fmt.tprintf(i18n.tr(s, "%d second", "%d seconds"), s)
+	case s % 60 == 0: return fmt.tprintf(i18n.tr(s / 60, "%d minute", "%d minutes"), s / 60)
 	}
 	return fmt.tprintf("%d min %d s", s / 60, s % 60)
 }
@@ -105,6 +106,6 @@ cpu_list_text :: proc(cpus: []bool) -> string {
 		if j > i { fmt.sbprintf(&b, "%d-%d", i, j) } else { fmt.sbprintf(&b, "%d", i) }
 		i = j + 1
 	}
-	if strings.builder_len(b) == 0 { return "none" }
+	if strings.builder_len(b) == 0 { return i18n.tr("none") }
 	return strings.to_string(b)
 }

@@ -7,6 +7,7 @@ package inspecteur
 
 import "core:fmt"
 import "gt:ui"
+import i18n "gt:i18n"
 
 SUMMARY_EM       :: 3.0   // its height
 // The temperature at which a tile's stripe is green, and red (degrees Celsius); the pressure at which it is red.
@@ -26,29 +27,29 @@ summary_build :: proc(app: ^App, em: f32) {
 	m := &app.machine
 	tiles := make([dynamic]Tile, context.temp_allocator)
 	mem := m.mem.total > 0 ? f32(f64(mem_used(m)) / f64(m.mem.total)) : 0
-	append(&tiles, Tile{"cpu", "CPU", fmt.tprintf("%.0f%%", m.cpu), {{&m.cpu_hist, hue(app, HUE_CPU), ""}}, 100, 0, m.cpu / 100, {.Cpu, 0}})
-	append(&tiles, Tile{"memory", "Memory", size_text(mem_used(m)), {{&m.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, 0, mem, {.Memory, 0}})
+	append(&tiles, Tile{"cpu", i18n.tr("CPU"), fmt.tprintf("%.0f%%", m.cpu), {{&m.cpu_hist, hue(app, HUE_CPU), ""}}, 100, 0, m.cpu / 100, {.Cpu, 0}})
+	append(&tiles, Tile{"memory", i18n.tr("Memory"), size_text(mem_used(m)), {{&m.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, 0, mem, {.Memory, 0}})
 	busiest, active := 0, f32(0)
 	for d, i in m.disks { if d.active > active { busiest, active = i, d.active } }
 	if len(m.disks) > 0 {
-		append(&tiles, Tile{"disk", "Disk", fmt.tprintf("%s/s", size_text(u64(m.disk_rate))), {{&m.disk_hist, hue(app, HUE_DISK), ""}}, 0, DISK_FLOOR, active / 100, {.Disk, busiest}})
+		append(&tiles, Tile{"disk", i18n.tr("Disk"), fmt.tprintf("%s/s", size_text(u64(m.disk_rate))), {{&m.disk_hist, hue(app, HUE_DISK), ""}}, 0, DISK_FLOOR, active / 100, {.Disk, busiest}})
 	}
 	if len(m.nets) > 0 {
-		append(&tiles, Tile{"network", "Network", bits_text(m.net_rate), {{&m.net_hist, hue(app, HUE_NETWORK), ""}}, 0, NET_FLOOR, -1, {.Network, 0}})
+		append(&tiles, Tile{"network", i18n.tr("Network"), bits_text(m.net_rate), {{&m.net_hist, hue(app, HUE_NETWORK), ""}}, 0, NET_FLOOR, -1, {.Network, 0}})
 	}
 	if len(m.gpus) > 0 {
 		g := &m.gpus[0]
-		value := g.read.asleep ? "asleep" : g.read.has_util ? fmt.tprintf("%.0f%%", g.read.util) : "–"
-		append(&tiles, Tile{"gpu", "GPU", value, {{&g.util_hist, hue(app, HUE_GPU), ""}}, 100, 0, g.read.has_util ? g.read.util / 100 : -1, {.Gpu, 0}})
+		value := g.read.asleep ? i18n.tr("asleep") : g.read.has_util ? fmt.tprintf("%.0f%%", g.read.util) : "–"
+		append(&tiles, Tile{"gpu", i18n.tr("GPU"), value, {{&g.util_hist, hue(app, HUE_GPU), ""}}, 100, 0, g.read.has_util ? g.read.util / 100 : -1, {.Gpu, 0}})
 	}
 	if m.temp_count > 0 {
 		c := m.temps[0].celsius
-		append(&tiles, Tile{"temperature", "Temperature", fmt.tprintf("%.0f °C", c), {{&m.temp_hist, hue(app, HUE_HEAT), ""}}, TEMP_TOP, 0, (c - SUMMARY_TEMP_COOL) / (SUMMARY_TEMP_HOT - SUMMARY_TEMP_COOL), {.Cpu, 0}})
+		append(&tiles, Tile{"temperature", i18n.tr("Temperature"), fmt.tprintf("%.0f °C", c), {{&m.temp_hist, hue(app, HUE_HEAT), ""}}, TEMP_TOP, 0, (c - SUMMARY_TEMP_COOL) / (SUMMARY_TEMP_HOT - SUMMARY_TEMP_COOL), {.Cpu, 0}})
 	}
 	if m.has_pressure {
 		worst := pressure_worst(m)
 		p := m.pressure[worst].some10
-		append(&tiles, Tile{"pressure", fmt.tprintf("Pressure, %s", PRESSURE_NAMES[worst]), fmt.tprintf("%.1f%%", p), pressure_series(app), 0, PRESSURE_FLOOR, p / SUMMARY_PRESSURE_FULL, {.Pressure, 0}})
+		append(&tiles, Tile{"pressure", fmt.tprintf(i18n.tr("Pressure, %s"), i18n.tr(PRESSURE_NAMES[worst])), fmt.tprintf("%.1f%%", p), pressure_series(app), 0, PRESSURE_FLOOR, p / SUMMARY_PRESSURE_FULL, {.Pressure, 0}})
 	}
 
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * SUMMARY_EM)), bg = surface("bar")})
@@ -90,7 +91,7 @@ summary_tile :: proc(app: ^App, t: Tile, em: f32) {
 		ui.sparkline("###spark", line_series(t.series), t.top, HISTORY_POINTS, t.floor)
 		ui.spacer(ui.px(em * 0.5))
 	}
-	tip_after(sig, fmt.tprintf("%s: %s. Show it in Performance", t.title, t.value))
+	tip_after(sig, fmt.tprintf(i18n.tr("%s: %s. Show it in Performance"), t.title, t.value))
 	if sig.clicked {
 		tab_show(app, .Performance)
 		app.device = t.device
@@ -103,5 +104,5 @@ summary_switch :: proc(app: ^App) {
 	app.settings.summary = !app.settings.summary
 	pref_set(&app.prefs, "processes.summary", app.settings.summary ? "true" : "false")
 	tab_show(app, .Processes)
-	say(app, app.settings.summary ? "The summary of the machine is shown" : "The summary of the machine is hidden")
+	say(app, app.settings.summary ? i18n.tr("The summary of the machine is shown") : i18n.tr("The summary of the machine is hidden"))
 }

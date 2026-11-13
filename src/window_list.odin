@@ -8,6 +8,7 @@ package inspecteur
 import "core:fmt"
 import "core:strings"
 import "gt:platform"
+import i18n "gt:i18n"
 
 App_Window :: struct {
 	entry:  int,      // its app's desktop entry
@@ -67,15 +68,15 @@ window_show :: proc(app: ^App, entry: int) -> bool {
 		if w.active { pick = list[(i + 1) % len(list)]; break }
 	}
 	if app.demo != nil {
-		say(app, "The window of %s comes to the front", pick.title)
+		say(app, i18n.tr("The window of %s comes to the front"), pick.title)
 		return true
 	}
-	if !platform.toplevel_activate(app.main.win, pick.id) { say(app, "That window has closed"); return false }
+	if !platform.toplevel_activate(app.main.win, pick.id) { say(app, i18n.tr("That window has closed")); return false }
 	return true
 }
 
 // The tooltip of a row's window button: the window it shows, or how many there are.
 window_tip :: proc(list: []App_Window) -> string {
-	if len(list) == 1 { return fmt.tprintf("Show its window: %s", list[0].title) }
-	return fmt.tprintf("Show its windows (%d), one after the other", len(list))
+	if len(list) == 1 { return fmt.tprintf(i18n.tr("Show its window: %s"), list[0].title) }
+	return fmt.tprintf(i18n.tr(len(list), "Show its windows (%d), one after the other", "Show its windows (%d), one after the other"), len(list))
 }

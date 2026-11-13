@@ -14,6 +14,7 @@ import "core:strconv"
 import "core:strings"
 import "core:sys/linux"
 import "gt:platform"
+import i18n "gt:i18n"
 
 // A disk's sector, as /proc/diskstats counts them (always 512 bytes, whatever the disk's own).
 SECTOR_BYTES :: 512
@@ -312,7 +313,7 @@ disks_list :: proc(out: ^[dynamic]Disk_Info) {
 		if sectors == 0 { continue }
 		d := Disk_Info{name = strings.clone(fi.name, context.temp_allocator), model = read_text(fmt.tprintf("%s/device/model", dir)), capacity = sectors * SECTOR_BYTES}
 		switch {
-		case read_text(fmt.tprintf("%s/removable", dir)) == "1":       d.kind = "Removable"
+		case read_text(fmt.tprintf("%s/removable", dir)) == "1":       d.kind = i18n.later("Removable")
 		case strings.has_prefix(fi.name, "nvme"):                        d.kind = "NVMe SSD"
 		case read_text(fmt.tprintf("%s/queue/rotational", dir)) == "1": d.kind = "HDD"
 		case:                                                             d.kind = "SSD"
@@ -406,8 +407,8 @@ nets_list :: proc(out: ^[dynamic]Net_Info) {
 		switch {
 		case os.exists(fmt.tprintf("%s/wireless", dir)) || os.exists(fmt.tprintf("%s/phy80211", dir)): n.kind = "Wi-Fi"
 		case kind == "1" && os.exists(fmt.tprintf("%s/device", dir)):                                   n.kind = "Ethernet"
-		case kind == "65534":                                                                           n.kind = "Tunnel"
-		case:                                                                                            n.kind = "Virtual"
+		case kind == "65534":                                                                           n.kind = i18n.later("Tunnel")
+		case:                                                                                            n.kind = i18n.later("Virtual")
 		}
 		state := read_text(fmt.tprintf("%s/operstate", dir))
 		n.up = state == "up" || state == "unknown"

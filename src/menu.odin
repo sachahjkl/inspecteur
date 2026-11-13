@@ -26,6 +26,7 @@ import process "gt:process"
 import "core:time"
 import "gt:platform"
 import "gt:ui"
+import i18n "gt:i18n"
 
 // After a signal, the next sample comes this soon: the row goes as the process ends.
 SAMPLE_AFTER_SIGNAL :: 300 * time.Millisecond
@@ -127,15 +128,15 @@ chosen_of_selection :: proc(app: ^App, whole: bool) -> (c: Chosen, ok: bool) {
 		g := app.table.groups[rows[0].index]
 		name := app.catalog.entries[g.entry].name
 		switch {
-		case len(c.targets) == 1: c.name = strings.clone(fmt.tprintf("%s (PID %d)", name, c.targets[0].pid))
-		case whole:               c.name = strings.clone(fmt.tprintf("%s (%d processes)", name, len(c.targets)))
-		case:                     c.name = strings.clone(fmt.tprintf("%s (%d instances)", name, len(c.targets)))
+		case len(c.targets) == 1: c.name = strings.clone(fmt.tprintf(i18n.tr("%s (PID %d)"), name, c.targets[0].pid))
+		case whole:               c.name = strings.clone(fmt.tprintf(i18n.tr(len(c.targets), "%s (%d processes)", "%s (%d processes)"), name, len(c.targets)))
+		case:                     c.name = strings.clone(fmt.tprintf(i18n.tr(len(c.targets), "%s (%d instances)", "%s (%d instances)"), name, len(c.targets)))
 		}
 	case len(c.targets) == 1:
 		p := find_proc(&app.sampler, c.targets[0].pid, c.targets[0].start)
-		c.name = strings.clone(fmt.tprintf("%s (PID %d)", p != nil ? p.name : "?", c.targets[0].pid))
+		c.name = strings.clone(fmt.tprintf(i18n.tr("%s (PID %d)"), p != nil ? p.name : "?", c.targets[0].pid))
 	case:
-		c.name = strings.clone(fmt.tprintf("%d processes", len(c.targets)))
+		c.name = strings.clone(fmt.tprintf(i18n.tr(len(c.targets), "%d processes", "%d processes"), len(c.targets)))
 	}
 	return c, len(c.targets) > 0
 }
@@ -161,7 +162,7 @@ chosen_tree :: proc(app: ^App) -> (c: Chosen, ok: bool) {
 	// (the children first: a parent that ends first may take its children with it or let them be adopted)
 	slice.reverse(c.targets[:])
 	under := len(c.targets) - len(roots.targets)
-	c.name = strings.clone(under > 0 ? fmt.tprintf("%s and %s under it", roots.name, count_text(under, "process", "processes")) : roots.name)
+	c.name = strings.clone(under > 0 ? fmt.tprintf(i18n.tr(under, "%s and %d process under it", "%s and %d processes under it"), roots.name, under) : roots.name)
 	return c, true
 }
 
@@ -183,7 +184,7 @@ search_online :: proc(app: ^App) {
 	if r, ok := selected_row(app); ok && r.kind == .App { name = app.catalog.entries[app.table.groups[r.index].entry].name }
 	url := strings.concatenate({SEARCH_URL, url_query(fmt.tprintf("%s process", name))}, context.temp_allocator)
 	ui.open(url, .Url)
-	say(app, "Searched the web for %s", name)
+	say(app, i18n.tr("Searched the web for %s"), name)
 }
 
 // The search engine a search online asks (the query follows).
@@ -208,10 +209,10 @@ dump_ask :: proc(app: ^App, p: ^Proc) {
 	confirm_free(m)
 	m.act = .Dump
 	append(&m.chosen.targets, Target{p.pid, p.start})
-	m.chosen.name = fmt.aprintf("%s (PID %d)", p.name, p.pid)
-	m.verb = "Create"
-	m.title = fmt.aprintf("Create a dump file of %s?", m.chosen.name)
-	m.note = fmt.aprintf("Its memory is written to a file of %s at most: anything it held, passwords and documents too. %s", size_text(p.resident), DUMP_HOW)
+	m.chosen.name = fmt.aprintf(i18n.tr("%s (PID %d)"), p.name, p.pid)
+	m.verb = i18n.tr("Create")
+	m.title = fmt.aprintf(i18n.tr("Create a dump file of %s?"), m.chosen.name)
+	m.note = fmt.aprintf(i18n.tr("Its memory is written to a file of %s at most: anything it held, passwords and documents too. %s"), size_text(p.resident), i18n.tr(DUMP_HOW))
 	m.enter_confirms = true
 	m.open = true
 }
@@ -238,10 +239,10 @@ row_menu_items :: proc(app: ^App) {
 		cmd_item(app, .Kill)
 		cmd_item(app, .End_Tree)
 		p := selected_proc(app)
-		cmd_item(app, .Suspend, p != nil && p.state == .Stopped ? "Resume" : "Suspend")
-		if ui.menu_submenu(COMMANDS[.Send_Signal].label) {
+		cmd_item(app, .Suspend, p != nil && p.state == .Stopped ? i18n.tr("Resume") : i18n.tr("Suspend"))
+		if ui.menu_submenu(cmd_label(.Send_Signal)) {
 			for s in SIGNAL_ITEMS {
-				if ui.menu_item(s.label, enabled = cmd_can(app, .Send_Signal)).clicked { signal_selected(app, s.sig) }
+				if ui.menu_item(i18n.tr(s.label), enabled = cmd_can(app, .Send_Signal)).clicked { signal_selected(app, s.sig) }
 			}
 		}
 		ui.menu_separator()
@@ -256,7 +257,7 @@ row_menu_items :: proc(app: ^App) {
 		cmd_item(app, .Search_Online)
 		cmd_item(app, .Dump)
 		ui.menu_separator()
-		cmd_item(app, .Pin, pin_name(app) != "" && app.table.pinned[pin_name(app)] ? "Unpin" : "Pin")
+		cmd_item(app, .Pin, pin_name(app) != "" && app.table.pinned[pin_name(app)] ? i18n.tr("Unpin") : i18n.tr("Pin"))
 		cmd_item(app, .Select_All)
 		cmd_item(app, .Properties)
 	}
@@ -266,21 +267,20 @@ row_menu_items :: proc(app: ^App) {
 open_location :: proc(app: ^App, p: ^Proc) {
 	if p.exe == "" { return }
 	ui.open(p.exe, .Reveal)
-	say(app, "Opened the folder of %s", p.exe)
+	say(app, i18n.tr("Opened the folder of %s"), p.exe)
 }
 
 copy_command :: proc(app: ^App, p: ^Proc) {
 	if p.cmdline == "" { return }
 	platform.set_clipboard(app.main.win, p.cmdline)
-	announce(app, fmt.tprintf("Copied the command line of %s", p.name))
+	announce(app, fmt.tprintf(i18n.tr("Copied the command line of %s"), p.name))
 }
 
 // The signals the row's menu sends (Send a signal), each by its name and its number's.
-@(rodata)
 SIGNAL_ITEMS := [?]struct { sig: process.Signal, label: string }{
-	{.Hangup, "Hang up (SIGHUP)"}, {.Interrupt, "Interrupt (SIGINT)"}, {.Quit, "Quit (SIGQUIT)"},
-	{.Terminate, "Terminate (SIGTERM)"}, {.Kill, "Kill (SIGKILL)…"}, {.Stop, "Stop (SIGSTOP)"}, {.Continue, "Continue (SIGCONT)"},
-	{.User1, "User 1 (SIGUSR1)"}, {.User2, "User 2 (SIGUSR2)"},
+	{.Hangup, i18n.later("Hang up (SIGHUP)")}, {.Interrupt, i18n.later("Interrupt (SIGINT)")}, {.Quit, i18n.later("Quit (SIGQUIT)")},
+	{.Terminate, i18n.later("Terminate (SIGTERM)")}, {.Kill, i18n.later("Kill (SIGKILL)…")}, {.Stop, i18n.later("Stop (SIGSTOP)")}, {.Continue, i18n.later("Continue (SIGCONT)")},
+	{.User1, i18n.later("User 1 (SIGUSR1)")}, {.User2, i18n.later("User 2 (SIGUSR2)")},
 }
 
 // Sends `sig` to the selected processes (an app's row: its first processes, as End task), with the guards of the others:
@@ -297,7 +297,7 @@ signal_selected :: proc(app: ^App, sig: process.Signal) {
 	#partial switch sig {
 	case .Stop:
 		for t in c.targets {
-			if guard_of(app, t.pid) != .None { say(app, "Not stopped: it is Inspecteur, runs it or draws the desktop, and nothing could resume it"); return }
+			if guard_of(app, t.pid) != .None { say(app, i18n.tr("Not stopped: it is Inspecteur, runs it or draws the desktop, and nothing could resume it")); return }
 		}
 		send_signal(app, &c, sig)
 	case .Continue:
@@ -337,8 +337,8 @@ suspend_selected :: proc(app: ^App) {
 
 // Its state is read when the act runs (acts.odin), not the last sample's: the process may have been resumed since.
 suspend_or_resume :: proc(app: ^App, p: ^Proc) {
-	if app.demo != nil { say(app, "The demo's processes are not the system's: nothing was sent"); return }
-	a := act_new(.Suspend, fmt.tprintf("%s (PID %d)", p.name, p.pid))
+	if app.demo != nil { say(app, i18n.tr("The demo's processes are not the system's: nothing was sent")); return }
+	a := act_new(.Suspend, fmt.tprintf(i18n.tr("%s (PID %d)"), p.name, p.pid))
 	append(&a.targets, Target{p.pid, p.start})
 	a.guard = guard_of(app, p.pid)
 	act_start(app, a)
@@ -385,22 +385,21 @@ confirm_ask :: proc(app: ^App, c: Chosen, sig: process.Signal, tree := false) {
 		case .None:
 		}
 		p := find_proc(&app.sampler, t.pid, t.start)
-		append(&m.lines, p != nil ? fmt.aprintf("%s, PID %d", p.name, p.pid) : fmt.aprintf("PID %d", t.pid))
+		append(&m.lines, p != nil ? fmt.aprintf(i18n.tr("%s, PID %d"), p.name, p.pid) : fmt.aprintf(i18n.tr("PID %d"), t.pid))
 	}
 	many := len(c.targets) > 1
-	verb := sig == .Kill ? "Kill" : "End"
-	m.verb = tree ? "End tree" : verb
-	m.title = fmt.aprintf("%s %s?", verb, c.name)
+	m.verb = tree ? i18n.tr("End tree") : sig == .Kill ? i18n.tr("Kill") : i18n.tr("End")
+	m.title = fmt.aprintf(sig == .Kill ? i18n.tr("Kill %s?") : i18n.tr("End %s?"), c.name)
 	note := strings.builder_make(context.temp_allocator)
 	switch {
-	case server:     strings.write_string(&note, "It draws the desktop: the session ends with it, and every program of the session with it. ")
-	case inspecteur: strings.write_string(&note, "Inspecteur ends with it: it runs under it. ")
+	case server:     strings.write_string(&note, i18n.tr("It draws the desktop: the session ends with it, and every program of the session with it. "))
+	case inspecteur: strings.write_string(&note, i18n.tr("Inspecteur ends with it: it runs under it. "))
 	}
 	switch {
-	case sig == .Kill && many: strings.write_string(&note, "They end at once, without the chance to save their work. End task asks them to end on their own.")
-	case sig == .Kill:         strings.write_string(&note, "It ends at once, without the chance to save its work. End task asks it to end on its own.")
-	case many:                 strings.write_string(&note, "Each is asked to end.")
-	case:                      strings.write_string(&note, "It is asked to end.")
+	case sig == .Kill && many: strings.write_string(&note, i18n.tr("They end at once, without the chance to save their work. End task asks them to end on their own."))
+	case sig == .Kill:         strings.write_string(&note, i18n.tr("It ends at once, without the chance to save its work. End task asks it to end on its own."))
+	case many:                 strings.write_string(&note, i18n.tr("Each is asked to end."))
+	case:                      strings.write_string(&note, i18n.tr("It is asked to end."))
 	}
 	m.note = strings.clone(strings.to_string(note))
 	// (Enter confirms only what is asked and safe: a kill, the session's end and Inspecteur's own are a click)
@@ -414,9 +413,9 @@ confirm_service :: proc(app: ^App, action: Service_Action, unit, danger: string)
 	confirm_free(m)
 	m.act, m.action = .Service, action
 	m.unit = strings.clone(unit)
-	m.verb = action == .Stop ? "Stop" : "Restart"
-	m.title = fmt.aprintf("%s %s?", m.verb, unit)
-	what := action == .Stop ? "It stops, and its processes end; what needs it may stop too." : "It stops, its processes end, and it starts again."
+	m.verb = action == .Stop ? i18n.tr("Stop") : i18n.tr("Restart")
+	m.title = fmt.aprintf(action == .Stop ? i18n.tr("Stop %s?") : i18n.tr("Restart %s?"), unit)
+	what := action == .Stop ? i18n.tr("It stops, and its processes end; what needs it may stop too.") : i18n.tr("It stops, its processes end, and it starts again.")
 	m.note = danger != "" ? fmt.aprintf("%s %s", danger, what) : strings.clone(what)
 	m.enter_confirms = danger == ""
 	m.open = true
@@ -443,7 +442,7 @@ confirm_act :: proc(app: ^App) {
 
 // Sends `sig` to each process chosen that is still that process (acts.odin); what came of it is said when it is done.
 send_signal :: proc(app: ^App, c: ^Chosen, sig: process.Signal) {
-	if app.demo != nil { say(app, "The demo's processes are not the system's: nothing was sent"); return }
+	if app.demo != nil { say(app, i18n.tr("The demo's processes are not the system's: nothing was sent")); return }
 	a := act_new(.Signal, c.name)
 	a.sig = sig
 	for t in c.targets {
@@ -478,8 +477,8 @@ default_action :: proc(app: ^App) {
 // Sets a process's priority (a nice value), on each of its threads. A user may only lower a priority: a higher one
 // needs the administrator (PRIORITY_DENIED).
 set_priority :: proc(app: ^App, p: ^Proc, nice: i8) {
-	if app.demo != nil { say(app, "The demo's processes are not the system's: nothing was changed"); return }
-	a := act_new(.Priority, fmt.tprintf("%s (PID %d)", p.name, p.pid))
+	if app.demo != nil { say(app, i18n.tr("The demo's processes are not the system's: nothing was changed")); return }
+	a := act_new(.Priority, fmt.tprintf(i18n.tr("%s (PID %d)"), p.name, p.pid))
 	append(&a.targets, Target{p.pid, p.start})
 	a.nice = nice
 	act_start(app, a)
@@ -488,7 +487,7 @@ set_priority :: proc(app: ^App, p: ^Proc, nice: i8) {
 // One step of PRIORITIES up (-1: a higher priority) or down (+1) from the process's nice value.
 priority_step :: proc(app: ^App, p: ^Proc, dir: int) {
 	i, ok := priority_next(p.nice, dir)
-	if !ok { say(app, "%s runs at the %s priority offered already", p.name, dir < 0 ? "highest" : "lowest"); return }
+	if !ok { say(app, dir < 0 ? i18n.tr("%s runs at the highest priority offered already") : i18n.tr("%s runs at the lowest priority offered already"), p.name); return }
 	set_priority(app, p, PRIORITIES[i].nice)
 }
 

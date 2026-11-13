@@ -7,6 +7,7 @@ package inspecteur
 import "core:fmt"
 import "core:slice"
 import "gt:ui"
+import i18n "gt:i18n"
 
 // When a part counts as busy: past WARN it is said, past BAD it is the cause.
 DIAG_CPU_WARN, DIAG_CPU_BAD           :: f32(60), f32(90)       // percent of the machine
@@ -36,47 +37,53 @@ diagnose :: proc(app: ^App) -> []Finding {
 	}
 
 	if m.cpu >= DIAG_CPU_WARN {
-		add(&out, m.cpu >= DIAG_CPU_BAD ? .Bad : .Warn, "The processors are %.0f%% busy. The busiest: %s.", m.cpu, busiest(app, .Cpu))
+		add(&out, m.cpu >= DIAG_CPU_BAD ? .Bad : .Warn, i18n.tr("The processors are %.0f%% busy. The busiest: %s."), m.cpu, busiest(app, .Cpu))
 	}
 	if m.has_pressure {
-		NAMES := [Pressure_Kind]string{.Cpu = "a processor", .Memory = "memory", .Io = "the disks"}
+		// (a sentence per resource: a language words each its own way)
+		sentences := [Pressure_Kind]string{
+			.Cpu = i18n.tr("Tasks waited for a processor %.0f%% of the last 10 seconds."),
+			.Memory = i18n.tr("Tasks waited for memory %.0f%% of the last 10 seconds."),
+			.Io = i18n.tr("Tasks waited for the disks %.0f%% of the last 10 seconds."),
+		}
 		for k in Pressure_Kind {
 			p := m.pressure[k].some10
 			if p >= DIAG_PRESSURE_WARN {
-				add(&out, p >= DIAG_PRESSURE_BAD ? .Bad : .Warn, "Tasks waited for %s %.0f%% of the last 10 seconds.", NAMES[k], p)
+				add(&out, p >= DIAG_PRESSURE_BAD ? .Bad : .Warn, sentences[k], p)
 			}
 		}
 	}
 	if m.mem.total > 0 {
 		used := f64(m.mem.total - min(m.mem.available, m.mem.total)) / f64(m.mem.total)
 		if used >= DIAG_MEM_WARN {
-			add(&out, used >= DIAG_MEM_BAD ? .Bad : .Warn, "The memory is %.0f%% in use (%s of %s). The largest: %s.", used * 100, size_text(m.mem.total - m.mem.available), size_text(m.mem.total), busiest(app, .Memory))
+			add(&out, used >= DIAG_MEM_BAD ? .Bad : .Warn, i18n.tr("The memory is %.0f%% in use (%s of %s). The largest: %s."), used * 100, size_text(m.mem.total - m.mem.available), size_text(m.mem.total), busiest(app, .Memory))
 		}
 	}
 	if m.mem.swap_total > 0 {
 		swapped := f64(m.mem.swap_total - min(m.mem.swap_free, m.mem.swap_total)) / f64(m.mem.swap_total)
 		if swapped >= DIAG_SWAP_WARN {
-			add(&out, .Warn, "%s of the swap is in use: pages wait on the disk.", size_text(m.mem.swap_total - m.mem.swap_free))
+			add(&out, .Warn, i18n.tr("%s of the swap is in use: pages wait on the disk."), size_text(m.mem.swap_total - m.mem.swap_free))
 		}
 	}
 	for &d in m.disks {
 		if d.active >= DIAG_DISK_WARN {
-			add(&out, d.active >= DIAG_DISK_BAD ? .Bad : .Warn, "The disk %s is busy %.0f%% of the time. Reading and writing the most: %s.", d.name, d.active, busiest(app, .Disk))
+			add(&out, d.active >= DIAG_DISK_BAD ? .Bad : .Warn, i18n.tr("The disk %s is busy %.0f%% of the time. Reading and writing the most: %s."), d.name, d.active, busiest(app, .Disk))
 		}
 	}
 	for &g in m.gpus {
 		if g.read.has_util && g.read.util >= DIAG_GPU_WARN {
-			add(&out, .Warn, "The GPU %s is %.0f%% busy.", gpu_name(&g.read), g.read.util)
+			add(&out, .Warn, i18n.tr("The GPU %s is %.0f%% busy."), gpu_name(&g.read), g.read.util)
 		}
 	}
 	if m.temp_count > 0 && m.temps[0].celsius >= DIAG_HOT_C {
-		add(&out, .Warn, "The processor is hot: %.0f °C.", m.temps[0].celsius)
+		add(&out, .Warn, i18n.tr("The processor is hot: %.0f °C."), m.temps[0].celsius)
 	}
 	if m.throttled > m.throttled_before {
-		add(&out, .Bad, "The processor slowed for its heat %d times since Inspecteur started.", m.throttled - m.throttled_before)
+		n := int(m.throttled - m.throttled_before)
+		add(&out, .Bad, i18n.tr(n, "The processor slowed for its heat %d time since Inspecteur started.", "The processor slowed for its heat %d times since Inspecteur started."), n)
 	}
 	if len(out) == 0 {
-		add(&out, .Fine, "Nothing stands out: the processors are %.0f%% busy and the memory has room.", m.cpu)
+		add(&out, .Fine, i18n.tr("Nothing stands out: the processors are %.0f%% busy and the memory has room."), m.cpu)
 	}
 	slice.stable_sort_by(out[:], proc(a, b: Finding) -> bool { return a.level > b.level })
 	return out[:]
@@ -143,7 +150,7 @@ busiest :: proc(app: ^App, by: Busy_By) -> string {
 		}
 		append(&parts, fmt.tprintf("%s (%s)", p.name, shown))
 	}
-	if len(parts) == 0 { return "none" }
+	if len(parts) == 0 { return i18n.tr("none") }
 	return join_comma(parts[:])
 }
 
@@ -167,7 +174,7 @@ diagnosis_build :: proc(app: ^App, em: f32) {
 			if ui.row(id = "###diag_head") {
 				ui.spacer(ui.px(pad))
 				ui.next({width = ui.fill(), font_size = em * 1.4})
-				ui.paragraph("Why is it slow?###diag_title")
+				ui.paragraph(fmt.tprintf("%s###diag_title", i18n.tr("Why is it slow?")))
 				ui.spacer(ui.px(pad))
 			}
 			ui.spacer(ui.px(em * 0.8))
@@ -189,7 +196,7 @@ diagnosis_build :: proc(app: ^App, em: f32) {
 			ui.next({width = ui.px(w), height = ui.children_sum()})
 			if ui.row(id = "###diag_foot") {
 				ui.spacer(ui.fill())
-				if ui.button("Close###diag_close").clicked { app.diagnosis_open = false }
+				if ui.button(fmt.tprintf("%s###diag_close", i18n.tr("Close"))).clicked { app.diagnosis_open = false }
 				ui.spacer(ui.px(pad))
 			}
 			ui.spacer(ui.px(pad))

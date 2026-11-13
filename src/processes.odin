@@ -19,15 +19,16 @@ import "core:strconv"
 import "core:strings"
 import "gt:ascii"
 import "gt:ui"
+import i18n "gt:i18n"
 
 // Memory is a process's private memory: the pages that are its own. The resident memory counts the pages it shares with
 // others too (its libraries, shared memory): summed over a group, it would count them once per process.
 Column :: enum u8 { Name, PID, PPID, User, State, Nice, CPU, CPU_Graph, Memory, Resident, GPU, GPU_Memory, Read, Write, Threads, Started, Command, Executable }
 
 COLUMN_NAMES := [Column]string{
-	.Name = "Name", .PID = "PID", .PPID = "Parent PID", .User = "User", .State = "State", .Nice = PRIORITY_COLUMN, .CPU = "CPU", .CPU_Graph = "CPU, 30 s",
-	.Memory = "Private memory", .Resident = "Resident", .GPU = "GPU", .GPU_Memory = "GPU memory", .Read = "Disk read", .Write = "Disk write",
-	.Threads = "Threads", .Started = "Started", .Command = "Command line", .Executable = "Executable",
+	.Name = i18n.later("Name"), .PID = i18n.later("PID"), .PPID = i18n.later("Parent PID"), .User = i18n.later("User"), .State = i18n.later("State"), .Nice = PRIORITY_COLUMN, .CPU = i18n.later("CPU"), .CPU_Graph = i18n.later("CPU, 30 s"),
+	.Memory = i18n.later("Private memory"), .Resident = i18n.later("Resident"), .GPU = i18n.later("GPU"), .GPU_Memory = i18n.later("GPU memory"), .Read = i18n.later("Disk read"), .Write = i18n.later("Disk write"),
+	.Threads = i18n.later("Threads"), .Started = i18n.later("Started"), .Command = i18n.later("Command line"), .Executable = i18n.later("Executable"),
 }
 // The names in the preferences (processes.columns, processes.widths, processes.sort).
 COLUMN_KEYS := [Column]string{
@@ -97,7 +98,7 @@ table_columns_init :: proc(t: ^Table) {
 	shown := columns_of(PREF_DEFS[PREF_COLUMNS].default.s)
 	for c in Column {
 		t.columns[int(c)] = {
-			title = COLUMN_NAMES[c], width = COLUMN_DEFAULT_EM[c], number = c not_in COLUMN_TEXT,
+			title = i18n.tr(COLUMN_NAMES[c]), width = COLUMN_DEFAULT_EM[c], number = c not_in COLUMN_TEXT,
 			low_first = c == .PID || c == .PPID || c == .Nice, hidden = c != .Name && c not_in shown,
 		}
 	}

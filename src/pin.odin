@@ -5,6 +5,7 @@ package inspecteur
 // stays pinned when it starts again. processes.pinned keeps the names.
 
 import "core:strings"
+import i18n "gt:i18n"
 
 // The name a selected row is pinned by: its app's for a group and for a process of one (the Pinned section holds what
 // the others list at their top: apps and background processes; a process's name pinned inside a group showed nowhere),
@@ -56,5 +57,5 @@ pin_switch :: proc(app: ^App) {
 	for n in t.pinned { append(&names, n) }
 	pref_set(&app.prefs, "processes.pinned", strings.join(names[:], ",", context.temp_allocator))
 	rows_again(app)
-	say(app, pinned ? "%s is pinned over the others" : "%s is unpinned", name)
+	say(app, pinned ? i18n.tr("%s is pinned over the others") : i18n.tr("%s is unpinned"), name)
 }

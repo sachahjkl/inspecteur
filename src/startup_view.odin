@@ -8,23 +8,24 @@ import "core:fmt"
 import lucide "gt:lucide"
 import "gt:platform"
 import "gt:ui"
+import i18n "gt:i18n"
 
 build_startup :: proc(app: ^App, em: f32) {
 	s := &app.startup
 	if s.rows.table.query != app.query { ui.table_apply(&s.rows.table, &s.rows.data, app.query) }
-	note := "Reading…"
+	note := i18n.tr("Reading…")
 	if s.pending {
-		note = "Changing…"
+		note = i18n.tr("Changing…")
 	} else if s.list != nil {
 		on := 0
 		for it in s.list.items { if it.enabled { on += 1 } }
-		note = fmt.tprintf("%s, %d on", count_text(len(s.list.items), "item", "items"), on)
+		note = fmt.tprintf(i18n.tr(len(s.list.items), "%d item, %d on", "%d items, %d on"), len(s.list.items), on)
 		if s.list.problem != "" { note = fmt.tprintf("%s. %s", note, s.list.problem) }
 	}
-	section_bar(app, "Startup", note, em, startup_actions)
-	ev := section_table_build(&s.rows, s.list != nil ? "Nothing starts with the session." : "")
+	section_bar(app, i18n.tr("Startup"), note, em, startup_actions)
+	ev := section_table_build(&s.rows, s.list != nil ? i18n.tr("Nothing starts with the session.") : "")
 	if ev.sorted { ui.table_apply(&s.rows.table, &s.rows.data, app.query) }
-	if ev.sorted || ev.resized || ev.moved { section_layout_save(&s.rows.table, &app.prefs, "startup") }
+	if ev.sorted || ev.resized || ev.moved { section_layout_save(&s.rows, &app.prefs, "startup") }
 	section_header_menu(&s.rows, ev, "startup", em)
 	if ev.activated && cmd_can(app, .Startup_Open) { startup_open(app) }
 	if ev.menu { startup_menu_open(app, ev.menu_at) }
@@ -79,7 +80,7 @@ startup_toggle :: proc(app: ^App, on: bool) {
 	it, ok := selected_startup(app)
 	if !ok { return }
 	app.startup.pending = true
-	say(app, "%s %s…", on ? "Enabling" : "Disabling", it.name)
+	say(app, on ? i18n.tr("Enabling %s…") : i18n.tr("Disabling %s…"), it.name)
 	startup_ask(app, true, it, on)
 }
 
@@ -87,12 +88,12 @@ startup_open :: proc(app: ^App) {
 	it, ok := selected_startup(app)
 	if !ok || it.path == "" { return }
 	ui.open(it.path, .Reveal)
-	say(app, "Opened the folder of %s", it.path)
+	say(app, i18n.tr("Opened the folder of %s"), it.path)
 }
 
 startup_copy :: proc(app: ^App) {
 	it, ok := selected_startup(app)
 	if !ok || it.command == "" { return }
 	platform.set_clipboard(app.main.win, it.command)
-	announce(app, fmt.tprintf("Copied the command of %s", it.name))
+	announce(app, fmt.tprintf(i18n.tr("Copied the command of %s"), it.name))
 }

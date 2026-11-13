@@ -18,6 +18,7 @@ import "core:strings"
 import "core:time"
 import lucide "gt:lucide"
 import "gt:ui"
+import i18n "gt:i18n"
 
 // What an action of the demo answers.
 DEMO_REFUSED :: "this is the demo: nothing was changed"
@@ -380,12 +381,12 @@ demo_services_read :: proc(d: ^Demo, manager: Manager, out: ^[dynamic]Service, a
 
 demo_startup_read :: proc(d: ^Demo, out: ^[dynamic]Startup_Item, allocator: mem.Allocator) -> string {
 	append(out,
-		Startup_Item{kind = .Autostart, id = "org.gnome.Software.desktop", name = "GNOME Software", command = "gnome-software --gapplication-service", icon = "demo:software", path = "/etc/xdg/autostart/org.gnome.Software.desktop", enabled = true, status = "Enabled", can_toggle = true},
-		Startup_Item{kind = .Autostart, id = "nextcloud.desktop", name = "Nextcloud", command = "nextcloud --background", icon = "demo:sync", path = "~/.config/autostart/nextcloud.desktop", enabled = false, status = "Disabled", can_toggle = true},
-		Startup_Item{kind = .Autostart, id = "org.gnome.Evolution-alarm-notify.desktop", name = "Evolution Alarm Notify", command = "/usr/libexec/evolution-data-server/evolution-alarm-notify", icon = "demo:alarm", path = "/etc/xdg/autostart/org.gnome.Evolution-alarm-notify.desktop", enabled = true, status = "Enabled", can_toggle = true},
-		Startup_Item{kind = .User_Service, id = "pipewire.service", name = "PipeWire Multimedia Service", command = "/usr/bin/pipewire", path = "/usr/lib/systemd/user/pipewire.service", enabled = true, status = "Enabled", can_toggle = true},
-		Startup_Item{kind = .User_Service, id = "syncthing.service", name = "Syncthing", command = "/usr/bin/syncthing serve --no-browser", path = "/usr/lib/systemd/user/syncthing.service", enabled = true, status = "Enabled", can_toggle = true},
-		Startup_Item{kind = .User_Service, id = "xdg-desktop-portal.service", name = "Portal service", command = "/usr/libexec/xdg-desktop-portal", path = "/usr/lib/systemd/user/xdg-desktop-portal.service", enabled = true, status = "Static", can_toggle = false},
+		Startup_Item{kind = .Autostart, id = "org.gnome.Software.desktop", name = "GNOME Software", command = "gnome-software --gapplication-service", icon = "demo:software", path = "/etc/xdg/autostart/org.gnome.Software.desktop", enabled = true, status = i18n.tr("Enabled"), can_toggle = true},
+		Startup_Item{kind = .Autostart, id = "nextcloud.desktop", name = "Nextcloud", command = "nextcloud --background", icon = "demo:sync", path = "~/.config/autostart/nextcloud.desktop", enabled = false, status = i18n.tr("Disabled"), can_toggle = true},
+		Startup_Item{kind = .Autostart, id = "org.gnome.Evolution-alarm-notify.desktop", name = "Evolution Alarm Notify", command = "/usr/libexec/evolution-data-server/evolution-alarm-notify", icon = "demo:alarm", path = "/etc/xdg/autostart/org.gnome.Evolution-alarm-notify.desktop", enabled = true, status = i18n.tr("Enabled"), can_toggle = true},
+		Startup_Item{kind = .User_Service, id = "pipewire.service", name = "PipeWire Multimedia Service", command = "/usr/bin/pipewire", path = "/usr/lib/systemd/user/pipewire.service", enabled = true, status = i18n.tr("Enabled"), can_toggle = true},
+		Startup_Item{kind = .User_Service, id = "syncthing.service", name = "Syncthing", command = "/usr/bin/syncthing serve --no-browser", path = "/usr/lib/systemd/user/syncthing.service", enabled = true, status = i18n.tr("Enabled"), can_toggle = true},
+		Startup_Item{kind = .User_Service, id = "xdg-desktop-portal.service", name = "Portal service", command = "/usr/libexec/xdg-desktop-portal", path = "/usr/lib/systemd/user/xdg-desktop-portal.service", enabled = true, status = i18n.tr("Static"), can_toggle = false},
 	)
 	return ""
 }
@@ -507,5 +508,5 @@ demo_unit_details :: proc(d: ^Demo, u: ^Unit_Details, a: mem.Allocator) {
 		}
 		return
 	}
-	u.journal_problem = "No line in the journal."
+	u.journal_problem = i18n.tr("No line in the journal.")
 }

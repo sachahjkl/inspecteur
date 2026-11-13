@@ -20,6 +20,7 @@ import "gt:host"
 import lucide "gt:lucide"
 import prefs_page "gt:prefs_page"
 import "gt:ui"
+import i18n "gt:i18n"
 
 // Heights in ems: the title bar, a section's bar, the header, a row, a line of the sidebar, the footer.
 TITLE_EM   :: 2.6
@@ -236,7 +237,7 @@ tree_view_switch :: proc(app: ^App) {
 	tab_show(app, .Processes)
 	rows_again(app)
 	app.vl.reveal = REVEAL_BUILDS
-	say(app, app.table.tree ? "Every process under its parent" : "Apps and background processes")
+	say(app, app.table.tree ? i18n.tr("Every process under its parent") : i18n.tr("Apps and background processes"))
 }
 
 ////////////////////////////////
@@ -307,7 +308,7 @@ build_sidebar :: proc(app: ^App, em: f32) {
 				ui.icon(TAB_ICONS[tab], em * 1.6, on ? ui.color("accent") : nil)
 				ui.spacer(ui.px(em * 0.4))
 				ui.next({width = ui.fill(), height = ui.pct(1)})
-				ui.label(fmt.tprintf("%s###t", TAB_LABELS[tab]))
+				ui.label(fmt.tprintf("%s###t", i18n.tr(TAB_LABELS[tab])))
 				if !on { ui.pop_tags() }
 			}
 			if sig.clicked { tab_show(app, tab) }
@@ -327,9 +328,9 @@ build_filter :: proc(app: ^App, em: f32) {
 		if ui.tags("weak") { ui.icon(lucide.SEARCH, em * 1.6) }
 		ui.next({width = ui.fill(), height = ui.pct(1)})
 		if ui.tags("bare") {
-			res := ui.line_edit("###search", &app.search, FILTER_HINTS[tab_listed(app.tab) ? app.tab : .Processes])
+			res := ui.line_edit("###search", &app.search, i18n.tr(FILTER_HINTS[tab_listed(app.tab) ? app.tab : .Processes]))
 			app.search_key = res.box.key
-			tip_after(res, "Filter: type anywhere (Ctrl+F); Escape clears it")
+			tip_after(res, i18n.tr("Filter: type anywhere (Ctrl+F); Escape clears it"))
 		}
 		ui.spacer(ui.px(em * 0.4))
 	}
@@ -341,8 +342,8 @@ build_filter :: proc(app: ^App, em: f32) {
 }
 
 FILTER_HINTS := [Tab]string{
-	.Mission_Control = "", .Processes = "Filter processes...", .Performance = "", .Services = "Filter services...", .Startup = "Filter startup...",
-	.Connections = "Filter connections...", .Information = "",
+	.Mission_Control = "", .Processes = i18n.later("Filter processes..."), .Performance = "", .Services = i18n.later("Filter services..."), .Startup = i18n.later("Filter startup..."),
+	.Connections = i18n.later("Filter connections..."), .Information = "",
 }
 
 // Whether the section has a table that the filter filters.
@@ -354,9 +355,9 @@ build_meters :: proc(app: ^App, em: f32) {
 	ui.hline(ui.fill())
 	ui.spacer(ui.px(em * 0.5))
 	// (the share of every logical processor, as the CPU % of the processes: "of 16 CPUs" as Linux counts them)
-	meter(app, "cpu", lucide.CPU, "CPU", fmt.tprintf("%.0f%% of %d CPUs", app.machine.cpu, len(app.machine.core_total)), app.machine.cpu / 100, em)
+	meter(app, "cpu", lucide.CPU, i18n.tr("CPU"), fmt.tprintf(i18n.tr(len(app.machine.core_total), "%.0f%% of %d CPUs", "%.0f%% of %d CPUs"), app.machine.cpu, len(app.machine.core_total)), app.machine.cpu / 100, em)
 	mem := app.machine.mem.total > 0 ? f32(f64(mem_used(&app.machine)) / f64(app.machine.mem.total)) : 0
-	meter(app, "memory", lucide.LAYERS_2, "Memory", fmt.tprintf("%s of %s", size_text(mem_used(&app.machine)), size_text(app.machine.mem.total)), mem, em)
+	meter(app, "memory", lucide.LAYERS_2, i18n.tr("Memory"), fmt.tprintf(i18n.tr("%s of %s"), size_text(mem_used(&app.machine)), size_text(app.machine.mem.total)), mem, em)
 	ui.spacer(ui.px(em * 0.7))
 }
 
@@ -406,12 +407,12 @@ build_footer :: proc(app: ^App, em: f32) {
 					#partial switch r.kind {
 					case .Process:
 						p := app.sampler.procs[r.index]
-						msg = fmt.tprintf("Selected: %s, PID %d", p.name, p.pid)
-						if n := ui.list_mark_count(&app.vl); n > 1 { msg = fmt.tprintf("Selected: %d rows", n) }
+						msg = fmt.tprintf(i18n.tr("Selected: %s, PID %d"), p.name, p.pid)
+						if n := ui.list_mark_count(&app.vl); n > 1 { msg = fmt.tprintf(i18n.tr("Selected: %d rows"), n) }
 					case .App:
 						g := app.table.groups[r.index]
-						msg = fmt.tprintf("Selected: %s, %s", app.catalog.entries[g.entry].name, count_text(g.count, "process", "processes"))
-						if n := ui.list_mark_count(&app.vl); n > 1 { msg = fmt.tprintf("Selected: %d rows", n) }
+						msg = fmt.tprintf(i18n.tr(g.count, "Selected: %s, %d process", "Selected: %s, %d processes"), app.catalog.entries[g.entry].name, g.count)
+						if n := ui.list_mark_count(&app.vl); n > 1 { msg = fmt.tprintf(i18n.tr("Selected: %d rows"), n) }
 					}
 				}
 			}
@@ -450,7 +451,7 @@ text_cut :: proc(b: ^ui.Box, text: string) -> bool {
 ////////////////////////////////
 // The theme's menu (the title bar's button)
 
-THEME_MODE_LABELS := [ui.Theme_Mode]string{.System = "As the system", .Dark = "Dark", .Light = "Light"}
+THEME_MODE_LABELS := [ui.Theme_Mode]string{.System = i18n.later("As the system"), .Dark = i18n.later("Dark"), .Light = i18n.later("Light")}
 THEME_MODE_KEYS := [ui.Theme_Mode]string{.System = "system", .Dark = "dark", .Light = "light"}
 
 // The theme's version (the system's, dark, light) and the theme, chosen from a menu and written to the preferences.
@@ -458,17 +459,17 @@ THEME_MODE_KEYS := [ui.Theme_Mode]string{.System = "system", .Dark = "dark", .Li
 theme_button :: proc(app: ^App, em: f32) {
 	if app.theme_menu == 0 { app.theme_menu = ui.key_from_string(0, "inspecteur_theme") }
 	ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
-	sig := ui.icon_button("theme", lucide.SUN_MOON, tip = fmt.tprintf("Colours: light or dark (%s), the theme", ui.command_shortcut(COMMANDS[.Light_Dark])), lit = ui.ctx_menu_is_open(app.theme_menu))
+	sig := ui.icon_button("theme", lucide.SUN_MOON, tip = fmt.tprintf(i18n.tr("Colours: light or dark (%s), the theme"), ui.command_shortcut(COMMANDS[.Light_Dark])), lit = ui.ctx_menu_is_open(app.theme_menu))
 	if sig.clicked { ui.ctx_menu_open_rect(app.theme_menu, sig.box.rect) }
 	if ui.ctx_menu(app.theme_menu) {
-		ui.menu_heading("Version")
+		ui.menu_heading(i18n.tr("Version"))
 		for mode in ui.Theme_Mode {
-			if ui.menu_item(THEME_MODE_LABELS[mode], checked = app.settings.look.mode == mode).clicked { mode_set(app, mode) }
+			if ui.menu_item(i18n.tr(THEME_MODE_LABELS[mode]), checked = app.settings.look.mode == mode).clicked { mode_set(app, mode) }
 		}
 		ui.menu_separator()
-		cmd_item(app, .Light_Dark, "Switch light and dark")
+		cmd_item(app, .Light_Dark, i18n.tr("Switch light and dark"))
 		ui.menu_separator()
-		if ui.menu_submenu("Theme") {
+		if ui.menu_submenu(i18n.tr("Theme")) {
 			// (the toolkit's themes, then the user's own: the themes file)
 			for t in app.themes_file.all {
 				if ui.menu_item(t.name, checked = app.settings.look.theme == t.name).clicked { look_set(app, prefs_page.THEME_PREF, t.name) }
@@ -481,12 +482,12 @@ theme_button :: proc(app: ^App, em: f32) {
 // The refresh: paused, or its period (the title bar's button, the footer, Ctrl+Space, Ctrl+Shift+R)
 
 // The periods the refresh menu offers, in milliseconds (processes.refresh_ms takes any from 250 to 10000).
-REFRESH_SPEEDS := [?]struct { name: string, ms: int }{{"High: 0.5 s", 500}, {"Normal: 1 s", 1000}, {"Low: 2 s", 2000}, {"Very low: 5 s", 5000}}
+REFRESH_SPEEDS := [?]struct { name: string, ms: int }{{i18n.later("High: 0.5 s"), 500}, {i18n.later("Normal: 1 s"), 1000}, {i18n.later("Low: 2 s"), 2000}, {i18n.later("Very low: 5 s"), 5000}}
 
 // "1 s", "0.5 s", "Paused": the footer's.
 refresh_text :: proc(app: ^App) -> string {
-	if app.paused { return "Paused" }
-	if app.held { return "Paused while Ctrl is held" }
+	if app.paused { return i18n.tr("Paused") }
+	if app.held { return i18n.tr("Paused while Ctrl is held") }
 	return app.settings.refresh_ms % 1000 == 0 ? fmt.tprintf("%d s", app.settings.refresh_ms / 1000) : fmt.tprintf("%.1f s", f64(app.settings.refresh_ms) / 1000)
 }
 
@@ -494,11 +495,11 @@ refresh_text :: proc(app: ^App) -> string {
 refresh_pause :: proc(app: ^App, pause: bool) {
 	app.paused = pause
 	if pause {
-		say(app, "Refresh paused: F5 reads again, Ctrl+Space resumes")
+		say(app, i18n.tr("Refresh paused: F5 reads again, Ctrl+Space resumes"))
 	} else {
 		app.sample_extra = true
 		sample_ask(app)
-		say(app, "Refresh every %s", refresh_text(app))
+		say(app, i18n.tr("Refresh every %s"), refresh_text(app))
 	}
 }
 
@@ -508,7 +509,7 @@ refresh_speed_set :: proc(app: ^App, ms: int) {
 	pref_set(&app.prefs, "processes.refresh_ms", fmt.tprintf("%d", ms))
 	app.paused = false
 	app.next_sample = time.tick_add(time.tick_now(), time.Duration(ms) * time.Millisecond)
-	say(app, "Refresh every %s: the graphs span %s", refresh_text(app), span_text(HISTORY_POINTS, ms))
+	say(app, i18n.tr("Refresh every %s: the graphs span %s"), refresh_text(app), span_text(HISTORY_POINTS, ms))
 }
 
 refresh_menu_open :: proc(app: ^App) {
@@ -520,19 +521,18 @@ refresh_menu_open :: proc(app: ^App) {
 @(private = "file")
 refresh_button :: proc(app: ^App, em: f32) {
 	ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
-	tip := fmt.tprintf("Refresh: %s. %s (%s), %s (%s)", app.paused ? "paused" : fmt.tprintf("every %s", refresh_text(app)),
-		COMMANDS[.Refresh_Speed].label, ui.command_shortcut(COMMANDS[.Refresh_Speed]), app.paused ? "Resume" : "Pause", ui.command_shortcut(COMMANDS[.Pause_Refresh]))
+	tip := app.paused ? fmt.tprintf(i18n.tr("Refresh: paused. %s (%s), Resume (%s)"), cmd_label(.Refresh_Speed), ui.command_shortcut(COMMANDS[.Refresh_Speed]), ui.command_shortcut(COMMANDS[.Pause_Refresh])) : fmt.tprintf(i18n.tr("Refresh: every %s. %s (%s), Pause (%s)"), refresh_text(app), cmd_label(.Refresh_Speed), ui.command_shortcut(COMMANDS[.Refresh_Speed]), ui.command_shortcut(COMMANDS[.Pause_Refresh]))
 	sig := ui.icon_button("refresh", app.paused ? lucide.PAUSE : lucide.REFRESH_CW, tip = tip, lit = app.refresh_menu != 0 && ui.ctx_menu_is_open(app.refresh_menu))
 	app.refresh_rect = sig.box.rect
 	if sig.clicked { refresh_menu_open(app) }
 	if app.refresh_menu == 0 { return }
 	if ui.ctx_menu(app.refresh_menu) {
-		if ui.menu_item(app.paused ? "Resume" : "Pause", ui.command_shortcut(COMMANDS[.Pause_Refresh]), checked = app.paused).clicked { refresh_pause(app, !app.paused) }
-		cmd_item(app, .Read_Again, "Read again now")
+		if ui.menu_item(app.paused ? i18n.tr("Resume") : i18n.tr("Pause"), ui.command_shortcut(COMMANDS[.Pause_Refresh]), checked = app.paused).clicked { refresh_pause(app, !app.paused) }
+		cmd_item(app, .Read_Again, i18n.tr("Read again now"))
 		ui.menu_separator()
-		ui.menu_heading("Refresh every")
+		ui.menu_heading(i18n.tr("Refresh every"))
 		for sp in REFRESH_SPEEDS {
-			if ui.menu_item(sp.name, checked = !app.paused && app.settings.refresh_ms == sp.ms).clicked { refresh_speed_set(app, sp.ms) }
+			if ui.menu_item(i18n.tr(sp.name), checked = !app.paused && app.settings.refresh_ms == sp.ms).clicked { refresh_speed_set(app, sp.ms) }
 		}
 	}
 }
@@ -549,5 +549,5 @@ zoom_follow :: proc(app: ^App) {
 	if abs(z - app.settings.zoom) < 0.001 { return }
 	app.settings.zoom = z
 	pref_set(&app.prefs, ZOOM_PREF, fmt.tprintf("%.3f", z))
-	say(app, "Zoom %.0f %%%s", z * 100, abs(z - 1) < 0.001 ? "" : " (Ctrl+0: 100 %)")
+	say(app, abs(z - 1) < 0.001 ? i18n.tr("Zoom %.0f %%") : i18n.tr("Zoom %.0f %% (Ctrl+0: 100 %%)"), z * 100)
 }

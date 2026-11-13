@@ -14,6 +14,7 @@ import "gt:host"
 import lucide "gt:lucide"
 import "gt:platform"
 import "gt:ui"
+import i18n "gt:i18n"
 
 Journal_Window :: struct {
 	using window: host.Host,
@@ -36,10 +37,10 @@ journal_window_open :: proc(app: ^App, manager: Manager, name: string) {
 	}
 	w := new(Journal_Window)
 	w.app, w.manager, w.name = app, manager, strings.clone(name)
-	if !host.host_open(&w.window, &app.shared, {title = fmt.tprintf("%s: journal", name), size = JOURNAL_WINDOW_SIZE, integrated_title = true}, journal_window_build, w) {
+	if !host.host_open(&w.window, &app.shared, {title = fmt.tprintf(i18n.tr("%s: journal"), name), size = JOURNAL_WINDOW_SIZE, integrated_title = true}, journal_window_build, w) {
 		delete(w.name)
 		free(w)
-		say(app, "No window for the journal: the renderer refused it")
+		say(app, i18n.tr("No window for the journal: the renderer refused it"))
 		return
 	}
 	w.params = proc(h: ^host.Host, bp: ^ui.Build_Params) { window_params(h, bp, (^Journal_Window)(h.user).app) }
@@ -53,7 +54,7 @@ journal_window_open :: proc(app: ^App, manager: Manager, name: string) {
 	w.view.next = time.tick_add(time.tick_now(), JOURNAL_FOLLOW_MS * time.Millisecond)
 	append(&app.journal_windows, w)
 	platform.show_window(w.win)
-	say(app, "The journal of %s in its own window", name)
+	say(app, i18n.tr("The journal of %s in its own window"), name)
 }
 
 @(private = "file")
@@ -100,9 +101,9 @@ journal_window_build :: proc(h: ^host.Host, size: host.Vec2) {
 @(private = "file")
 journal_window_info :: proc(app: ^App, w: ^Journal_Window) -> string {
 	parts := make([dynamic]string, context.temp_allocator)
-	append(&parts, w.manager == .System ? "a system service" : "a user service")
+	append(&parts, w.manager == .System ? i18n.tr("a system service") : i18n.tr("a user service"))
 	if d := w.view.details; d != nil && d.name == w.name {
-		if d.since > 0 { append(&parts, fmt.tprintf("in its state since %s", started_text(app, d.since))) }
+		if d.since > 0 { append(&parts, fmt.tprintf(i18n.tr("in its state since %s"), started_text(app, d.since))) }
 		if d.file != "" { append(&parts, d.file) }
 	}
 	return strings.join(parts[:], "  ·  ", context.temp_allocator)

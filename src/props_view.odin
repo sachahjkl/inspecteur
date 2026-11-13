@@ -9,6 +9,7 @@ import "core:fmt"
 import "core:strings"
 import lucide "gt:lucide"
 import "gt:ui"
+import i18n "gt:i18n"
 
 PROPS_W_EM, PROPS_H_EM         :: 58, 40
 PROPS_MIN_W_EM, PROPS_MIN_H_EM :: 36, 24
@@ -29,11 +30,12 @@ props_build :: proc(app: ^App, em: f32) {
 			if ui.row(.Center, {.Draw_Side_Bottom}, "###props_tabs") {
 				ui.spacer(ui.px(em * 0.4))
 				labels := PROPS_TAB_LABELS
+				for &l in labels { l = i18n.tr(l) }
 				sel := int(pp.tab)
 				nothing: []string
 				if ui.tabs("props_tab", props_slice(&labels), nothing, &sel) { pp.tab = Props_Tab(sel) }
 				// (each tab's tooltip says the keys that go from tab to tab)
-				tabs_tip := fmt.tprintf("%s (%s), %s (%s)", COMMANDS[.Props_Next_Tab].label, ui.command_shortcut(COMMANDS[.Props_Next_Tab]), COMMANDS[.Props_Previous_Tab].label, ui.command_shortcut(COMMANDS[.Props_Previous_Tab]))
+				tabs_tip := fmt.tprintf("%s (%s), %s (%s)", cmd_label(.Props_Next_Tab), ui.command_shortcut(COMMANDS[.Props_Next_Tab]), cmd_label(.Props_Previous_Tab), ui.command_shortcut(COMMANDS[.Props_Previous_Tab]))
 				for i in 0 ..< len(Props_Tab) { hover_tip(fmt.tprintf("props_tab_%d", i), tabs_tip) }
 				ui.spacer(ui.fill())
 				if props_tab_listed(pp.tab) { props_filter_field(app, em) }
@@ -41,7 +43,7 @@ props_build :: proc(app: ^App, em: f32) {
 			ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
 			if ui.column(id = "###props_body") {
 				if p == nil || pp.gone {
-					props_note("The process has ended.", em)
+					props_note(i18n.tr("The process has ended."), em)
 				} else {
 					switch pp.tab {
 					case .General:     props_general(app, p, em)
@@ -78,7 +80,7 @@ props_title :: proc(app: ^App, p: ^Proc, em: f32) {
 		ui.label(fmt.tprintf("%s###props_name", ui.text_shown(name)))
 		if ui.tags("weak") {
 			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = em * 0.6})
-			ui.label(fmt.tprintf("PID %d%s###props_pid", app.props.pid, p != nil ? fmt.tprintf("  ·  %s", state_text(p.state)) : ""))
+			ui.label(fmt.tprintf("%s%s###props_pid", fmt.tprintf(i18n.tr("PID %d"), app.props.pid), p != nil ? fmt.tprintf("  ·  %s", state_text(p.state)) : ""))
 		}
 		ui.next({width = ui.px(em * 2.2), height = ui.px(em * 2.2)})
 		if ui.icon_button("###props_close", lucide.X, face = .Ghost, tip = cmd_tip(.Props_Close)).clicked { app.props.open = false }
@@ -119,34 +121,34 @@ props_general :: proc(app: ^App, p: ^Proc, em: f32) {
 	ui.next({width = ui.fill(), height = ui.fill()})
 	if ui.scroll_y("###general") {
 		ui.spacer(ui.px(em * 0.8))
-		parent := "none"
-		if q := find_pid(&app.sampler, p.ppid); q != nil { parent = fmt.tprintf("%s (PID %d)", q.name, q.pid) }
+		parent := i18n.tr("none")
+		if q := find_pid(&app.sampler, p.ppid); q != nil { parent = fmt.tprintf(i18n.tr("%s (PID %d)"), q.name, q.pid) }
 		cwd, cpus := "…", ""
 		if d := pp.data; d != nil && d.read_tab == .General {
 			cwd, cpus = d.cwd, d.cpus
 			switch d.cwd_read {
 			case .Read:
-			case .Denied: cwd = "Access denied (another user's process)"
-			case .Gone:   cwd = "unknown"
+			case .Denied: cwd = i18n.tr("Access denied (another user's process)")
+			case .Gone:   cwd = i18n.tr("unknown")
 			}
 		}
-		props_line("Name", p.name, em)
-		props_line("PID", fmt.tprintf("%d", p.pid), em)
-		props_line("Parent", parent, em)
-		props_line("User", p.user != "" ? p.user : "unknown", em)
-		props_line("State", state_text(p.state), em)
-		props_line("Priority", priority_text(p.nice), em)
-		props_line("Affinity", cpus != "" ? fmt.tprintf("processors %s", cpus) : "unknown", em)
-		props_line("Started", started_text(app, p.started), em)
-		props_line("Executable", p.exe != "" ? p.exe : "Access denied (another user's process)", em)
-		props_line("Command line", p.cmdline != "" ? p.cmdline : "none", em)
-		props_line("Working folder", cwd, em)
-		props_line("CPU", fmt.tprintf("%.1f%% of the machine", p.cpu), em)
-		props_line("Memory", fmt.tprintf("%s private, %s resident (with the pages it shares with other processes)", size_text(p.private), size_text(p.resident)), em)
-		if p.gpu_mem > 0 { props_line("GPU memory", size_text(p.gpu_mem), em) }
-		if p.gpu > 0 { props_line("GPU", fmt.tprintf("%.0f%% of a GPU's time", p.gpu), em) }
-		props_line("Threads", fmt.tprintf("%d", p.threads), em)
-		props_line("Disk", !p.io_known ? "Access denied (another user's process)" : fmt.tprintf("%s read, %s written since it started", size_text(p.io_read), size_text(p.io_write)), em)
+		props_line(i18n.tr("Name"), p.name, em)
+		props_line(i18n.tr("PID"), fmt.tprintf("%d", p.pid), em)
+		props_line(i18n.tr("Parent"), parent, em)
+		props_line(i18n.tr("User"), p.user != "" ? p.user : i18n.tr("unknown"), em)
+		props_line(i18n.tr("State"), state_text(p.state), em)
+		props_line(i18n.tr("Priority"), priority_text(p.nice), em)
+		props_line(i18n.tr("Affinity"), cpus != "" ? fmt.tprintf(i18n.tr("processors %s"), cpus) : i18n.tr("unknown"), em)
+		props_line(i18n.tr("Started"), started_text(app, p.started), em)
+		props_line(i18n.tr("Executable"), p.exe != "" ? p.exe : i18n.tr("Access denied (another user's process)"), em)
+		props_line(i18n.tr("Command line"), p.cmdline != "" ? p.cmdline : i18n.tr("none"), em)
+		props_line(i18n.tr("Working folder"), cwd, em)
+		props_line(i18n.tr("CPU"), fmt.tprintf(i18n.tr("%.1f%% of the machine"), p.cpu), em)
+		props_line(i18n.tr("Memory"), fmt.tprintf(i18n.tr("%s private, %s resident (with the pages it shares with other processes)"), size_text(p.private), size_text(p.resident)), em)
+		if p.gpu_mem > 0 { props_line(i18n.tr("GPU memory"), size_text(p.gpu_mem), em) }
+		if p.gpu > 0 { props_line(i18n.tr("GPU"), fmt.tprintf(i18n.tr("%.0f%% of a GPU's time"), p.gpu), em) }
+		props_line(i18n.tr("Threads"), fmt.tprintf("%d", p.threads), em)
+		props_line(i18n.tr("Disk"), !p.io_known ? i18n.tr("Access denied (another user's process)") : fmt.tprintf(i18n.tr("%s read, %s written since it started"), size_text(p.io_read), size_text(p.io_write)), em)
 	}
 }
 
@@ -155,7 +157,7 @@ props_general :: proc(app: ^App, p: ^Proc, em: f32) {
 @(private = "file")
 props_history :: proc(app: ^App, p: ^Proc, em: f32) {
 	if p.hist == nil || p.hist.cpu.count < 2 {
-		props_note("Its history starts at the next samples.", em)
+		props_note(i18n.tr("Its history starts at the next samples."), em)
 		return
 	}
 	h := p.hist
@@ -175,7 +177,7 @@ props_history :: proc(app: ^App, p: ^Proc, em: f32) {
 				ui.spacer(ui.fill())
 				if ui.tags("weak") {
 					ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0, font_size = em * 0.85})
-					ui.label(fmt.tprintf("%s, top %s###r", span_text(hist.count, period), value(shown_top)))
+					ui.label(fmt.tprintf("%s###r", fmt.tprintf(i18n.tr("%s, top %s"), span_text(hist.count, period), value(shown_top))))
 				}
 				ui.spacer(ui.px(em))
 			}
@@ -189,10 +191,10 @@ props_history :: proc(app: ^App, p: ^Proc, em: f32) {
 			}
 			ui.spacer(ui.px(em * 0.5))
 		}
-		graph("hist_cpu", "CPU", &h.cpu, hue(app, HUE_CPU), 0, 5, proc(v: f32) -> string { return fmt.tprintf("%.1f%%", v) }, period, em)
-		graph("hist_memory", "Private memory", &h.memory, hue(app, HUE_MEMORY), 0, 16 * 1024 * 1024, proc(v: f32) -> string { return size_text(u64(v)) }, period, em)
+		graph("hist_cpu", i18n.tr("CPU"), &h.cpu, hue(app, HUE_CPU), 0, 5, proc(v: f32) -> string { return fmt.tprintf("%.1f%%", v) }, period, em)
+		graph("hist_memory", i18n.tr("Private memory"), &h.memory, hue(app, HUE_MEMORY), 0, 16 * 1024 * 1024, proc(v: f32) -> string { return size_text(u64(v)) }, period, em)
 		if p.io_known {
-			graph("hist_disk", "Disk", &h.disk, hue(app, HUE_DISK), 0, DISK_FLOOR, proc(v: f32) -> string { return fmt.tprintf("%s/s", size_text(u64(v))) }, period, em)
+			graph("hist_disk", i18n.tr("Disk"), &h.disk, hue(app, HUE_DISK), 0, DISK_FLOOR, proc(v: f32) -> string { return fmt.tprintf("%s/s", size_text(u64(v))) }, period, em)
 		}
 	}
 }
@@ -204,8 +206,8 @@ props_list :: proc(app: ^App, id: string, titles: []string, widths: []f32, count
 	d := pp.data
 	if d == nil || d.read_tab != pp.tab { return }   // (its reading comes)
 	switch d.list_read {
-	case .Denied: props_note(fmt.tprintf("Access denied: another user's process. Only its owner, or %s, may read it.", ADMIN), em); return
-	case .Gone:   props_note("The process has ended.", em); return
+	case .Denied: props_note(fmt.tprintf(i18n.tr("Access denied: another user's process. Only its owner, or %s, may read it."), ADMIN), em); return
+	case .Gone:   props_note(i18n.tr("The process has ended."), em); return
 	case .Read:
 	}
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * HEADER_EM)), bg = surface("bar")})
@@ -264,14 +266,14 @@ props_list :: proc(app: ^App, id: string, titles: []string, widths: []f32, count
 	if len(shown) == 0 {
 		if ui.tags("weak") {
 			ui.next({width = ui.fill(), height = ui.px(em * 3)})
-			if ui.style({text_align = .Center}) { ui.label(n == 0 ? "None###empty" : fmt.tprintf("Nothing matches “%s”.###empty", ui.text_shown(q))) }
+			if ui.style({text_align = .Center}) { ui.label(fmt.tprintf("%s###empty", n == 0 ? i18n.tr("None") : fmt.tprintf(i18n.tr("Nothing matches “%s”."), ui.text_shown(q)))) }
 		}
 	}
 }
 
 @(private = "file")
 props_threads :: proc(app: ^App, em: f32) {
-	props_list(app, "threads", {"TID", "Name", "State", "CPU time", "Nice"}, {7, 0, 8, 8, 5}, proc(d: ^Props_Data) -> int { return len(d.threads) }, proc(app: ^App, row, col: int) -> string {
+	props_list(app, "threads", {i18n.tr("TID"), i18n.tr("Name"), i18n.tr("State"), i18n.tr("CPU time"), i18n.tr(PRIORITY_COLUMN)}, {7, 0, 8, 8, 5}, proc(d: ^Props_Data) -> int { return len(d.threads) }, proc(app: ^App, row, col: int) -> string {
 		t := app.props.data.threads[row]
 		switch col {
 		case 0: return fmt.tprintf("%d", t.tid)
@@ -285,7 +287,7 @@ props_threads :: proc(app: ^App, em: f32) {
 
 @(private = "file")
 props_files :: proc(app: ^App, em: f32) {
-	props_list(app, "files", {"FD", "What it is open on"}, {5, 0}, proc(d: ^Props_Data) -> int { return len(d.files) }, proc(app: ^App, row, col: int) -> string {
+	props_list(app, "files", {i18n.tr("FD"), i18n.tr("What it is open on")}, {5, 0}, proc(d: ^Props_Data) -> int { return len(d.files) }, proc(app: ^App, row, col: int) -> string {
 		f := app.props.data.files[row]
 		return col == 0 ? fmt.tprintf("%d", f.fd) : f.target
 	}, em)
@@ -293,7 +295,7 @@ props_files :: proc(app: ^App, em: f32) {
 
 @(private = "file")
 props_modules :: proc(app: ^App, em: f32) {
-	props_list(app, "modules", {"File mapped", "Size"}, {0, 8}, proc(d: ^Props_Data) -> int { return len(d.modules) }, proc(app: ^App, row, col: int) -> string {
+	props_list(app, "modules", {i18n.tr("File mapped"), i18n.tr("Size")}, {0, 8}, proc(d: ^Props_Data) -> int { return len(d.modules) }, proc(app: ^App, row, col: int) -> string {
 		m := app.props.data.modules[row]
 		return col == 0 ? m.path : size_text(m.size)
 	}, em)
@@ -301,7 +303,7 @@ props_modules :: proc(app: ^App, em: f32) {
 
 @(private = "file")
 props_env :: proc(app: ^App, em: f32) {
-	props_list(app, "environment", {"Name", "Value"}, {16, 0}, proc(d: ^Props_Data) -> int { return len(d.env) }, proc(app: ^App, row, col: int) -> string {
+	props_list(app, "environment", {i18n.tr("Name"), i18n.tr("Value")}, {16, 0}, proc(d: ^Props_Data) -> int { return len(d.env) }, proc(app: ^App, row, col: int) -> string {
 		v := app.props.data.env[row]
 		eq := strings.index_byte(v, '=')
 		if eq < 0 { return col == 0 ? v : "" }
@@ -319,17 +321,17 @@ props_actions :: proc(app: ^App, p: ^Proc, em: f32) {
 		if p != nil && !pp.gone {
 			if ui.tags("weak") {
 				ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
-				ui.label("Priority###prio_label")
+				ui.label(fmt.tprintf("%s###prio_label", i18n.tr("Priority")))
 			}
 			ui.spacer(ui.px(em * 0.5))
 			names: [len(PRIORITIES)]string
-			for q, i in PRIORITIES { names[i] = q.name }
+			for q, i in PRIORITIES { names[i] = i18n.tr(q.name) }
 			if !ui.ctx_menu_any_open() { pp.nice_sel = priority_index(p.nice) }
 			ui.next({width = ui.px(em * 11), height = ui.px(ui.dense(em * 2.1))})
 			if ui.dropdown("###priority", names[:], &pp.nice_sel) { set_priority(app, p, PRIORITIES[pp.nice_sel].nice) }
-			hover_tip("priority", fmt.tprintf("%s (%s), %s (%s)", COMMANDS[.Props_Raise_Priority].label, ui.command_shortcut(COMMANDS[.Props_Raise_Priority]), COMMANDS[.Props_Lower_Priority].label, ui.command_shortcut(COMMANDS[.Props_Lower_Priority])))
+			hover_tip("priority", fmt.tprintf("%s (%s), %s (%s)", cmd_label(.Props_Raise_Priority), ui.command_shortcut(COMMANDS[.Props_Raise_Priority]), cmd_label(.Props_Lower_Priority), ui.command_shortcut(COMMANDS[.Props_Lower_Priority])))
 			ui.spacer(ui.px(em * 0.4))
-			if props_button(app, "props_affinity", lucide.MICROCHIP, "Affinity…", .Props_Affinity, em) { cmd_run(app, .Props_Affinity) }
+			if props_button(app, "props_affinity", lucide.MICROCHIP, i18n.tr("Affinity…"), .Props_Affinity, em) { cmd_run(app, .Props_Affinity) }
 			ui.spacer(ui.px(em * 0.8))
 			if ui.tags("weak") {
 				msg := ui.now_ms() < app.status_until ? app.status : ""
@@ -337,11 +339,11 @@ props_actions :: proc(app: ^App, p: ^Proc, em: f32) {
 				ui.label_tip(fmt.tprintf("%s###props_msg", ui.text_shown(msg)))
 			}
 			stopped := p.state == .Stopped
-			if props_button(app, "props_suspend", stopped ? lucide.PLAY : lucide.SQUARE, stopped ? "Resume" : "Suspend", .Props_Suspend, em, .Primary) { props_suspend(app) }
+			if props_button(app, "props_suspend", stopped ? lucide.PLAY : lucide.SQUARE, stopped ? i18n.tr("Resume") : i18n.tr("Suspend"), .Props_Suspend, em, .Primary) { props_suspend(app) }
 			ui.spacer(ui.px(em * 0.4))
-			if props_button(app, "props_end", lucide.X, "End task", .Props_End_Task, em, .Warning) { props_signal(app, false) }
+			if props_button(app, "props_end", lucide.X, i18n.tr("End task"), .Props_End_Task, em, .Warning) { props_signal(app, false) }
 			ui.spacer(ui.px(em * 0.4))
-			if props_button(app, "props_kill", lucide.ZAP, "Kill…", .Props_Kill, em, .Danger) { props_signal(app, true) }
+			if props_button(app, "props_kill", lucide.ZAP, i18n.tr("Kill…"), .Props_Kill, em, .Danger) { props_signal(app, true) }
 		} else {
 			ui.spacer(ui.fill())
 		}
@@ -373,7 +375,7 @@ props_keys :: proc(app: ^App) {
 props_filter_field :: proc(app: ^App, em: f32) {
 	pp := &app.props
 	ui.next({width = ui.px(em * 14), height = ui.px(ui.dense(em * 2))})
-	res := ui.line_edit("###props_filter", &pp.filter, "Filter the list...")
+	res := ui.line_edit("###props_filter", &pp.filter, i18n.tr("Filter the list..."))
 	pp.filter_key = res.box.key
 	tip_after(res, cmd_tip(.Props_Filter))
 	ui.spacer(ui.px(em * 0.6))
@@ -401,7 +403,7 @@ props_suspend :: proc(app: ^App) {
 props_signal :: proc(app: ^App, kill: bool) {
 	p := find_proc(&app.sampler, app.props.pid, app.props.start)
 	if p == nil { return }
-	c := Chosen{name = fmt.tprintf("%s (PID %d)", p.name, p.pid)}
+	c := Chosen{name = fmt.tprintf(i18n.tr("%s (PID %d)"), p.name, p.pid)}
 	append(&c.targets, Target{p.pid, p.start})
 	defer delete(c.targets)
 	if kill { confirm_ask(app, c, .Kill) } else { signal_or_confirm(app, &c, .Terminate) }

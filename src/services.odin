@@ -13,17 +13,19 @@ import "core:sync"
 import "core:time"
 import lucide "gt:lucide"
 import tasks "gt:tasks"
+import i18n "gt:i18n"
 import "gt:ui"
 
 Manager :: enum u8 { System, User }
 
-MANAGER_LABELS := [Manager]string{.System = "System", .User = "User"}
+MANAGER_LABELS := [Manager]string{.System = i18n.later("System"), .User = i18n.later("User")}
 MANAGER_KEYS := [Manager]string{.System = "system", .User = "user"}
 
 Service_Action :: enum u8 { None, Start, Stop, Restart, Enable, Disable }
 
-SERVICE_ACTION_DOING := [Service_Action]string{.None = "", .Start = "Starting", .Stop = "Stopping", .Restart = "Restarting", .Enable = "Enabling", .Disable = "Disabling"}
-SERVICE_ACTION_DONE := [Service_Action]string{.None = "", .Start = "Started", .Stop = "Stopped", .Restart = "Restarted", .Enable = "Enabled", .Disable = "Disabled"}
+// (whole sentences, the unit's name their %s: a language puts it where it goes)
+SERVICE_ACTION_DOING := [Service_Action]string{.None = "", .Start = i18n.later("Starting %s…"), .Stop = i18n.later("Stopping %s…"), .Restart = i18n.later("Restarting %s…"), .Enable = i18n.later("Enabling %s…"), .Disable = i18n.later("Disabling %s…")}
+SERVICE_ACTION_DONE := [Service_Action]string{.None = "", .Start = i18n.later("Started %s"), .Stop = i18n.later("Stopped %s"), .Restart = i18n.later("Restarted %s"), .Enable = i18n.later("Enabled %s"), .Disable = i18n.later("Disabled %s")}
 
 // No memory figure (the manager does not count it for this service).
 MEMORY_UNKNOWN :: max(u64)
@@ -93,7 +95,7 @@ Journal_Entry :: struct {
 // The journal's levels a filter keeps: every entry, warnings and worse (4 and under), errors and worse (3 and under).
 Journal_Level :: enum u8 { All, Warnings, Errors }
 JOURNAL_LEVEL_KEYS := [Journal_Level]string{.All = "all", .Warnings = "warnings", .Errors = "errors"}
-JOURNAL_LEVEL_LABELS := [Journal_Level]string{.All = "All", .Warnings = "Warnings", .Errors = "Errors"}
+JOURNAL_LEVEL_LABELS := [Journal_Level]string{.All = i18n.later("All"), .Warnings = i18n.later("Warnings"), .Errors = i18n.later("Errors")}
 
 // Whether an entry of priority `p` passes the filter `l`.
 journal_level_keeps :: proc(l: Journal_Level, p: u8) -> bool {
@@ -131,18 +133,18 @@ Services :: struct {
 }
 
 SERVICE_COLUMNS := [?]ui.Table_Column{
-	{title = "Name", width = 0},
-	{title = "Description", width = 22, weak = true},
-	{title = "State", width = 11},
-	{title = "Startup", width = 7.5},
-	{title = "Load", width = 7, weak = true},
-	{title = "PID", width = 5.5, number = true, weak = true},
-	{title = "Memory", width = 7, number = true},
+	{title = i18n.later("Name"), width = 0},
+	{title = i18n.later("Description"), width = 22, weak = true},
+	{title = i18n.later("State"), width = 11},
+	{title = i18n.later("Startup"), width = 7.5},
+	{title = i18n.later("Load"), width = 7, weak = true},
+	{title = i18n.later("PID"), width = 5.5, number = true, weak = true},
+	{title = i18n.later("Memory"), width = 7, number = true},
 }
 
 services_init :: proc(s: ^Services, app: ^App) {
 	section_table_init(&s.rows, app, SERVICE_COLUMNS[:])
-	section_layout_load(&s.rows.table, &app.prefs, "services")
+	section_layout_load(&s.rows, &app.prefs, "services")
 	s.manager = app.settings.manager
 	s.demo = app.demo
 	s.state = &app.main.state
@@ -231,7 +233,7 @@ services_take :: proc(app: ^App, l: ^Service_List) {
 		// (the manager queued a job, which takes some time: its outcome shows at a reading soon after)
 		s.next = time.tick_add(time.tick_now(), SERVICE_AFTER_ACTION)
 		if l.failure == "" {
-			say(app, "%s %s", SERVICE_ACTION_DONE[l.action], l.unit)
+			say(app, i18n.tr(SERVICE_ACTION_DONE[l.action]), l.unit)
 		} else {
 			say(app, "%s: %s", l.unit, l.failure)
 		}
@@ -264,7 +266,7 @@ services_rows :: proc(app: ^App) {
 	}
 	ui.table_apply(&st.table, &st.data, app.query)
 	if s.select_name != "" && s.list != nil && s.list.manager == s.manager {
-		if !ui.table_select_id(&st.table, name_id(s.select_name)) { say(app, "%s is not among the %s services", s.select_name, MANAGER_KEYS[s.manager]) }
+		if !ui.table_select_id(&st.table, name_id(s.select_name)) { say(app, s.manager == .System ? i18n.tr("%s is not among the system services") : i18n.tr("%s is not among the user services"), s.select_name) }
 		delete(s.select_name)
 		s.select_name = ""
 	}

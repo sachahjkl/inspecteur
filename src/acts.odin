@@ -5,10 +5,10 @@ package inspecteur
 // which can wait. The window asks (act_start), a task of the chores acts, and the window says what came of it at its
 // next build (act_done).
 
-import "core:fmt"
 import "core:strings"
 import process "gt:process"
 import "gt:ui"
+import i18n "gt:i18n"
 
 Act_Kind :: enum u8 {
 	Signal,          // `sig` to every target
@@ -105,29 +105,29 @@ act_done :: proc(data: rawptr, _: u64) {
 	case .Priority:
 		#partial switch a.result {
 		case .Gone:
-			say(app, "%s has ended already", a.name)
+			say(app, i18n.tr("%s has ended already"), a.name)
 		case .Done:
-			say(app, "%s now runs at %s", a.name, priority_text(a.nice))
+			say(app, i18n.tr("%s now runs at %s"), a.name, priority_text(a.nice))
 			if p := find_proc(&app.sampler, a.targets[0].pid, a.targets[0].start); p != nil { p.nice = a.nice }
 			sample_soon(app)
 		case .Denied:
-			say(app, "Access denied: %s", PRIORITY_DENIED)
+			say(app, i18n.tr("Access denied: %s"), i18n.tr(PRIORITY_DENIED))
 		case:
-			say(app, "The priority of %s cannot be changed", a.name)
+			say(app, i18n.tr("The priority of %s cannot be changed"), a.name)
 		}
 	case .Affinity_Read:
 		#partial switch a.result {
 		case .Done:   affinity_show(app, a.targets[0], a.name, a.set)
-		case .Gone:   say(app, "%s has ended already", a.name)
-		case .Denied: say(app, "Access denied: %s is another user's process", a.name)
-		case:         say(app, "The affinity of %s cannot be read", a.name)
+		case .Gone:   say(app, i18n.tr("%s has ended already"), a.name)
+		case .Denied: say(app, i18n.tr("Access denied: %s is another user's process"), a.name)
+		case:         say(app, i18n.tr("The affinity of %s cannot be read"), a.name)
 		}
 	case .Affinity_Set:
 		#partial switch a.result {
-		case .Done:   say(app, "%s runs on %s now", a.name, cpu_set_text(a.set, min(len(app.machine.core_total), process.CPU_SET_MAX)))
-		case .Gone:   say(app, "%s has ended already", a.name)
-		case .Denied: say(app, "Access denied: only its owner, or %s, may change the affinity of %s", ADMIN, a.name)
-		case:         say(app, "The affinity of %s cannot be changed", a.name)
+		case .Done:   say(app, i18n.tr("%s runs on %s now"), a.name, cpu_set_text(a.set, min(len(app.machine.core_total), process.CPU_SET_MAX)))
+		case .Gone:   say(app, i18n.tr("%s has ended already"), a.name)
+		case .Denied: say(app, i18n.tr("Access denied: only its owner, or %s, may change the affinity of %s"), ADMIN, a.name)
+		case:         say(app, i18n.tr("The affinity of %s cannot be changed"), a.name)
 		}
 	}
 }
@@ -138,31 +138,34 @@ signal_said :: proc(app: ^App, a: ^Act) {
 	if a.guarded {
 		switch a.guard {
 		case .None:
-		case .Self:           say(app, "Inspecteur does not suspend itself: nothing could resume it")
-		case .Ancestor:       say(app, "%s runs Inspecteur: suspended, it would stop Inspecteur too", a.name)
-		case .Display_Server: say(app, "%s draws the desktop: suspended, it would freeze every window, this one too", a.name)
+		case .Self:           say(app, i18n.tr("Inspecteur does not suspend itself: nothing could resume it"))
+		case .Ancestor:       say(app, i18n.tr("%s runs Inspecteur: suspended, it would stop Inspecteur too"), a.name)
+		case .Display_Server: say(app, i18n.tr("%s draws the desktop: suspended, it would freeze every window, this one too"), a.name)
 		}
 		return
 	}
-	verb := "end"
+	// (a sentence per verb: a language words each its own way)
+	denied, failed := i18n.tr("%s is %s's: Inspecteur may not end it (only its owner, or %s, may)"), i18n.tr("%s cannot be ended (error %d)")
 	#partial switch a.sig {
-	case .Stop:     verb = "suspend"
-	case .Continue: verb = "resume"
+	case .Stop:
+		denied, failed = i18n.tr("%s is %s's: Inspecteur may not suspend it (only its owner, or %s, may)"), i18n.tr("%s cannot be suspended (error %d)")
+	case .Continue:
+		denied, failed = i18n.tr("%s is %s's: Inspecteur may not resume it (only its owner, or %s, may)"), i18n.tr("%s cannot be resumed (error %d)")
 	}
 	switch {
 	case a.result == .Denied:
-		say(app, "%s is %s's: Inspecteur may not %s it (only its owner, or %s, may)", a.name, a.owner, verb, ADMIN)
+		say(app, denied, a.name, a.owner, ADMIN)
 	case a.result != .Done:
-		say(app, "%s cannot be %s (error %d)", a.name, verb == "end" ? "ended" : fmt.tprintf("%sed", verb), a.errno)
+		say(app, failed, a.name, a.errno)
 	case a.sent > 0:
 		#partial switch a.sig {
-		case .Kill:     say(app, "Killed %s", a.name)
-		case .Stop:     say(app, "Suspended %s", a.name)
-		case .Continue: say(app, "Resumed %s", a.name)
-		case:           say(app, "Asked %s to end", a.name)
+		case .Kill:     say(app, i18n.tr("Killed %s"), a.name)
+		case .Stop:     say(app, i18n.tr("Suspended %s"), a.name)
+		case .Continue: say(app, i18n.tr("Resumed %s"), a.name)
+		case:           say(app, i18n.tr("Asked %s to end"), a.name)
 		}
 	case:
-		say(app, "%s has ended already", a.name)
+		say(app, i18n.tr("%s has ended already"), a.name)
 	}
 	if a.sent == 0 { return }
 	#partial switch a.sig {

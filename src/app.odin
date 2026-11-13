@@ -24,6 +24,7 @@ import setup "gt:setup"
 import update "gt:update"
 import instance "gt:instance"
 import identity "identity"
+import i18n "gt:i18n"
 
 // Frames owed after an event (what it set off settles: the layout, the reveal of the selected row).
 FRAMES_AFTER_INPUT :: 3
@@ -33,7 +34,8 @@ WINDOW_SIZE :: [2]int{1100, 720}
 
 Tab :: enum u8 { Mission_Control, Processes, Performance, Services, Startup, Connections, Information }
 
-TAB_LABELS := [Tab]string{.Mission_Control = "Mission Control", .Processes = "Processes", .Performance = "Performance", .Services = "Services", .Startup = "Startup", .Connections = "Connections", .Information = "Information"}
+// (English: a section's name in the preferences and on the command line too; i18n.tr where it is shown)
+TAB_LABELS := [Tab]string{.Mission_Control = i18n.later("Mission Control"), .Processes = i18n.later("Processes"), .Performance = i18n.later("Performance"), .Services = i18n.later("Services"), .Startup = i18n.later("Startup"), .Connections = i18n.later("Connections"), .Information = i18n.later("Information")}
 TAB_ICONS := [Tab]string{.Mission_Control = lucide.LAYOUT_GRID, .Processes = lucide.LAYOUT_LIST, .Performance = lucide.GAUGE, .Services = lucide.SETTINGS, .Startup = lucide.POWER, .Connections = lucide.GLOBE, .Information = lucide.INFO}
 
 App :: struct {
@@ -138,6 +140,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	app.prefs = prefs^
 	prefs^ = {}
 	app.settings = prefs_read(&app.prefs)
+	// (the language before anything is formatted for display: the first build, the window's toasts, the demo's texts)
+	prefs_page.language_start(&app.prefs, PROGRAM_CATALOGUES)
 	// (no file read here: the user's themes come at the first builds, read by a task)
 	prefs_page.themes_file_init(&app.themes_file, themes_file(), ui.THEMES[:])
 	demo: Demo
@@ -175,7 +179,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	app.announcer.state = &app.main.state   // (a command runs between builds too: its toast goes to this window)
 	if opts.last_crash != "" {
 		log.warnf("the last run ended without its clean end: %s", opts.last_crash)
-		ui.announce(&app.announcer, .Bad, "Inspecteur ended without warning last time", fmt.tprintf("Its report: %s", opts.last_crash))
+		ui.announce(&app.announcer, .Bad, i18n.tr("Inspecteur ended without warning last time"), fmt.tprintf(i18n.tr("Its report: %s"), opts.last_crash))
 	}
 	sampling_attach(app, &h.state)
 	app.icons, _ = font.load_embedded(&app.shared.fonts, lucide.DATA)
@@ -231,7 +235,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 		app.frames += 1
 		// (what this round changed in the preferences: the writer's thread writes the file)
 		config.user_writer_save(&app.prefs_writer, &app.prefs)
-		if config.user_writer_failed(&app.prefs_writer) { say(app, "The preferences cannot be written") }
+		if config.user_writer_failed(&app.prefs_writer) { say(app, i18n.tr("The preferences cannot be written")) }
 	}
 
 	if opts.first_frame {
@@ -333,7 +337,7 @@ refresh_now :: proc(app: ^App) {
 	case .Services:    services_ask(app)
 	case .Startup:     startup_ask(app)
 	}
-	say(app, "Read again")
+	say(app, i18n.tr("Read again"))
 }
 
 selected_id :: proc(app: ^App) -> u64 {

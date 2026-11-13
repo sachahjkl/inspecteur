@@ -36,7 +36,7 @@ main :: proc() {
 	toolbox.tool_main("inspecteurtool", {
 		{name = "build", usage = "[release]: the toolkit's text library when its sources changed, then build/inspecteur", run = run_build},
 		{name = "test", usage = ": the unit tests of the program", run = run_test},
-		{name = "check", usage = ": odin check of the program and of this tool (-vet), its scopes, the tests, the changelog's fragments, THIRD-PARTY-NOTICES up to date, then a release build", run = run_check},
+		{name = "check", usage = ": odin check of the program and of this tool (-vet), its scopes, the tests, the changelog's fragments, the French catalogue, THIRD-PARTY-NOTICES up to date, then a release build", run = run_check},
 		{name = "live", usage = "[--keep]: the real program in a sway nobody sees, driven as a person would; it acts only on what it made", run = run_live},
 		toolbox.logo_command(logo()),
 		{name = "shots", usage = "[--out folder]: the pictures of the documentation, of the demo's made-up machine, in a sway nobody sees", run = run_shots},
@@ -46,6 +46,7 @@ main :: proc() {
 		r[0], r[1], r[2],
 		{name = "update", usage = "keygen <file> | pubkey | manifest <program> <version> - <out> | verify <manifest> -: inspecteur's update key and manifests", run = proc(args: []string) -> int { return toolbox.update_command(inspecteur_update.PRODUCT, args) }},
 		changelog.command(p),
+		toolbox.i18n_command({dirs = {"src"}, folder = "i18n"}),
 		site_command(),
 		l[0], l[1],
 	}, toolbox.ROOT_MARK_DEFAULT)

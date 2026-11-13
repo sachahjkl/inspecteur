@@ -12,6 +12,7 @@ import "core:strings"
 import "core:time"
 import lucide "gt:lucide"
 import tasks "gt:tasks"
+import i18n "gt:i18n"
 import "gt:ui"
 
 Proto :: enum u8 { TCP, UDP }
@@ -24,10 +25,10 @@ Socket_State :: enum u8 {
 }
 
 SOCKET_STATE_TEXT := [Socket_State]string{
-	.Unknown = "?", .Established = "Established", .Syn_Sent = "SYN sent", .Syn_Received = "SYN received",
-	.Fin_Wait_1 = "FIN wait 1", .Fin_Wait_2 = "FIN wait 2", .Time_Wait = "Time wait", .Closed = "Closed",
-	.Close_Wait = "Close wait", .Last_Ack = "Last ACK", .Listening = "Listening", .Closing = "Closing", .Open = "Open",
-	.Connected = "Connected",
+	.Unknown = "?", .Established = i18n.later("Established"), .Syn_Sent = i18n.later("SYN sent"), .Syn_Received = i18n.later("SYN received"),
+	.Fin_Wait_1 = i18n.later("FIN wait 1"), .Fin_Wait_2 = i18n.later("FIN wait 2"), .Time_Wait = i18n.later("Time wait"), .Closed = i18n.later("Closed"),
+	.Close_Wait = i18n.later("Close wait"), .Last_Ack = i18n.later("Last ACK"), .Listening = i18n.later("Listening"), .Closing = i18n.later("Closing"), .Open = i18n.later("Open"),
+	.Connected = i18n.later("Connected"),
 }
 
 Socket :: struct {
@@ -58,17 +59,17 @@ Connections :: struct {
 }
 
 CONN_COLUMNS := [?]ui.Table_Column{
-	{title = "Process", width = 0},
-	{title = "PID", width = 5.5, number = true, weak = true},
-	{title = "Protocol", width = 6},
-	{title = "Local address", width = 17},
-	{title = "Remote address", width = 17},
-	{title = "State", width = 8.5, weak = true},
+	{title = i18n.later("Process"), width = 0},
+	{title = i18n.later("PID"), width = 5.5, number = true, weak = true},
+	{title = i18n.later("Protocol"), width = 6},
+	{title = i18n.later("Local address"), width = 17},
+	{title = i18n.later("Remote address"), width = 17},
+	{title = i18n.later("State"), width = 8.5, weak = true},
 }
 
 connections_init :: proc(c: ^Connections, app: ^App) {
 	section_table_init(&c.rows, app, CONN_COLUMNS[:])
-	section_layout_load(&c.rows.table, &app.prefs, "connections")
+	section_layout_load(&c.rows, &app.prefs, "connections")
 	c.demo = app.demo
 	c.state = &app.main.state
 	c.job = {work = connections_work, data = c}
@@ -151,7 +152,7 @@ connections_rows :: proc(app: ^App) {
 		proto := s.v6 ? (s.proto == .TCP ? "TCPv6" : "UDPv6") : (s.proto == .TCP ? "TCP" : "UDP")
 		local := endpoint_text(s.local, s.lport, s.v6)
 		remote := remote_text(s)
-		state := SOCKET_STATE_TEXT[s.state]
+		state := i18n.tr(SOCKET_STATE_TEXT[s.state])
 		section_row(st, socket_id(s), strings.join({name, pid, proto, local, remote, state}, " ", context.temp_allocator), icon, s.pid > 0 ? .Normal : .Dim)
 		ui.table_data_cell(&st.data, name)
 		ui.table_data_cell(&st.data, pid, f64(s.pid))

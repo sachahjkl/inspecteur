@@ -5,6 +5,7 @@ package inspecteur
 // selection by the row's identity), with the icon of each row before its first cell; and their bar.
 
 import "core:fmt"
+import i18n "gt:i18n"
 import "gt:ui"
 
 // The icon before a row's first cell: the first of its names the icon theme has (an app's desktop entry's Icon=, then
@@ -19,6 +20,8 @@ Row_Icon :: struct {
 // A section's table, its rows and their icons (one per data row, in the order of the rows).
 Section_Table :: struct {
 	table: ui.Table,
+	english: []ui.Table_Column,   // the columns as declared: their English titles name them in the preferences
+	columns: []ui.Table_Column,   // owned: the same, their titles in the language in use (the table's)
 	data:  ui.Table_Data,
 	icons: [dynamic]Row_Icon,
 	app:   ^App,
@@ -26,7 +29,13 @@ Section_Table :: struct {
 }
 
 section_table_init :: proc(st: ^Section_Table, app: ^App, columns: []ui.Table_Column) {
-	ui.table_init(&st.table, columns)
+	st.english = columns
+	st.columns = make([]ui.Table_Column, len(columns))
+	for c, i in columns {
+		st.columns[i] = c
+		st.columns[i].title = i18n.tr(c.title)
+	}
+	ui.table_init(&st.table, st.columns)
 	st.app = app
 	st.table.lead = row_icon_lead
 	st.table.lead_user = st
@@ -34,6 +43,7 @@ section_table_init :: proc(st: ^Section_Table, app: ^App, columns: []ui.Table_Co
 
 section_table_destroy :: proc(st: ^Section_Table) {
 	ui.table_destroy(&st.table)
+	delete(st.columns)
 	ui.table_data_destroy(&st.data)
 	delete(st.icons)
 }
@@ -55,7 +65,7 @@ section_row :: proc(st: ^Section_Table, id: u64, search: string, icon := Row_Ico
 
 // The table, its header and its rows. `empty`: what it says with no row and no filter.
 section_table_build :: proc(st: ^Section_Table, empty: string) -> ui.Table_Events {
-	shown := st.table.query != "" ? fmt.tprintf("Nothing matches “%s”.", st.table.query) : empty
+	shown := st.table.query != "" ? fmt.tprintf(i18n.tr("Nothing matches “%s”."), st.table.query) : empty
 	st.table.header_bg = surface("bar")
 	rows_look(st.app, &st.table.vl)
 	ui.next({width = ui.fill(), height = ui.fill()})
@@ -71,7 +81,7 @@ section_header_menu :: proc(st: ^Section_Table, ev: ui.Table_Events, section: st
 	if ui.ctx_menu(st.menu, em * 16) {
 		changed, sorted := ui.table_menu_items(&st.table.layout)
 		if sorted { ui.table_apply(&st.table, &st.data, app.query) }
-		if changed { section_layout_save(&st.table, &app.prefs, section) }
+		if changed { section_layout_save(st, &app.prefs, section) }
 	}
 }
 

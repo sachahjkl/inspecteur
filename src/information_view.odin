@@ -8,6 +8,7 @@ import "core:strings"
 import lucide "gt:lucide"
 import "gt:platform"
 import "gt:ui"
+import i18n "gt:i18n"
 
 INFO_KEY_EM :: 13   // the labels' column
 INFO_WIDTH_EM :: 60  // the text's width at most: long lines read badly
@@ -29,86 +30,106 @@ info_report :: proc(app: ^App) -> []Info_Group {
 	}
 	m := &app.machine
 	if s != nil {
-		add(&lines, "Operating system", s.os_name)
-		add(&lines, "Kernel", s.kernel)
-		add(&lines, "Architecture", s.arch)
-		add(&lines, "Computer name", s.hostname)
+		add(&lines, i18n.tr("Operating system"), s.os_name)
+		add(&lines, i18n.tr("Kernel"), s.kernel)
+		add(&lines, i18n.tr("Architecture"), s.arch)
+		add(&lines, i18n.tr("Computer name"), s.hostname)
 	}
-	add(&lines, "Up for", duration_words(m.uptime))
+	add(&lines, i18n.tr("Up for"), duration_words(m.uptime))
 	if s != nil {
-		add(&lines, "Desktop", s.desktop)
-		add(&lines, "Session", s.display != "" ? s.display : s.session)
-		add(&lines, "Computer", s.computer)
-		add(&lines, "Motherboard", s.board)
-		add(&lines, "Firmware", s.firmware)
+		add(&lines, i18n.tr("Desktop"), s.desktop)
+		add(&lines, i18n.tr("Session"), s.display != "" ? s.display : s.session)
+		add(&lines, i18n.tr("Computer"), s.computer)
+		add(&lines, i18n.tr("Motherboard"), s.board)
+		add(&lines, i18n.tr("Firmware"), s.firmware)
 	}
-	group(&groups, &lines, "System", lucide.MONITOR)
+	group(&groups, &lines, i18n.tr("System"), lucide.MONITOR)
 
 	if s != nil && s.cpu.logical > 0 {
-		add(&lines, "Model", s.cpu.model)
-		add(&lines, "Cores", fmt.tprintf("%s, %s%s", count_text(s.cpu.cores, "core", "cores"), count_text(s.cpu.logical, "logical processor", "logical processors"), s.cpu.sockets > 1 ? fmt.tprintf(", %d sockets", s.cpu.sockets) : ""))
+		add(&lines, i18n.tr("Model"), s.cpu.model)
+		add(&lines, i18n.tr("Cores"), cores_text(s.cpu.cores, s.cpu.logical, s.cpu.sockets))
 	}
-	group(&groups, &lines, "Processor", lucide.CPU)
+	group(&groups, &lines, i18n.tr("Processor"), lucide.CPU)
 
-	add(&lines, "Installed", size_text(m.mem.total))
-	add(&lines, "Available now", size_text(m.mem.available))
-	add(&lines, "Swap", m.mem.swap_total > 0 ? size_text(m.mem.swap_total) : "none")
-	group(&groups, &lines, "Memory", lucide.LAYERS_2)
+	add(&lines, i18n.tr("Installed"), size_text(m.mem.total))
+	add(&lines, i18n.tr("Available now"), size_text(m.mem.available))
+	add(&lines, i18n.tr("Swap"), m.mem.swap_total > 0 ? size_text(m.mem.swap_total) : i18n.tr("none"))
+	group(&groups, &lines, i18n.tr("Memory"), lucide.LAYERS_2)
 
 	if s != nil {
 		for g in s.gpus {
 			name := g.name
 			// (no pci.ids: the GPU's own library may name it, as Performance shows)
 			if !g.named { for &mg in m.gpus { if mg.read.vendor == g.vendor && gpu_name(&mg.read) != "" { name = gpu_name(&mg.read) } } }
-			add(&lines, name, fmt.tprintf("PCI %s at %s%s", g.ids, g.slot, g.driver != "" ? fmt.tprintf(", driver %s", g.driver) : ""))
+			add(&lines, name, g.driver != "" ? fmt.tprintf(i18n.tr("PCI %s at %s, driver %s"), g.ids, g.slot, g.driver) : fmt.tprintf(i18n.tr("PCI %s at %s"), g.ids, g.slot))
 		}
 	}
-	group(&groups, &lines, "Graphics", lucide.APP_WINDOW)
+	group(&groups, &lines, i18n.tr("Graphics"), lucide.APP_WINDOW)
 
 	for &d in m.disks {
-		add(&lines, d.name, strings.join({d.model != "" ? d.model : "Disk", d.kind, size_text(d.capacity)}, ", ", context.temp_allocator))
+		add(&lines, d.name, strings.join({d.model != "" ? d.model : i18n.tr("Disk"), i18n.tr(d.kind), size_text(d.capacity)}, ", ", context.temp_allocator))
 	}
 	if s != nil {
 		for f in s.fss {
-			add(&lines, f.mount, fmt.tprintf("%s free of %s (%s, %s)", size_text(f.free), size_text(f.size), f.kind, f.device))
+			add(&lines, f.mount, fmt.tprintf(i18n.tr("%s free of %s (%s, %s)"), size_text(f.free), size_text(f.size), f.kind, f.device))
 		}
 	}
-	group(&groups, &lines, "Storage", lucide.HARD_DRIVE)
+	group(&groups, &lines, i18n.tr("Storage"), lucide.HARD_DRIVE)
 
 	for &n in m.nets {
 		parts := make([dynamic]string, context.temp_allocator)
-		append(&parts, n.kind)
-		append(&parts, n.up ? "up" : "down")
+		append(&parts, i18n.tr(n.kind))
+		append(&parts, n.up ? i18n.tr("up") : i18n.tr("down"))
 		if n.speed_mbps > 0 { append(&parts, fmt.tprintf("%d Mbit/s", n.speed_mbps)) }
 		if n.mac != "" { append(&parts, fmt.tprintf("MAC %s", n.mac)) }
 		for a in n.addrs { append(&parts, a) }
 		add(&lines, n.name, strings.join(parts[:], ", ", context.temp_allocator))
 	}
-	group(&groups, &lines, "Network", lucide.GLOBE)
+	group(&groups, &lines, i18n.tr("Network"), lucide.GLOBE)
 
 	if s != nil {
 		for sc in s.screens {
-			add(&lines, sc.connector, strings.join({sc.name != "" ? sc.name : "Screen", sc.mode}, ", ", context.temp_allocator))
+			add(&lines, sc.connector, strings.join({sc.name != "" ? sc.name : i18n.tr("Screen"), sc.mode}, ", ", context.temp_allocator))
 		}
 	}
 	if win := app.main.win; win != nil {
 		size := platform.monitor_size(win)
 		d := platform.display_info(win)
-		if size.x > 0 { add(&lines, "This window's screen", fmt.tprintf("%d×%d logical pixels, %.0f Hz", size.x, size.y, d.hz)) }
+		if size.x > 0 { add(&lines, i18n.tr("This window's screen"), fmt.tprintf(i18n.tr("%d×%d logical pixels, %.0f Hz"), size.x, size.y, d.hz)) }
 	}
-	group(&groups, &lines, "Displays", lucide.MONITOR)
+	group(&groups, &lines, i18n.tr("Displays"), lucide.MONITOR)
 
 	if s != nil {
 		for b in s.batteries {
-			v := fmt.tprintf("%d%%, %s", b.capacity, strings.to_lower(b.status, context.temp_allocator))
-			if b.health >= 0 { v = fmt.tprintf("%s; holds %d%% of its design capacity", v, b.health) }
+			v := fmt.tprintf("%d%%, %s", b.capacity, battery_status_text(b.status))
+			if b.health >= 0 { v = fmt.tprintf(i18n.tr("%s; holds %d%% of its design capacity"), v, b.health) }
 			if b.model != "" { v = fmt.tprintf("%s; %s", v, b.model) }
 			if b.technology != "" && b.technology != "Unknown" { v = fmt.tprintf("%s, %s", v, b.technology) }
 			add(&lines, b.name, v)
 		}
 	}
-	group(&groups, &lines, "Battery", lucide.PLUG)
+	group(&groups, &lines, i18n.tr("Battery"), lucide.PLUG)
 	return groups[:]
+}
+
+// "8 cores, 16 logical processors" (", 2 sockets" when there are more than one).
+@(private = "file")
+cores_text :: proc(cores, logical, sockets: int) -> string {
+	text := fmt.tprintf("%s, %s", fmt.tprintf(i18n.tr(cores, "%d core", "%d cores"), cores), fmt.tprintf(i18n.tr(logical, "%d logical processor", "%d logical processors"), logical))
+	if sockets > 1 { text = fmt.tprintf(i18n.tr("%s, %d sockets"), text, sockets) }
+	return text
+}
+
+// A battery's state as the system says it ("Charging"), in lower case: its words where they are known.
+@(private = "file")
+battery_status_text :: proc(status: string) -> string {
+	switch status {
+	case "Charging":     return i18n.tr("charging")
+	case "Discharging":  return i18n.tr("discharging")
+	case "Full":         return i18n.tr("full")
+	case "Not charging": return i18n.tr("not charging")
+	}
+	return strings.to_lower(status, context.temp_allocator)
 }
 
 // The report as plain text: a title per group, then "label: value" lines.
@@ -125,7 +146,7 @@ info_text :: proc(groups: []Info_Group) -> string {
 build_information :: proc(app: ^App, em: f32) {
 	inf := &app.information
 	busy := information_busy(inf)
-	section_bar(app, "Information", busy && inf.data == nil ? "Reading…" : "This computer and its system", em, info_actions)
+	section_bar(app, i18n.tr("Information"), busy && inf.data == nil ? i18n.tr("Reading…") : i18n.tr("This computer and its system"), em, info_actions)
 	groups := info_report(app)
 	ui.next({width = ui.fill(), height = ui.fill()})
 	if ui.scroll_y("###info") {
@@ -173,5 +194,6 @@ info_actions :: proc(app: ^App, em: f32) {
 info_copy :: proc(app: ^App) {
 	text := info_text(info_report(app))
 	platform.set_clipboard(app.main.win, text)
-	announce(app, fmt.tprintf("Copied the system's information (%d lines)", strings.count(text, "\n")))
+	n := strings.count(text, "\n")
+	announce(app, fmt.tprintf(i18n.tr(n, "Copied the system's information (%d lines)", "Copied the system's information (%d lines)"), n))
 }

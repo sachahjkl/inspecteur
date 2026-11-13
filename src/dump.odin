@@ -6,6 +6,7 @@ package inspecteur
 
 import "core:strings"
 import "gt:ui"
+import i18n "gt:i18n"
 
 Dump :: struct {
 	running: bool,   // a dump asked and not done
@@ -23,15 +24,15 @@ Dump_Task :: struct {
 // Writes a dump of the process `t` (named `name` in the footer) on the chores.
 dump_start :: proc(app: ^App, t: Target, name: string) {
 	d := &app.dump
-	if app.demo != nil { say(app, "The demo's processes are not the system's: no dump was written"); return }
-	if d.running { say(app, "A dump is being written already"); return }
+	if app.demo != nil { say(app, i18n.tr("The demo's processes are not the system's: no dump was written")); return }
+	if d.running { say(app, i18n.tr("A dump is being written already")); return }
 	p := find_proc(&app.sampler, t.pid, t.start)
-	if p == nil { say(app, "%s has ended already", name); return }
+	if p == nil { say(app, i18n.tr("%s has ended already"), name); return }
 	job := new(Dump_Task)
 	job^ = {target = t, name = strings.clone(p.name), shown = strings.clone(name)}
 	d.running = true
 	ui.task(&app.main.state, dump_work, dump_done, job, dump_lost)
-	say(app, "Writing a dump of %s…", name)
+	say(app, i18n.tr("Writing a dump of %s…"), name)
 }
 
 @(private = "file")
@@ -49,8 +50,8 @@ dump_done :: proc(data: rawptr, _: u64) {
 	app := the_app
 	if app == nil { return }
 	app.dump.running = false
-	if j.why != "" { say(app, "No dump: %s", j.why); return }
-	say(app, "Wrote the dump %s", j.path)
+	if j.why != "" { say(app, i18n.tr("No dump: %s"), j.why); return }
+	say(app, i18n.tr("Wrote the dump %s"), j.path)
 }
 
 @(private = "file")

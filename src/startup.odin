@@ -11,11 +11,12 @@ import "core:strings"
 import "core:sync"
 import lucide "gt:lucide"
 import tasks "gt:tasks"
+import i18n "gt:i18n"
 import "gt:ui"
 
 Startup_Kind :: enum u8 { Autostart, User_Service }
 
-STARTUP_KIND_TEXT := [Startup_Kind]string{.Autostart = "Autostart entry", .User_Service = "User service"}
+STARTUP_KIND_TEXT := [Startup_Kind]string{.Autostart = i18n.later("Autostart entry"), .User_Service = i18n.later("User service")}
 
 // The longest id a change carries.
 STARTUP_ID_MAX :: 512
@@ -72,16 +73,16 @@ Startup :: struct {
 }
 
 STARTUP_COLUMNS := [?]ui.Table_Column{
-	{title = "Name", width = 0},
-	{title = "Command", width = 18, weak = true},
-	{title = "Type", width = 9},
-	{title = "Status", width = 10},
-	{title = "File", width = 18, weak = true},
+	{title = i18n.later("Name"), width = 0},
+	{title = i18n.later("Command"), width = 18, weak = true},
+	{title = i18n.later("Type"), width = 9},
+	{title = i18n.later("Status"), width = 10},
+	{title = i18n.later("File"), width = 18, weak = true},
 }
 
 startup_init :: proc(s: ^Startup, app: ^App) {
 	section_table_init(&s.rows, app, STARTUP_COLUMNS[:])
-	section_layout_load(&s.rows.table, &app.prefs, "startup")
+	section_layout_load(&s.rows, &app.prefs, "startup")
 	s.demo = app.demo
 	s.state = &app.main.state
 	s.job = {work = startup_work, data = s}
@@ -148,7 +149,7 @@ startup_posted :: proc(data: rawptr, _: u64) {
 	if l.changed {
 		s.pending = false
 		if l.failure == "" {
-			say(app, "%s %s: %s", l.on ? "Enabled" : "Disabled", l.name, l.on ? "it starts with the session" : "it no longer starts with the session")
+			say(app, l.on ? i18n.tr("Enabled %s: it starts with the session") : i18n.tr("Disabled %s: it no longer starts with the session"), l.name)
 		} else {
 			say(app, "%s: %s", l.name, l.failure)
 		}
@@ -163,8 +164,9 @@ startup_rows :: proc(app: ^App) {
 	if s.list != nil {
 		for it in s.list.items {
 			icon := Row_Icon{app = it.icon, glyph = it.kind == .Autostart ? lucide.POWER : lucide.SETTINGS}
-			kind := STARTUP_KIND_TEXT[it.kind]
-			section_row(st, name_id(strings.concatenate({kind, it.id}, context.temp_allocator)), strings.join({it.name, it.id, it.command, it.status, kind}, " ", context.temp_allocator), icon, it.enabled ? .Normal : .Dim)
+			kind := i18n.tr(STARTUP_KIND_TEXT[it.kind])
+			// (the row's identity from the English: the selection is kept whatever the language)
+			section_row(st, name_id(strings.concatenate({STARTUP_KIND_TEXT[it.kind], it.id}, context.temp_allocator)), strings.join({it.name, it.id, it.command, it.status, kind}, " ", context.temp_allocator), icon, it.enabled ? .Normal : .Dim)
 			ui.table_data_cell(&st.data, it.name)
 			ui.table_data_cell(&st.data, command_shown(it.command))
 			ui.table_data_cell(&st.data, kind)

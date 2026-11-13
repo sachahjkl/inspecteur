@@ -12,10 +12,11 @@ import "core:strings"
 import "core:time"
 import process "gt:process"
 import "gt:ui"
+import i18n "gt:i18n"
 
 Props_Tab :: enum u8 { General, History, Threads, Files, Modules, Environment }
 
-PROPS_TAB_LABELS := [Props_Tab]string{.General = "General", .History = "History", .Threads = "Threads", .Files = "Open files", .Modules = "Modules", .Environment = "Environment"}
+PROPS_TAB_LABELS := [Props_Tab]string{.General = i18n.later("General"), .History = i18n.later("History"), .Threads = i18n.later("Threads"), .Files = i18n.later("Open files"), .Modules = i18n.later("Modules"), .Environment = i18n.later("Environment")}
 
 // The tabs with a list (and its filter): the others read no list.
 props_tab_listed :: proc(tab: Props_Tab) -> bool { return tab != .General && tab != .History }

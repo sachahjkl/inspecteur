@@ -21,6 +21,7 @@ import "core:strings"
 import "core:sys/linux"
 import "core:time"
 import dbus "gt:dbus"
+import i18n "gt:i18n"
 
 SYSTEMD_DEST  :: "org.freedesktop.systemd1"
 SYSTEMD_PATH  :: "/org/freedesktop/systemd1"
@@ -63,9 +64,9 @@ service_conn :: proc(b: ^Service_Bus, m: Manager) -> ^dbus.Conn {
 // The services of manager `m` into `out`, their texts in `a`. Returns why they cannot be read (temporary).
 services_read :: proc(b: ^Service_Bus, m: Manager, out: ^[dynamic]Service, a: runtime.Allocator) -> (problem: string) {
 	c := service_conn(b, m)
-	if c == nil { return m == .System ? "The system's service manager cannot be reached." : "The user's service manager cannot be reached (no session bus)." }
+	if c == nil { return m == .System ? i18n.tr("The system's service manager cannot be reached.") : i18n.tr("The user's service manager cannot be reached (no session bus).") }
 	msg, ok := dbus.call(c, SYSTEMD_DEST, SYSTEMD_PATH, SYSTEMD_IFACE, "ListUnits", "", nil)
-	if !ok { return call_failure(&msg, "systemd does not list its units") }
+	if !ok { return call_failure(&msg, i18n.tr("systemd does not list its units")) }
 	paths := make([dynamic]string, context.temp_allocator)   // each service's object path
 	listed := make(map[string]bool, 256, context.temp_allocator)
 	r := dbus.msg_reader(&msg)
@@ -195,7 +196,7 @@ unit_file_value :: proc(text, group, key: string) -> string {
 // (temporary).
 service_act :: proc(b: ^Service_Bus, m: Manager, action: Service_Action, name: string) -> (failure: string) {
 	c := service_conn(b, m)
-	if c == nil { return "the service manager cannot be reached" }
+	if c == nil { return i18n.tr("the service manager cannot be reached") }
 	return unit_act(c, action, name)
 }
 
@@ -221,11 +222,11 @@ unit_act :: proc(c: ^dbus.Conn, action: Service_Action, name: string) -> (failur
 	}
 	// (interactive: polkit may ask the user for a password before the system's manager acts)
 	msg, ok := dbus.call(c, SYSTEMD_DEST, SYSTEMD_PATH, SYSTEMD_IFACE, member, sig, w.buf[:], ACTION_TIMEOUT_MS, interactive = true)
-	if !ok { return call_failure(&msg, "the service manager did not answer") }
+	if !ok { return call_failure(&msg, i18n.tr("the service manager did not answer")) }
 	if action == .Enable || action == .Disable {
 		// (systemctl does the same: the manager reads the links it was given)
 		rmsg, rok := dbus.call(c, SYSTEMD_DEST, SYSTEMD_PATH, SYSTEMD_IFACE, "Reload", "", nil, ACTION_TIMEOUT_MS, interactive = true)
-		if !rok { return call_failure(&rmsg, "the service manager did not reload") }
+		if !rok { return call_failure(&rmsg, i18n.tr("the service manager did not reload")) }
 	}
 	return ""
 }
@@ -239,7 +240,7 @@ call_failure :: proc(msg: ^dbus.Message, silent: string) -> string {
 	text := strings.has_prefix(msg.signature, "s") ? strings.clone(dbus.r_string(&r), context.temp_allocator) : ""
 	switch msg.error_name {
 	case "org.freedesktop.DBus.Error.InteractiveAuthorizationRequired", "org.freedesktop.DBus.Error.AccessDenied":
-		return strings.concatenate({"not allowed: ", text != "" ? text : "access denied", " (a system service needs an administrator's permission)"}, context.temp_allocator)
+		return fmt.tprintf(i18n.tr("not allowed: %s (a system service needs an administrator's permission)"), text != "" ? text : i18n.tr("access denied"))
 	}
 	if text != "" { return text }
 	return strings.clone(msg.error_name, context.temp_allocator)
@@ -273,17 +274,17 @@ unit_details_read :: proc(b: ^Service_Bus, d: ^Unit_Details, a: runtime.Allocato
 	state, stdout, stderr, err := os.process_exec({command = args[:]}, context.temp_allocator)
 	switch {
 	case err != nil:
-		d.journal_problem = "journalctl cannot be run: the journal is not read"
+		d.journal_problem = i18n.tr("journalctl cannot be run: the journal is not read")
 	case !state.exited || state.exit_code != 0:
 		text := strings.trim_space(string(stderr))
-		d.journal_problem = strings.clone(text != "" ? text : "journalctl failed", a)
+		d.journal_problem = strings.clone(text != "" ? text : i18n.tr("journalctl failed"), a)
 	case:
 		rest := string(stdout)
 		for line in strings.split_lines_iterator(&rest) {
 			if e, ok := journal_entry_parse(line, a); ok { append(&d.journal, e) }
 		}
 		// (a user that is not in the systemd-journal group or adm reads its own units' lines alone)
-		if len(d.journal) == 0 { d.journal_problem = d.boot ? "No entry of this boot that this user may read." : "No entry in the journal that this user may read." }
+		if len(d.journal) == 0 { d.journal_problem = d.boot ? i18n.tr("No entry of this boot that this user may read.") : i18n.tr("No entry in the journal that this user may read.") }
 	}
 }
 

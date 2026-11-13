@@ -12,6 +12,7 @@ package inspecteur
 import "core:slice"
 import "core:strings"
 import "gt:ui"
+import i18n "gt:i18n"
 
 // The points of a graph: one per sample (60 s at the default period).
 HISTORY_POINTS :: 60
@@ -79,7 +80,7 @@ core_celsius_range :: proc(m: ^Machine) -> (low, high: f32, ok: bool) {
 // What waits on a resource (pressure stall information): the share of the time some task (`some`), or every task
 // (`full`), waited on it, over the last 10 and 60 seconds, in percent. The CPU's `full` is not told by every kernel.
 Pressure_Kind :: enum u8 { Cpu, Memory, Io }
-PRESSURE_NAMES := [Pressure_Kind]string{.Cpu = "CPU", .Memory = "Memory", .Io = "I/O"}
+PRESSURE_NAMES := [Pressure_Kind]string{.Cpu = i18n.later("CPU"), .Memory = i18n.later("Memory"), .Io = i18n.later("I/O")}
 Pressure :: struct { some10, some60, full10, full60: f32 }
 Net_Counters :: struct { name: string, rx, tx: u64 }
 

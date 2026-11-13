@@ -13,11 +13,13 @@ package inspecteur
 //   and off with EnableUnitFiles and DisableUnitFiles on the user's manager (the session bus).
 
 import "base:runtime"
+import "core:fmt"
 import "core:os"
 import "core:path/filepath"
 import "core:strings"
 import dbus "gt:dbus"
 import "gt:platform"
+import i18n "gt:i18n"
 
 // The targets of a session: a service they want starts with it.
 SESSION_TARGETS :: [2]string{"default.target", "graphical-session.target"}
@@ -83,8 +85,8 @@ autostart_read :: proc(out: ^[dynamic]Startup_Item, a: runtime.Allocator) {
 			if rerr != nil { continue }
 			e := autostart_entry(string(data), desktops)
 			if !e.application { continue }
-			status := "Enabled"
-			if !e.enabled { status = "Disabled" } else if !e.in_desktop { status = "Not in this desktop" }
+			status := i18n.tr("Enabled")
+			if !e.enabled { status = i18n.tr("Disabled") } else if !e.in_desktop { status = i18n.tr("Not in this desktop") }
 			append(out, Startup_Item{
 				kind = .Autostart, id = strings.clone(fi.name, a), name = strings.clone(e.name != "" ? e.name : fi.name, a),
 				command = strings.clone(e.exec, a), icon = strings.clone(e.icon, a), path = strings.clone(path, a),
@@ -126,11 +128,11 @@ autostart_entry :: proc(text: string, desktops: []string) -> (e: Autostart_Entry
 @(private = "file")
 user_services_read :: proc(b: ^Startup_Bus, out: ^[dynamic]Startup_Item, a: runtime.Allocator) -> (problem: string) {
 	c := startup_conn(b)
-	if c == nil { return "The user's service manager cannot be reached (no session bus): its services are not listed." }
+	if c == nil { return i18n.tr("The user's service manager cannot be reached (no session bus): its services are not listed.") }
 	states := make(map[string]string, 256, context.temp_allocator)   // name -> unit file state
 	paths := make(map[string]string, 256, context.temp_allocator)
 	msg, ok := dbus.call(c, SYSTEMD_DEST, SYSTEMD_PATH, SYSTEMD_IFACE, "ListUnitFiles", "", nil)
-	if !ok { return "The user's service manager does not list its services." }
+	if !ok { return i18n.tr("The user's service manager does not list its services.") }
 	r := dbus.msg_reader(&msg)
 	end := dbus.r_array_begin(&r, "(ss)")
 	for r.pos < end && !r.err {
@@ -197,8 +199,8 @@ exec_command :: proc(exec: string) -> string {
 // What the Status column says of a user service: whether it starts with the session; a masked one never can.
 @(private = "file")
 unit_status :: proc(state: string, on: bool) -> string {
-	if state == "masked" || state == "masked-runtime" { return "Masked" }
-	return on ? "Enabled" : "Disabled"
+	if state == "masked" || state == "masked-runtime" { return i18n.tr("Masked") }
+	return on ? i18n.tr("Enabled") : i18n.tr("Disabled")
 }
 
 // Turns an entry or a service on or off. Returns "" when it is done, else why not (temporary).
@@ -207,7 +209,7 @@ startup_set_enabled :: proc(b: ^Startup_Bus, kind: Startup_Kind, id: string, on:
 	case .Autostart:    return autostart_set_enabled(id, on)
 	case .User_Service:
 		c := startup_conn(b)
-		if c == nil { return "the user's service manager cannot be reached" }
+		if c == nil { return i18n.tr("the user's service manager cannot be reached") }
 		return unit_act(c, on ? .Enable : .Disable, id)
 	}
 	return ""
@@ -217,7 +219,7 @@ startup_set_enabled :: proc(b: ^Startup_Bus, kind: Startup_Kind, id: string, on:
 // and a copy that says the same as the system's entry goes with them.
 @(private = "file")
 autostart_set_enabled :: proc(id: string, on: bool) -> (failure: string) {
-	if strings.contains(id, "/") || !strings.has_suffix(id, ".desktop") { return "not an autostart entry" }
+	if strings.contains(id, "/") || !strings.has_suffix(id, ".desktop") { return i18n.tr("not an autostart entry") }
 	user_dir := autostart_user_dir()
 	user_path := strings.concatenate({user_dir, "/", id}, context.temp_allocator)
 	system_text := ""
@@ -231,12 +233,12 @@ autostart_set_enabled :: proc(id: string, on: bool) -> (failure: string) {
 	text := system_text
 	has_user := false
 	if data, err := os.read_entire_file(user_path, context.temp_allocator); err == nil { text, has_user = string(data), true }
-	if !has_user && !has_system { return "its file is gone" }
+	if !has_user && !has_system { return i18n.tr("its file is gone") }
 	if on {
 		text = desktop_entry_set(text, "Hidden", "")
 		if unit_file_value(text, "Desktop Entry", "X-GNOME-Autostart-enabled") == "false" { text = desktop_entry_set(text, "X-GNOME-Autostart-enabled", "") }
 		if has_system && text == system_text {
-			if has_user && os.remove(user_path) != nil { return strings.concatenate({"cannot remove ", user_path}, context.temp_allocator) }
+			if has_user && os.remove(user_path) != nil { return fmt.tprintf(i18n.tr("cannot remove %s"), user_path) }
 			return ""
 		}
 		if has_system && unit_file_value(text, "Desktop Entry", "Hidden") == "" && unit_file_value(system_text, "Desktop Entry", "Hidden") == "true" {
@@ -248,10 +250,10 @@ autostart_set_enabled :: proc(id: string, on: bool) -> (failure: string) {
 	_ = os.make_directory_all(user_dir)   // (an error when it is there already: the write says what matters)
 	// (a file beside it, then renamed over it: the session never reads a half-written entry)
 	temp := strings.concatenate({user_path, ".inspecteur-new"}, context.temp_allocator)
-	if os.write_entire_file(temp, text) != nil { return strings.concatenate({"cannot write ", temp}, context.temp_allocator) }
+	if os.write_entire_file(temp, text) != nil { return fmt.tprintf(i18n.tr("cannot write %s"), temp) }
 	if os.rename(temp, user_path) != nil {
 		_ = os.remove(temp)
-		return strings.concatenate({"cannot write ", user_path}, context.temp_allocator)
+		return fmt.tprintf(i18n.tr("cannot write %s"), user_path)
 	}
 	return ""
 }

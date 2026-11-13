@@ -18,6 +18,7 @@ import "core:dynlib"
 import "core:fmt"
 import "core:strconv"
 import "core:strings"
+import i18n "gt:i18n"
 
 // Where NixOS puts the driver's libraries (dlopen looks there after the usual places).
 NIXOS_DRIVER_LIB :: "/run/opengl-driver/lib/libnvidia-ml.so.1"
@@ -270,7 +271,7 @@ drm_read :: proc(snap: ^Gpu_Snapshot) {
 			continue   // (NVIDIA: NVML's; another: nothing to read)
 		}
 		name := read_text(fmt.tprintf("%s/product_name", dir))
-		if name == "" { name = fmt.tprintf("%s GPU (card%d)", g.vendor, card) }
+		if name == "" { name = fmt.tprintf(i18n.tr("%s GPU (card%d)"), g.vendor, card) }
 		g.name_len = copy(g.name[:], name)
 		snap.gpus[snap.count] = g
 		snap.count += 1
