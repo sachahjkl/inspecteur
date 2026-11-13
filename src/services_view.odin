@@ -172,7 +172,7 @@ services_manager_choice :: proc(app: ^App, em: f32) {
 	sel := int(s.manager)
 	key := ui.command_shortcut(COMMANDS[.Service_Manager])
 	tips := [2]string{fmt.tprintf(i18n.tr("The system's services (%s)"), key), fmt.tprintf(i18n.tr("The user's services (%s)"), key)}
-	ui.next({width = ui.px(segmented_width(labels[:], em, 10)), height = ui.px(ui.dense(em * 2))})
+	ui.next({height = ui.px(ui.dense(em * 2))})   // (as wide as its labels: ui.segmented's own width)
 	if ui.segmented("svc_manager", labels[:], &sel, tips[:]) { services_switch(app, Manager(sel)) }
 }
 

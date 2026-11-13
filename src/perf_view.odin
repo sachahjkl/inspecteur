@@ -50,7 +50,7 @@ build_performance :: proc(app: ^App, em: f32) {
 		ui.spacer(ui.fill())
 		if app.device.kind == .Cpu {
 			labels := []string{i18n.tr("Overall"), i18n.tr("Logical processors")}
-			ui.next({width = ui.px(segmented_width(labels, em, 21)), height = ui.px(ui.dense(em * 1.9))})
+			ui.next({height = ui.px(ui.dense(em * 1.9))})   // (as wide as its labels: ui.segmented's own width)
 			sel := app.cpu_grid ? 1 : 0
 			// (the key that switches them, in each segment's tooltip)
 			key := ui.command_shortcut(COMMANDS[.Cpu_Grid])

@@ -128,14 +128,14 @@ journal_bar :: proc(app: ^App, v: ^Journal_View, shown: int, em: f32, in_window:
 			key := ui.command_shortcut(COMMANDS[.Journal_Level])
 			tips := [3]string{fmt.tprintf(i18n.tr("Every entry (%s)"), key), fmt.tprintf(i18n.tr("Warnings and worse (%s)"), key), fmt.tprintf(i18n.tr("Errors and worse (%s)"), key)}
 			sel := int(app.settings.journal_level)
-			ui.next({width = ui.px(segmented_width(labels[:], em, 21)), height = ui.px(bar_h)})
+			ui.next({height = ui.px(bar_h)})   // (as wide as its labels: ui.segmented's own width)
 			if ui.segmented("svc_journal_level", labels[:], &sel, tips[:]) { journal_level_set(app, Journal_Level(sel)) }
 			ui.spacer(ui.px(em * 0.6))
 			boot := app.settings.journal_boot ? 0 : 1
 			bkey := ui.command_shortcut(COMMANDS[.Journal_Boot])
 			btips := [2]string{fmt.tprintf(i18n.tr("The entries of this boot (%s)"), bkey), fmt.tprintf(i18n.tr("The last entries, from any boot (%s)"), bkey)}
 			boot_labels := [2]string{i18n.tr("This boot"), i18n.tr("Every boot")}
-			ui.next({width = ui.px(segmented_width(boot_labels[:], em, 12)), height = ui.px(bar_h)})
+			ui.next({height = ui.px(bar_h)})
 			if ui.segmented("svc_journal_boot", boot_labels[:], &boot, btips[:]) { journal_boot_set(app, boot == 0) }
 			ui.spacer(ui.px(em * 0.6))
 			follow := app.settings.journal_follow
@@ -166,17 +166,6 @@ journal_bar :: proc(app: ^App, v: ^Journal_View, shown: int, em: f32, in_window:
 
 // The journal's search field, at least, in ems.
 JOURNAL_SEARCH_EM :: 16
-
-// A segmented control's width: each segment as wide as the widest label, so that a language's longer word widens the
-// control instead of being cut; `least_em` at least.
-segmented_width :: proc(labels: []string, em: f32, least_em: f32) -> f32 {
-	widest: f32
-	for l in labels { widest = max(widest, ui.text_width(ui.top_style().font, em, l)) }
-	return max(em * least_em, f32(len(labels)) * (widest + em * SEGMENT_PAD_EM) + em * 0.5)
-}
-
-// A segment's room beside its label: its key's margins and the label's own padding, in ems.
-SEGMENT_PAD_EM :: 1.6
 
 // One entry: its time, its level in its colour, its program and process, its message (in the level's colour when it is
 // a warning or worse).
