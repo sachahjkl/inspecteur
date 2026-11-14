@@ -3,6 +3,23 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.6.0] - 2026-11-14
+
+### Added
+- **Select several items with Ctrl and Shift**: in Services, Startup and Connections as in Processes, Ctrl+click adds or takes out a row, Shift+click selects the range from the last row clicked, Ctrl+Shift+click adds a range, and Shift or Ctrl+Shift with the arrows, Page Up, Page Down, Home and End do the same from the keyboard. Start, Stop, Restart, Enable and Disable act on every service selected that they apply to, Enable and Disable on every startup item, End task and Kill on the processes of every socket; Copy copies every row, a line each. One question names how many: "Stop 3 services?", and End task on several processes asks too. Properties and the other views of one thing stay on the row of the cursor. Escape on several rows keeps the cursor's row alone; Escape again clears the filter.
+
+### Changed
+- **Mission Control follows the window, and the journals come back**: Mission Control's zones are shares of the section, as before the panels became views, so they grow and shrink with the window; "the layout as at first" puts their sizes back too. The services' journals left open at the quit open again at the next start, where they were.
+- **Dialogs and panels where you want them**: Properties, the affinity, "Why is it slow?", the confirmations, the command palette and the keys' sheet can float in the window, open in a window of their own or dock at an edge (the small icon of their header, a right click on it, or the palette, which lists these moves); the service's details move the same way, and Mission Control's panels too: a right click at a panel's top, or a drag of its tab onto the squares that show where it lands. Each one opens as it was left, with its size; the details and the panels left open, in windows of their own too, open again at the next start. A service's journal (Ctrl+Shift+J) still opens in a window of its own; closing that window puts it under the Services table, a tab beside the details. F6 moves the keyboard from the page to each panel and floating view. The preferences `services.details`, `services.details_height`, `mission.layout`, `mission.windows` and `view.palette_size` are gone: `views.txt` in the state folder keeps all of it, and Mission Control's layout and the palette's size start again from their defaults.
+- **The update in the footer**: a button in the footer says that a new version is on offer, downloading or ready to restart, and acts on it; the footer's message no longer says it too. A failed update is said there.
+
+### Fixed
+- **The text of the panes can be selected and copied.** A drag selects a process's name, PID and properties, a journal entry's level, time, program and message, the system's facts and graphics cards, the summary's and the performance's values, the notes and the findings of the diagnosis; Ctrl+C copies the text selected instead of a row's command line or name, until a press elsewhere. A click on a summary tile still opens its tab.
+- **The palette and the keys open from the settings.** In the settings, Ctrl+K, Ctrl+Shift+P and F1 did nothing, and over the Properties or another dialog Ctrl+, did nothing either. They now work in every page, while a field has the keyboard as well, and the palette lists the settings from there.
+- **One journal per service, user or system**: a system service and a user service with the same name each get a journal of their own (Ctrl+Shift+J); the second no longer brings the first one's forward.
+- **Process names whole**: in the Processes tab, a name is no longer cut to a few letters or to "…" alone while its column has room. Its count and its window's button follow it; only a column too narrow cuts the name.
+- **The font settings apply.** The interface, monospace and reading fonts chosen in the settings changed nothing; they now show at once, in every window, and Default brings inspecteur's own back.
+
 ## [0.5.1] - 2026-11-14
 
 ### Fixed
@@ -209,6 +226,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.6.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.6.0
 [0.5.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.5.1
 [0.5.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.5.0
 [0.4.2]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.4.2
