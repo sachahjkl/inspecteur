@@ -84,7 +84,6 @@ App :: struct {
 	sheet:       ui.Shortcuts_Sheet,   // the sheet of the keys (commands.odin)
 	sheet_commands: [dynamic]ui.Command,   // its list, made at its first opening
 	views:       ui.Views,          // the dialogs, the panels, the windows of their own, and how each was last shown (views.odin)
-	views_seen:  [2]int,            // the sample and the Properties' reading the views' windows were last woken for (views_follow)
 	mission:     Mission_Control,   // the Mission Control section: its panels (mission_control.odin)
 	install:     prefs_page.Install,   // the install: its offer, its dialog, the settings' page (setup.odin)
 	setup_due:   bool,              // --setup: the install's view opens in the first build
@@ -224,7 +223,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 		ms :: proc(a, b: time.Tick) -> f64 { return time.duration_milliseconds(time.tick_diff(a, b)) }
 		fmt.printfln("first-frame %d read %.1f window %.1f frame %.1f (draw %.1f, present %.1f)", time.now()._nsec, ms(t_main, t_read), ms(t_read, t_window), ms(t_window, time.tick_now()), time.duration_milliseconds(h.times.draw), time.duration_milliseconds(h.times.present))
 	}
-	// (the views' windows are the main window's: host_frame makes their frames after its own, hosts_wait counts them)
+	// (the views' windows are the main window's: host_frame builds them right after each of its frames, so they show
+	// what that frame took; hosts_wait counts them)
 	hosts := [1]^host.Host{h}
 	for !platform.is_closed(win) {
 		host.hosts_wait(hosts[:])
@@ -238,7 +238,6 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 		updates_follow(app)
 		t_frame := time.tick_now()
 		host.host_frame(h)
-		views_follow(app)
 		zoom_follow(app)
 		app.frame_time += time.tick_since(t_frame)
 		app.frames += 1

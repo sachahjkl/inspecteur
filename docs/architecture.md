@@ -102,7 +102,7 @@ journal's last entries from `journalctl -u <unit> -n 1000 -o json` (`-b`: this b
 journald's files), on a thread of their own: when another service is selected, and every 2 s while it is followed. A
 `Journal_View` (journal.odin) holds one service's reading, its list and its search: the details have one, each journal
 on its own (journal_window.odin: the view `journal`, an instance per service) its own. Their readings are posted to the
-main window; after its frame, `views_follow` wakes the windows of the views that show what came. Stop and Restart are
+main window; the views' windows are built right after each of its frames, so they show what came. Stop and Restart are
 asked first: the question says when the
 service runs the desktop or Inspecteur (its main process is the display server or one Inspecteur runs under, or
 Inspecteur's own cgroup is under that unit).

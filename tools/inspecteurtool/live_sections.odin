@@ -100,7 +100,8 @@ live_services :: proc(l: ^Live) {
 	title := fmt.tprintf("%s: journal", service)
 	check(l, cdp.key(c, "ctrl+shift+j") && wait_sway_title(l, title, true), "Ctrl+Shift+J: the journal in a window of its own (%s)", title)
 	check(l, sway_command(l, fmt.tprintf(`[title="%s"] kill`, title)) && wait_sway_title(l, title, false), "closed, the window goes")
-	check(l, cdp.wait_name(c, fmt.tprintf("view_tab_view_journal/%s", service), SESSION_WAIT), "the journal is a tab under the table")
+	// (the journal's instance names the manager: a user service's here)
+	check(l, cdp.wait_name(c, fmt.tprintf("view_tab_view_journal/user/%s", service), SESSION_WAIT), "the journal is a tab under the table")
 	check(l, cdp.click_name(c, "view_tab_view_service") && wait_named_text(c, "svc_details_name", service), "the details' tab shows them again")
 	check(l, cdp.wait_name(c, "svc_journal_count", SESSION_WAIT), "the main window answers on")
 

@@ -18,7 +18,7 @@ PROPS_VIEW     :: "props"
 AFFINITY_VIEW  :: "affinity"
 DIAGNOSIS_VIEW :: "diagnosis"
 SERVICE_VIEW   :: "service"
-JOURNAL_VIEW   :: "journal"     // an instance per service (its name)
+JOURNAL_VIEW   :: "journal"     // an instance per service ("<manager>/<service>")
 // The confirmation of a kill, a signal, a service's stop, a dump (the toolkit's ui.confirm_open).
 CONFIRM_VIEW   :: "kill"
 
@@ -49,6 +49,7 @@ views_start :: proc(app: ^App) {
 	// (the details open at the very first start, as they were by default; then as the user left them)
 	_ = ui.view_restore(&app.views, SERVICE_VIEW, app, first_start_open = true, owner = &h.state)
 	mission_restore(app)
+	journals_restore(app)
 }
 
 // Whether the keyboard is in one of the views (a floating, docked or separate one), the service's details apart: their
@@ -56,28 +57,4 @@ views_start :: proc(app: ^App) {
 focus_in_view :: proc(app: ^App) -> bool {
 	id, _, ok := ui.views_focus(&app.views)
 	return ok && id != SERVICE_VIEW
-}
-
-// After the main window's frame: the windows of the views that show what a sample or a reading brought are built again.
-// A view's window builds on its own input or a wake; its data comes to the main window.
-views_follow :: proc(app: ^App) {
-	seen := [2]int{app.refreshes, app.props.serial}
-	pane := journal_view_taken(&app.services.pane)
-	if seen != app.views_seen || pane {
-		app.views_seen = seen
-		views_wake(app, PROPS_VIEW)
-		views_wake(app, DIAGNOSIS_VIEW)
-		views_wake(app, SERVICE_VIEW)
-		for id in MISSION_VIEWS { views_wake(app, id) }
-	}
-	for j in app.journals {
-		if journal_view_taken(&j.view) { views_wake(app, JOURNAL_VIEW, j.name) }
-	}
-}
-
-// A view's window built at its next turn of the loop (none: the view is not in a window of its own).
-@(private = "file")
-views_wake :: proc(app: ^App, id: string, instance := "") {
-	// (1 ms: a wake of 0 is none; the window's last build is older than that, so it is due at once)
-	if st := ui.view_window_state(&app.views, id, instance); st != nil { ui.wake_within(st, 1) }
 }

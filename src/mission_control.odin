@@ -64,12 +64,12 @@ MISSION_PLACES := [Mission_Panel]ui.View_Place{
 	.System   = {space = MISSION_SPACE, edge = .Bottom, stack = 2},
 }
 
-// The zones' extents at first, in ems: the top's and the bottom's heights, the left's and the right's widths (the centre
-// takes the rest).
+// The zones at first, as shares of the section (they follow the window): the machine a third of its height at the top,
+// the bottom row a third of it; in the row between them, the health a third of the width at the left, the busiest by
+// memory a third at the right, the busiest by CPU the rest in the centre. The bottom zone's three stacks share its
+// width equally.
 @(rodata)
-MISSION_EXTENTS := [Mission_Panel]f32{
-	.Machine = 15, .Health = 22, .Cpu = 0, .Memory = 22, .Services = 14, .Network = 14, .Startup = 14, .System = 14,
-}
+MISSION_ZONES := ui.View_Dock_Options{extent_frac = #partial [ui.View_Edge]f32{.Top = 0.32, .Bottom = 0.34, .Left = 0.34, .Right = 0.33}}
 
 // The order the panels open in at the start and come back in: a stack's tab shown is the last opened (Startup over
 // System).
@@ -123,7 +123,7 @@ mission_register :: proc(app: ^App) {
 	for p in Mission_Panel {
 		ui.view_register(&app.views, MISSION_VIEWS[p], mission_view, ui.View_Options{
 			title = MISSION_TITLES[p], icon = MISSION_ICONS[p], home = .Panel, home_place = MISSION_PLACES[p],
-			extent_em = MISSION_EXTENTS[p], width_em = MISSION_W_EM, height_em = MISSION_H_EM,
+			width_em = MISSION_W_EM, height_em = MISSION_H_EM,
 		})
 	}
 }
@@ -140,14 +140,14 @@ mission_panel_of :: proc(id: string) -> Mission_Panel {
 	return .Machine
 }
 
-// Each panel back in its place, those closed open again. (The sizes of the zones and of their stacks stay as the user
-// left them.)
+// The layout as at first: the zones' and stacks' sizes and the tabs shown back to the defaults, each panel back in its
+// place (one floated, in a window or docked elsewhere comes back), those closed open again.
 mission_reset :: proc(app: ^App) {
 	for p in MISSION_ORDER {
 		id := MISSION_VIEWS[p]
 		if !ui.view_is_open(&app.views, id) { ui.view_open(&app.views, id, app, owner = &app.main.state) }
-		ui.view_reattach(&app.views, id)
 	}
+	ui.views_space_reset(&app.views, MISSION_SPACE)
 	tab_show(app, .Mission_Control)
 	say(app, i18n.tr("Mission Control: the layout as at first"))
 }
@@ -162,7 +162,7 @@ build_mission :: proc(app: ^App, em: f32) {
 	for id in MISSION_VIEWS { if ui.view_is_open(&app.views, id) { shown += 1 } }
 	section_bar(app, i18n.tr("Mission Control"), fmt.tprintf(i18n.tr("%d of %d panels: a right click at the top of one moves it"), shown, len(Mission_Panel)), em, nil, mission_bar_right)
 	ui.next({width = ui.fill(), height = ui.fill()})
-	if ui.views_dock(&app.views, MISSION_SPACE, {}) {}
+	if ui.views_dock(&app.views, MISSION_SPACE, MISSION_ZONES) {}
 	mission_menu(app, em)
 }
 

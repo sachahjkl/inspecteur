@@ -1,12 +1,14 @@
 package inspecteur
 
 // A service's journal on its own (Ctrl+Shift+J, or the button of the details' journal): a view per service (its
-// instance is the service's name). It opens in a window of its own, for a second screen or to keep it in view while the
-// window shows another section; the system's close of that window brings it back under the Services table, a tab beside
-// the details. It can float in the window, or dock elsewhere, as any view. It has its own Journal_View, for the service
-// it was opened for (the details go on following the selection); the level, the boot and following are the
-// preferences', as in the details. Its keys are the journal's (Ctrl+J, Alt+L, Alt+B, Alt+F, Alt+C, Alt+Shift+C) while
-// it has the keyboard. Several can be open, one per service.
+// instance names the manager and the unit: "system/foo.service", "user/foo.service", so a system service and a user
+// service of the same name never share one). It opens in a window of its own, for a second screen or to keep it in
+// view while the window shows another section; the system's close of that window brings it back under the Services
+// table, a tab beside the details. It can float in the window, or dock elsewhere, as any view. It has its own
+// Journal_View, for the service it was opened for (the details go on following the selection); the level, the boot and
+// following are the preferences', as in the details. Its keys are the journal's (Ctrl+J, Alt+L, Alt+B, Alt+F, Alt+C,
+// Alt+Shift+C) while it has the keyboard. Several can be open, one per service; those open at the quit open again at
+// the next start, where they were.
 
 import "core:fmt"
 import "core:strings"
@@ -19,8 +21,26 @@ Journal_Window :: struct {
 	app:     ^App,
 	view:    Journal_View,
 	manager: Manager,
-	name:    string,   // owned: the service, and the view's instance
+	name:    string,   // owned: the service
+	instance: string,  // owned: the view's instance, "<manager>/<service>" (journal_instance)
 	drained: bool,     // closed, no reading under way, and a build of the main window since took what was posted
+}
+
+// The view's instance of the journal of `name` of `manager` (temporary allocator).
+@(private = "file")
+journal_instance :: proc(manager: Manager, name: string) -> string {
+	return fmt.tprintf("%s/%s", MANAGER_KEYS[manager], name)
+}
+
+// The manager and the service an instance names; false when it names none (a line of another version).
+@(private = "file")
+journal_instance_parse :: proc(instance: string) -> (manager: Manager, name: string, ok: bool) {
+	slash := strings.index_byte(instance, '/')
+	if slash <= 0 || slash == len(instance) - 1 { return }
+	for key, m in MANAGER_KEYS {
+		if key == instance[:slash] { return m, instance[slash + 1:], true }
+	}
+	return
 }
 
 // Its size in a window of its own, at first (ems).
@@ -37,22 +57,37 @@ journal_register :: proc(app: ^App) {
 
 // Opens the journal of the service `name` of `manager` on its own (one already open comes forward).
 journal_window_open :: proc(app: ^App, manager: Manager, name: string) {
+	instance := journal_instance(manager, name)
 	for w in app.journals {
-		if w.name == name {
-			ui.view_open(&app.views, JOURNAL_VIEW, w, instance = w.name, owner = &app.main.state)
+		if w.instance == instance {
+			ui.view_open(&app.views, JOURNAL_VIEW, w, instance = w.instance, owner = &app.main.state)
 			return
 		}
 	}
+	journal_window_new(app, manager, name)
+	say(app, i18n.tr("The journal of %s on its own"), name)
+}
+
+// At start-up: the journals open at the last quit, each where it was.
+journals_restore :: proc(app: ^App) {
+	for instance in ui.view_restored_instances(&app.views, JOURNAL_VIEW, context.temp_allocator) {
+		if manager, name, ok := journal_instance_parse(instance); ok { journal_window_new(app, manager, name) }
+	}
+}
+
+// A journal of its own for the service `name` of `manager`, its reading asked, its view opened.
+@(private = "file")
+journal_window_new :: proc(app: ^App, manager: Manager, name: string) {
 	w := new(Journal_Window)
 	w.app, w.manager, w.name = app, manager, strings.clone(name)
-	// (its readings are posted to the main window, whose build takes them: views_follow wakes the view's window then)
+	w.instance = strings.clone(journal_instance(manager, name))
+	// (its readings are posted to the main window, whose build takes them; the view's window is built after it)
 	journal_view_init(&w.view, app.demo, &app.main.state)
 	journal_view_ask(&w.view, manager, name, app.settings.journal_boot)
 	w.view.next = time.tick_add(time.tick_now(), JOURNAL_FOLLOW_MS * time.Millisecond)
 	append(&app.journals, w)
 	// (the main window owns it wherever it is opened from: it docks in the Services section of the main window)
-	ui.view_open(&app.views, JOURNAL_VIEW, w, instance = w.name, owner = &app.main.state)
-	say(app, i18n.tr("The journal of %s on its own"), name)
+	ui.view_open(&app.views, JOURNAL_VIEW, w, instance = w.instance, owner = &app.main.state)
 }
 
 @(private = "file")
@@ -99,8 +134,8 @@ journal_window_info :: proc(app: ^App, w: ^Journal_Window) -> string {
 journals_tick :: proc(app: ^App) {
 	for i := len(app.journals) - 1; i >= 0; i -= 1 {
 		w := app.journals[i]
-		if !ui.view_is_open(&app.views, JOURNAL_VIEW, w.name) {
-			_, _ = ui.view_ended(&app.views, JOURNAL_VIEW, w.name)   // (how it ended says nothing to do)
+		if !ui.view_is_open(&app.views, JOURNAL_VIEW, w.instance) {
+			_, _ = ui.view_ended(&app.views, JOURNAL_VIEW, w.instance)   // (how it ended says nothing to do)
 			ordered_remove(&app.journals, i)
 			append(&app.journals_closed, w)
 			continue
@@ -141,5 +176,6 @@ journals_destroy :: proc(app: ^App) {
 journal_window_free :: proc(w: ^Journal_Window) {
 	journal_view_destroy(&w.view)
 	delete(w.name)
+	delete(w.instance)
 	free(w)
 }

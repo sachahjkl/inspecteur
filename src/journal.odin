@@ -21,7 +21,6 @@ Journal_View :: struct {
 	ask:        struct { manager: Manager, name: [SERVICE_NAME_MAX]u8, name_len: int, boot: bool },   // under the mutex
 	details:    ^Unit_Details,    // the window's
 	serial:     int,              // counts the readings taken (what is shown follows it)
-	taken:      bool,             // a reading came since the window last looked (journal_view_taken)
 	// the entries the level and the search keep, and the counts of the levels: made again when the reading, the level
 	// or the search changes (journal_shown), not at each frame
 	shown:      [dynamic]int,
@@ -77,12 +76,6 @@ journal_view_ask :: proc(v: ^Journal_View, manager: Manager, name: string, boot:
 // Whether a reading is asked or under way.
 journal_view_busy :: proc(v: ^Journal_View) -> bool { return tasks.job_busy(ui.chores(), &v.job) }
 
-// True once after a reading came in (the window settles its layout).
-journal_view_taken :: proc(v: ^Journal_View) -> bool {
-	defer v.taken = false
-	return v.taken
-}
-
 @(private = "file")
 journal_view_work :: proc(data: rawptr) {
 	v := (^Journal_View)(data)
@@ -113,7 +106,6 @@ journal_view_posted :: proc(data: rawptr, _: u64) {
 	unit_details_free(v.details)
 	v.details = r.details
 	v.serial += 1
-	v.taken = true
 	free(r)
 }
 
