@@ -3,6 +3,14 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.7.0] - 2026-11-14
+
+### Added
+- **Go to a process or a service from the palette**: `@` in the palette (Ctrl+K) lists the processes and the services (also found by a search without it); choosing one selects its row, in Processes or in Services.
+
+### Changed
+- **The command palette is gui_toolkit's one palette**: its prefixes are the same in every program (`>` the commands and the views' moves, `:` the settings, `@` go to), the hint row at its foot says them, a switch of the settings flips in place and the palette stays open, the commands that cannot act now are greyed and listed last, and what was chosen before comes first under Recent, in every language. The choices made in the palette before are not kept: Recent starts empty.
+
 ## [0.6.0] - 2026-11-14
 
 ### Added
@@ -226,6 +234,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.7.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.7.0
 [0.6.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.6.0
 [0.5.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.5.1
 [0.5.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.5.0
