@@ -67,6 +67,9 @@ fr %s repris
 en Asked %s to end
 fr Fin demandée à %s
 
+en Affinity
+fr Affinité
+
 en %s (PID %d)
 fr %s (PID %d)
 
@@ -767,14 +770,14 @@ en+ Copied %d entries
 fr %d entrée copiée
 fr+ %d entrées copiées
 
+en Journal
+fr Journal
+
+en The journal of %s on its own
+fr Le journal de %s, à part
+
 en %s: journal
 fr %s : journal
-
-en No window for the journal: the renderer refused it
-fr Pas de fenêtre pour le journal : le moteur de rendu l'a refusée
-
-en The journal of %s in its own window
-fr Le journal de %s dans sa propre fenêtre
 
 en a system service
 fr un service du système
@@ -823,14 +826,14 @@ fr+ %s et %d processus sous lui
 en Searched the web for %s
 fr Recherche de %s sur le web
 
-en Create
-fr Créer
-
 en Create a dump file of %s?
 fr Créer un fichier d'image mémoire de %s ?
 
 en Its memory is written to a file of %s at most: anything it held, passwords and documents too. %s
 fr Sa mémoire est écrite dans un fichier de %s au plus : tout ce qu'il contenait, mots de passe et documents compris. %s
+
+en Create
+fr Créer
 
 en Resume
 fr Reprendre
@@ -889,21 +892,6 @@ fr %s, PID %d
 en PID %d
 fr PID %d
 
-en End tree
-fr Terminer l'arborescence
-
-en Kill
-fr Forcer l'arrêt
-
-en End
-fr Terminer
-
-en Kill %s?
-fr Forcer l'arrêt de %s ?
-
-en End %s?
-fr Terminer %s ?
-
 en It draws the desktop: the session ends with it, and every program of the session with it. 
 fr Il dessine le bureau : la session se termine avec lui, et tous les programmes de la session avec elle. 
 
@@ -922,17 +910,32 @@ fr Il est demandé à chacun de s'arrêter.
 en It is asked to end.
 fr Il lui est demandé de s'arrêter.
 
-en Stop %s?
-fr Arrêter %s ?
+en Kill %s?
+fr Forcer l'arrêt de %s ?
 
-en Restart %s?
-fr Redémarrer %s ?
+en End %s?
+fr Terminer %s ?
+
+en End tree
+fr Terminer l'arborescence
+
+en Kill
+fr Forcer l'arrêt
+
+en End
+fr Terminer
 
 en It stops, and its processes end; what needs it may stop too.
 fr Il s'arrête, et ses processus se terminent ; ce qui en dépend peut s'arrêter aussi.
 
 en It stops, its processes end, and it starts again.
 fr Il s'arrête, ses processus se terminent, et il redémarre.
+
+en Stop %s?
+fr Arrêter %s ?
+
+en Restart %s?
+fr Redémarrer %s ?
 
 en %s runs at the highest priority offered already
 fr %s tourne déjà à la plus haute priorité proposée
@@ -952,8 +955,8 @@ fr Top CPU
 en Busiest: memory
 fr Top mémoire
 
-en %d of %d panels: drag a tab to move it
-fr %d panneaux sur %d : faites glisser un onglet pour le déplacer
+en %d of %d panels: a right click at the top of one moves it
+fr %d panneaux sur %d : un clic droit en haut de l'un d'eux le déplace
 
 en %s closed: the panels' menu brings it back
 fr %s fermé : le menu des panneaux le fait revenir
@@ -1022,9 +1025,6 @@ fr Afficher son processus
 
 en Show in Startup
 fr Afficher dans Démarrage
-
-en No window for %s: the renderer refused it
-fr Pas de fenêtre pour %s : le moteur de rendu l'a refusée
 
 en Overall
 fr Global
@@ -1327,9 +1327,6 @@ fr Parent
 
 en Priority
 fr Priorité
-
-en Affinity
-fr Affinité
 
 en processors %s
 fr processeurs %s
@@ -1731,12 +1728,6 @@ fr Gestionnaire
 
 en The services the Services section lists: the system's (system) or the user's (user). Its System and User buttons change it.
 fr Les services que liste la section Services : ceux du système ou ceux de l'utilisateur. Ses boutons Système et Utilisateur le changent.
-
-en Details
-fr Détails
-
-en Show the selected service's details and its journal's last lines under the table (Ctrl+I).
-fr Afficher les détails du service sélectionné et les dernières lignes de son journal sous le tableau (Ctrl+I).
 
 en Journal boot
 fr Journal de ce démarrage

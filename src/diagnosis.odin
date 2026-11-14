@@ -2,10 +2,12 @@ package inspecteur
 
 // "Why is it slow?" (F2): what the last sample says of the machine, in sentences, the worst first: the processors and
 // who keeps them busy, the time tasks waited (pressure), the memory and the swap, the disks, the GPU, the heat. Read from
-// the machine and the processes already sampled: nothing is read for it.
+// the machine and the processes already sampled: nothing is read for it. A view ("diagnosis": views.odin), a dialog at
+// home.
 
 import "core:fmt"
 import "core:slice"
+import lucide "gt:lucide"
 import "gt:ui"
 import i18n "gt:i18n"
 
@@ -161,45 +163,38 @@ join_comma :: proc(parts: []string) -> string {
 	return out
 }
 
-// The dialog: the findings, each after a dot in the colour of its level.
-diagnosis_build :: proc(app: ^App, em: f32) {
-	w := em * DIAG_W_EM
-	// (the dialog ends with this if's block: modal_end is deferred to it)
-	if ui.modal("diagnosis", &app.diagnosis_open, {width_em = DIAG_W_EM}) {
-		pad := em * 1.4
-		ui.next({width = ui.px(w), height = ui.children_sum(), axis = .Y})
-		if ui.column(id = "###diagnosis") {
-			ui.spacer(ui.px(pad))
-			ui.next({width = ui.px(w), height = ui.children_sum()})
-			if ui.row(id = "###diag_head") {
+diagnosis_register :: proc(app: ^App) {
+	ui.view_register(&app.views, DIAGNOSIS_VIEW, diagnosis_view, ui.View_Options{title = i18n.later("Why is it slow?"), icon = lucide.LIGHTBULB, width_em = DIAG_W_EM})
+}
+
+// "Why is it slow?" (F2, the Health panel's (i)): one already open comes forward.
+diagnosis_open :: proc(app: ^App) { ui.view_open(&app.views, DIAGNOSIS_VIEW, app) }
+
+// The view: the findings, each after a dot in the colour of its level. Its rows take the room it has: a dialog's width,
+// or a panel's or a window's.
+@(private = "file")
+diagnosis_view :: proc(v: ^ui.View, app: ^App) {
+	em := ui.font_size()
+	pad := em * 1.4
+	ui.next({width = ui.fill(), height = ui.children_sum(), axis = .Y})
+	if ui.column(id = "###diagnosis") {
+		ui.spacer(ui.px(em * 0.8))
+		for f, i in diagnose(app) {
+			ui.next({width = ui.fill(), height = ui.children_sum(), cross = .Start})
+			if ui.row(id = fmt.tprintf("###diag_row%d", i)) {
 				ui.spacer(ui.px(pad))
-				ui.next({width = ui.fill(), font_size = em * 1.4})
-				ui.paragraph(fmt.tprintf("%s###diag_title", i18n.tr("Why is it slow?")))
-				ui.spacer(ui.px(pad))
-			}
-			ui.spacer(ui.px(em * 0.8))
-			for f, i in diagnose(app) {
-				ui.next({width = ui.px(w), height = ui.children_sum(), cross = .Start})
-				if ui.row(id = fmt.tprintf("###diag_row%d", i)) {
-					ui.spacer(ui.px(pad))
-					heat := f.level == .Bad ? f32(1) : f.level == .Warn ? f32(0.55) : f32(0)
-					ui.next({width = ui.px(em * 0.7), height = ui.px(em * 0.7), radius = em * 0.35, bg = heat_hue(heat)})
-					ui.build_box({.Draw_Background}, fmt.tprintf("###diag_dot%d", i))
-					ui.spacer(ui.px(em * 0.6))
-					ui.next({width = ui.fill()})
-					ui.paragraph(fmt.tprintf("%s###diag_text%d", f.text, i))
-					ui.spacer(ui.px(pad))
-				}
-				ui.spacer(ui.px(em * 0.5))
-			}
-			ui.spacer(ui.px(em * 0.6))
-			ui.next({width = ui.px(w), height = ui.children_sum()})
-			if ui.row(id = "###diag_foot") {
-				ui.spacer(ui.fill())
-				if ui.button("diag_close", i18n.tr("Close")).clicked { app.diagnosis_open = false }
+				heat := f.level == .Bad ? f32(1) : f.level == .Warn ? f32(0.55) : f32(0)
+				ui.next({width = ui.px(em * 0.7), height = ui.px(em * 0.7), radius = em * 0.35, bg = heat_hue(heat)})
+				ui.build_box({.Draw_Background}, fmt.tprintf("###diag_dot%d", i))
+				ui.spacer(ui.px(em * 0.6))
+				ui.next({width = ui.fill()})
+				ui.paragraph(fmt.tprintf("%s###diag_text%d", f.text, i))
 				ui.spacer(ui.px(pad))
 			}
-			ui.spacer(ui.px(pad))
+			ui.spacer(ui.px(em * 0.5))
 		}
+	}
+	if ui.dialog_buttons("diag_foot") {
+		if ui.button("diag_close", i18n.tr("Close")).clicked { ui.view_end(v, 0) }
 	}
 }

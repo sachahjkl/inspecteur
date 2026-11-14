@@ -232,22 +232,22 @@ live_settings :: proc(l: ^Live) {
 	check(l, cdp.key(c, "Escape") && cdp.wait_name(c, "settings_button", SESSION_WAIT) && cdp.wait_for(c, "Draw a thin line", SESSION_WAIT, gone = true), "Escape goes back to the sections")
 }
 
-// Mission Control (Ctrl+1): its panels; one closed from its menu, brought back; the layout as at first, kept.
+// Mission Control (Ctrl+1): its panels; one closed from its menu, brought back; the layout as at first; one in a window
+// of its own, kept, and back in the section when its window closes.
 live_mission :: proc(l: ^Live) {
 	c := &l.c
-	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
+	views := fmt.tprintf("%s/state/inspecteur/views.txt", l.dir)
 	check(l, cdp.key(c, "ctrl+1") && cdp.wait_name(c, "mc_machine", SESSION_WAIT) && cdp.wait_name(c, "mc_health", SESSION_WAIT) && cdp.wait_name(c, "mc_cpu", SESSION_WAIT), "Ctrl+1: Mission Control, its panels")
 	check(l, cdp.wait_name(c, "mc_cpu_0", SESSION_WAIT), "the busiest processes are listed")
 	check(l, cdp.click_name(c, "mission_panels") && cdp.wait_for(c, "Busiest: memory", SESSION_WAIT), "the panels' menu")
-	// (the menu's line, not the tab of the same name: the menu is built after the panels)
-	_, menu_ok := cdp.call(c, "Toolkit.click", `{"text":"Busiest: memory","index":1}`)
-	check(l, menu_ok && cdp.wait_name(c, "mc_memory", SESSION_WAIT, gone = true) && file_has(prefs, "mission.layout"), "a panel closed, the layout kept")
+	// (the menu's line: a panel alone in its stack has no tab, its title is the menu's alone)
+	check(l, cdp.click_text(c, "Busiest: memory") && cdp.wait_name(c, "mc_memory", SESSION_WAIT, gone = true), "a panel closed from the menu")
 	check(l, cdp.click_name(c, "mission_reset") && cdp.wait_name(c, "mc_memory", SESSION_WAIT), "the layout as at first brings it back")
-	// a panel in a window of its own (its tab's menu): out of the dock, kept; the window closed, it comes back
-	_, tab_menu := cdp.call(c, "Toolkit.click", fmt.tprintf(`{{"name":"dock_tab_%d","index":0,"count":1,"button":"right"}}`, 2))
-	check(l, tab_menu && cdp.wait_for(c, "Open in a window", SESSION_WAIT) && cdp.click_text(c, "Open in a window"), "a panel's menu: Open in a window")
-	check(l, wait_sway_title(l, "Health", true) && cdp.wait_name(c, "mc_health", SESSION_WAIT, gone = true), "Health in a window of its own, out of the dock")
-	check(l, file_has(prefs, "mission.windows\thealth"), "the window is kept")
+	// a panel in a window of its own (the palette's move of it): out of the section, kept; its window's close (the
+	// system's) brings it back
+	check(l, cdp.key(c, "ctrl+k") && cdp.wait_name(c, "palette_top", SESSION_WAIT) && cdp.type_text(c, "Open Health in a window") && cdp.key(c, "Enter"), "the palette: Open Health in a window")
+	check(l, wait_sway_title(l, "Health", true) && cdp.wait_name(c, "mc_health", SESSION_WAIT, gone = true), "Health in a window of its own, out of the section")
+	check(l, file_has(views, "mission/health\tv1 as=external"), "the window is kept")
 	check(l, sway_command(l, `[title="Health"] kill`) && wait_sway_title(l, "Health", false) && cdp.wait_name(c, "mc_health", SESSION_WAIT), "its window closed, Health is back in Mission Control")
 	// a line's menu (a right click), its first item: the process in Processes; then a click on the line's middle (its name)
 	_, right_ok := cdp.call(c, "Toolkit.click", `{"name":"mc_cpu_0","index":0,"count":1,"button":"right"}`)

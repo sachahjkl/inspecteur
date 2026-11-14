@@ -160,7 +160,7 @@ sample_take :: proc(app: ^App) {
 	app_windows_read(app)
 	rows_again(app)
 	ranking_make(app)
-	if app.props.open { props_tick(app, find_proc(&app.sampler, app.props.pid, app.props.start) != nil) }
+	if props_shown(app) { props_tick(app, find_proc(&app.sampler, app.props.pid, app.props.start) != nil) }
 	app.refresh_time += r.took + time.tick_since(t0)
 	app.refreshes += 1
 	app.main.settle = max(app.main.settle, 1)

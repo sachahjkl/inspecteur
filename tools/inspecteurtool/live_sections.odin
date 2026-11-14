@@ -95,10 +95,13 @@ live_services :: proc(l: ^Live) {
 	check(l, cdp.key(c, "alt+l") && file_has(prefs_path(l), "services.journal_level\twarnings"), "Alt+L: warnings and worse, kept")
 	check(l, cdp.key(c, "alt+l") && cdp.key(c, "alt+l") && file_has(prefs_path(l), "services.journal_level\tall"), "Alt+L twice: errors, then all")
 	check(l, cdp.key(c, "alt+b") && file_has(prefs_path(l), "services.journal_boot\tfalse") && cdp.key(c, "alt+b"), "Alt+B: every boot, and back")
-	// its journal in a window of its own: sway lists it; closed, it goes and the main window answers on
+	// its journal in a window of its own: sway lists it; the window closed, the journal comes under the table, a tab
+	// beside the details (shown again by their tab), and the main window answers on
 	title := fmt.tprintf("%s: journal", service)
 	check(l, cdp.key(c, "ctrl+shift+j") && wait_sway_title(l, title, true), "Ctrl+Shift+J: the journal in a window of its own (%s)", title)
 	check(l, sway_command(l, fmt.tprintf(`[title="%s"] kill`, title)) && wait_sway_title(l, title, false), "closed, the window goes")
+	check(l, cdp.wait_name(c, fmt.tprintf("view_tab_view_journal/%s", service), SESSION_WAIT), "the journal is a tab under the table")
+	check(l, cdp.click_name(c, "view_tab_view_service") && wait_named_text(c, "svc_details_name", service), "the details' tab shows them again")
 	check(l, cdp.wait_name(c, "svc_journal_count", SESSION_WAIT), "the main window answers on")
 
 	if !select_unit(l, service) { return }

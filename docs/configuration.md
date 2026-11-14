@@ -35,6 +35,11 @@ The user's own themes are in `$XDG_CONFIG_HOME/inspecteur/themes.txt`: the setti
 under the themes' cards; a click makes it (with its instructions in comments) and opens it. A change to it is shown in
 the next two seconds.
 
+Where each dialog and each panel is shown (a dialog, floating in the window, in a window of its own, docked), the sizes
+the user gave them, the layout of Mission Control and of the Services section, and which ones were open at the last
+quit are kept in `$XDG_STATE_HOME/inspecteur/views.txt` (gui_toolkit's views). It is not a preference: deleting it
+puts every one of them back as at the first start.
+
 ## Inspecteur's settings
 
 | Name | Default | What it does |
@@ -52,11 +57,9 @@ the next two seconds.
 | `services.widths` | (empty) | The widths of the Services table's columns that were resized, in ems (`description=30`). Dragging the line before a column's title changes them. |
 | `services.order` | (empty) | The order of the Services table's columns, apart by commas (`name,state,description`). Dragging a column's title sideways changes it. |
 | `services.sort` | name | The column the services are sorted by: `name`, `description`, `state`, `startup`, `load`, `pid` or `memory`; a `-` before it for the largest (or Z) first. A click on a title changes it. |
-| `services.details` | true | Show the selected service's details (its unit file, since when it is in its state, its tasks, CPU time and restarts) and its journal's last lines under the table. Ctrl+I shows or hides them. |
 | `services.journal_boot` | true | The details' journal shows this boot's entries alone; `false`: its last entries, from any boot. Alt+B switches it. |
 | `services.journal_level` | all | The entries of the details' journal shown: `all`, `warnings` (and worse) or `errors` (and worse). Alt+L goes through them. |
 | `services.journal_follow` | true | Read the details' journal again every 2 seconds while it is shown: new entries come in at the end. Alt+F switches it. |
-| `services.details_height` | 16 | The height of the details' pane, in ems (6 to 80). Dragging the line above it changes it. |
 | `startup.widths` | (empty) | The widths of the Startup table's columns that were resized, in ems (`command=24`). |
 | `startup.order` | (empty) | The order of the Startup table's columns, apart by commas (`name,status,command`). |
 | `startup.sort` | name | The column the startup items are sorted by: `name`, `command`, `type`, `status` or `file`; a `-` before it for Z first. |
@@ -65,12 +68,9 @@ the next two seconds.
 | `connections.sort` | process | The column the sockets are sorted by: `process`, `pid`, `protocol`, `local_address`, `remote_address` or `state`; a `-` before it for the largest (or Z) first. |
 | `connections.refresh_ms` | 3000 | How often the sockets are read again while Connections or Mission Control is shown, in milliseconds (1000 to 60000). A reading goes through every process's open files: a longer period costs less. |
 | `services.refresh_ms` | 3000 | How often the services are read again while their section is shown, in milliseconds (1000 to 60000). |
-| `mission.layout` | (empty) | Mission Control's panels: where each one is docked, its stacks and their sizes, those closed left out. Its panels' menu brings one back; *Mission Control: the layout as at first* sets it back. |
-| `mission.windows` | (empty) | Mission Control's panels in windows of their own, apart by commas (`health,network`): they open again at the start. A panel's menu opens one; closed, it goes back to Mission Control. |
 | `view.zebra` | true | Shade every second row of the tables (Processes, Services, Startup, Connections, the Properties' lists): a line of numbers reads across. |
 | `view.rules` | true | Draw a thin line under each row of the tables. |
 | `view.placement` | (empty) | Where the window was left and its size, in physical pixels, and whether it was maximized (`120 80 1400 900 maximized`; empty: the first start's size). Written when it closes; Wayland lets a program set the size alone. |
-| `view.palette_size` | (empty) | The command palette's size, in logical pixels: its width and its height. Dragging its edges or its corner changes it. |
 | `view.section` | processes | The section shown at the start: the one shown last (`mission control`, `processes`, `performance`, `services`, `startup`, `connections`, `information`). `--section` shows another. |
 | `performance.cpu_view` | overall | The CPU's page in Performance: one graph for all the processors (`overall`), or one per logical processor (`logical`). Ctrl+G switches them. |
 | `setup.choice` | (empty) | What was answered to the install's dialog: `installed`, `standalone` (this copy runs on its own: not offered again), or dismissed for a version. |

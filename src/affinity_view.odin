@@ -2,9 +2,10 @@ package inspecteur
 
 // The affinity of a process (Set affinity…, Ctrl+Shift+A, in the Processes section and the Properties): the logical
 // processors it may run on, a box each. The toolkit reads and sets it on every thread of the process, pinned by its pid
-// and its start time (process.affinity, process.set_affinity).
+// and its start time (process.affinity, process.set_affinity). A view ("affinity": views.odin), a dialog at home.
 
 import "core:fmt"
+import lucide "gt:lucide"
 import process "gt:process"
 import "gt:ui"
 import i18n "gt:i18n"
@@ -14,12 +15,15 @@ AFFINITY_W_EM :: 30
 AFFINITY_COLUMNS :: 4
 
 Affinity :: struct {
-	open:   bool,
 	target: Target,
 	name:   [64]u8,
 	name_len: int,
 	cpus:   [process.CPU_SET_MAX]bool,
 	count:  int,   // the logical processors of the machine
+}
+
+affinity_register :: proc(app: ^App) {
+	ui.view_register(&app.views, AFFINITY_VIEW, affinity_view, ui.View_Options{title = i18n.later("Affinity"), icon = lucide.MICROCHIP, width_em = AFFINITY_W_EM})
 }
 
 // Reads the process's affinity (acts.odin), then opens the dialog (affinity_show); says why when it cannot be read.
@@ -43,7 +47,7 @@ affinity_show :: proc(app: ^App, t: Target, name: string, set: process.Cpu_Set) 
 	a.count = min(len(app.machine.core_total), process.CPU_SET_MAX)
 	a.cpus = {}
 	for i in 0 ..< a.count { a.cpus[i] = process.cpu_set_has(set, i) }
-	a.open = true
+	ui.view_open(&app.views, AFFINITY_VIEW, app)
 }
 
 // The processors of `set` among the first `count`, as a list ("0-3, 8").
@@ -62,74 +66,53 @@ affinity_set :: proc(a: ^Affinity) -> (set: process.Cpu_Set, n: int) {
 	return
 }
 
+// The processors chosen, set (a task of the chores: acts.odin). False: none is chosen, the view stays.
 @(private = "file")
-affinity_apply :: proc(app: ^App) {
+affinity_apply :: proc(app: ^App) -> bool {
 	a := &app.affinity
 	name := fmt.tprintf(i18n.tr("%s (PID %d)"), string(a.name[:a.name_len]), a.target.pid)
 	set, n := affinity_set(a)
-	if n == 0 { say(app, i18n.tr("Choose at least one processor")); return }
-	a.open = false
-	if app.demo != nil { say(app, i18n.tr("The demo's processes are not the system's: nothing was changed")); return }
+	if n == 0 { say(app, i18n.tr("Choose at least one processor")); return false }
+	if app.demo != nil { say(app, i18n.tr("The demo's processes are not the system's: nothing was changed")); return true }
 	act := act_new(.Affinity_Set, name)
 	append(&act.targets, a.target)
 	act.set = set
 	act_start(app, act)
+	return true
 }
 
-affinity_build :: proc(app: ^App, em: f32) {
+// The view: which process (its title), the processors' boxes in rows, All, None, Cancel, Apply. Its rows take the room
+// it has: a dialog's width, or a panel's or a window's.
+@(private = "file")
+affinity_view :: proc(v: ^ui.View, app: ^App) {
 	a := &app.affinity
-	w := em * AFFINITY_W_EM
-	if ui.modal("affinity", &a.open, {width_em = AFFINITY_W_EM}) {
-		pad := em * 1.2
-		ui.next({width = ui.px(w), height = ui.children_sum(), axis = .Y})
-		if ui.column(id = "###affinity") {
-			ui.spacer(ui.px(pad))
-			line :: proc(id_text: string, w, pad: f32, weak := false, size: f32 = 0) {
-				ui.next({width = ui.px(w), height = ui.children_sum()})
-				if ui.row(.Start, {}, fmt.tprintf("###row%s", id_text)) {
-					ui.spacer(ui.px(pad))
-					if weak { ui.push_tags("weak") }
-					ui.next({width = ui.px(w - 2 * pad), font_size = size > 0 ? size : nil})
-					ui.paragraph(id_text)
-					if weak { ui.pop_tags() }
+	em := ui.font_size()
+	ui.view_title(v, fmt.tprintf(i18n.tr("Affinity of %s (PID %d)"), string(a.name[:a.name_len]), a.target.pid))
+	if ui.dialog_body("affinity") {
+		if ui.tags("weak") {
+			ui.next({width = ui.fill()})
+			ui.paragraph(fmt.tprintf("%s###affinity_text", i18n.tr("The logical processors it may run on: each of its threads runs on these alone.")))
+		}
+		rows := (a.count + AFFINITY_COLUMNS - 1) / AFFINITY_COLUMNS
+		for r in 0 ..< rows {
+			ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2))})
+			if ui.row(.Center, {}, fmt.tprintf("###cpus_%d", r)) {
+				for c in 0 ..< AFFINITY_COLUMNS {
+					i := r * AFFINITY_COLUMNS + c
+					// (the last row's empty cells keep the columns in line)
+					if i >= a.count { ui.spacer(ui.fill()); continue }
+					ui.next({width = ui.fill(), height = ui.pct(1)})
+					ui.checkbox(fmt.tprintf("###cpu_%d", i), fmt.tprintf(i18n.tr("CPU %d"), i), &a.cpus[i])
 				}
 			}
-			line(fmt.tprintf("%s###affinity_title", fmt.tprintf(i18n.tr("Affinity of %s (PID %d)"), ui.text_shown(string(a.name[:a.name_len])), a.target.pid)), w, pad, size = em * 1.15)
-			ui.spacer(ui.px(em * 0.4))
-			line(fmt.tprintf("%s###affinity_text", i18n.tr("The logical processors it may run on: each of its threads runs on these alone.")), w, pad, weak = true)
-			ui.spacer(ui.px(em * 0.8))
-			rows := (a.count + AFFINITY_COLUMNS - 1) / AFFINITY_COLUMNS
-			cell_w := (w - 2 * pad) / AFFINITY_COLUMNS
-			for r in 0 ..< rows {
-				ui.next({width = ui.px(w), height = ui.px(ui.dense(em * 2))})
-				if ui.row(.Center, {}, fmt.tprintf("###cpus_%d", r)) {
-					ui.spacer(ui.px(pad))
-					for c in 0 ..< AFFINITY_COLUMNS {
-						i := r * AFFINITY_COLUMNS + c
-						if i >= a.count { break }
-						ui.next({width = ui.px(cell_w), height = ui.pct(1)})
-						ui.checkbox(fmt.tprintf("###cpu_%d", i), fmt.tprintf(i18n.tr("CPU %d"), i), &a.cpus[i])
-					}
-				}
-			}
-			ui.spacer(ui.px(em * 0.8))
-			ui.next({width = ui.px(w), height = ui.children_sum()})
-			if ui.row(.Center, {}, "###affinity_foot") {
-				ui.spacer(ui.px(pad))
-				ui.next({width = ui.text_size(em * 1.2), height = ui.px(ui.dense(em * 2.2))})
-				if ui.button("affinity_all", i18n.tr("All")).clicked { for i in 0 ..< a.count { a.cpus[i] = true } }
-				ui.spacer(ui.px(em * 0.4))
-				ui.next({width = ui.text_size(em * 1.2), height = ui.px(ui.dense(em * 2.2))})
-				if ui.button("affinity_none", i18n.tr("None")).clicked { for i in 0 ..< a.count { a.cpus[i] = false } }
-				ui.spacer(ui.fill())
-				ui.next({width = ui.text_size(em * 1.2), height = ui.px(ui.dense(em * 2.2))})
-				if ui.button("affinity_cancel", i18n.tr("Cancel")).clicked { a.open = false }
-				ui.spacer(ui.px(em * 0.6))
-				ui.next({width = ui.text_size(em * 1.2), height = ui.px(ui.dense(em * 2.2))})
-				if ui.button("affinity_apply", i18n.tr("Apply (Enter)"), o = {intent = .Primary}).clicked || ui.key_press(.Return) { affinity_apply(app) }
-				ui.spacer(ui.px(pad))
-			}
-			ui.spacer(ui.px(pad))
+		}
+	}
+	if ui.dialog_buttons("affinity_foot") {
+		if ui.button("affinity_all", i18n.tr("All")).clicked { for i in 0 ..< a.count { a.cpus[i] = true } }
+		if ui.button("affinity_none", i18n.tr("None")).clicked { for i in 0 ..< a.count { a.cpus[i] = false } }
+		if ui.button("affinity_cancel", i18n.tr("Cancel")).clicked { ui.view_end(v, ui.VIEW_CANCELLED) }
+		if ui.button("affinity_apply", i18n.tr("Apply (Enter)"), o = {intent = .Primary}).clicked || v.shown && ui.key_press(.Return) {
+			if affinity_apply(app) { ui.view_end(v, 0) }
 		}
 	}
 }

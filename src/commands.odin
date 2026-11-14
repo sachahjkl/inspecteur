@@ -6,9 +6,9 @@ package inspecteur
 // the sheet of the keys (F1).
 //
 // A command of a section acts in that section only; one of the Window or Sections groups, wherever the window is. A
-// command of the Properties group acts while the Properties dialog is open (props_view.odin reads its keys).
+// command of the Properties group acts while the Properties are open (props_view.odin reads its keys). The palette also
+// lists the moves of each open view (views.odin).
 
-import "core:fmt"
 import "core:mem/virtual"
 import "core:reflect"
 import "core:slice"
@@ -187,11 +187,12 @@ editing_chord :: proc(ch: ui.Chord) -> bool {
 }
 
 // The commands' keys of the frame, when no menu or dialog has the keyboard: those of the window and of the section
-// shown. `field_keeps`: the filter has the keyboard and some text: its editing keys are its own.
-commands_keys :: proc(app: ^App, field_keeps: bool) {
+// shown (`window_only`: the window's alone, a view has the keyboard). `field_keeps`: the filter has the keyboard and
+// some text: its editing keys are its own.
+commands_keys :: proc(app: ^App, field_keeps: bool, window_only := false) {
 	for c in Cmd {
 		if cmd_is_props(c) { continue }
-		if t, ok := cmd_tab(c).?; ok && t != app.tab { continue }
+		if t, ok := cmd_tab(c).?; ok && (window_only || t != app.tab) { continue }
 		cmd := COMMANDS[c]
 		if field_keeps || ui.focus_key() == app.search_key && app.search_key != 0 {
 			// (the filter keeps Space while it has the keyboard: a space in a name; the keys are a slice that COMMANDS
@@ -206,8 +207,12 @@ commands_keys :: proc(app: ^App, field_keeps: bool) {
 	}
 }
 
-// Opens the command palette.
-palette_open :: proc(app: ^App) { ui.palette_open(&app.palette) }
+// Opens the command palette (a view of the toolkit's), its list given first.
+palette_open :: proc(app: ^App) {
+	palette_table_keep(app)
+	palette_give(app)
+	ui.palette_open(&app.palette)
+}
 
 // Where the palette's choices are kept: <state>/inspecteur/palette_choices; none (in memory only) in the demo, whose
 // pictures must not depend on what the user chose.
@@ -217,23 +222,32 @@ palette_choices_file :: proc(app: ^App) -> string {
 }
 
 // The palette's list: the commands of the window, of the sections and of the section shown, then one line per
-// preference (prefs_page.palette_commands). It is made again only when what it holds can change: the section shown, the
-// preferences (their version) or the language (the settings' group is translated text), never at each frame. Its
-// own arena holds it.
+// preference (prefs_page.palette_commands), then the moves of each open view (float it, dock it, put it in a window of
+// its own, re-attach it, close it: ui.View_Commands). It is made again only when what it holds can change: the section
+// shown, the preferences (their version), the language (the settings' group is translated text) or the views, never at
+// each frame. Its own arena holds it; the views' moves are the View_Commands' (made again with it).
 Palette_Table :: struct {
 	arena:    virtual.Arena,
 	commands: []ui.Command,
 	cmds:     []Cmd,        // the command of each line before the settings'
 	settings: []string,     // the preferences' names, the lines after `cmds`
-	names:    []string,     // line -> its key in the memory of choices (a command's enum name, stable across languages; "" for a setting: not remembered)
-	disabled: [dynamic]bool,   // per line, filled at each frame: what can act depends on the selection
+	acts:     []ui.View_Command,   // what each line after the settings does
+	names:    []string,     // line -> its key in the memory of choices (a command's enum name, stable across languages; "" for a setting or a move: not remembered)
+	disabled: [dynamic]bool,   // per line, as last given to the palette: what can act depends on the selection
+	view_cmds: ui.View_Commands,   // the views' moves, made again only when the views or the language change
 	tab:      Tab,          // what it was made for
 	prefs:    u64,
 	language: u32,          // i18n.version() it was made in: a change of language makes it again
-	version:  u64,          // bumped at each making (0: not made); the palette's version
+	views:    u64,          // view_cmds.serial it was made with
+	version:  u64,          // bumped at each making (0: not made)
 }
 
-palette_table_make :: proc(table: ^Palette_Table, app: ^App) {
+// The table as it is now: made again when what it holds changed (true then).
+@(private = "file")
+palette_table_keep :: proc(app: ^App) -> bool {
+	table := &app.palette_table
+	_ = ui.views_commands_update(&table.view_cmds, &app.views)
+	if table.version != 0 && table.tab == app.tab && table.prefs == app.prefs.version && table.language == i18n.version() && table.views == table.view_cmds.serial { return false }
 	virtual.arena_destroy(&table.arena)
 	table.arena = {}
 	a := virtual.arena_allocator(&table.arena)
@@ -252,53 +266,93 @@ palette_table_make :: proc(table: ^Palette_Table, app: ^App) {
 	settings, setting_names := prefs_page.palette_commands(&app.prefs, settings_options(app), a)
 	append(&commands, ..settings)
 	for _ in settings { append(&names, "") }
-	table.commands, table.cmds, table.names = commands[:], cmds[:], names[:]
 	table.settings = make([]string, len(setting_names), a)
 	for n, i in setting_names { table.settings[i] = strings.clone(n, a) }
-	resize(&table.disabled, len(table.commands))
-	table.tab, table.prefs, table.language = app.tab, app.prefs.version, i18n.version()
+	// the views' moves, but the palette's own (it is open while they are listed: moving it from itself is no help)
+	vc := &table.view_cmds
+	acts := make([dynamic]ui.View_Command, 0, len(vc.acts), a)
+	for cmd, i in vc.commands {
+		if vc.acts[i].id == ui.PALETTE_VIEW { continue }
+		append(&commands, cmd)
+		append(&acts, vc.acts[i])
+		append(&names, "")
+	}
+	table.commands, table.cmds, table.names, table.acts = commands[:], cmds[:], names[:], acts[:]
+	table.tab, table.prefs, table.language, table.views = app.tab, app.prefs.version, i18n.version(), vc.serial
 	table.version += 1
+	return true
 }
 
 palette_table_destroy :: proc(table: ^Palette_Table) {
 	virtual.arena_destroy(&table.arena)
 	delete(table.disabled)
+	ui.views_commands_destroy(&table.view_cmds)
 	table^ = {}
 }
 
-// The palette while it is open. Its size, when the user changes it, is kept (view.palette_size).
-palette_build :: proc(app: ^App) {
-	if !app.palette.open { return }
+// Which lines can act now (the program's commands; the others always can), into `disabled`. True when it changed.
+@(private = "file")
+palette_disabled :: proc(app: ^App, disabled: []bool) -> (changed: bool) {
 	table := &app.palette_table
-	if table.version == 0 || table.tab != app.tab || table.prefs != app.prefs.version || table.language != i18n.version() {
-		palette_table_make(table, app)
+	for c, i in table.cmds {
+		off := !cmd_can(app, c)
+		if disabled[i] != off { disabled[i], changed = off, true }
 	}
-	for c, i in table.cmds { table.disabled[i] = !cmd_can(app, c) }
+	return
+}
+
+// The table given to the palette (it keeps it while it is open: the arena is not emptied until the next making).
+@(private = "file")
+palette_give :: proc(app: ^App) {
+	table := &app.palette_table
+	resize(&table.disabled, len(table.commands))
+	for &d in table.disabled { d = false }
+	_ = palette_disabled(app, table.disabled[:])
 	// (the memory's own version counts its changes: the palette reads it beside the table's)
-	i, resized := ui.palette(&app.palette, table.commands, table.disabled[:], {memory = &app.palette_choices, names = table.names, version = table.version})
-	if resized { pref_set(&app.prefs, "view.palette_size", fmt.tprintf("%.0f %.0f", app.palette.size.x, app.palette.size.y)) }
-	commands := len(table.cmds)
-	switch {
-	case i >= commands:
-		app.settings_open = true
-		prefs_page.show(&app.settings_page, &app.prefs, settings_options(app), table.settings[i - commands])
-	case i >= 0:
-		ui.choice_note(&app.palette_choices, table.names[i])
-		cmd_run(app, table.cmds[i])
+	ui.palette_set(&app.palette, table.commands, table.disabled[:], {memory = &app.palette_choices, names = table.names, version = table.version})
+}
+
+// Each frame: the palette's choice, run; while it is open, its table kept and what can act given again when it changed.
+palette_build :: proc(app: ^App) {
+	table := &app.palette_table
+	// (the choice is a line of the table it was made from: taken before the table is made again)
+	if i, _, ok := ui.palette_chosen(&app.palette); ok && i < len(table.commands) {
+		commands := len(table.cmds)
+		settings_end := commands + len(table.settings)
+		switch {
+		case i >= settings_end:
+			ui.views_command_run(&app.views, table.acts[i - settings_end])
+		case i >= commands:
+			app.settings_open = true
+			prefs_page.show(&app.settings_page, &app.prefs, settings_options(app), table.settings[i - commands])
+		case:
+			ui.choice_note(&app.palette_choices, table.names[i])
+			cmd_run(app, table.cmds[i])
+		}
+	}
+	if !ui.palette_is_open(&app.palette) { return }
+	if palette_table_keep(app) {
+		palette_give(app)
+	} else if len(table.disabled) == len(table.commands) {
+		// (the selection can change under a palette that floats: what can act is read again, given when it changed)
+		now := make([]bool, len(table.disabled), context.temp_allocator)
+		copy(now, table.disabled[:])
+		if palette_disabled(app, now) {
+			copy(table.disabled[:], now)
+			ui.palette_set(&app.palette, table.commands, table.disabled[:], {memory = &app.palette_choices, names = table.names, version = table.version})
+		}
 	}
 }
 
-// The sheet of the keys while it is open: every command, its section's first. The list is made once, at the first
-// opening: COMMANDS does not change, and the sheet translates the labels itself. Its address stays, so the sheet needs
-// no version.
-shortcuts_build :: proc(app: ^App) {
-	if app.sheet.open && len(app.sheet_commands) == 0 {
+// The sheet of the keys (F1): every command, its section's first. The list is made once, at the first opening: COMMANDS
+// does not change, and the sheet translates the labels itself. Its address stays, so the sheet needs no version.
+shortcuts_open :: proc(app: ^App) {
+	if len(app.sheet_commands) == 0 {
 		for c in Cmd { if cmd_tab(c) == nil && !cmd_is_props(c) { append(&app.sheet_commands, COMMANDS[c]) } }
 		for c in Cmd { if _, ok := cmd_tab(c).?; ok { append(&app.sheet_commands, COMMANDS[c]) } }
 		for c in Cmd { if cmd_is_props(c) { append(&app.sheet_commands, COMMANDS[c]) } }
 	}
-	// (called while closed too: the modal's Escape and its closing are its own)
-	ui.shortcuts_sheet(&app.sheet, "shortcuts", app.sheet_commands[:])
+	ui.shortcuts_sheet_open(&app.sheet, app.sheet_commands[:])
 }
 
 // Whether the command can act now.
@@ -344,9 +398,9 @@ cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 		return ok
 	case .Info_Copy: return true
 	case .Props_Suspend, .Props_End_Task, .Props_Kill, .Props_Raise_Priority, .Props_Lower_Priority, .Props_Affinity:
-		return app.props.open && find_proc(&app.sampler, app.props.pid, app.props.start) != nil
-	case .Props_Filter: return app.props.open && props_tab_listed(app.props.tab)
-	case .Props_Next_Tab, .Props_Previous_Tab, .Props_Close: return app.props.open
+		return props_shown(app) && find_proc(&app.sampler, app.props.pid, app.props.start) != nil
+	case .Props_Filter: return props_shown(app) && props_tab_listed(app.props.tab)
+	case .Props_Next_Tab, .Props_Previous_Tab, .Props_Close: return props_shown(app)
 	}
 	return false
 }
@@ -354,7 +408,7 @@ cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 cmd_run :: proc(app: ^App, c: Cmd) {
 	switch c {
 	case .Palette:          palette_open(app)
-	case .Shortcuts:        app.sheet.open = true
+	case .Shortcuts:        shortcuts_open(app)
 	// (its text selected: what is typed then replaces it, as in a browser's Ctrl+F)
 	case .Filter:           if app.search_key != 0 { ui.set_focus(app.search_key); ui.line_edit_select_all(&app.search) }
 	case .Clear_Filter:     ui.line_edit_clear(&app.search)
@@ -367,7 +421,7 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Light_Dark:       light_dark_switch(app)
 	case .Settings:         settings_toggle(app)
 	case .Check_Updates:    update.check_now(app.updater); say(app, i18n.tr("Checking for updates…"))
-	case .Diagnose:         app.diagnosis_open = true
+	case .Diagnose:         diagnosis_open(app)
 	case .Show_Mission_Control: tab_show(app, .Mission_Control)
 	case .Show_Processes:   tab_show(app, .Processes)
 	case .Show_Performance: tab_show(app, .Performance)
@@ -435,7 +489,7 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Props_Filter:         props_filter_focus(app)
 	case .Props_Next_Tab:       app.props.tab = Props_Tab((int(app.props.tab) + 1) % len(Props_Tab))
 	case .Props_Previous_Tab:   app.props.tab = Props_Tab((int(app.props.tab) + len(Props_Tab) - 1) % len(Props_Tab))
-	case .Props_Close:          app.props.open = false
+	case .Props_Close:          ui.view_close(&app.views, PROPS_VIEW)
 	}
 }
 

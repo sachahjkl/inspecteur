@@ -5,7 +5,7 @@ package inspecteur
 // (all, warnings, errors, each with its count: Alt+L), this boot or every boot (Alt+B), following (Alt+F: read again
 // every JOURNAL_FOLLOW_MS, new entries come in at the end while the view is there), a search of its own (Ctrl+J) and
 // Copy (Alt+C: the entries shown). Under them, the selected entry whole: its date, its level, its program, its message
-// wrapped (Alt+Shift+C copies it). The line above the pane, dragged, sets its height (services.details_height).
+// wrapped (Alt+Shift+C copies it). A journal on its own (journal_window.odin) is built by the same procedures.
 
 import "core:fmt"
 import "core:strings"
@@ -31,7 +31,7 @@ JOURNAL_LEVEL_TAGS := [8]string{"bad", "bad", "bad", "bad", "warn", "", "", "wea
 @(private = "file") ENTRY_EM :: 6
 
 // The journal of the service `name` of `manager` in `v` (`wanted` false: no service is chosen yet). `in_window`: the
-// view is a window's (its own keys; no button to open a window).
+// journal is on its own already (no button to put it on its own).
 journal_build :: proc(app: ^App, v: ^Journal_View, name: string, manager: Manager, wanted: bool, em: f32, in_window := false) {
 	d := v.details
 	if !wanted || d == nil || d.name != name || d.manager != manager {
@@ -293,17 +293,29 @@ journal_boot_set :: proc(app: ^App, boot: bool) {
 	// (each view read again, back to its end once read)
 	app.services.pane.shown_for = 0
 	if u, ok := selected_service(app); ok { details_ask(app, u.name) }
-	for w in app.journal_windows {
+	for w in app.journals {
 		w.view.shown_for = 0
 		journal_view_ask(&w.view, w.manager, w.name, boot)
 	}
 	say(app, boot ? i18n.tr("The journal: this boot") : i18n.tr("The journal: every boot"))
 }
 
-// Whether a command of the journal can act now on the pane's: the pane is shown, with entries for Copy.
+// Whether a command of the journal can act now on the details': they are open, with entries for Copy.
 journal_can :: proc(app: ^App, c: Cmd) -> bool {
-	if !app.settings.details || app.tab != .Services { return false }
+	if !service_details_shown(app) || app.tab != .Services { return false }
 	return journal_can_on(app, &app.services.pane, c)
+}
+
+// The journal's keys, read in a view that shows one (the details, a journal on its own) while it has the keyboard. The
+// search keeps its editing keys; Escape there clears it first.
+journal_keys :: proc(app: ^App, v: ^Journal_View) {
+	if journal_search_escape(v) { return }
+	field := v.search_key != 0 && ui.focus_key() == v.search_key
+	for c in ([?]Cmd{.Journal_Search, .Journal_Level, .Journal_Boot, .Journal_Follow, .Journal_Copy, .Journal_Copy_Entry, .Journal_Window}) {
+		// (Alt+C is no editing key; Ctrl+J in the search gives it the keyboard again: nothing to do)
+		if field && c == .Journal_Search { continue }
+		if ui.command_pressed(COMMANDS[c], !journal_can_on(app, v, c)) { journal_run_on(app, v, c) }
+	}
 }
 
 journal_can_on :: proc(app: ^App, v: ^Journal_View, c: Cmd) -> bool {
@@ -347,18 +359,18 @@ journal_run_on :: proc(app: ^App, v: ^Journal_View, c: Cmd) {
 	}
 }
 
-// Every journal shown: the pane's, then the windows' (temporary allocator).
+// Every journal shown: the details', then those on their own (temporary allocator).
 journal_views :: proc(app: ^App) -> []^Journal_View {
-	out := make([dynamic]^Journal_View, 0, 1 + len(app.journal_windows), context.temp_allocator)
+	out := make([dynamic]^Journal_View, 0, 1 + len(app.journals), context.temp_allocator)
 	append(&out, &app.services.pane)
-	for w in app.journal_windows { append(&out, &w.view) }
+	for w in app.journals { append(&out, &w.view) }
 	return out[:]
 }
 
-// While the pane follows the journal: the selected service's read again every JOURNAL_FOLLOW_MS (services_tick).
+// While the details follow the journal: the selected service's read again every JOURNAL_FOLLOW_MS (services_tick).
 journal_follow_tick :: proc(app: ^App) {
 	v := &app.services.pane
-	if app.tab != .Services || !app.settings.details || !app.settings.journal_follow || app.paused { return }
+	if !service_details_seen(app) || !app.settings.journal_follow || app.paused { return }
 	if time.tick_diff(v.next, time.tick_now()) < 0 || journal_view_busy(v) { return }
 	v.next = time.tick_add(time.tick_now(), JOURNAL_FOLLOW_MS * time.Millisecond)
 	if u, ok := selected_service(app); ok { details_ask(app, u.name) }
@@ -366,7 +378,7 @@ journal_follow_tick :: proc(app: ^App) {
 
 // The milliseconds until the followed journal is read again (max(int): it is not followed).
 journal_due_ms :: proc(app: ^App) -> int {
-	if app.tab != .Services || !app.settings.details || !app.settings.journal_follow || app.paused { return max(int) }
+	if !service_details_seen(app) || !app.settings.journal_follow || app.paused { return max(int) }
 	return max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), app.services.pane.next))) + 1, 1)
 }
 

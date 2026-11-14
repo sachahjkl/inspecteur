@@ -1,9 +1,10 @@
 package inspecteur
 
-// The Properties dialog of a process (props.odin): resizable, over the window. Its title says which process; its tabs
-// show its details, its threads, its open files, its modules, its environment; its foot sets its priority, suspends or
-// resumes it, ends or kills it. A list it may not read says "Access denied". Its keys are the Properties group's of
-// commands.odin (Ctrl+Tab, Ctrl+P, Delete, Shift+Delete, Ctrl+Up, Ctrl+Down, Escape).
+// The Properties of a process (props.odin): a view ("props": views.odin), a resizable dialog at home, which the user can
+// float, dock or put in a window of its own. Its first line says which process; its tabs show its details, its threads,
+// its open files, its modules, its environment; its foot sets its priority, suspends or resumes it, ends or kills it. A
+// list it may not read says "Access denied". Its keys are the Properties group's of commands.odin (Ctrl+Tab, Ctrl+P,
+// Delete, Shift+Delete, Ctrl+Up, Ctrl+Down, Escape), read while it has the keyboard.
 
 import "core:fmt"
 import "core:strings"
@@ -16,65 +17,66 @@ PROPS_MIN_W_EM, PROPS_MIN_H_EM :: 36, 24
 PROPS_ROW_EM                   :: 1.8
 PROPS_KEY_EM                   :: 11   // the General tab's labels
 
-props_build :: proc(app: ^App, em: f32) {
+props_register :: proc(app: ^App) {
+	ui.view_register(&app.views, PROPS_VIEW, props_view, ui.View_Options{
+		title = i18n.later("Properties"), icon = lucide.INFO, resizable = true,
+		width_em = PROPS_W_EM, height_em = PROPS_H_EM, min_width_em = PROPS_MIN_W_EM, min_height_em = PROPS_MIN_H_EM,
+	})
+}
+
+@(private = "file")
+props_view :: proc(v: ^ui.View, app: ^App) {
 	pp := &app.props
-	if ui.modal("properties", &pp.open, {width_em = PROPS_W_EM, height_em = PROPS_H_EM, min_width_em = PROPS_MIN_W_EM, min_height_em = PROPS_MIN_H_EM, size = &pp.size}) {
-		// (its keys inside it: an open dialog holds the keys, the code built outside it gets none)
-		if !app.menu.confirm.open && !app.affinity.open && !ui.menu_any_open() { props_keys(app) }
-		p := find_proc(&app.sampler, pp.pid, pp.start)
-		if p != nil && !pp.gone && (pp.data == nil || pp.tab != pp.data.read_tab) { props_read(app) }   // (a tab shown is read at once)
+	em := ui.font_size()
+	// (the toolkit gives its keys to it while it has the keyboard, and to a question opened over it first)
+	if v.shown { props_keys(app) }
+	p := find_proc(&app.sampler, pp.pid, pp.start)
+	if p != nil && !pp.gone && (pp.data == nil || pp.tab != pp.data.read_tab) { props_read(app) }   // (a tab shown is read at once)
+	ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
+	if ui.column(id = "###props") {
+		props_title(app, p, em)
+		ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.4))})
+		if ui.row(.Center, {.Draw_Side_Bottom}, "###props_tabs") {
+			ui.spacer(ui.px(em * 0.4))
+			labels := PROPS_TAB_LABELS
+			for &l in labels { l = i18n.tr(l) }
+			sel := int(pp.tab)
+			nothing: []string
+			if ui.tabs("props_tab", props_slice(&labels), nothing, &sel) { pp.tab = Props_Tab(sel) }
+			// (each tab's tooltip says the keys that go from tab to tab)
+			tabs_tip := fmt.tprintf("%s (%s), %s (%s)", cmd_label(.Props_Next_Tab), ui.command_shortcut(COMMANDS[.Props_Next_Tab]), cmd_label(.Props_Previous_Tab), ui.command_shortcut(COMMANDS[.Props_Previous_Tab]))
+			for i in 0 ..< len(Props_Tab) { hover_tip(fmt.tprintf("props_tab_%d", i), tabs_tip) }
+			ui.spacer(ui.fill())
+			if props_tab_listed(pp.tab) { props_filter_field(app, em) }
+		}
 		ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
-		if ui.column(id = "###props") {
-			props_title(app, p, em)
-			ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.4))})
-			if ui.row(.Center, {.Draw_Side_Bottom}, "###props_tabs") {
-				ui.spacer(ui.px(em * 0.4))
-				labels := PROPS_TAB_LABELS
-				for &l in labels { l = i18n.tr(l) }
-				sel := int(pp.tab)
-				nothing: []string
-				if ui.tabs("props_tab", props_slice(&labels), nothing, &sel) { pp.tab = Props_Tab(sel) }
-				// (each tab's tooltip says the keys that go from tab to tab)
-				tabs_tip := fmt.tprintf("%s (%s), %s (%s)", cmd_label(.Props_Next_Tab), ui.command_shortcut(COMMANDS[.Props_Next_Tab]), cmd_label(.Props_Previous_Tab), ui.command_shortcut(COMMANDS[.Props_Previous_Tab]))
-				for i in 0 ..< len(Props_Tab) { hover_tip(fmt.tprintf("props_tab_%d", i), tabs_tip) }
-				ui.spacer(ui.fill())
-				if props_tab_listed(pp.tab) { props_filter_field(app, em) }
-			}
-			ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
-			if ui.column(id = "###props_body") {
-				if p == nil || pp.gone {
-					props_note(i18n.tr("The process has ended."), em)
-				} else {
-					switch pp.tab {
-					case .General:     props_general(app, p, em)
-					case .History:     props_history(app, p, em)
-					case .Threads:     props_threads(app, em)
-					case .Files:       props_files(app, em)
-					case .Modules:     props_modules(app, em)
-					case .Environment: props_env(app, em)
-					}
+		if ui.column(id = "###props_body") {
+			if p == nil || pp.gone {
+				props_note(i18n.tr("The process has ended."), em)
+			} else {
+				switch pp.tab {
+				case .General:     props_general(app, p, em)
+				case .History:     props_history(app, p, em)
+				case .Threads:     props_threads(app, em)
+				case .Files:       props_files(app, em)
+				case .Modules:     props_modules(app, em)
+				case .Environment: props_env(app, em)
 				}
 			}
-			props_actions(app, p, em)
 		}
+		props_actions(app, p, em)
 	}
 }
 
 @(private = "file")
 props_slice :: proc(labels: ^[Props_Tab]string) -> []string { return (cast([^]string)labels)[:len(Props_Tab)] }
 
+// The process: its name, its pid and its state, under the view's header (which says Properties, and closes it).
 @(private = "file")
 props_title :: proc(app: ^App, p: ^Proc, em: f32) {
-	// (on the bars' darker surface, a line under it: the title and its facts apart from the tabs; the dialog's corners
-	// and rim kept, as the toolkit's strip across a dialog's top draws it)
-	app.props.title_bg = surface("bar")
-	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 3)), radius = 0})
+	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.6))})
 	if ui.row(.Center, {}, "###props_title") {
-		ui.parent_box().custom = ui.top_strip_draw
-		ui.parent_box().custom_user = &app.props.title_bg
 		ui.spacer(ui.px(em))
-		ui.icon(lucide.INFO, em * 1.8, ui.color("accent"))
-		ui.spacer(ui.px(em * 0.4))
 		name := p != nil ? p.name : "?"
 		ui.next({width = ui.text_size(), height = ui.pct(1), font_size = em * 1.25, text_pad = 0})
 		ui.label(fmt.tprintf("%s###props_name", ui.text_shown(name)))
@@ -82,8 +84,6 @@ props_title :: proc(app: ^App, p: ^Proc, em: f32) {
 			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = em * 0.6})
 			ui.label(fmt.tprintf("%s%s###props_pid", fmt.tprintf(i18n.tr("PID %d"), app.props.pid), p != nil ? fmt.tprintf("  ·  %s", state_text(p.state)) : ""))
 		}
-		ui.next({width = ui.px(em * 2.2), height = ui.px(em * 2.2)})
-		if ui.button("props_close", icon = lucide.X, o = {face = .Ghost, tip = cmd_tip(.Props_Close)}).clicked { app.props.open = false }
 		ui.spacer(ui.px(em * 0.6))
 	}
 }

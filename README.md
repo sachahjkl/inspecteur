@@ -17,8 +17,10 @@ Information.
 
 - **Mission Control** (Ctrl+1): the whole machine on one page, in panels you arrange: the machine's tiles and graphs,
   what the diagnosis says, the busiest processes by CPU and by memory, the failed services, the network's sockets, what
-  starts with the session, the system. Drag a panel's tab into another stack, beside one, to an edge or out to float;
-  resize the stacks; close a panel and bring it back from the panels' menu; the layout as at first. The layout is kept.
+  starts with the session, the system. A right click at a panel's top (or on its tab) moves it: to another zone or
+  stack, floating in the window, in a window of its own, to an edge of the window; drag a tab to a square that shows
+  where it lands; resize the zones and the stacks; close a panel and bring it back from the panels' menu; the layout as
+  at first. The layout is kept, and the panels left in windows of their own open there again.
 
   ![Mission Control](docs/screenshots/mission_control.png)
 - **Processes**: name with the app's icon, PID, user, CPU %, private memory, disk read and write rates, threads, and more
@@ -42,8 +44,9 @@ Information.
 - **Services**: systemd's services, the system's or the user's: their state, whether they start by themselves, their
   main process and memory; under the table, the selected one's unit file, tasks, CPU time and its journal: each entry's time, level in
   its colour, program and message; all, warnings or errors with their counts, this boot or every boot, followed live, its
-  own search, the selected entry whole, Copy; in a window of its own for a second screen (Ctrl+Shift+J)
-  (Ctrl+I). Start, Stop, Restart (both asked first), Enable, Disable, over D-Bus; for a system service the manager asks
+  own search, the selected entry whole, Copy (Ctrl+I); a service's journal in a window of its own for a second screen
+  (Ctrl+Shift+J), back under the table when that window closes. Start, Stop, Restart (both asked first), Enable,
+  Disable, over D-Bus; for a system service the manager asks
   polkit, which can ask for a password, and the footer says what it answered.
 - **Startup**: the XDG autostart entries and the user's systemd services that start with the session; turn one on or off,
   open its file's folder.
@@ -60,6 +63,9 @@ Information.
 - **Install and updates**: a downloaded copy installs itself for the user (the program, its menu entry with an action
   per section, its icons); the installed copy updates itself from the signed releases. On NixOS a classic install runs
   by itself; the Nix package is installed and updated by Nix.
+- **Dialogs and panels where you want them**: Properties, the affinity, "Why is it slow?", the service's details, a
+  journal and Mission Control's panels each float in the window, go to a window of their own, or dock at an edge, from
+  the small icon of their header, their menu (a right click on it) or the palette. Each is shown as it was left.
 - **Settings** (Ctrl+, or the title bar's button): every preference on a page, searched as you type, applied at once.
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L); the zoom with Ctrl+wheel, Ctrl+=, Ctrl+- and Ctrl+0.
 - **One Inspecteur at a time**: a second start shows its section in the one that runs.
@@ -83,7 +89,8 @@ The pictures show the demo's made-up machine (`inspecteur --demo`), not a real o
 | Key | |
 |---|---|
 | typing, Ctrl+F | filter the section shown; Escape clears the filter |
-| Ctrl+K, Ctrl+Shift+P | the command palette (its edges and corner resize it) |
+| Ctrl+K, Ctrl+Shift+P | the command palette (its edges and corner resize it); it also moves each open dialog or panel |
+| F6, Shift+F6 | the keyboard to the next or the previous area: the page, each panel, each floating view |
 | F1 | every key |
 | Ctrl+1 to Ctrl+7, Ctrl+Tab, Ctrl+Shift+Tab | show a section (Ctrl+1: Mission Control), the next, the previous |
 | F5 | read the section again now |
@@ -101,7 +108,7 @@ The pictures show the demo's made-up machine (`inspecteur --demo`), not a real o
 | Processes | Delete End task, Shift+Delete Kill, Ctrl+Delete End process tree, Ctrl+A Select all (Ctrl and Shift clicks too), Ctrl+P Suspend or resume, Ctrl+Up and Ctrl+Down the priority, Ctrl+Shift+A Set affinity, Ctrl+Shift+S Go to service, Ctrl+Shift+F Search online, Ctrl+Shift+D Create dump file, Alt+Enter Properties, Ctrl+O Open file location, Ctrl+C Copy command line, Right and Left open and close a group, Ctrl+T the tree or the apps, Ctrl+Shift+C Columns |
 | Properties | Ctrl+Tab and Ctrl+Shift+Tab the tabs, Ctrl+F the filter of a list, Ctrl+P, Delete, Shift+Delete, Ctrl+Up, Ctrl+Down, Ctrl+Shift+A as in Processes, Escape closes |
 | Performance | Up and Down the devices, Ctrl+G one graph per logical processor |
-| Services | Ctrl+S Start, Delete Stop, Ctrl+R Restart, Ctrl+E Enable, Ctrl+D Disable, Enter Open in Processes, Ctrl+C Copy name, Ctrl+I the details and the journal, Ctrl+O Open unit file, Ctrl+U System or User; the journal: Ctrl+J search, Alt+L all, warnings, errors, Alt+B this boot or every boot, Alt+F follow, Alt+C copy the entries shown, Alt+Shift+C copy the entry, Ctrl+Shift+J the journal in its own window (Ctrl+W closes it) |
+| Services | Ctrl+S Start, Delete Stop, Ctrl+R Restart, Ctrl+E Enable, Ctrl+D Disable, Enter Open in Processes, Ctrl+C Copy name, Ctrl+I the details and the journal, Ctrl+O Open unit file, Ctrl+U System or User; the journal: Ctrl+J search, Alt+L all, warnings, errors, Alt+B this boot or every boot, Alt+F follow, Alt+C copy the entries shown, Alt+Shift+C copy the entry, Ctrl+Shift+J the journal in its own window (closing the window puts it under the table; Ctrl+W closes it) |
 | Startup | Ctrl+E Enable, Ctrl+D Disable, Space toggles, Enter Open file location, Ctrl+C Copy command |
 | Connections | Delete End task, Shift+Delete Kill, Enter Open in Processes, Ctrl+C Copy address |
 | Information | Ctrl+C Copy all |

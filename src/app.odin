@@ -83,9 +83,11 @@ App :: struct {
 	palette_choices: ui.Choice_Memory,   // what the user chose in it before (palette_choices_file)
 	sheet:       ui.Shortcuts_Sheet,   // the sheet of the keys (commands.odin)
 	sheet_commands: [dynamic]ui.Command,   // its list, made at its first opening
-	diagnosis_open: bool,   // "Why is it slow?" (F2, diagnosis.odin)
+	views:       ui.Views,          // the dialogs, the panels, the windows of their own, and how each was last shown (views.odin)
+	views_seen:  [2]int,            // the sample and the Properties' reading the views' windows were last woken for (views_follow)
 	mission:     Mission_Control,   // the Mission Control section: its panels (mission_control.odin)
 	install:     prefs_page.Install,   // the install: its offer, its dialog, the settings' page (setup.odin)
+	setup_due:   bool,              // --setup: the install's view opens in the first build
 	updates_asked: bool,            // the updates started, once the install was read (setup_follow)
 	crash_bar:   crash_bar.Bar,     // the last run's crash report, said at the top of the window
 	settings_open: bool,            // the settings' page shows in place of the sections (settings_view.odin)
@@ -95,9 +97,8 @@ App :: struct {
 	installed_copy: bool,           // this copy is the installed one: it updates itself (update.auto)
 	restart:     bool,              // at the end, the new program starts (an update in place)
 	closing:     bool,              // the window closed: what the chores posted is freed, not shown
-	journal_windows: [dynamic]^Journal_Window,   // the journals in windows of their own (journal_window.odin)
+	journals:    [dynamic]^Journal_Window,   // the services' journals on their own, a view each (journal_window.odin)
 	journals_closed: [dynamic]^Journal_Window,   // closed, freed once their reading is done
-	mission_windows: [dynamic]^Mission_Window,   // Mission Control's panels in windows of their own (mission_window.odin)
 	windows:     [dynamic]App_Window,   // the apps' windows, read at each sample (window_list.odin)
 	one_copy:    ^instance.Server,  // the name of the one Inspecteur that runs, served (one_copy.odin)
 	tz:          ^datetime.TZ_Region,   // local time, for the processes' start (the first reading's; nil: UTC)
@@ -161,7 +162,6 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	table_layout_load(&app.table, app.settings)
 	app.table.tree = app.settings.tree
 	pins_load(&app.table, app.settings.pinned)
-	app.palette.size = app.settings.palette_size
 	app.vl.multi = true   // (Ctrl and Shift clicks, Ctrl+A: End task and Kill act on every row marked)
 	app.tab = opts.tab
 	app.cpu_grid = config.string_of(&app.prefs, "performance.cpu_view") == "logical"
@@ -207,9 +207,11 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	startup_init(&app.startup, app)
 	mission_init(app)
 	section_first_show(app)
+	// (the views' memory read, the panels open again as they were: before the first frame)
+	views_start(app)
 	// (the install is read on a task; the updates start once it says which copy runs: setup_follow. Never offered in the demo)
 	prefs_page.install_offer(&app.install, &h.state, offer = !opts.setup && app.demo == nil)
-	if opts.setup { prefs_page.install_open(&app.install) }
+	app.setup_due = opts.setup
 	if opts.owns { one_copy_serve(app, opts.owner) }
 
 	t_window := time.tick_now()
@@ -217,25 +219,26 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	if pl, ok := platform.placement_parse(config.string_of(&app.prefs, "view.placement")); ok { platform.set_placement(win, pl) }
 	platform.show_window(win)
 	host.host_frame(h)
-	mission_windows_restore(app)
 	if opts.first_frame {
 		// (a tool reads it: the end of the first frame, then where the time went since main)
 		ms :: proc(a, b: time.Tick) -> f64 { return time.duration_milliseconds(time.tick_diff(a, b)) }
 		fmt.printfln("first-frame %d read %.1f window %.1f frame %.1f (draw %.1f, present %.1f)", time.now()._nsec, ms(t_main, t_read), ms(t_read, t_window), ms(t_window, time.tick_now()), time.duration_milliseconds(h.times.draw), time.duration_milliseconds(h.times.present))
 	}
+	// (the views' windows are the main window's: host_frame makes their frames after its own, hosts_wait counts them)
+	hosts := [1]^host.Host{h}
 	for !platform.is_closed(win) {
-		windows_wait(app)
+		host.hosts_wait(hosts[:])
 		if !app.paused && !app.held && time.tick_diff(app.next_sample, time.tick_now()) >= 0 { sample_ask(app) }
 		if !app.paused && !app.held {
 			services_tick(app)
 			connections_tick(app)
 		}
+		journals_tick(app)
 		setup_follow(app)
 		updates_follow(app)
 		t_frame := time.tick_now()
 		host.host_frame(h)
-		journal_windows_frame(app)
-		mission_windows_frame(app)
+		views_follow(app)
 		zoom_follow(app)
 		app.frame_time += time.tick_since(t_frame)
 		app.frames += 1
@@ -257,10 +260,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	ui.drain_posts(&h.state)
 	devtools.stop(app.devtools)
 	one_copy_stop(app)
-	journal_windows_close(app)
 	app_windows_clear(app)
 	delete(app.windows)
-	mission_windows_close(app)
 	updates_stop(app)
 	// (the chores have stopped: no task of theirs holds the themes file or the licence's store)
 	prefs_page.themes_file_destroy(&app.themes_file)
@@ -276,6 +277,10 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	if app.logo.ok { render.destroy_texture(&app.shared.r, app.logo.tex) }
 	prefs_page.install_end(&app.install)
 	crash_bar.destroy(&app.crash_bar)
+	// (after the last build, while the window's State is there: which views were open is written, their windows close;
+	// then their data goes)
+	ui.views_destroy(&app.views)
+	journals_destroy(app)
 	host.host_close(h)
 	ui.line_edit_destroy(&app.search)
 	ui.vlist_destroy(&app.vl)
@@ -381,12 +386,11 @@ until_sample :: proc(app: ^App) -> int {
 	return max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), app.next_sample))) + 1, 1)
 }
 
-// What each build is given: the palette and the base style of the preferences.
+// What each build of the window is given: the theme, the base style of the preferences. (The views' windows follow the
+// main window's style: the toolkit's style_follow.)
 @(private = "file")
-app_params :: proc(h: ^host.Host, bp: ^ui.Build_Params) { window_params(h, bp, (^App)(h.user)) }
-
-// What each build of a window of inspecteur is given (the main one, a journal's): the theme, the base style.
-window_params :: proc(h: ^host.Host, bp: ^ui.Build_Params, app: ^App) {
+app_params :: proc(h: ^host.Host, bp: ^ui.Build_Params) {
+	app := (^App)(h.user)
 	// (applied only when it changes, or the system goes light or dark: a palette applied starts a cross-fade)
 	choice := prefs_page.appearance_choice(app.settings.look)
 	if ui.theme_show(&app.shared.theme, app.themes_file.all[:], choice, &app.theme_shown, render.blend_space(&app.shared.r)) { platform.set_dark_title(h.win, !app.theme_shown.light) }

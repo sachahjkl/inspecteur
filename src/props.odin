@@ -57,11 +57,9 @@ Props_Data :: struct {
 }
 
 Props :: struct {
-	open:     bool,
 	pid:      i32,
 	start:    u64,
 	tab:      Props_Tab,
-	size:     [2]f32,   // the dialog's size, as the user left it, in ems (ui.modal)
 	data:     ^Props_Data,   // the last reading (nil: none yet)
 	serial:   int,           // counts the readings taken (the filter's rows follow it)
 	read_at:  time.Tick,
@@ -76,7 +74,6 @@ Props :: struct {
 	shown_of:   int,       // the reading they are of (serial)
 	shown_tab:  Props_Tab,
 	shown_query: string,   // owned
-	title_bg:   ui.Color,  // the title strip's colour (ui.top_strip_draw reads it while the frame is drawn)
 }
 
 // A priority offered (PRIORITIES, the system's: system_linux.odin): its name and its value as a nice value (-20 the
@@ -98,21 +95,26 @@ props_data_free :: proc(d: ^Props_Data) {
 	free(d)
 }
 
+// The Properties of the process (pid, start), in their view (props_view.odin): an open one shows this process now.
 props_open :: proc(app: ^App, pid: i32, start: u64) {
 	p := &app.props
-	p.open, p.pid, p.start, p.tab, p.gone = true, pid, start, .General, false
+	p.pid, p.start, p.tab, p.gone = pid, start, .General, false
 	props_data_free(p.data)
 	p.data = nil
 	p.serial += 1
 	ui.line_edit_clear(&p.filter)
+	ui.view_open(&app.views, PROPS_VIEW, app)
 	props_read(app)
 }
 
-// At each sample while the dialog is open: `alive` says whether the process is still there. The tab shown is read
-// again when another tab is shown or every PROPS_REFRESH_MS.
+// Whether the Properties are open, wherever they are.
+props_shown :: proc(app: ^App) -> bool { return ui.view_is_open(&app.views, PROPS_VIEW) }
+
+// At each sample while the view is open: `alive` says whether the process is still there. The tab shown is read again
+// when another tab is shown or every PROPS_REFRESH_MS.
 props_tick :: proc(app: ^App, alive: bool) {
 	p := &app.props
-	if !p.open || p.gone { return }
+	if !props_shown(app) || p.gone { return }
 	if !alive { p.gone = true; return }
 	if p.data == nil || p.tab != p.data.read_tab || time.duration_milliseconds(time.tick_since(p.read_at)) >= PROPS_REFRESH_MS { props_read(app) }
 }
@@ -175,7 +177,7 @@ props_done :: proc(data: rawptr, _: u64) {
 	if app == nil { props_data_free(r.data); return }
 	p := &app.props
 	p.reading = false
-	if !p.open || p.pid != r.pid || p.start != r.start { props_data_free(r.data); return }
+	if !props_shown(app) || p.pid != r.pid || p.start != r.start { props_data_free(r.data); return }
 	props_data_free(p.data)
 	p.data = r.data
 	p.serial += 1

@@ -115,9 +115,9 @@ JOURNAL_LINES :: 1000
 JOURNAL_FOLLOW_MS :: 2000
 
 Services :: struct {
-	pane:         Journal_View,      // the details' pane: the selected service's details and journal (journal.odin)
+	pane:         Journal_View,      // the details' view: the selected service's details and journal (journal.odin)
 	select_name:  string,            // owned: a service to select once a reading lists it (Go to service)
-	details_for:  u64,               // the service the pane was asked for (its name's id)
+	details_for:  u64,               // the service the details were asked for (its name's id)
 	job:     tasks.Job,
 	bus:     Service_Bus,      // the job's own (services_linux.odin)
 	demo:    ^Demo,            // not nil: the services are the demo's
@@ -320,7 +320,7 @@ services_rows :: proc(app: ^App) {
 		s.select_name = ""
 	}
 	// (the pane follows the selection, and each reading: the journal moves)
-	if app.settings.details { if u, ok := selected_service(app); ok { details_ask(app, u.name) } }
+	if service_details_shown(app) { if u, ok := selected_service(app); ok { details_ask(app, u.name) } }
 }
 
 // Selects the service `name` once a reading of the manager shown lists it.

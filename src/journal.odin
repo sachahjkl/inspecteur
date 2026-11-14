@@ -2,8 +2,8 @@ package inspecteur
 
 // A journal shown: the details and journal entries of one service, read in a tasks.Job on the toolkit's chores
 // (journalctl and the manager's properties take a while), whose reading comes back to the window that shows it by
-// ui.post, with its list, its selection and its search. The Services section's pane has one (it follows the selected
-// service); each journal window has its own (journal_window.odin), for the service it was opened for.
+// ui.post, with its list, its selection and its search. The Services section's details have one (it follows the selected
+// service); each journal on its own has its own (journal_window.odin), for the service it was opened for.
 
 import "core:mem/virtual"
 import "core:strings"

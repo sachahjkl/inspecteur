@@ -96,12 +96,14 @@ user's manager which services the session's targets want (their `Wants` property
 turned off by the user's copy of it with `Hidden=true`, as the specification says; turned on again, the copy goes when
 nothing else changed in it.
 
-A service's details (the pane under the table) come from its unit's properties over the same bus (`LoadUnit`, then
-`FragmentPath`, `StateChangeTimestamp`, `TasksCurrent`, `CPUUsageNSec`, `NRestarts`) and its journal's last entries
-from `journalctl -u <unit> -n 1000 -o json` (`-b`: this boot; the journal's own program reads journald's files), on a
-thread of their own: when another service is selected, and every 2 s while it is followed. A `Journal_View`
-(journal.odin) holds one service's reading, its list and its search: the pane has one, each journal window
-(journal_window.odin: another `host.Host` on the main window's `Shared`, built after it in the loop) its own. Stop and Restart are asked first: the question says when the
+A service's details (a view docked under the table at first) come from its unit's properties over the same bus
+(`LoadUnit`, then `FragmentPath`, `StateChangeTimestamp`, `TasksCurrent`, `CPUUsageNSec`, `NRestarts`) and its
+journal's last entries from `journalctl -u <unit> -n 1000 -o json` (`-b`: this boot; the journal's own program reads
+journald's files), on a thread of their own: when another service is selected, and every 2 s while it is followed. A
+`Journal_View` (journal.odin) holds one service's reading, its list and its search: the details have one, each journal
+on its own (journal_window.odin: the view `journal`, an instance per service) its own. Their readings are posted to the
+main window; after its frame, `views_follow` wakes the windows of the views that show what came. Stop and Restart are
+asked first: the question says when the
 service runs the desktop or Inspecteur (its main process is the display server or one Inspecteur runs under, or
 Inspecteur's own cgroup is under that unit).
 
@@ -226,9 +228,25 @@ key of `src/update/product.odin` (its private half is the release workflow's sec
 `settings_view.odin` shows the preferences' registry with the toolkit's `gt:prefs_page` (the layouts of the tables are
 `hidden`: the tables set them). The look, the text, the scrolling, the input, the delays, the rendering, the updates and
 the messages are the toolkit's standard settings (`prefs_page.standard_register` in `settings.odin`): `standard_watch`
-applies them to the main window as they change, `window_standard` to the journals' and the panels' windows; the theme
-is shown by `window_params` from `appearance_read`, over the toolkit's themes and the user's own (`themes.txt`,
-`prefs_page.Themes_File`).
+applies them to the main window as they change, and the views' windows follow its style (the toolkit's
+`style_follow`); the theme is shown by `app_params` from `appearance_read`, over the toolkit's themes and the user's own
+(`themes.txt`, `prefs_page.Themes_File`).
+
+## The views
+
+`views.odin` declares inspecteur's views (gui_toolkit's views, its `docs/views.md`): Properties (`props`), the
+affinity, "Why is it slow?", the service's details (`service`), a service's journal (`journal`, an instance per
+service) and Mission Control's eight panels (`mission/<panel>`). Each is a build procedure on the App; the toolkit
+builds it where the user puts it: a dialog, floating in the window, in a window of its own (a `host.Host` the toolkit
+opens on the main window's `Shared`, framed after it), or docked in a dock space. The window's frame is one
+(`ui.views_frame` around the whole page); the Services section has one around its table (`services`), Mission Control
+one of panels only (`mission`: the top, the left, the centre, the right and the bottom zones, each a row of stacks).
+One `ui.Views` holds them all, its memory in `$XDG_STATE_HOME/inspecteur/views.txt` (none in the demo): the
+presentation the user chose, the sizes, the docks' layouts, which were open at the last quit (`view_restore` opens the
+details and the panels again at the start). The palette lists the moves of each open view (`ui.View_Commands`). A
+dialog holds the window's keys (`ui.views_hold_keys`); a floating or docked view with the keyboard leaves the window's
+commands alone to the page (`focus_in_view`). The command palette, the sheet of the keys, the confirmations and the
+install's dialog are the toolkit's own views, on the same `Views`.
 
 `licence.odin` keeps the licence (gt:licence, the product in `src/licence/product.odin`): a store read and written by
 tasks of the chores, shown under the settings' General page.

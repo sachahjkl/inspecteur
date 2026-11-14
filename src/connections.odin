@@ -207,9 +207,9 @@ remote_text :: proc(s: Socket) -> string {
 
 // The sockets are read on their own period (connections.refresh_ms), not at each sample of the processes: a reading
 // goes through every process's open files. Only while they are shown: their section, Mission Control or one of its
-// panels in a window.
+// panels out of it.
 connections_shown :: proc(app: ^App) -> bool {
-	return app.tab == .Connections || app.tab == .Mission_Control || len(app.mission_windows) > 0
+	return app.tab == .Connections || app.tab == .Mission_Control || mission_out(app)
 }
 
 // A reading now (the section shown, F5), the next one a period later.

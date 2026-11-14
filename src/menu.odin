@@ -47,18 +47,14 @@ Row_Menu :: struct {
 // What a confirmation does when it is confirmed: send a signal to processes, or ask the service manager to act.
 Confirm_Act :: enum u8 { Signal, Service, Dump }
 
+// What the question asked (the toolkit's confirmation, a view: ui.confirm_open) acts on once it is confirmed. Its words
+// are given when it opens (the toolkit clones them).
 Confirm :: struct {
-	open:    bool,
 	act:     Confirm_Act,
-	chosen:  Chosen,            // Signal: the processes
+	chosen:  Chosen,            // Signal, Dump: the processes
 	sig:     process.Signal,
 	action:  Service_Action,    // Service: the action on `unit`, of the manager shown
 	unit:    string,            // owned
-	title:   string,            // owned: "Kill sleep (PID 1234)?"
-	note:    string,            // owned: what comes of it
-	lines:   [dynamic]string,   // owned: the processes it acts on, a line each ("sleep, PID 1234"; the dialog shows the first)
-	verb:    string,            // the confirming button's label
-	enter_confirms: bool,       // Enter confirms; else Enter cancels (a kill, the end of the session or of Inspecteur)
 }
 
 chosen_free :: proc(c: ^Chosen) {
@@ -70,10 +66,6 @@ chosen_free :: proc(c: ^Chosen) {
 confirm_free :: proc(c: ^Confirm) {
 	chosen_free(&c.chosen)
 	delete(c.unit)
-	delete(c.title)
-	delete(c.note)
-	for l in c.lines { delete(l) }
-	delete(c.lines)
 	c^ = {}
 }
 
@@ -209,11 +201,11 @@ dump_ask :: proc(app: ^App, p: ^Proc) {
 	m.act = .Dump
 	append(&m.chosen.targets, Target{p.pid, p.start})
 	m.chosen.name = fmt.aprintf(i18n.tr("%s (PID %d)"), p.name, p.pid)
-	m.verb = i18n.tr("Create")
-	m.title = fmt.aprintf(i18n.tr("Create a dump file of %s?"), m.chosen.name)
-	m.note = fmt.aprintf(i18n.tr("Its memory is written to a file of %s at most: anything it held, passwords and documents too. %s"), size_text(p.resident), i18n.tr(DUMP_HOW))
-	m.enter_confirms = true
-	m.open = true
+	ui.confirm_open(CONFIRM_VIEW, {
+		title = fmt.tprintf(i18n.tr("Create a dump file of %s?"), m.chosen.name),
+		note = fmt.tprintf(i18n.tr("Its memory is written to a file of %s at most: anything it held, passwords and documents too. %s"), size_text(p.resident), i18n.tr(DUMP_HOW)),
+		act = i18n.tr("Create"), enter_confirms = true,
+	})
 }
 
 ROW_MENU :: "inspecteur_row_menu"
@@ -224,10 +216,10 @@ row_menu_open :: proc(app: ^App, pos: ui.Vec2, from_keyboard := false) {
 	ui.menu_open(ROW_MENU, pos, from_keyboard = from_keyboard)
 }
 
-// The menu and the confirmation, when open (built at the end of the window's build).
+// The menu when open, and the confirmation's answer (built at the end of the window's build).
 row_menu_build :: proc(app: ^App, em: f32) {
 	row_menu_items(app)
-	confirm_build(app, em)
+	if ui.confirm_answer(CONFIRM_VIEW) == .Confirmed { confirm_act(app) }
 }
 
 @(private = "file")
@@ -377,6 +369,8 @@ confirm_ask :: proc(app: ^App, c: Chosen, sig: process.Signal, tree := false) {
 	for t in c.targets { append(&m.chosen.targets, t) }
 	m.chosen.name = strings.clone(c.name)
 	server, inspecteur := false, false
+	// (the processes it acts on, a line each ("sleep, PID 1234"): what Kill acts on is seen before it acts)
+	lines := make([dynamic]string, context.temp_allocator)
 	for t in c.targets {
 		switch guard_of(app, t.pid) {
 		case .Display_Server:  server = true
@@ -384,11 +378,9 @@ confirm_ask :: proc(app: ^App, c: Chosen, sig: process.Signal, tree := false) {
 		case .None:
 		}
 		p := find_proc(&app.sampler, t.pid, t.start)
-		append(&m.lines, p != nil ? fmt.aprintf(i18n.tr("%s, PID %d"), p.name, p.pid) : fmt.aprintf(i18n.tr("PID %d"), t.pid))
+		append(&lines, p != nil ? fmt.tprintf(i18n.tr("%s, PID %d"), p.name, p.pid) : fmt.tprintf(i18n.tr("PID %d"), t.pid))
 	}
 	many := len(c.targets) > 1
-	m.verb = tree ? i18n.tr("End tree") : sig == .Kill ? i18n.tr("Kill") : i18n.tr("End")
-	m.title = fmt.aprintf(sig == .Kill ? i18n.tr("Kill %s?") : i18n.tr("End %s?"), c.name)
 	note := strings.builder_make(context.temp_allocator)
 	switch {
 	case server:     strings.write_string(&note, i18n.tr("It draws the desktop: the session ends with it, and every program of the session with it. "))
@@ -400,10 +392,13 @@ confirm_ask :: proc(app: ^App, c: Chosen, sig: process.Signal, tree := false) {
 	case many:                 strings.write_string(&note, i18n.tr("Each is asked to end."))
 	case:                      strings.write_string(&note, i18n.tr("It is asked to end."))
 	}
-	m.note = strings.clone(strings.to_string(note))
-	// (Enter confirms only what is asked and safe: a kill, the session's end and Inspecteur's own are a click)
-	m.enter_confirms = sig != .Kill && !server && !inspecteur
-	m.open = true
+	ui.confirm_open(CONFIRM_VIEW, {
+		title = fmt.tprintf(sig == .Kill ? i18n.tr("Kill %s?") : i18n.tr("End %s?"), c.name),
+		note = strings.to_string(note), lines = lines[:],
+		act = tree ? i18n.tr("End tree") : sig == .Kill ? i18n.tr("Kill") : i18n.tr("End"),
+		// (Enter confirms only what is asked and safe: a kill, the session's end and Inspecteur's own are a click)
+		enter_confirms = sig != .Kill && !server && !inspecteur,
+	})
 }
 
 // Asks to confirm a service's stop or restart. `danger`: what else ends with it ("" none): Enter cancels then.
@@ -412,20 +407,13 @@ confirm_service :: proc(app: ^App, action: Service_Action, unit, danger: string)
 	confirm_free(m)
 	m.act, m.action = .Service, action
 	m.unit = strings.clone(unit)
-	m.verb = action == .Stop ? i18n.tr("Stop") : i18n.tr("Restart")
-	m.title = fmt.aprintf(action == .Stop ? i18n.tr("Stop %s?") : i18n.tr("Restart %s?"), unit)
 	what := action == .Stop ? i18n.tr("It stops, and its processes end; what needs it may stop too.") : i18n.tr("It stops, its processes end, and it starts again.")
-	m.note = danger != "" ? fmt.aprintf("%s %s", danger, what) : strings.clone(what)
-	m.enter_confirms = danger == ""
-	m.open = true
-}
-
-// The toolkit's confirmation: each process by its name and pid (what Kill acts on is seen before it acts).
-@(private = "file")
-confirm_build :: proc(app: ^App, em: f32) {
-	m := &app.menu.confirm
-	answer := ui.confirm("kill", &m.open, {title = m.title, note = m.note, lines = m.lines[:], act = m.verb, enter_confirms = m.enter_confirms})
-	if answer == .Confirmed { confirm_act(app) }
+	ui.confirm_open(CONFIRM_VIEW, {
+		title = fmt.tprintf(action == .Stop ? i18n.tr("Stop %s?") : i18n.tr("Restart %s?"), unit),
+		note = danger != "" ? fmt.tprintf("%s %s", danger, what) : what,
+		act = action == .Stop ? i18n.tr("Stop") : i18n.tr("Restart"),
+		enter_confirms = danger == "",
+	})
 }
 
 // What the confirmation was asked for, done.

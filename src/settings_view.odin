@@ -2,11 +2,10 @@ package inspecteur
 
 // The settings: gui_toolkit's page of the preferences (gt:prefs_page), in place of the sidebar and the section. The title
 // bar's button, Ctrl+, or the palette opens it; Escape or Ctrl+, again goes back. Each change is applied at once: the
-// toolkit's standard settings by prefs_page.standard_watch (the main window) and window_standard (the others),
+// toolkit's standard settings by prefs_page.standard_watch (the main window; the views' windows follow its style),
 // inspecteur's by settings_changed. The loop's writer saves the file off this thread.
 
 import "core:time"
-import "gt:host"
 import "gt:platform"
 import prefs_page "gt:prefs_page"
 import "gt:ui"
@@ -95,14 +94,8 @@ settings_preview :: proc(user: rawptr, name: string, value: f64) {
 	}
 }
 
-// A window of its own (a journal's, a Mission Control panel's) takes the standard settings as the main window does. The
-// renderer and the fonts are shared: the main window's watch sets them.
-window_standard :: proc(app: ^App, h: ^host.Host) {
-	prefs_page.standard_apply(&app.prefs, &h.state, {partial_redraw = &h.partial_redraw})
-}
-
 // A preference was set or reset: read again, and what it changes applied; the standard ones are applied to the main
-// window by standard_watch already, and here to the other windows (the loop writes the file).
+// window by standard_watch already, and the views' windows follow its style (the loop writes the file).
 @(private = "file")
 settings_changed :: proc(user: rawptr, name: string) {
 	app := (^App)(user)
@@ -120,8 +113,6 @@ settings_changed :: proc(user: rawptr, name: string) {
 		// (inspecteur's window changes its title bar at once, where the desktop lets it)
 		platform.set_integrated_title(app.main.win, !app.settings.system_title)
 	}
-	for w in app.journal_windows { window_standard(app, &w.window) }
-	for w in app.mission_windows { window_standard(app, &w.window) }
 	settings_free(&old)
 	updates_auto(app)
 }

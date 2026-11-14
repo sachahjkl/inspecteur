@@ -4,6 +4,10 @@ package inspecteur
 // User at the right of its bar, Ctrl+U). Its bar, a row's menu and the keys (commands.odin) act on the selected service:
 // Start, Stop, Restart, Enable (it starts by itself, at boot or with the user's session), Disable, Open in Processes
 // (its main process, selected there), Copy name.
+//
+// The selected service's details and journal are a view ("service": views.odin), docked at first under the table, in
+// the section's dock space: the user resizes it by the line above it, floats it, puts it in a window of its own or
+// docks it elsewhere. A journal on its own docks there too, a tab beside it.
 
 import "core:fmt"
 import "core:strings"
@@ -12,6 +16,9 @@ import lucide "gt:lucide"
 import "gt:platform"
 import "gt:ui"
 import i18n "gt:i18n"
+
+// The details' height under the table at first, in ems (then the views' memory).
+DETAILS_EM :: 16
 
 build_services :: proc(app: ^App, em: f32) {
 	s := &app.services
@@ -25,48 +32,65 @@ build_services :: proc(app: ^App, em: f32) {
 		note = fmt.tprintf(i18n.tr(len(s.list.units), "%d service, %d running", "%d services, %d running"), len(s.list.units), running)
 	}
 	section_bar(app, i18n.tr("Services"), note, em, services_actions, services_manager_choice)
-	empty := ""
-	if s.list != nil && s.list.manager == s.manager { empty = s.list.problem != "" ? s.list.problem : i18n.tr("No service.") }
-	ev := section_table_build(&s.rows, empty)
-	if ev.sorted { ui.table_apply(&s.rows.table, &s.rows.data, app.query) }
-	if ev.sorted || ev.resized || ev.moved { section_layout_save(&s.rows, &app.prefs, "services") }
-	section_header_menu(&s.rows, ev, "services", em)
-	if ev.activated && cmd_can(app, .Service_Open) { service_reveal(app) }
-	if ev.menu { services_menu_open(app, ev.menu_at) }
-	// (the pane follows the selection: another service selected is read at once)
+	// (the table is the space's centre; the details and the journals dock around it)
+	ui.next({width = ui.fill(), height = ui.fill()})
+	if ui.views_dock(&app.views, SERVICES_SPACE, {content = true}) {
+		empty := ""
+		if s.list != nil && s.list.manager == s.manager { empty = s.list.problem != "" ? s.list.problem : i18n.tr("No service.") }
+		ev := section_table_build(&s.rows, empty)
+		if ev.sorted { ui.table_apply(&s.rows.table, &s.rows.data, app.query) }
+		if ev.sorted || ev.resized || ev.moved { section_layout_save(&s.rows, &app.prefs, "services") }
+		section_header_menu(&s.rows, ev, "services", em)
+		if ev.activated && cmd_can(app, .Service_Open) { service_reveal(app) }
+		if ev.menu { services_menu_open(app, ev.menu_at) }
+	}
+	// (the details follow the selection: another service selected is read at once)
 	u, selected := selected_service(app)
 	id := selected ? name_id(u.name) : 0
-	if app.settings.details && id != s.details_for {
+	if service_details_shown(app) && id != s.details_for {
 		s.details_for = id
 		if selected { details_ask(app, u.name) }
 	}
-	if app.settings.details { service_details_build(app, em) }
 	services_menu(app, em)
 }
 
-// The pane under the table: the selected service's unit file, since when it is in its state, its tasks, CPU time and
-// restarts, and its journal's last lines.
+service_register :: proc(app: ^App) {
+	ui.view_register(&app.views, SERVICE_VIEW, service_view, ui.View_Options{
+		title = i18n.later("Details and journal"), icon = lucide.SCROLL_TEXT,
+		home = .Panel, home_place = {space = SERVICES_SPACE, edge = .Bottom},
+		extent_em = DETAILS_EM, width_em = 64, height_em = 40,
+	})
+}
+
+// Whether the details are open, wherever they are.
+service_details_shown :: proc(app: ^App) -> bool { return ui.view_is_open(&app.views, SERVICE_VIEW) }
+
+// Whether the details can be seen now: open, and the Services section shown, unless they are out of it (floating, in a
+// window of their own).
+service_details_seen :: proc(app: ^App) -> bool {
+	if !service_details_shown(app) { return false }
+	return app.tab == .Services || ui.view_presentation(&app.views, SERVICE_VIEW) != .Panel
+}
+
+// The details' view: the selected service's unit file, since when it is in its state, its tasks, CPU time and restarts,
+// and its journal's last lines.
 @(private = "file")
-service_details_build :: proc(app: ^App, em: f32) {
-	s := &app.services
-	u, selected := selected_service(app)
-	d := s.pane.details
-	// (the line above the pane, dragged, sets its height: kept when let go)
-	h := app.settings.details_em
-	ui.next({width = ui.fill()})
-	split := ui.splitter("###svc_split", .Y, &h, DETAILS_MIN_EM, DETAILS_MAX_EM, {after = true, unit = em, flush = true, line_at = .Start})
-	if split.changed { app.settings.details_em = h }
-	if split.finished { pref_set(&app.prefs, "services.details_height", fmt.tprintf("%.1f", h)) }
-	ui.next({width = ui.fill(), height = ui.px(em * app.settings.details_em), axis = .Y, bg = surface("well")})
-	pane := ui.build_box({.Clip, .Draw_Background, .Draw_Side_Top}, "###svc_pane")
-	if ui.parent(pane) { service_details_body(app, u, selected, d, em) }
+service_view :: proc(v: ^ui.View, app: ^App) {
+	em := ui.font_size()
+	if v.shown { journal_keys(app, &app.services.pane) }
+	ui.next({width = ui.fill(), height = ui.fill(), axis = .Y, bg = surface("well")})
+	pane := ui.build_box({.Clip, .Draw_Background}, "###svc_pane")
+	if ui.parent(pane) { service_details_body(app, v, em) }
 }
 
 @(private = "file")
-service_details_body :: proc(app: ^App, u: Service, selected: bool, d: ^Unit_Details, em: f32) {
+service_details_body :: proc(app: ^App, v: ^ui.View, em: f32) {
 	s := &app.services
+	u, selected := selected_service(app)
+	d := s.pane.details
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.2))})
 	if ui.row(.Center, {}, "###svc_details_head") {
+		ui.view_drag_handle(v, ui.parent_box())
 		ui.spacer(ui.px(em * 0.8))
 		title := selected ? u.name : i18n.tr("No service selected")
 		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
@@ -87,24 +111,26 @@ service_details_body :: proc(app: ^App, u: Service, selected: bool, d: ^Unit_Det
 			ui.label_tip(fmt.tprintf("%s###svc_details_info", ui.text_shown(info)))
 		}
 		cmd_button(app, "svc_file", lucide.FILE_TEXT, .Service_Open_File, em)
-		tool := tool_button("svc_details_close", lucide.X, fmt.tprintf(i18n.tr("Hide the details (%s)"), ui.command_shortcut(COMMANDS[.Service_Details])), true, em)
-		if tool { service_details_switch(app) }
+		// (docked, its own way to close; elsewhere its header has one)
+		if v.presentation == .Panel {
+			tool := tool_button("svc_details_close", lucide.X, fmt.tprintf(i18n.tr("Hide the details (%s)"), ui.command_shortcut(COMMANDS[.Service_Details])), true, em)
+			if tool { service_details_switch(app) }
+		}
 		ui.spacer(ui.px(em * 0.4))
 	}
 	journal_build(app, &s.pane, u.name, s.manager, selected, em)
 }
 
-// The pane's height at least and at most, in ems (services.details_height).
-DETAILS_MIN_EM :: 6
-DETAILS_MAX_EM :: 80
-
-// Shows or hides the pane of the details (written to services.details).
+// Shows or hides the details (the views' memory keeps whether they are open).
 service_details_switch :: proc(app: ^App) {
-	app.settings.details = !app.settings.details
-	pref_set(&app.prefs, "services.details", app.settings.details ? "true" : "false")
+	if service_details_shown(app) {
+		ui.view_close(&app.views, SERVICE_VIEW)
+	} else {
+		ui.view_open(&app.views, SERVICE_VIEW, app, owner = &app.main.state)
+	}
 	app.services.details_for = 0
 	tab_show(app, .Services)
-	say(app, app.settings.details ? i18n.tr("The selected service's details and journal") : i18n.tr("Details hidden"))
+	say(app, service_details_shown(app) ? i18n.tr("The selected service's details and journal") : i18n.tr("Details hidden"))
 }
 
 // The selected service's unit file, opened (the person's text editor).
@@ -121,10 +147,13 @@ services_tick :: proc(app: ^App) {
 	journal_follow_tick(app)
 }
 
-// The milliseconds until the next reading of the services is due, while they are shown (the window wakes for it).
+// The milliseconds until the next reading of the services is due, while they are shown, or of the details' journal
+// while it is followed (the window wakes for it).
 services_due_ms :: proc(app: ^App) -> int {
-	if app.tab != .Services || app.paused { return max(int) }
-	return min(max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), app.services.next))) + 1, 1), journal_due_ms(app))
+	if app.paused { return max(int) }
+	due := journal_due_ms(app)
+	if app.tab == .Services { due = min(due, max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), app.services.next))) + 1, 1)) }
+	return due
 }
 
 // Whether a command of the section can act on the selected service now.
@@ -209,7 +238,7 @@ services_menu :: proc(app: ^App, em: f32) {
 		cmd_item(app, .Service_Copy)
 		cmd_item(app, .Service_Open_File)
 		ui.menu_separator()
-		cmd_item(app, .Service_Details, app.settings.details ? i18n.tr("Hide the details") : i18n.tr("Details and journal"))
+		cmd_item(app, .Service_Details, service_details_shown(app) ? i18n.tr("Hide the details") : i18n.tr("Details and journal"))
 	}
 }
 

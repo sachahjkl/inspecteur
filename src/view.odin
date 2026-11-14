@@ -9,6 +9,8 @@ package inspecteur
 //   │                       │ footer: a message │ the counters │
 //   └───────────────────────┴──────────────────────────────────┘
 //
+// The views (views.odin) dock at the window's edges around all of it, float over it, or go to windows of their own.
+//
 // Every colour is the theme's: the surfaces are its page, its bars and its wells (surface), the lines its border.
 // Typing anywhere filters the section shown; every other key is a command's (commands.odin), or the table's: Up, Down,
 // Page Up, Page Down, Home, End move in it.
@@ -43,56 +45,71 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	// Ctrl held: the rows stand still under the pointer (a key pressed before the window had the keyboard is not held:
 	// the compositor's Ctrl+Shift+Escape that opened it)
 	app.held = ui.key_held(.Ctrl)
-	// (the user's themes file: a task looks at it now and then and reads it when it changed; window_params shows it)
+	// (the user's themes file: a task looks at it now and then and reads it when it changed; app_params shows it)
 	if prefs_page.themes_file_poll(&app.themes_file, &h.state) { h.settle = max(h.settle, FRAMES_AFTER_INPUT) }
-	free_keys := !app.menu.confirm.open && !app.props.open && !app.affinity.open && !app.sheet.open && !prefs_page.install_open_now(&app.install) && !app.diagnosis_open && !app.palette.open && !ui.menu_any_open()
-	if free_keys && app.settings_open {
-		settings_keys(app)   // (the page's own: its search takes what is typed)
-	} else if free_keys {
-		// typing anywhere filters: a character typed gives the filter the keyboard (an open menu searches its own items)
-		ui.type_to_field(app.search_key)
-		view_keys(app)
+	// (--setup: the install's view, opened in the first build: its owner is this window)
+	if app.setup_due {
+		app.setup_due = false
+		prefs_page.install_open(&app.install)
 	}
-	ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
-	page := ui.build_box({.Draw_Background}, "###page")
-	if ui.parent(page) {
-		build_title(app, em)
-		crash_bar.bar(&app.crash_bar, {name = "inspecteur", version = APP_VERSION, repository = "sachahjkl/inspecteur"})
-		ui.next({width = ui.fill(), height = ui.fill()})
-		if app.settings_open {
-			settings_build(app)
-		} else if ui.row(id = "###body") {
-			build_sidebar(app, em)
-			ui.next({width = ui.fill(), height = ui.pct(1), axis = .Y})
-			if ui.column(id = "###main") {
-				ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
-				if ui.column(id = "###section") {
-					switch app.tab {
-					case .Mission_Control: build_mission(app, em)
-					case .Processes:   build_processes(app, em)
-					case .Performance: build_performance(app, em)
-					case .Services:    build_services(app, em)
-					case .Startup:     build_startup(app, em)
-					case .Connections: build_connections(app, em)
-					case .Information: build_information(app, em)
+	// (the views docked at the window's edges and floating in it are built first: they read their keys first)
+	if ui.views_frame(&app.views) {
+		// (a dialog holds the keyboard; a view that has it otherwise leaves the window's commands alone to the content)
+		free_keys := !ui.views_hold_keys(&app.views) && !ui.menu_any_open()
+		in_view := focus_in_view(app)
+		if free_keys && app.settings_open {
+			if !in_view { settings_keys(app) }   // (the page's own: its search takes what is typed)
+		} else if free_keys {
+			// typing anywhere filters: a character typed gives the filter the keyboard (an open menu searches its own
+			// items; a view with the keyboard keeps what is typed)
+			if !in_view { ui.type_to_field(app.search_key) }
+			view_keys(app, in_view)
+		}
+		ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
+		page := ui.build_box({.Draw_Background}, "###page")
+		if ui.parent(page) {
+			build_title(app, em)
+			crash_bar.bar(&app.crash_bar, {name = "inspecteur", version = APP_VERSION, repository = "sachahjkl/inspecteur"})
+			ui.next({width = ui.fill(), height = ui.fill()})
+			if app.settings_open {
+				settings_build(app)
+			} else if ui.row(id = "###body") {
+				build_sidebar(app, em)
+				ui.next({width = ui.fill(), height = ui.pct(1), axis = .Y})
+				if ui.column(id = "###main") {
+					ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
+					if ui.column(id = "###section") {
+						switch app.tab {
+						case .Mission_Control: build_mission(app, em)
+						case .Processes:   build_processes(app, em)
+						case .Performance: build_performance(app, em)
+						case .Services:    build_services(app, em)
+						case .Startup:     build_startup(app, em)
+						case .Connections: build_connections(app, em)
+						case .Information: build_information(app, em)
+						}
 					}
+					build_footer(app, em)
 				}
-				build_footer(app, em)
 			}
 		}
+		// (a line of a Mission Control panel in this window, docked or floating, opens its menu here)
+		mission_line_menu(app, em)
+		mission_closed_say(app)
+		row_menu_build(app, em)
+		palette_build(app)
+		if prefs_page.install_frame(&app.install) == .Launched { platform.request_close(app.main.win) }   // (the installed copy runs)
 	}
-	props_build(app, em)
-	affinity_build(app, em)   // (after the Properties: it opens from them)
-	row_menu_build(app, em)   // (after the Properties: the kill's confirmation goes over them)
-	palette_build(app)
-	shortcuts_build(app)
-	if prefs_page.install_frame(&app.install, em) == .Launched { platform.request_close(app.main.win) }   // (the installed copy runs)
-	diagnosis_build(app, em)
-	ui.wake_within(&app.main.state, min(until_sample(app), services_due_ms(app), connections_due_ms(app)))
+	ui.wake_within(&app.main.state, min(until_sample(app), services_due_ms(app), connections_due_ms(app), journals_due_ms(app)))
 }
 
 @(private = "file")
-view_keys :: proc(app: ^App) {
+view_keys :: proc(app: ^App, in_view: bool) {
+	// (a view has the keyboard: the window's commands alone; its own keys are its own)
+	if in_view {
+		commands_keys(app, false, window_only = true)
+		return
+	}
 	// (a filter with text and the keyboard keeps its editing keys: Delete erases a character there, not a process)
 	// (the journal's search keeps them all, empty or not: Delete there is no Stop)
 	jk := app.services.pane.search_key
@@ -278,7 +295,7 @@ build_title :: proc(app: ^App, em: f32) {
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
 		if ui.button("palette_button", icon = lucide.COMMAND, o = {tip = cmd_tip(.Palette)}).clicked { palette_open(app) }
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
-		if ui.button("help_button", icon = lucide.KEYBOARD, o = {tip = cmd_tip(.Shortcuts)}).clicked { app.sheet.open = true }
+		if ui.button("help_button", icon = lucide.KEYBOARD, o = {tip = cmd_tip(.Shortcuts)}).clicked { shortcuts_open(app) }
 		theme_button(app, em)
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
 		// (the settings shown: the button is held down)
@@ -541,11 +558,11 @@ refresh_button :: proc(app: ^App, em: f32) {
 // The zoom (Ctrl+wheel, Ctrl+=, Ctrl+-, Ctrl+0)
 
 // The zoom (the toolkit's: Ctrl+wheel, Ctrl+=, Ctrl+-, Ctrl+0, and the commands), after a frame: kept when it changed
-// (appearance.zoom: inspecteur opens as it was left), said in the footer, and the journals' windows zoomed alike. The
-// standard settings' watch sets the same zoom again when the preference is written: nothing moves.
+// (appearance.zoom: inspecteur opens as it was left) and said in the footer. The views' windows follow the main
+// window's (the toolkit's style_follow). The standard settings' watch sets the same zoom again when the preference is
+// written: nothing moves.
 zoom_follow :: proc(app: ^App) {
 	z := ui.zoom(&app.main.state)
-	for w in app.journal_windows { ui.set_zoom(&w.state, z) }
 	if abs(z - app.settings.zoom) < 0.001 { return }
 	app.settings.zoom = z
 	pref_set(&app.prefs, ZOOM_PREF, fmt.tprintf("%.3f", z))

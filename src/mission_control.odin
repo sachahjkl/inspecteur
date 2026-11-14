@@ -1,21 +1,25 @@
 package inspecteur
 
-// Mission Control: the whole machine on one page, in panels the user arranges (gui_toolkit's dock, its docs/docking.md):
-// the machine's tiles and graphs, what the diagnosis says, the busiest processes by CPU and by memory, the services (the
-// failed ones first), the network's sockets, what starts with the session, the system. Each panel is a tab that can be
-// dragged into another stack, beside one, to an edge, or out to float; the line between two stacks resizes them; a
-// panel can be closed and brought back from the panels' menu; Mission Control: the layout as at first (the palette, the
-// bar's button) sets it back. The layout is kept (mission.layout). A panel's menu opens it in a window of its own
-// (mission_window.odin). A click on a line goes to its section; a right click
-// opens its menu: its section, and what is related to it (a process's properties, service and connections; a service's
-// process, details and journal).
+// Mission Control: the whole machine on one page, in panels the user arranges: the machine's tiles and graphs, what the
+// diagnosis says, the busiest processes by CPU and by memory, the services (the failed ones first), the network's
+// sockets, what starts with the session, the system. Each panel is a view ("mission/<panel>": views.odin) docked in the
+// section's dock space: its zones (the top, the left, the centre, the right, the bottom) hold stacks of panels, a tab
+// each when a stack holds more than one; the lines between them resize them. A panel moves by its menu (a right click at
+// its top, or its tab), by a drag of its tab, or by the palette: to another zone or stack, floating in the window, in a
+// window of its own, or to an edge of the window. It can be closed and brought back from the panels' menu; Mission
+// Control: the layout as at first (the palette, the bar's button) puts each panel back in its place. The views' memory
+// keeps the layout, and the panels open at the last quit open again, in a window of their own too. A click on a line
+// goes to its section; a right click opens its menu: its section, and what is related to it (a process's properties,
+// service and connections; a service's process, details and journal).
 //
-// It reads nothing of its own: each section's reading (Mission Control asks every section to read while it is shown).
+// It reads nothing of its own: each section's reading (Mission Control asks every section to read while it is shown, or
+// while one of its panels is out of it).
 
 import "core:fmt"
 import "core:strings"
 import "gt:draw"
 import lucide "gt:lucide"
+import "gt:platform"
 import "gt:ui"
 import i18n "gt:i18n"
 
@@ -27,15 +31,54 @@ MISSION_NAMES := [Mission_Panel]string{
 	.Services = "services", .Network = "network", .Startup = "startup", .System = "system",
 }
 
+// Each panel's view.
+@(rodata)
+MISSION_VIEWS := [Mission_Panel]string{
+	.Machine = "mission/machine", .Health = "mission/health", .Cpu = "mission/cpu", .Memory = "mission/memory",
+	.Services = "mission/services", .Network = "mission/network", .Startup = "mission/startup", .System = "mission/system",
+}
+
 // (not rodata: i18n.later runs when the program starts)
 MISSION_TITLES := [Mission_Panel]string{
 	.Machine = i18n.later("Machine"), .Health = i18n.later("Health"), .Cpu = i18n.later("Busiest: CPU"), .Memory = i18n.later("Busiest: memory"),
 	.Services = i18n.later("Services"), .Network = i18n.later("Network"), .Startup = i18n.later("Startup"), .System = i18n.later("System"),
 }
 
-// The layout at first: the machine across the top; under it the health and the busiest processes; under them the
-// services, the network, and the startup with the system in tabs.
-MISSION_DEFAULT :: "dock1 y0.320([*machine] y0.500(x0.340([*health] x0.500([*cpu] [*memory])) x0.340([*services] x0.500([*network] [*startup,system]))))"
+@(rodata)
+MISSION_ICONS := [Mission_Panel]string{
+	.Machine = lucide.GAUGE, .Health = lucide.LIGHTBULB, .Cpu = lucide.CPU, .Memory = lucide.LAYERS_2,
+	.Services = lucide.SETTINGS, .Network = lucide.GLOBE, .Startup = lucide.POWER, .System = lucide.INFO,
+}
+
+// The layout at first, each panel's home: the machine across the top; under it the health, the busiest processes by
+// CPU and by memory side by side; under them the services, the network, and the startup with the system in tabs.
+@(rodata)
+MISSION_PLACES := [Mission_Panel]ui.View_Place{
+	.Machine  = {space = MISSION_SPACE, edge = .Top},
+	.Health   = {space = MISSION_SPACE, edge = .Left},
+	.Cpu      = {space = MISSION_SPACE, edge = .Center},
+	.Memory   = {space = MISSION_SPACE, edge = .Right},
+	.Services = {space = MISSION_SPACE, edge = .Bottom, stack = 0},
+	.Network  = {space = MISSION_SPACE, edge = .Bottom, stack = 1},
+	.Startup  = {space = MISSION_SPACE, edge = .Bottom, stack = 2},
+	.System   = {space = MISSION_SPACE, edge = .Bottom, stack = 2},
+}
+
+// The zones' extents at first, in ems: the top's and the bottom's heights, the left's and the right's widths (the centre
+// takes the rest).
+@(rodata)
+MISSION_EXTENTS := [Mission_Panel]f32{
+	.Machine = 15, .Health = 22, .Cpu = 0, .Memory = 22, .Services = 14, .Network = 14, .Startup = 14, .System = 14,
+}
+
+// The order the panels open in at the start and come back in: a stack's tab shown is the last opened (Startup over
+// System).
+@(rodata)
+MISSION_ORDER := [?]Mission_Panel{.Machine, .Health, .Cpu, .Memory, .Services, .Network, .System, .Startup}
+
+// A panel's size floating or in a window of its own, at first (ems).
+@(private = "file") MISSION_W_EM :: 46
+@(private = "file") MISSION_H_EM :: 30
 
 // The panels' menu's width, in ems: its last line ("Mission Control: the layout as at first") whole.
 @(private = "file") MISSION_MENU_EM :: 22
@@ -47,11 +90,10 @@ MISSION_MENU :: "inspecteur_mission_panels"
 MISSION_LINE_MENU :: "inspecteur_mission_line"
 
 Mission_Control :: struct {
-	dock:      ui.Dock,
 	line:      Mission_Line,
-	// a panel the dock let go to a window of its own, opened by the loop between two frames (mission_windows_frame), not
-	// in the middle of the main window's build
-	to_window: Maybe(Mission_Panel),
+	// the last frame (App.frames) a panel was built out of the section (floating, in a window, docked elsewhere): what
+	// Mission Control sums up is read while it is (connections_shown)
+	out_frame: int,
 }
 
 // What a line shows, for its menu: a process, a service or a startup item.
@@ -65,42 +107,47 @@ Mission_Line :: struct {
 }
 
 mission_init :: proc(app: ^App) {
-	ui.dock_init(&app.mission.dock)
-	if !ui.dock_parse(&app.mission.dock, app.settings.mission_layout, mission_id_of, app) {
-		ui.dock_parse(&app.mission.dock, MISSION_DEFAULT, mission_id_of, app)
-	}
+	app.mission.out_frame = -MISSION_OUT_FRAMES - 1   // (no panel was out yet)
 }
 
 mission_destroy :: proc(app: ^App) {
-	ui.dock_destroy(&app.mission.dock)
 	delete(app.mission.line.name)
 }
 
-@(private = "file")
-mission_id_of :: proc(user: rawptr, name: string) -> (u32, bool) {
-	for n, p in MISSION_NAMES { if n == name { return u32(p), true } }
-	return 0, false
+// A panel built out of the section counts this many frames: a frame of the main window may come without one of a
+// panel's window.
+MISSION_OUT_FRAMES :: 2
+
+// Once, at start-up, on the program's Views: each panel, its home in the section's dock space.
+mission_register :: proc(app: ^App) {
+	for p in Mission_Panel {
+		ui.view_register(&app.views, MISSION_VIEWS[p], mission_view, ui.View_Options{
+			title = MISSION_TITLES[p], icon = MISSION_ICONS[p], home = .Panel, home_place = MISSION_PLACES[p],
+			extent_em = MISSION_EXTENTS[p], width_em = MISSION_W_EM, height_em = MISSION_H_EM,
+		})
+	}
 }
 
-@(private = "file")
-mission_name :: proc(user: rawptr, id: u32) -> string {
-	if id < u32(min(Mission_Panel)) || id > u32(max(Mission_Panel)) { return "" }
-	return MISSION_NAMES[Mission_Panel(id)]
+// At start-up: the panels open at the last quit (each at its very first start), where they were.
+mission_restore :: proc(app: ^App) {
+	for p in MISSION_ORDER { _ = ui.view_restore(&app.views, MISSION_VIEWS[p], app, first_start_open = true, owner = &app.main.state) }
 }
 
+// The panel of the view `id`.
 @(private = "file")
-mission_save :: proc(user: rawptr, d: ^ui.Dock) {
-	app := (^App)(user)
-	text := ui.dock_format(d, mission_name, app)
-	pref_set(&app.prefs, "mission.layout", text)
-	delete(app.settings.mission_layout)
-	app.settings.mission_layout = strings.clone(text)
+mission_panel_of :: proc(id: string) -> Mission_Panel {
+	for v, p in MISSION_VIEWS { if v == id { return p } }
+	return .Machine
 }
 
-// The layout as at first, kept.
+// Each panel back in its place, those closed open again. (The sizes of the zones and of their stacks stay as the user
+// left them.)
 mission_reset :: proc(app: ^App) {
-	ui.dock_parse(&app.mission.dock, MISSION_DEFAULT, mission_id_of, app)
-	mission_save(app, &app.mission.dock)
+	for p in MISSION_ORDER {
+		id := MISSION_VIEWS[p]
+		if !ui.view_is_open(&app.views, id) { ui.view_open(&app.views, id, app, owner = &app.main.state) }
+		ui.view_reattach(&app.views, id)
+	}
 	tab_show(app, .Mission_Control)
 	say(app, i18n.tr("Mission Control: the layout as at first"))
 }
@@ -111,24 +158,43 @@ mission_panels_open :: proc(app: ^App) {
 }
 
 build_mission :: proc(app: ^App, em: f32) {
-	d := &app.mission.dock
 	shown := 0
-	for p in Mission_Panel { if ui.dock_has(d, u32(p)) { shown += 1 } }
-	section_bar(app, i18n.tr("Mission Control"), fmt.tprintf(i18n.tr("%d of %d panels: drag a tab to move it"), shown, len(Mission_Panel)), em, nil, mission_bar_right)
+	for id in MISSION_VIEWS { if ui.view_is_open(&app.views, id) { shown += 1 } }
+	section_bar(app, i18n.tr("Mission Control"), fmt.tprintf(i18n.tr("%d of %d panels: a right click at the top of one moves it"), shown, len(Mission_Panel)), em, nil, mission_bar_right)
 	ui.next({width = ui.fill(), height = ui.fill()})
-	ui.dock_begin(d, "###mission", {
-		title = proc(user: rawptr, panel: u32) -> string { return i18n.tr(MISSION_TITLES[Mission_Panel(panel)]) },
-		on_save = mission_save, user = app, close_buttons = true, windows = true,
-	})
-	for p in Mission_Panel {
-		if ui.dock_panel(d, u32(p)) { mission_panel(app, p, em) }
-	}
-	res := ui.dock_end(d)
-	if res.closed != ui.DOCK_NO_PANEL { say(app, i18n.tr("%s closed: the panels' menu brings it back"), i18n.tr(MISSION_TITLES[Mission_Panel(res.closed)])) }
-	if res.windowed != ui.DOCK_NO_PANEL { app.mission.to_window = Mission_Panel(res.windowed) }
+	if ui.views_dock(&app.views, MISSION_SPACE, {}) {}
 	mission_menu(app, em)
-	mission_line_menu(app, em)
 }
+
+// Each frame (the main window's build): a panel the user closed is said, with where it comes back from.
+mission_closed_say :: proc(app: ^App) {
+	for id, p in MISSION_VIEWS {
+		if code, ok := ui.view_ended(&app.views, id); ok && code == ui.VIEW_CANCELLED {
+			say(app, i18n.tr("%s closed: the panels' menu brings it back"), i18n.tr(MISSION_TITLES[p]))
+		}
+	}
+}
+
+// A panel's view: the panel, wherever it is. Out of the section (floating, in a window of its own, docked elsewhere),
+// what Mission Control sums up is read; in a window of its own, a line's menu is that window's, and a line clicked
+// shows its section in the main window, which comes forward.
+@(private = "file")
+mission_view :: proc(v: ^ui.View, app: ^App) {
+	em := ui.font_size()
+	if v.presentation != .Panel || v.place.space != MISSION_SPACE {
+		if app.frames - app.mission.out_frame > MISSION_OUT_FRAMES { mission_read(app) }
+		app.mission.out_frame = app.frames
+	}
+	tab := app.tab
+	mission_panel(app, mission_panel_of(v.id), em)
+	if v.presentation == .External {
+		mission_line_menu(app, em)
+		if app.tab != tab { platform.raise_window(app.main.win) }
+	}
+}
+
+// Whether a panel was built out of the section lately.
+mission_out :: proc(app: ^App) -> bool { return app.frames - app.mission.out_frame <= MISSION_OUT_FRAMES }
 
 // The bar's right: the panels' menu, the layout as at first.
 @(private = "file")
@@ -144,19 +210,14 @@ mission_bar_right :: proc(app: ^App, em: f32) {
 // at first.
 @(private = "file")
 mission_menu :: proc(app: ^App, em: f32) {
-	d := &app.mission.dock
 	if ui.menu(MISSION_MENU, em * MISSION_MENU_EM) {
 		ui.menu_heading(i18n.tr("Panels"))
 		for p in Mission_Panel {
-			on := ui.dock_has(d, u32(p))
+			id := MISSION_VIEWS[p]
+			on := ui.view_is_open(&app.views, id)
 			if ui.menu_item(i18n.tr(MISSION_TITLES[p]), checked = on).clicked {
-				if on {
-					ui.dock_close(d, u32(p))
-				} else {
-					ui.dock_add(d, u32(p), mission_place(d))
-					ui.dock_activate(d, u32(p))
-				}
-				mission_save(app, d)
+				// (one brought back opens where it was last: the views' memory)
+				if on { ui.view_close(&app.views, id) } else { ui.view_open(&app.views, id, app, owner = &app.main.state) }
 			}
 		}
 		ui.menu_separator()
@@ -164,28 +225,12 @@ mission_menu :: proc(app: ^App, em: f32) {
 	}
 }
 
-// Where a panel brought back goes: with the first panel shown (else the empty space).
-// A panel back from its window, where a panel brought back from the menu goes; the layout kept.
-mission_dock_back :: proc(app: ^App, p: Mission_Panel) {
-	d := &app.mission.dock
-	if ui.dock_has(d, u32(p)) { return }
-	ui.dock_add(d, u32(p), mission_place(d))
-	ui.dock_activate(d, u32(p))
-	mission_save(app, d)
-}
-
-// What Mission Control sums up, read now: each section (when it is shown, or one of its panels is in a window).
+// What Mission Control sums up, read now: each section (when it is shown, or one of its panels is out of it).
 mission_read :: proc(app: ^App) {
 	connections_ask(app)
 	if !app.information.asked { information_ask(&app.information) }
 	services_ask(app)
 	startup_ask(app)
-}
-
-@(private = "file")
-mission_place :: proc(d: ^ui.Dock) -> ui.Dock_Target {
-	for p in Mission_Panel { if ui.dock_has(d, u32(p)) { return ui.dock_with(d, u32(p)) } }
-	return {place = .Tab, node = d.main, index = -1}
 }
 
 mission_panel :: proc(app: ^App, p: Mission_Panel, em: f32) {
@@ -252,7 +297,7 @@ mission_health :: proc(app: ^App, em: f32) {
 		ui.next({width = ui.px(em * 1.8), height = ui.px(em * 1.8), font = app.icons, font_size = em, text_align = .Center, text_pad = 0, cursor = .Help})
 		info: ui.Signal
 		if ui.tags("weak") { info = ui.signal(ui.build_box({.Clickable, .Draw_Text, .No_Text_Trunc, .Draw_Hot_Effects}, fmt.tprintf("%s###mc_health_info", lucide.INFO))) }
-		if info.clicked { app.diagnosis_open = true }
+		if info.clicked { diagnosis_open(app) }
 		if ui.hovered_for(info) {
 			if ui.tooltip() {
 				ui.next({width = ui.px(em * 24), height = ui.children_sum(), axis = .Y})
@@ -545,7 +590,7 @@ mission_line_menu :: proc(app: ^App, em: f32) {
 			if ui.menu_item(i18n.tr("Show its process"), icon = lucide.LAYOUT_LIST, disabled = q == nil, icon_font = app.icons).clicked { processes_reveal(app, q.pid, q.start) }
 			if ui.menu_item(cmd_label(.Service_Details), icon = COMMANDS[.Service_Details].icon, icon_font = app.icons).clicked {
 				mission_show_service(app, line.name)
-				if !app.settings.details { service_details_switch(app) }
+				if !service_details_shown(app) { service_details_switch(app) }
 			}
 		case .Startup:
 			if ui.menu_item(i18n.tr("Show in Startup"), icon = lucide.POWER, icon_font = app.icons).clicked { tab_show(app, .Startup) }

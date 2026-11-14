@@ -7,7 +7,6 @@ package inspecteur
 // checks it).
 
 import "core:fmt"
-import "core:strconv"
 import "core:strings"
 import config "gt:config"
 import i18n "gt:i18n"
@@ -46,11 +45,9 @@ PREF_DEFS := [?]config.Def{
 	{name = "services.widths", description = "The widths of the Services table's columns that were resized, in ems (description=30). Dragging the line before a column's title changes them.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "services.order", description = "The order of the Services table's columns, apart by commas (name,state,description). Dragging a column's title sideways changes it.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "services.sort", description = "The column the services are sorted by (name, description, state, startup, load, pid, memory), a - before it for the largest (or Z) first. A click on a title changes it.", kind = .String, default = {s = "name"}, hidden = true},
-	{name = "services.details", title = i18n.later("Details"), description = i18n.later("Show the selected service's details and its journal's last lines under the table (Ctrl+I)."), kind = .Bool, default = {b = true}},
 	{name = "services.journal_boot", title = i18n.later("Journal boot"), description = i18n.later("The details' journal shows this boot's entries alone; off: its last entries, from any boot. Alt+B switches it."), kind = .Bool, default = {b = true}},
 	{name = "services.journal_level", title = i18n.later("Journal level"), description = i18n.later("The entries of the details' journal shown: all, warnings (and worse), errors (and worse). Alt+L goes through them."), kind = .String, default = {s = "all"}, choices = {"all", "warnings", "errors"}, choice_labels = {i18n.later("All entries"), i18n.later("Warnings and errors"), i18n.later("Errors")}},
 	{name = "services.journal_follow", title = i18n.later("Journal follow"), description = i18n.later("Read the details' journal again every 2 seconds while it is shown: new entries come in at the end. Alt+F switches it."), kind = .Bool, default = {b = true}},
-	{name = "services.details_height", description = "The height of the details' pane, in ems. Dragging the line above it changes it.", kind = .Float, default = {f = 16}, min = 6, max = 80, bounded = true, hidden = true},
 	{name = "startup.widths", description = "The widths of the Startup table's columns that were resized, in ems (command=24).", kind = .String, default = {s = ""}, hidden = true},
 	{name = "startup.order", description = "The order of the Startup table's columns, apart by commas (name,status,command).", kind = .String, default = {s = ""}, hidden = true},
 	{name = "startup.sort", description = "The column the startup items are sorted by (name, command, type, status, file), a - before it for Z first.", kind = .String, default = {s = "name"}, hidden = true},
@@ -59,12 +56,9 @@ PREF_DEFS := [?]config.Def{
 	{name = "connections.sort", description = "The column the sockets are sorted by (process, pid, protocol, local_address, remote_address, state), a - before it for the largest (or Z) first.", kind = .String, default = {s = "process"}, hidden = true},
 	{name = "connections.refresh_ms", title = i18n.later("Refresh"), description = i18n.later("How often the sockets are read again while Connections or Mission Control is shown, in milliseconds. A reading goes through every process's open files: a longer period costs less."), kind = .Int, default = {i = 3000}, min = 1000, max = 60_000, bounded = true, unit = "ms", tags = {"network", "sockets", "speed", "interval"}},
 	{name = "services.refresh_ms", title = i18n.later("Refresh"), description = i18n.later("How often the services are read again while their section is shown, in milliseconds."), kind = .Int, default = {i = 3000}, min = 1000, max = 60_000, bounded = true, unit = "ms"},
-	{name = "mission.layout", description = "Mission Control's panels: where each one is docked, its stacks and their sizes, those closed left out (the dock's text). Its panels' menu brings one back; Mission Control: the layout as at first sets it back.", kind = .String, default = {s = ""}, hidden = true},
-	{name = "mission.windows", description = "Mission Control's panels in windows of their own, apart by commas (health,network): they open again at the start. A panel's menu opens one; closed, it goes back to Mission Control.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "view.zebra", title = i18n.later("Zebra"), description = i18n.later("Shade every second row of the tables: a line of numbers reads across."), kind = .Bool, default = {b = true}, tags = {"stripes", "rows"}},
 	{name = "view.rules", title = i18n.later("Rules"), description = i18n.later("Draw a thin line under each row of the tables."), kind = .Bool, default = {b = true}, tags = {"lines", "rows"}},
 	{name = "view.placement", description = "Where the window was left and its size, in physical pixels, and whether it was maximized (\"120 80 1400 900 maximized\"; empty: the first start's size). Written when it closes; Wayland lets a program set the size alone.", kind = .String, default = {s = ""}, hidden = true},
-	{name = "view.palette_size", description = "The command palette's size, in logical pixels: its width and its height (empty: the default). Dragging its edges or its corner changes it.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "view.section", description = "The section shown at the start: the one shown last (mission control, processes, performance, services, startup, connections, information). --section shows another.", kind = .String, default = {s = "processes"}, hidden = true},
 	{name = "performance.cpu_view", description = "The CPU's page in Performance: one graph for all the processors (overall), or one per logical processor (logical). Ctrl+G switches them.", kind = .String, default = {s = "overall"}, choices = {"overall", "logical"}, hidden = true},
 }
@@ -85,11 +79,9 @@ Settings :: struct {
 	summary:    bool,       // processes.summary
 	pinned:     string,     // owned: processes.pinned as written
 	manager:    Manager,    // services.manager
-	details:    bool,       // services.details
 	journal_boot: bool,     // services.journal_boot
 	journal_level: Journal_Level,   // services.journal_level
 	journal_follow: bool,   // services.journal_follow
-	details_em: f32,        // services.details_height
 	services_ms: int,       // services.refresh_ms
 	connections_ms: int,    // connections.refresh_ms
 	columns:    string,   // owned: processes.columns, .widths, .order, .sort as written
@@ -100,10 +92,8 @@ Settings :: struct {
 	look:       prefs_page.Appearance,   // appearance.theme, mode, finish, glow, font_size (owned)
 	system_title: bool,     // window.system_title
 	zoom:       f32,        // appearance.zoom
-	mission_layout: string, // owned: mission.layout
 	zebra:      bool,     // view.zebra
 	rules:      bool,     // view.rules
-	palette_size: [2]f32,   // view.palette_size ({}: the default)
 	update_auto: bool,    // update.auto
 	update_base_url: string,   // owned: update.base_url (read at the start: the Updater keeps it)
 }
@@ -134,11 +124,9 @@ prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Sett
 	s.tree = config.string_of(p, "processes.view") == "tree"
 	s.summary = config.bool_of(p, "processes.summary")
 	s.pinned = strings.clone(config.string_of(p, "processes.pinned"), allocator)
-	s.details = config.bool_of(p, "services.details")
 	s.journal_boot = config.bool_of(p, "services.journal_boot")
 	for l in Journal_Level { if JOURNAL_LEVEL_KEYS[l] == config.string_of(p, "services.journal_level") { s.journal_level = l } }
 	s.journal_follow = config.bool_of(p, "services.journal_follow")
-	s.details_em = f32(config.float_of(p, "services.details_height"))
 	s.manager = config.string_of(p, "services.manager") == "user" ? .User : .System
 	s.services_ms = int(config.int_of(p, "services.refresh_ms"))
 	s.connections_ms = int(config.int_of(p, "connections.refresh_ms"))
@@ -150,14 +138,8 @@ prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Sett
 	s.look = prefs_page.appearance_read(p, allocator)
 	s.system_title = config.bool_of(p, prefs_page.SYSTEM_TITLE_PREF)
 	s.zoom = f32(config.float_of(p, ZOOM_PREF))
-	s.mission_layout = strings.clone(config.string_of(p, "mission.layout"), allocator)
 	s.zebra = config.bool_of(p, "view.zebra")
 	s.rules = config.bool_of(p, "view.rules")
-	if parts := strings.fields(config.string_of(p, "view.palette_size"), context.temp_allocator); len(parts) == 2 {
-		w, wok := strconv.parse_f32(parts[0])
-		h, hok := strconv.parse_f32(parts[1])
-		if wok && hok { s.palette_size = {w, h} }
-	}
 	s.update_auto = config.bool_of(p, prefs_page.UPDATE_AUTO_PREF)
 	s.update_base_url = strings.clone(config.string_of(p, BASE_URL_PREF), allocator)
 	return
@@ -171,7 +153,6 @@ settings_free :: proc(s: ^Settings) {
 	delete(s.sort)
 	delete(s.order)
 	delete(s.pinned)
-	delete(s.mission_layout)
 	s^ = {}
 }
 
