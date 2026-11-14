@@ -153,8 +153,9 @@ headless sway), `shots`, `bench`, `logo`, `desktop_files`, `notices`. See [docs/
 ## Documentation
 
 - [Configuration](docs/configuration.md): every preference.
-- [Architecture](docs/architecture.md): how the processes, services, sockets and the rest are read and shown, and why;
-  what a port to Windows writes.
+- [Architecture](docs/architecture.md): how the processes, services, sockets and the rest are read and shown.
+- [Intent](src/md/README.md): why the code has its shape, the decisions and the refused alternatives; what a port to
+  Windows writes.
 - [Development](docs/development.md): building, testing, `inspecteurtool`.
 
 ## Licence

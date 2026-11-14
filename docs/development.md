@@ -108,7 +108,7 @@ odin run ext/gui_toolkit/tools/tk -- cdp --port 9222 tree , shot window.png
 - An action is a command of `COMMANDS` (`src/commands.odin`): its key, its menu line and its tooltip come from there, and
   the palette and the sheet of the keys list it. A test checks that no key does two things in one place.
 - A reading of the system goes in a `*_linux.odin` file, behind the plain structs of its model, and gets its demo's
-  counterpart in `src/demo.odin` (see [architecture.md](architecture.md), "Porting to Windows").
+  counterpart in `src/demo.odin` (see [src/md/infrastructure/porting.md](../src/md/infrastructure/porting.md)).
 - What another program could use goes in gui_toolkit, generic, with its documentation, its test and its changelog
   fragment; inspecteur then points to the toolkit's new tag.
 - Write what a user sees changed as a fragment of `changelog.d/` (`inspecteurtool changelog new <type> <subject> <text>`;

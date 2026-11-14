@@ -1,7 +1,7 @@
 package inspecteur
 
 // What the window says of the system that is Linux's own: the priorities offered (nice values), the name of the
-// administrator. A port writes its own (docs/architecture.md, "Porting to Windows").
+// administrator. A port writes its own (src/md/infrastructure/porting.md).
 
 import "core:fmt"
 import i18n "gt:i18n"
