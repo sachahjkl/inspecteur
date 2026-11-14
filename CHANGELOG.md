@@ -3,6 +3,11 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.5.1] - 2026-11-14
+
+### Fixed
+- **Dialogs open without a jump**: a dialog shows at its final size and place from its first frame, and the shade behind it fades in with it.
+
 ## [0.5.0] - 2026-11-13
 
 ### Added
@@ -204,6 +209,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.5.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.5.1
 [0.5.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.5.0
 [0.4.2]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.4.2
 [0.4.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.4.1
