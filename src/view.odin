@@ -395,6 +395,11 @@ build_footer :: proc(app: ^App, em: f32) {
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * FOOTER_EM)), bg = surface("bar")})
 	if ui.row(.Center, {.Draw_Background, .Draw_Side_Top}, "###footer") {
 		ui.spacer(ui.px(em * 0.8))
+		// (an update on offer, coming or in place: the one place that shows it, as in every program of the toolkit)
+		if app.updater != nil {
+			ui.next({height = ui.px(ui.dense(em * (FOOTER_EM - 0.45)))})
+			if prefs_page.update_badge(app.updater, proc(user: rawptr) { updates_restart((^App)(user)) }, app) != nil { ui.spacer(ui.px(em * 0.6)) }
+		}
 		if ui.style({font_size = em * 0.92}) {
 			msg := app.status
 			if msg == "" || ui.now_ms() > app.status_until {

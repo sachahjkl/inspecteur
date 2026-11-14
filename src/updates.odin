@@ -39,15 +39,15 @@ updates_auto :: proc(app: ^App) {
 	update.set_auto(app.updater, auto ? .Install : .Off)
 }
 
-// At each turn of the loop: what changed is said in the footer.
+// At each turn of the loop: the footer's badge shows the phase (a version on offer, its download, a restart); the
+// footer's message says only what the badge cannot (update.notice), once.
 updates_follow :: proc(app: ^App) {
 	if app.updater == nil { return }
 	st := update.status(app.updater)
 	if st.serial == app.update_serial { return }
 	app.update_serial = st.serial
-	app.main.settle = max(app.main.settle, FRAMES_AFTER_INPUT)   // (the settings show the state)
-	// (said when asked, or when there is something to know: not each check that found nothing)
-	if st.asked || st.phase == .Installed || st.phase == .Available { say(app, "%s", update.status_words(st)) }
+	app.main.settle = max(app.main.settle, FRAMES_AFTER_INPUT)   // (the badge and the settings show the state)
+	if words, _ := update.notice(st); words != "" { say(app, "%s", words) }
 	// (the installed copy: its manifest says the new version; written by a task of the chores)
 	if st.phase == .Installed {
 		version := new(string)
