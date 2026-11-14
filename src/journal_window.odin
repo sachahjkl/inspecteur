@@ -26,22 +26,14 @@ Journal_Window :: struct {
 	drained: bool,     // closed, no reading under way, and a build of the main window since took what was posted
 }
 
-// The view's instance of the journal of `name` of `manager` (temporary allocator).
+// The view's instance of the journal of `name` of `manager`: the service's id, as the palette's Go to names it
+// (temporary allocator).
 @(private = "file")
-journal_instance :: proc(manager: Manager, name: string) -> string {
-	return fmt.tprintf("%s/%s", MANAGER_KEYS[manager], name)
-}
+journal_instance :: proc(manager: Manager, name: string) -> string { return go_to_service_id(manager, name) }
 
 // The manager and the service an instance names; false when it names none (a line of another version).
 @(private = "file")
-journal_instance_parse :: proc(instance: string) -> (manager: Manager, name: string, ok: bool) {
-	slash := strings.index_byte(instance, '/')
-	if slash <= 0 || slash == len(instance) - 1 { return }
-	for key, m in MANAGER_KEYS {
-		if key == instance[:slash] { return m, instance[slash + 1:], true }
-	}
-	return
-}
+journal_instance_parse :: proc(instance: string) -> (manager: Manager, name: string, ok: bool) { return go_to_service_parse(instance) }
 
 // Its size in a window of its own, at first (ems).
 @(private = "file") JOURNAL_W_EM :: 64

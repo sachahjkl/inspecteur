@@ -51,3 +51,5 @@ section, the views, the tests) is [docs/architecture.md](../../docs/architecture
 - [features/gpus.md](features/gpus.md): why a sleeping GPU is not woken, when NVML is open
 - [features/connections.md](features/connections.md): a socket's process, the scan of descriptors skipped when every
   socket is known
+- [features/palette.md](features/palette.md): the palette's sources (the toolkit's commands and settings, Go to: the
+  processes and the services), what can act as a version, Go to's ids and its answers made on a chore

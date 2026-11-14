@@ -78,9 +78,11 @@ App :: struct {
 	device:      Device,            // the Performance section's device shown (perf_view.odin)
 	cpu_grid:    bool,              // the CPU's page shows a graph per logical processor
 	bar_rect:    ui.Rect,           // the Processes section's bar, as last laid out (the columns' menu opens under it)
-	palette:     ui.Command_Palette,   // the command palette (commands.odin)
-	palette_table: Palette_Table,   // its list, made again only when it changes (commands.odin)
-	palette_choices: ui.Choice_Memory,   // what the user chose in it before (palette_choices_file)
+	palette:     ui.Command_Palette,   // the command palette, and what the user chose in it (commands.odin)
+	palette_list: Palette_List,     // its commands source's table, made again only when it changes (commands.odin)
+	palette_settings: prefs_page.Palette_Settings,   // its settings source (`:`)
+	go_to:       Go_To,             // its Go to sources (`@`): the processes and the services (go_to.odin)
+	rows_made:   int,               // counts rows_again: what the commands can act on may have changed
 	sheet:       ui.Shortcuts_Sheet,   // the sheet of the keys (commands.odin)
 	sheet_commands: [dynamic]ui.Command,   // its list, made at its first opening
 	views:       ui.Views,          // the dialogs, the panels, the windows of their own, and how each was last shown (views.odin)
@@ -192,7 +194,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	}
 	h.state.icon_font = app.icons
 	// (the file is read by a task: the window's state is made, its chores run it)
-	ui.choice_memory_open(&app.palette_choices, &h.state, palette_choices_file(app))
+	ui.palette_memory_open(&app.palette, &h.state, palette_choices_file(app))
 	h.after_input = FRAMES_AFTER_INPUT
 	// (the zoom, the rounding, the scrolling, the delays, partial redraw...: applied now, then each as it changes)
 	prefs_page.standard_watch(&app.standard, &app.prefs, &h.state, {renderer = &app.shared.r, fonts = &app.shared.fonts, partial_redraw = &h.partial_redraw})
@@ -208,6 +210,9 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	section_first_show(app)
 	// (the views' memory read, the panels open again as they were: before the first frame)
 	views_start(app)
+	// (the palette's sources but the commands', which its first build gives)
+	palette_settings_add(app)
+	go_to_add(app)
 	// (the install is read on a task; the updates start once it says which copy runs: setup_follow. Never offered in the demo)
 	prefs_page.install_offer(&app.install, &h.state, offer = !opts.setup && app.demo == nil)
 	app.setup_due = opts.setup
@@ -280,6 +285,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	// then their data goes)
 	ui.views_destroy(&app.views)
 	journals_destroy(app)
+	// (before its window's State goes; its usage memory writes what changed and waits for its writer's thread)
+	ui.palette_destroy(&app.palette)
 	host.host_close(h)
 	ui.line_edit_destroy(&app.search)
 	ui.vlist_destroy(&app.vl)
@@ -296,12 +303,9 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	delete(app.own_units)
 	props_destroy(&app.props)
 	for &vl in app.props_lists { ui.vlist_destroy(&vl) }
-	ui.palette_destroy(&app.palette)
+	palette_list_destroy(&app.palette_list)
 	ui.shortcuts_sheet_destroy(&app.sheet)
 	delete(app.sheet_commands)
-	palette_table_destroy(&app.palette_table)
-	// (it writes what changed and waits for its writer's thread: the window is closed by now)
-	ui.choice_memory_close(&app.palette_choices)
 	settings_free(&app.settings)
 	prefs_page.standard_unwatch(&app.standard)
 	config.prefs_destroy(&app.prefs)
@@ -315,6 +319,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 // (the rows selected are ids: they stay; the list drops those no longer shown at its build).
 rows_again :: proc(app: ^App) {
 	keep := selected_id(app)
+	app.rows_made += 1
 	ui.vlist_invalidate(&app.vl)
 	table_rows(&app.table, &app.sampler, &app.catalog)
 	app.vl.sel = -1

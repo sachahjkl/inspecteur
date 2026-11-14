@@ -137,8 +137,12 @@ live_commands :: proc(l: ^Live) {
 	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
 	check(l, cdp.key(c, "Escape") && cdp.key(c, "ctrl+2"), "the Processes section")
 	check(l, cdp.key(c, "ctrl+k") && cdp.wait_name(c, "palette_top", SESSION_WAIT), "Ctrl+K opens the palette")
-	check(l, cdp.type_text(c, "performance") && cdp.wait_for(c, "Performance  ·  Sections", SESSION_WAIT), "typing finds the Performance section")
+	// (Enter waits for the ranking of what was typed: the first row is the section's command)
+	check(l, cdp.type_text(c, "performance") && cdp.wait_for(c, "Sections", SESSION_WAIT), "typing finds the Performance section")
 	check(l, cdp.key(c, "Enter") && cdp.wait_name(c, "cpu_graph", SESSION_WAIT), "Enter shows it")
+	// `@`: Go to, the processes and the services; inspecteur's own process chosen, its row is selected in Processes
+	check(l, cdp.key(c, "ctrl+k") && cdp.wait_name(c, "palette_top", SESSION_WAIT) && cdp.type_text(c, "@inspecteur") && cdp.key(c, "Enter"), "@: Go to inspecteur's own process")
+	check(l, cdp.wait_for(c, "Selected: inspecteur, PID", SESSION_WAIT), "its row is selected in Processes")
 	check(l, cdp.key(c, "ctrl+shift+p") && cdp.wait_name(c, "palette_top", SESSION_WAIT), "Ctrl+Shift+P opens it too")
 	check(l, cdp.type_text(c, "zzqx") && cdp.wait_for(c, "Nothing matches", SESSION_WAIT), "a search that keeps nothing says so (no crash)")
 	check(l, cdp.key(c, "Escape") && cdp.wait_name(c, "palette_top", SESSION_WAIT, gone = true), "Escape closes it")

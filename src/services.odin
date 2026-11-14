@@ -128,6 +128,7 @@ Services :: struct {
 	mutex:   sync.Mutex,
 	ask:     Service_Ask,      // under the mutex
 	list:    ^Service_List,    // the window's
+	readings: u64,             // counts the readings taken (the palette's Go to reads again)
 	rows:    Section_Table,
 	manager: Manager,          // the one shown
 	next:    time.Tick,        // the next reading while the section is shown
@@ -256,6 +257,7 @@ services_take :: proc(app: ^App, l: ^Service_List) {
 	s := &app.services
 	service_list_free(s.list)
 	s.list = l
+	s.readings += 1
 	for u in l.units {
 		if u.active == "active" && u.sub == "running" { l.running += 1 }
 		if u.active == "failed" { l.failed += 1 }

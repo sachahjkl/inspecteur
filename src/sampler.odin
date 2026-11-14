@@ -94,6 +94,7 @@ Sampler :: struct {
 	procs:   [dynamic]Proc,   // sorted by pid
 	last_ns: i64,             // when the last sample was taken (monotonic)
 	samples: int,
+	changes: u64,             // counts the samples that brought a process or took one away (the palette's Go to reads again)
 }
 
 sampler_destroy :: proc(s: ^Sampler) {
@@ -142,8 +143,10 @@ proc_ended :: proc(p: ^Proc, now_ns: i64) -> bool {
 procs_merge :: proc(s: ^Sampler, counters: []Proc_Counters, facts: []Proc_Facts, dt: f64, d_total_ns: u64, catalog: ^Catalog, history := true, now_ns: i64 = 0) {
 	next := make([dynamic]Proc, 0, len(counters))
 	old := 0
+	changed := false
 	for c, i in counters {
 		for old < len(s.procs) && s.procs[old].pid < c.pid {
+			changed = changed || !s.procs[old].ended
 			if proc_ended(&s.procs[old], now_ns) { append(&next, s.procs[old]) }
 			old += 1
 		}
@@ -159,6 +162,7 @@ procs_merge :: proc(s: ^Sampler, counters: []Proc_Counters, facts: []Proc_Facts,
 			}
 			f := i < len(facts) && facts[i].read ? facts[i] : Proc_Facts{}
 			proc_learn(&p, c, f, catalog)
+			changed = true
 			// (the processes of the first sample were there before: only those that come after are new)
 			if s.samples > 1 { p.born_ns = now_ns }
 		}
@@ -172,10 +176,12 @@ procs_merge :: proc(s: ^Sampler, counters: []Proc_Counters, facts: []Proc_Facts,
 		append(&next, p)
 	}
 	for ; old < len(s.procs); old += 1 {
+		changed = changed || !s.procs[old].ended
 		if proc_ended(&s.procs[old], now_ns) { append(&next, s.procs[old]) }
 	}
 	delete(s.procs)
 	s.procs = next
+	if changed { s.changes += 1 }
 }
 
 @(private = "file")

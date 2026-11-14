@@ -163,11 +163,7 @@ chosen_tree :: proc(app: ^App) -> (c: Chosen, ok: bool) {
 // The service the process belongs to, selected in the Services section (its manager's: the system's or the user's).
 go_to_service :: proc(app: ^App, p: ^Proc) {
 	if p.unit == "" { return }
-	ui.line_edit_clear(&app.search)
-	query_set(app, "")
-	services_switch(app, p.unit_user ? .User : .System)
-	tab_show(app, .Services)
-	service_select(app, p.unit)
+	go_to_service_named(app, p.unit_user ? .User : .System, p.unit)
 }
 
 // The process's name, searched for on the web (the person's browser).

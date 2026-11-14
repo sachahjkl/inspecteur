@@ -335,7 +335,7 @@ build_title :: proc(app: ^App, em: f32) {
 		ui.spacer(ui.fill())
 		refresh_button(app, em)
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
-		if ui.button("palette_button", icon = lucide.COMMAND, o = {tip = cmd_tip(.Palette)}).clicked { palette_open(app) }
+		if ui.button("palette_button", icon = lucide.COMMAND, o = {tip = ui.command_tip(ui.palette_command())}).clicked { ui.palette_toggle(&app.palette) }
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
 		if ui.button("help_button", icon = lucide.KEYBOARD, o = {tip = cmd_tip(.Shortcuts)}).clicked { shortcuts_open(app) }
 		theme_button(app, em)

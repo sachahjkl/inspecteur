@@ -67,9 +67,10 @@ and filters. Every colour comes from the theme: its page, bars and wells for the
 warning hue for the tint of busy cells. Corners are nearly square (`ui.set_rounding`).
 
 Every action is a command of one table (`COMMANDS`, the toolkit's `ui.Command`): its label, its group, its keys. The
-keys are read from it, the menus' lines and the buttons' tooltips say its key, the command palette (Ctrl+K) lists the
-commands of the window and of the section shown, and the sheet of the keys (F1) lists them all. A test checks that no
-key does two things in one place.
+keys are read from it, the menus' lines and the buttons' tooltips say its key, the command palette (Ctrl+K, the
+toolkit's) lists the commands of the window and of the section shown beside the settings, the views' moves and Go to
+(`@`: the processes and the services, `go_to.odin`; [src/md/features/palette.md](../src/md/features/palette.md)), and
+the sheet of the keys (F1) lists them all. A test checks that no key does two things in one place.
 
 ## Install, updates, settings (setup.odin, updates.odin, settings_view.odin, src/identity, src/update)
 
@@ -102,7 +103,7 @@ opens on the main window's `Shared`, framed after it), or docked in a dock space
 one of panels only (`mission`: the top, the left, the centre, the right and the bottom zones, each a row of stacks).
 One `ui.Views` holds them all, its memory in `$XDG_STATE_HOME/inspecteur/views.txt` (none in the demo): the
 presentation the user chose, the sizes, the docks' layouts, which were open at the last quit (`view_restore` opens the
-details and the panels again at the start). The palette lists the moves of each open view (`ui.View_Commands`). A
+details and the panels again at the start). The palette lists the moves of each open view (the toolkit's moves source). A
 dialog holds the window's keys (`ui.views_hold_keys`); a floating or docked view with the keyboard leaves the window's
 commands alone to the page (`focus_in_view`). The command palette, the sheet of the keys, the confirmations and the
 install's dialog are the toolkit's own views, on the same `Views`.

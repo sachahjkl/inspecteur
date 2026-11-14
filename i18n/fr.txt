@@ -127,14 +127,11 @@ fr Les réglages ne peuvent pas être écrits
 en Read again
 fr Actualiser
 
-en Command palette
-fr Palette de commandes
+en Keyboard shortcuts
+fr Raccourcis clavier
 
 en Window
 fr Fenêtre
-
-en Keyboard shortcuts
-fr Raccourcis clavier
 
 en Filter
 fr Filtrer
@@ -560,6 +557,15 @@ en+ %d minutes
 fr %d minute
 fr+ %d minutes
 
+en Show
+fr Afficher
+
+en PID %d
+fr PID %d
+
+en PID %d is not in the processes' last sample
+fr Le PID %d n'est pas dans la dernière mesure des processus
+
 en %s GPU (card%d)
 fr GPU %s (card%d)
 
@@ -893,9 +899,6 @@ fr Les processus de la démo ne sont pas ceux du système : rien n'a été envoy
 
 en %s, PID %d
 fr %s, PID %d
-
-en PID %d
-fr PID %d
 
 en It draws the desktop: the session ends with it, and every program of the session with it. 
 fr Il dessine le bureau : la session se termine avec lui, et tous les programmes de la session avec elle. 
@@ -1726,9 +1729,6 @@ fr inspecteur tourne sous lui : inspecteur se termine avec lui.
 
 en inspecteur runs in it: inspecteur ends with it.
 fr inspecteur tourne dedans : inspecteur se termine avec lui.
-
-en PID %d is not in the processes' last sample
-fr Le PID %d n'est pas dans la dernière mesure des processus
 
 en %d name
 en+ %d names
