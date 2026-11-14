@@ -53,8 +53,8 @@ Confirm :: struct {
 	act:     Confirm_Act,
 	chosen:  Chosen,            // Signal, Dump: the processes
 	sig:     process.Signal,
-	action:  Service_Action,    // Service: the action on `unit`, of the manager shown
-	unit:    string,            // owned
+	action:  Service_Action,    // Service: the action on `units`, of the manager shown
+	units:   [dynamic]string,   // owned
 }
 
 chosen_free :: proc(c: ^Chosen) {
@@ -65,7 +65,8 @@ chosen_free :: proc(c: ^Chosen) {
 
 confirm_free :: proc(c: ^Confirm) {
 	chosen_free(&c.chosen)
-	delete(c.unit)
+	for u in c.units { delete(u) }
+	delete(c.units)
 	c^ = {}
 }
 
@@ -86,16 +87,18 @@ selected_is_process :: proc(app: ^App) -> bool {
 	return ok && r.kind == .Process
 }
 
-// What the selection stands for: the rows marked (Ctrl and Shift clicks, Ctrl+A), else the selected row. A process's row
-// is that process; an app's row is its processes (`whole`: every process of the group; else the app's own, whose
-// children end with them). A process met twice (its own row and its group's) is chosen once.
-@(private = "file")
+// What the selection stands for: the rows selected (clicks, Shift and the moves, Ctrl+A), else the cursor's row (a row
+// the program chose, before the build that selects it). A process's row is that process; an app's row is its processes
+// (`whole`: every process of the group; else the app's own, whose children end with them). A process met twice (its own
+// row and its group's) is chosen once.
 chosen_of_selection :: proc(app: ^App, whole: bool) -> (c: Chosen, ok: bool) {
 	rows := make([dynamic]Row, context.temp_allocator)
-	if ui.list_mark_count(&app.vl) > 0 {
-		for r, i in app.table.rows { if r.kind != .Section && ui.list_is_marked(&app.vl, i) { append(&rows, r) } }
-	} else if r, has := selected_row(app); has && r.kind != .Section {
-		append(&rows, r)
+	if len(app.vl.selected) > 0 {
+		// (by the ids of the rows now: a sample since the last build made the rows again)
+		for r, i in app.table.rows { if r.kind != .Section && app.table.ids[i] in app.vl.selected { append(&rows, r) } }
+	}
+	if len(rows) == 0 {
+		if r, has := selected_row(app); has && r.kind != .Section { append(&rows, r) }
 	}
 	seen := make(map[i32]bool, 16, context.temp_allocator)
 	add :: proc(c: ^Chosen, seen: ^map[i32]bool, p: Proc) {
@@ -298,11 +301,13 @@ signal_selected :: proc(app: ^App, sig: process.Signal) {
 	}
 }
 
-// Asks the selected processes to end (SIGTERM).
+// Asks the selected processes to end (SIGTERM). Several rows are asked once, the confirmation naming their count and
+// listing their processes: a row selected by mistake among many is seen before it ends.
 end_selected :: proc(app: ^App) {
 	c, ok := chosen_of_selection(app, whole = false)
 	defer chosen_free(&c)
-	if ok { signal_or_confirm(app, &c, .Terminate) }
+	if !ok { return }
+	if len(app.vl.selected) > 1 { confirm_ask(app, c, .Terminate) } else { signal_or_confirm(app, &c, .Terminate) }
 }
 
 // Asks to confirm a kill of the selected processes (an app's: all of them).
@@ -401,16 +406,32 @@ confirm_ask :: proc(app: ^App, c: Chosen, sig: process.Signal, tree := false) {
 	})
 }
 
-// Asks to confirm a service's stop or restart. `danger`: what else ends with it ("" none): Enter cancels then.
-confirm_service :: proc(app: ^App, action: Service_Action, unit, danger: string) {
+// Asks to confirm the stop or the restart of services: one is named, several are counted and listed. `danger`: what
+// else ends with them ("" none): Enter cancels then.
+confirm_service :: proc(app: ^App, action: Service_Action, units: []string, danger: string) {
 	m := &app.menu.confirm
 	confirm_free(m)
 	m.act, m.action = .Service, action
-	m.unit = strings.clone(unit)
-	what := action == .Stop ? i18n.tr("It stops, and its processes end; what needs it may stop too.") : i18n.tr("It stops, its processes end, and it starts again.")
+	for u in units { append(&m.units, strings.clone(u)) }
+	many := len(units) > 1
+	what: string
+	switch {
+	case action == .Stop && many: what = i18n.tr("They stop, and their processes end; what needs them may stop too.")
+	case action == .Stop:         what = i18n.tr("It stops, and its processes end; what needs it may stop too.")
+	case many:                    what = i18n.tr("They stop, their processes end, and they start again.")
+	case:                         what = i18n.tr("It stops, its processes end, and it starts again.")
+	}
+	title: string
+	switch {
+	case action == .Stop && many: title = fmt.tprintf(i18n.tr(len(units), "Stop %d service?", "Stop %d services?"), len(units))
+	case action == .Stop:         title = fmt.tprintf(i18n.tr("Stop %s?"), units[0])
+	case many:                    title = fmt.tprintf(i18n.tr(len(units), "Restart %d service?", "Restart %d services?"), len(units))
+	case:                         title = fmt.tprintf(i18n.tr("Restart %s?"), units[0])
+	}
 	ui.confirm_open(CONFIRM_VIEW, {
-		title = fmt.tprintf(action == .Stop ? i18n.tr("Stop %s?") : i18n.tr("Restart %s?"), unit),
+		title = title,
 		note = danger != "" ? fmt.tprintf("%s %s", danger, what) : what,
+		lines = many ? units : nil,
 		act = action == .Stop ? i18n.tr("Stop") : i18n.tr("Restart"),
 		enter_confirms = danger == "",
 	})
@@ -422,7 +443,7 @@ confirm_act :: proc(app: ^App) {
 	m := &app.menu.confirm
 	switch m.act {
 	case .Signal:  send_signal(app, &m.chosen, m.sig)
-	case .Service: service_act_now(app, m.action, m.unit)
+	case .Service: service_act_now(app, m.action, m.units[:])
 	case .Dump:    dump_start(app, m.chosen.targets[0], m.chosen.name)
 	}
 }

@@ -1,9 +1,9 @@
 package inspecteur
 
 // The Services section (services.odin): a table of the services of the system's manager or of the user's (System and
-// User at the right of its bar, Ctrl+U). Its bar, a row's menu and the keys (commands.odin) act on the selected service:
-// Start, Stop, Restart, Enable (it starts by itself, at boot or with the user's session), Disable, Open in Processes
-// (its main process, selected there), Copy name.
+// User at the right of its bar, Ctrl+U). Its bar, a row's menu and the keys (commands.odin) act on the services
+// selected: Start, Stop, Restart, Enable (it starts by itself, at boot or with the user's session), Disable (each on
+// those it means something for), Copy name; and on the cursor's: Open in Processes (its main process, selected there).
 //
 // The selected service's details and journal are a view ("service": views.odin), docked at first under the table, in
 // the section's dock space: the user resizes it by the line above it, floats it, puts it in a window of its own or
@@ -156,19 +156,16 @@ services_due_ms :: proc(app: ^App) -> int {
 	return due
 }
 
-// Whether a command of the section can act on the selected service now.
+// Whether a command of the section can act now: an action of the manager on one of the services selected at least, the
+// others on the cursor's.
 service_can :: proc(app: ^App, c: Cmd) -> bool {
 	u, ok := selected_service(app)
 	if !ok { return false }
 	// (what asks nothing of the manager acts while an action waits)
 	if app.services.pending != .None && c != .Service_Open && c != .Service_Copy && c != .Service_Open_File { return false }
-	running := u.active == "active" || u.active == "activating" || u.active == "reloading"
 	#partial switch c {
-	case .Service_Start:   return !running && u.load != "masked"
-	case .Service_Stop:    return running
-	case .Service_Restart: return u.load != "masked" && u.load != "not-found"
-	case .Service_Enable:  return u.file == "disabled"
-	case .Service_Disable: return u.file == "enabled" || u.file == "enabled-runtime" || u.file == "linked"
+	case .Service_Start, .Service_Stop, .Service_Restart, .Service_Enable, .Service_Disable:
+		return len(service_targets(app, service_cmd_action(c))) > 0
 	case .Service_Open:    return u.pid > 0
 	case .Service_Copy:    return true
 	case .Service_Open_File:
@@ -242,23 +239,70 @@ services_menu :: proc(app: ^App, em: f32) {
 	}
 }
 
-// Asks the manager to act on the selected service. Stop and Restart are asked first: they end the service's processes.
-service_do :: proc(app: ^App, action: Service_Action) {
-	u, ok := selected_service(app)
-	if !ok { return }
-	if action == .Stop || action == .Restart {
-		confirm_service(app, action, u.name, service_danger(app, u))
-		return
+// The action of a command of the manager (.None: the command is not one).
+service_cmd_action :: proc(c: Cmd) -> Service_Action {
+	#partial switch c {
+	case .Service_Start:   return .Start
+	case .Service_Stop:    return .Stop
+	case .Service_Restart: return .Restart
+	case .Service_Enable:  return .Enable
+	case .Service_Disable: return .Disable
 	}
-	service_act_now(app, action, u.name)
+	return .None
 }
 
-// The manager asked to act on `unit`; the footer says it is asked, then what came of it (services_take).
-service_act_now :: proc(app: ^App, action: Service_Action, unit: string) {
-	if app.services.pending != .None { return }
+// Whether `action` means something for the service `u` (a running one is not started, a disabled one not disabled).
+service_takes :: proc(u: Service, action: Service_Action) -> bool {
+	running := u.active == "active" || u.active == "activating" || u.active == "reloading"
+	#partial switch action {
+	case .Start:   return !running && u.load != "masked"
+	case .Stop:    return running
+	case .Restart: return u.load != "masked" && u.load != "not-found"
+	case .Enable:  return u.file == "disabled"
+	case .Disable: return u.file == "enabled" || u.file == "enabled-runtime" || u.file == "linked"
+	}
+	return false
+}
+
+// The services selected that `action` means something for, in the order shown.
+service_targets :: proc(app: ^App, action: Service_Action) -> []Service {
+	s := &app.services
+	out := make([dynamic]Service, context.temp_allocator)
+	if s.list == nil || s.list.manager != s.manager { return out[:] }
+	for r in selected_rows(&s.rows.table) {
+		if r < len(s.list.units) && service_takes(s.list.units[r], action) { append(&out, s.list.units[r]) }
+	}
+	return out[:]
+}
+
+// Asks the manager to act on the services selected that the action means something for. Stop and Restart are asked
+// first, once for all of them: they end the services' processes.
+service_do :: proc(app: ^App, action: Service_Action) {
+	targets := service_targets(app, action)
+	if len(targets) == 0 { return }
+	names := make([]string, len(targets), context.temp_allocator)
+	danger := ""
+	for u, i in targets {
+		names[i] = u.name
+		if danger == "" { danger = service_danger(app, u) }
+	}
+	if action == .Stop || action == .Restart {
+		confirm_service(app, action, names, danger)
+		return
+	}
+	service_act_now(app, action, names)
+}
+
+// The manager asked to act on `units`; the footer says it is asked, then what came of it (services_take).
+service_act_now :: proc(app: ^App, action: Service_Action, units: []string) {
+	if app.services.pending != .None || len(units) == 0 { return }
 	app.services.pending = action
-	say(app, i18n.tr(SERVICE_ACTION_DOING[action]), unit)
-	services_ask(app, action, unit)
+	if len(units) == 1 {
+		say(app, i18n.tr(SERVICE_ACTION_DOING[action]), units[0])
+	} else {
+		say(app, i18n.tr(SERVICE_ACTION_DOING[action]), fmt.tprintf(i18n.tr(len(units), "%d service", "%d services"), len(units)))
+	}
+	services_ask(app, action, units)
 }
 
 // What else ends when the service `u` stops: the desktop (its main process is the display server), or Inspecteur (its
@@ -282,9 +326,14 @@ service_reveal :: proc(app: ^App) {
 	if p == nil || !processes_reveal(app, p.pid, p.start) { say(app, i18n.tr("PID %d is not in the processes' last sample"), u.pid) }
 }
 
+// The names of the services selected, a line each.
 service_copy :: proc(app: ^App) {
-	u, ok := selected_service(app)
-	if !ok { return }
-	platform.set_clipboard(app.main.win, u.name)
-	announce(app, i18n.tr("Copied"), u.name)
+	s := &app.services
+	if s.list == nil { return }
+	names := make([dynamic]string, context.temp_allocator)
+	for r in selected_rows(&s.rows.table) { if r < len(s.list.units) { append(&names, s.list.units[r].name) } }
+	if len(names) == 0 { return }
+	text := strings.join(names[:], "\n", context.temp_allocator)
+	platform.set_clipboard(app.main.win, text)
+	announce(app, i18n.tr("Copied"), len(names) == 1 ? text : fmt.tprintf(i18n.tr(len(names), "%d name", "%d names"), len(names)))
 }

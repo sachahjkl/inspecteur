@@ -1,8 +1,8 @@
 package inspecteur
 
 // The Connections section (connections.odin): a table of the sockets and their processes. Its bar, a row's menu and the
-// keys (commands.odin) act on the selected socket's process: End task, Kill (after a confirmation), Open in Processes
-// (the process, selected there), Copy address (the remote address, else the local one).
+// keys (commands.odin) act on the processes of the sockets selected: End task, Kill (after a confirmation), Copy address
+// (the remote address, else the local one); and on the cursor's: Open in Processes (the process, selected there).
 
 import "core:fmt"
 import "core:strings"
@@ -64,17 +64,41 @@ connections_menu :: proc(app: ^App, em: f32) {
 	}
 }
 
-// End task on the selected socket's process; Kill asks first, as in the Processes section.
+// The processes of the sockets selected, each once (a process holds many sockets), those still running; `gone`: the pid
+// of a socket's process that has ended (0: none).
+sockets_chosen :: proc(app: ^App) -> (c: Chosen, gone: i32) {
+	seen := make(map[i32]bool, 16, context.temp_allocator)
+	for r in selected_rows(&app.connections.rows.table) {
+		if r >= len(app.connections.sockets) { continue }
+		s := app.connections.sockets[r]
+		if s.pid <= 0 || s.pid in seen { continue }
+		seen[s.pid] = true
+		p := find_proc(&app.sampler, s.pid, s.start)
+		if p == nil { gone = s.pid; continue }
+		append(&c.targets, Target{p.pid, p.start})
+		if len(c.targets) == 1 { c.name = strings.clone(fmt.tprintf(i18n.tr("%s (PID %d)"), p.name, p.pid)) }
+	}
+	if len(c.targets) > 1 {
+		delete(c.name)
+		c.name = strings.clone(fmt.tprintf(i18n.tr(len(c.targets), "%d processes", "%d processes"), len(c.targets)))
+	}
+	return
+}
+
+// End task on the processes of the sockets selected; Kill asks first, as in the Processes section, and so does End
+// task on several: once, naming their count.
 connection_signal :: proc(app: ^App, kill: bool) {
-	s, ok := selected_socket(app)
-	if !ok || s.pid <= 0 { return }
-	p := find_proc(&app.sampler, s.pid, s.start)
-	if p == nil { say(app, i18n.tr("PID %d has ended already"), s.pid); return }
-	c: Chosen
+	c, gone := sockets_chosen(app)
 	defer chosen_free(&c)
-	append(&c.targets, Target{p.pid, p.start})
-	c.name = strings.clone(fmt.tprintf(i18n.tr("%s (PID %d)"), p.name, p.pid))
-	if kill { confirm_ask(app, c, .Kill) } else { signal_or_confirm(app, &c, .Terminate) }
+	if len(c.targets) == 0 {
+		if gone > 0 { say(app, i18n.tr("PID %d has ended already"), gone) }
+		return
+	}
+	switch {
+	case kill:                 confirm_ask(app, c, .Kill)
+	case len(c.targets) > 1:   confirm_ask(app, c, .Terminate)
+	case:                      signal_or_confirm(app, &c, .Terminate)
+	}
 }
 
 connection_reveal :: proc(app: ^App) {
@@ -83,11 +107,18 @@ connection_reveal :: proc(app: ^App) {
 	if !processes_reveal(app, s.pid, s.start) { say(app, i18n.tr("PID %d has ended"), s.pid) }
 }
 
+// The addresses of the sockets selected (the remote one, else the local one), a line each.
 connection_copy :: proc(app: ^App) {
-	s, ok := selected_socket(app)
-	if !ok { return }
-	text := remote_text(s)
-	if text == "" { text = endpoint_text(s.local, s.lport, s.v6) }
+	lines := make([dynamic]string, context.temp_allocator)
+	for r in selected_rows(&app.connections.rows.table) {
+		if r >= len(app.connections.sockets) { continue }
+		s := app.connections.sockets[r]
+		text := remote_text(s)
+		if text == "" { text = endpoint_text(s.local, s.lport, s.v6) }
+		append(&lines, text)
+	}
+	if len(lines) == 0 { return }
+	text := strings.join(lines[:], "\n", context.temp_allocator)
 	platform.set_clipboard(app.main.win, text)
-	announce(app, i18n.tr("Copied"), text)
+	announce(app, i18n.tr("Copied"), len(lines) == 1 ? text : fmt.tprintf(i18n.tr(len(lines), "%d address", "%d addresses"), len(lines)))
 }

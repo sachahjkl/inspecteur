@@ -54,6 +54,9 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	}
 	// (the views docked at the window's edges and floating in it are built first: they read their keys first)
 	if ui.views_frame(&app.views) {
+		// (the window's commands first, in every page, whatever has the keyboard, over a dialog too; not while a menu is
+		// open: its keys, Escape and the letters that search it, are its own until it closes)
+		if !ui.menu_any_open() { window_keys(app) }
 		// (a dialog holds the keyboard; a view that has it otherwise leaves the window's commands alone to the content)
 		free_keys := !ui.views_hold_keys(&app.views) && !ui.menu_any_open()
 		in_view := focus_in_view(app)
@@ -115,6 +118,18 @@ view_keys :: proc(app: ^App, in_view: bool) {
 	jk := app.services.pane.search_key
 	field_keeps := ui.focus_key() == app.search_key && app.search_key != 0 && len(app.search.buf) > 0 || jk != 0 && ui.focus_key() == jk
 	if journal_search_escape(&app.services.pane) { return }
+	// (Escape on several rows selected: the toolkit's, the cursor's row alone; else the filter's. The filter has the
+	// keyboard: the table's list does not see it)
+	if ui.key_pressed_peek(.Escape) {
+		taken := false
+		#partial switch app.tab {
+		case .Processes:   taken = ui.item_selection_escape(&app.vl.selection, process_rows(app))
+		case .Services:    taken = ui.item_selection_escape(&app.services.rows.table.vl.selection, table_rows_now(&app.services.rows.table))
+		case .Startup:     taken = ui.item_selection_escape(&app.startup.rows.table.vl.selection, table_rows_now(&app.startup.rows.table))
+		case .Connections: taken = ui.item_selection_escape(&app.connections.rows.table.vl.selection, table_rows_now(&app.connections.rows.table))
+		}
+		if taken { _ = ui.key_press(.Escape); return }
+	}
 	commands_keys(app, field_keeps)
 	#partial switch app.tab {
 	case .Processes:   processes_keys(app, field_keeps)
@@ -132,24 +147,49 @@ section_keys :: proc(app: ^App, st: ^Section_Table, field_keeps: bool, enter: Cm
 	if !field_keeps && len(t.ids) > 0 {
 		if ui.key_press(.Home) { ui.list_select(&t.vl, 0) }
 		if ui.key_press(.End) { ui.list_select(&t.vl, len(t.ids) - 1) }
+		// (with Shift: the range from the anchor, as the toolkit's Shift+Ctrl+Home while the filter keeps Home)
+		if ui.key_press(.Home, {.Shift}) { ui.item_selection_move(&t.vl.selection, table_rows_now(t), 0, {.Shift}); t.vl.reveal = REVEAL_BUILDS }
+		if ui.key_press(.End, {.Shift}) { ui.item_selection_move(&t.vl.selection, table_rows_now(t), len(t.ids) - 1, {.Shift}); t.vl.reveal = REVEAL_BUILDS }
 	}
 	keys := ui.table_keys(t)
 	if keys.activated && cmd_can(app, enter) { cmd_run(app, enter) }
 	if keys.menu { menu_open(app, keys.menu_at, true) }
 }
 
-// The moves in the Processes table (over the sections' rows), its row's menu.
+// The moves in the Processes table (over the sections' rows), its row's menu. Alone, a move selects its row alone; with
+// Shift, the range from the anchor; with Ctrl+Shift, the range added to what was selected (the toolkit's
+// item_selection_move). Ctrl alone is the priority's (Ctrl+Up, Ctrl+Down); Ctrl+Home and Ctrl+End are Home and End
+// while the filter keeps those.
 @(private = "file")
 processes_keys :: proc(app: ^App, field_keeps: bool) {
 	page := max(app.vl.page_rows - 1, 1)
-	if ui.key_press(.Down) { select_step(app, app.vl.sel, 1, 1) }
-	if ui.key_press(.Up) { select_step(app, app.vl.sel, -1, 1) }
-	if ui.key_press(.Page_Down) { select_step(app, app.vl.sel, 1, page) }
-	if ui.key_press(.Page_Up) { select_step(app, app.vl.sel, -1, page) }
-	if ui.key_press(.Home, {.Ctrl}) || (!field_keeps && ui.key_press(.Home)) { select_step(app, -1, 1, 1) }
-	if ui.key_press(.End, {.Ctrl}) || (!field_keeps && ui.key_press(.End)) { select_step(app, len(app.table.rows), -1, 1) }
+	n := len(app.table.rows)
+	for mods in ([3]platform.Modifiers{{}, {.Shift}, {.Ctrl, .Shift}}) {
+		at := app.vl.sel
+		to := -1
+		ends := .Ctrl not_in mods   // (Ctrl+Shift+Home is Shift+Home's, taken in the Shift turn)
+		switch {
+		case ui.key_press(.Down, mods):      to = step_target(app, at, 1, 1)
+		case ui.key_press(.Up, mods):        to = step_target(app, at, -1, 1)
+		case ui.key_press(.Page_Down, mods): to = step_target(app, at, 1, page)
+		case ui.key_press(.Page_Up, mods):   to = step_target(app, at, -1, page)
+		case ends && (ui.key_press(.Home, mods + {.Ctrl}) || (!field_keeps && ui.key_press(.Home, mods))): to = step_target(app, -1, 1, 1)
+		case ends && (ui.key_press(.End, mods + {.Ctrl}) || (!field_keeps && ui.key_press(.End, mods))):   to = step_target(app, n, -1, 1)
+		}
+		if to < 0 || to >= n { continue }
+		ui.item_selection_move(&app.vl.selection, process_rows(app), to, mods)
+		app.vl.reveal = REVEAL_BUILDS
+	}
 	if ui.key_press(.Menu) || ui.key_press(.F10, {.Shift}) { row_menu_open(app, {app.sel_rect.min.x + 40, app.sel_rect.max.y}, from_keyboard = true) }
 }
+
+// The Processes table's rows as the selection sees them now (a sample may have made them again since the last build).
+process_rows :: proc(app: ^App) -> ui.Item_Rows {
+	return {count = len(app.table.ids), ids = app.table.ids[:], selectable = app.table.selectable[:]}
+}
+
+// A table's rows as the selection sees them now (table_apply may have made them again since the last build).
+table_rows_now :: proc(t: ^ui.Table) -> ui.Item_Rows { return {count = len(t.ids), ids = t.ids[:]} }
 
 // Whether a row's children (an app's group's processes, a process's in the tree) are shown.
 row_open :: proc(app: ^App, r: Row) -> bool {
@@ -185,22 +225,24 @@ group_set :: proc(app: ^App, open: bool) {
 	}
 }
 
-// Moves the selection `count` rows from `from` in `dir`, over the section rows.
+// The row `count` selectable rows from `from` in `dir`, over the section rows; `from` when there is none.
 @(private = "file")
-select_step :: proc(app: ^App, from, dir, count: int) {
+step_target :: proc(app: ^App, from, dir, count: int) -> int {
 	n := len(app.table.rows)
 	at, left := from, count
 	for k := from + dir; k >= 0 && k < n && left > 0; k += dir {
 		if app.table.selectable[k] { at = k; left -= 1 }
 	}
-	if at >= 0 && at < n && at != from { select_row(app, at) }
+	return at
 }
 
-// Makes `row` the selection (the rows marked, if any, are not: a move alone selects one row).
+// Every process's and app's row selected (Ctrl+A while the filter has the keyboard: the list's own is the toolkit's).
+select_all :: proc(app: ^App) { ui.item_selection_all(&app.vl.selection, process_rows(app)) }
+
+// Makes `row` the selection, alone, and brings it into view.
 select_row :: proc(app: ^App, row: int) {
-	app.vl.sel = row
+	ui.item_selection_one(&app.vl.selection, process_rows(app), row)
 	app.vl.reveal = REVEAL_BUILDS
-	ui.list_marks_clear(&app.vl)
 }
 
 // Shows the process (pid, start) selected in the Processes section: the filter cleared, its app's group open. False
@@ -426,11 +468,11 @@ build_footer :: proc(app: ^App, em: f32) {
 					case .Process:
 						p := app.sampler.procs[r.index]
 						msg = fmt.tprintf(i18n.tr("Selected: %s, PID %d"), p.name, p.pid)
-						if n := ui.list_mark_count(&app.vl); n > 1 { msg = fmt.tprintf(i18n.tr("Selected: %d rows"), n) }
+						if n := len(app.vl.selected); n > 1 { msg = fmt.tprintf(i18n.tr("Selected: %d rows"), n) }
 					case .App:
 						g := app.table.groups[r.index]
 						msg = fmt.tprintf(i18n.tr(g.count, "Selected: %s, %d process", "Selected: %s, %d processes"), app.catalog.entries[g.entry].name, g.count)
-						if n := ui.list_mark_count(&app.vl); n > 1 { msg = fmt.tprintf(i18n.tr("Selected: %d rows"), n) }
+						if n := len(app.vl.selected); n > 1 { msg = fmt.tprintf(i18n.tr("Selected: %d rows"), n) }
 					}
 				}
 			}

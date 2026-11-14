@@ -30,7 +30,7 @@ section, the views, the tests) is [docs/architecture.md](../../docs/architecture
 
 ## Subtleties
 
-- A process is the pair (pid, start time), never a pid alone: the selection, the marks, the signals, the Properties'
+- A process is the pair (pid, start time), never a pid alone: the selection, the signals, the Properties'
   reads all check it.
 - Readers give counters, not rates: the neutral side computes the rates, so the arithmetic is the same on every system
   and is tested with no system.

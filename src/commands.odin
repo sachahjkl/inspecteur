@@ -48,8 +48,8 @@ Cmd :: enum u8 {
 }
 
 COMMANDS := [Cmd]ui.Command{
-	.Palette          = {icon = lucide.COMMAND, label = i18n.later("Command palette"), group = i18n.later("Window"), keys = {{.K, {.Ctrl}}, {.P, {.Ctrl, .Shift}}}},
-	.Shortcuts        = {icon = lucide.KEYBOARD, label = i18n.later("Keyboard shortcuts"), group = i18n.later("Window"), keys = {{.F1, {}}}, tags = {"keys", "help", "keyboard"}},
+	.Palette          = {icon = lucide.COMMAND, label = i18n.later("Command palette"), group = i18n.later("Window"), keys = {{.K, {.Ctrl}}, {.P, {.Ctrl, .Shift}}}, scope = .Window},
+	.Shortcuts        = {icon = lucide.KEYBOARD, label = i18n.later("Keyboard shortcuts"), group = i18n.later("Window"), keys = {{.F1, {}}}, tags = {"keys", "help", "keyboard"}, scope = .Window},
 	.Filter           = {icon = lucide.FILTER, label = i18n.later("Filter"), group = i18n.later("Window"), keys = {{.F, {.Ctrl}}}},
 	.Clear_Filter     = {icon = lucide.X, label = i18n.later("Clear the filter"), group = i18n.later("Window"), keys = {{.Escape, {}}}},
 	.Read_Again       = {icon = lucide.REFRESH_CW, label = i18n.later("Read again"), group = i18n.later("Window"), keys = {{.F5, {}}}, tags = {"refresh", "reload"}},
@@ -59,7 +59,7 @@ COMMANDS := [Cmd]ui.Command{
 	.Zoom_Out         = {icon = lucide.ZOOM_OUT, label = i18n.later("Zoom out"), group = i18n.later("Window"), keys = {{.Minus, {.Ctrl}}, {.Num_Subtract, {.Ctrl}}}},
 	.Zoom_Reset       = {icon = lucide.SEARCH, label = i18n.later("Zoom: 100 %"), group = i18n.later("Window"), keys = {{.N0, {.Ctrl}}}},
 	.Light_Dark       = {icon = lucide.SUN_MOON, label = i18n.later("Light or dark"), group = i18n.later("Window"), keys = {{.L, {.Ctrl, .Shift}}}, tags = {"theme", "dark", "night", "colours"}},
-	.Settings         = {icon = lucide.SLIDERS_HORIZONTAL, label = i18n.later("Settings"), group = i18n.later("Window"), keys = {{.Comma, {.Ctrl}}}, tags = {"preferences", "options", "configure"}},
+	.Settings         = {icon = lucide.SLIDERS_HORIZONTAL, label = i18n.later("Settings"), group = i18n.later("Window"), keys = {{.Comma, {.Ctrl}}}, tags = {"preferences", "options", "configure"}, scope = .Window},
 	.Check_Updates    = {icon = lucide.HARD_DRIVE_DOWNLOAD, label = i18n.later("Check for updates"), group = i18n.later("Window")},
 	.Diagnose         = {icon = lucide.LIGHTBULB, label = i18n.later("Why is it slow?"), group = i18n.later("Window"), keys = {{.F2, {}}}, tags = {"slow", "lag", "performance", "why"}},
 
@@ -175,13 +175,14 @@ cmd_item :: proc(app: ^App, c: Cmd, label := "") {
 	if ui.menu_item(label != "" ? label : cmd_label(c), ui.command_shortcut(COMMANDS[c]), icon = COMMANDS[c].icon, disabled = !cmd_can(app, c), icon_font = app.icons).clicked { cmd_run(app, c) }
 }
 
-// The keys the filter keeps while it has the keyboard and some text: they edit it.
+// The keys the filter keeps while it has the keyboard and some text: they edit it. (The keys that type text, Space and
+// Backspace among them, are a focused field's already: ui.command_pressed leaves them to it.)
 @(private = "file")
 editing_chord :: proc(ch: ui.Chord) -> bool {
 	// (Ctrl+C copies, Ctrl+A selects the text, Ctrl+Delete erases a word: the filter's while it has text)
 	if ch.mods - {.Shift} != {} { return ch.mods == {.Ctrl} && (ch.key == .C || ch.key == .A || ch.key == .Delete) }
 	#partial switch ch.key {
-	case .Delete, .Backspace, .Space, .Left, .Right, .Home, .End: return true
+	case .Delete, .Left, .Right, .Home, .End: return true
 	}
 	return false
 }
@@ -191,19 +192,24 @@ editing_chord :: proc(ch: ui.Chord) -> bool {
 // some text: its editing keys are its own.
 commands_keys :: proc(app: ^App, field_keeps: bool, window_only := false) {
 	for c in Cmd {
-		if cmd_is_props(c) { continue }
+		if cmd_is_props(c) || COMMANDS[c].scope == .Window { continue }
 		if t, ok := cmd_tab(c).?; ok && (window_only || t != app.tab) { continue }
 		cmd := COMMANDS[c]
-		if field_keeps || ui.focus_key() == app.search_key && app.search_key != 0 {
-			// (the filter keeps Space while it has the keyboard: a space in a name; the keys are a slice that COMMANDS
-			// shares: a copy is edited, never the table)
+		if field_keeps {
+			// (the keys are a slice that COMMANDS shares: a copy is edited, never the table)
 			cmd.keys = slice.clone(cmd.keys, context.temp_allocator)
-			for &ch in cmd.keys {
-				if ch.key == .Space && ui.focus_key() == app.search_key { ch = {} }
-				if field_keeps && editing_chord(ch) { ch = {} }
-			}
+			for &ch in cmd.keys { if editing_chord(ch) { ch = {} } }
 		}
 		if ui.command_pressed(cmd, !cmd_can(app, c)) { cmd_run(app, c) }
+	}
+}
+
+// The keys of the window's commands (scope .Window: the palette, the keys, the settings), in every page and mode: the
+// settings, a view with the keyboard, a dialog over the window. The toolkit takes their keys whatever has the focus.
+window_keys :: proc(app: ^App) {
+	for c in Cmd {
+		if COMMANDS[c].scope != .Window { continue }
+		if ui.command_pressed(COMMANDS[c], !cmd_can(app, c)) { cmd_run(app, c) }
 	}
 }
 
@@ -366,7 +372,7 @@ cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 	case .Zoom_Reset: return ui.zoom(&app.main.state) != 1
 	case .Clear_Filter: return len(app.search.buf) > 0
 	case .Show_Mission_Control, .Show_Processes, .Show_Performance, .Show_Services, .Show_Startup, .Show_Connections, .Show_Information, .Next_Section, .Previous_Section: return true
-	case .End_Task, .Kill, .End_Tree: return p != nil || ui.list_mark_count(&app.vl) > 0
+	case .End_Task, .Kill, .End_Tree: return p != nil || len(app.vl.selected) > 0
 	case .Select_All: return len(app.table.rows) > 0
 	case .Properties, .Search_Online: return p != nil
 	case .Affinity: return p != nil && selected_is_process(app)
@@ -434,7 +440,7 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .End_Task:         end_selected(app)
 	case .Kill:             kill_selected(app)
 	case .End_Tree:         end_tree_selected(app)
-	case .Select_All:       ui.list_mark_all(&app.vl)
+	case .Select_All:       select_all(app)
 	case .Suspend:          suspend_selected(app)
 	case .Properties:       props_selected(app)
 	case .Open_Location:    if p := selected_proc(app); p != nil { open_location(app, p) }

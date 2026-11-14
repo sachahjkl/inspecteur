@@ -304,11 +304,12 @@ mission_health :: proc(app: ^App, em: f32) {
 				if ui.column(id = "###mc_health_tip") {
 					for f, k in findings {
 						ui.next({width = ui.fill()})
-						if ui.style({text_pad = em * 0.3}) { ui.paragraph(fmt.tprintf("%s %s###f%d", f.level == .Bad ? "●" : f.level == .Warn ? "▲" : "✓", ui.text_shown(f.text), k)) }
+						// (a tooltip's: it goes when the pointer moves, so nothing selects in it; the diagnosis has the words)
+						if ui.style({text_pad = em * 0.3}) { ui.paragraph(fmt.tprintf("%s %s###f%d", f.level == .Bad ? "●" : f.level == .Warn ? "▲" : "✓", ui.text_shown(f.text), k), selectable = false) }
 					}
 					if ui.tags("weak") {
 						ui.next({width = ui.fill()})
-						if ui.style({text_pad = em * 0.3}) { ui.paragraph(fmt.tprintf("%s###more", fmt.tprintf(i18n.tr("A click, or %s: why it is slow, in full."), ui.command_shortcut(COMMANDS[.Diagnose])))) }
+						if ui.style({text_pad = em * 0.3}) { ui.paragraph(fmt.tprintf("%s###more", fmt.tprintf(i18n.tr("A click, or %s: why it is slow, in full."), ui.command_shortcut(COMMANDS[.Diagnose]))), selectable = false) }
 					}
 				}
 			}
@@ -479,7 +480,7 @@ mission_system :: proc(app: ^App, em: f32) {
 				ui.next({width = ui.px(em * 7), height = ui.pct(1), text_pad = 0})
 				ui.label(fmt.tprintf("%s###k", f[0]))
 			}
-			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0})
+			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0, flags = {.Selectable}})   // (content: a fact to copy)
 			ui.label_tip(fmt.tprintf("%s###v", ui.text_shown(f[1])))
 		}
 	}
@@ -491,7 +492,7 @@ mission_system :: proc(app: ^App, em: f32) {
 				ui.next({width = ui.px(em * 7), height = ui.pct(1), text_pad = 0})
 				ui.label(fmt.tprintf("%s###k", fmt.tprintf(i18n.tr("GPU %d"), i)))
 			}
-			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0})
+			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0, flags = {.Selectable}})
 			ui.label_tip(fmt.tprintf("%s###v", ui.text_shown(g.name)))
 		}
 	}

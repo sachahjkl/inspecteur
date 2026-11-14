@@ -1,10 +1,12 @@
 package inspecteur
 
 // The Startup section (startup.odin): what starts with the session. Its bar, a row's menu and the keys (commands.odin)
-// act on the selected item: Enable (it starts with the session), Disable, Enable or disable (Space), Open file location
-// (its file's folder in the file manager), Copy command.
+// act on the items selected: Enable (it starts with the session), Disable, Enable or disable (Space: the cursor's item
+// says which, the others selected go the same way), Copy command; and on the cursor's: Open file location (its file's
+// folder in the file manager).
 
 import "core:fmt"
+import "core:strings"
 import lucide "gt:lucide"
 import "gt:platform"
 import "gt:ui"
@@ -43,13 +45,14 @@ build_startup :: proc(app: ^App, em: f32) {
 	startup_menu(app, em)
 }
 
-// Whether a command of the section can act on the selected item now.
+// Whether a command of the section can act now: Enable and Disable on one of the items selected at least, the others on
+// the cursor's.
 startup_can :: proc(app: ^App, c: Cmd) -> bool {
 	it, ok := selected_startup(app)
 	if !ok || app.startup.pending { return false }
 	#partial switch c {
-	case .Startup_Enable:  return it.can_toggle && !it.enabled
-	case .Startup_Disable: return it.can_toggle && it.enabled
+	case .Startup_Enable:  return len(startup_targets(app, true)) > 0
+	case .Startup_Disable: return len(startup_targets(app, false)) > 0
 	case .Startup_Toggle:  return it.can_toggle
 	case .Startup_Open:    return it.path != ""
 	case .Startup_Copy:    return it.command != ""
@@ -85,12 +88,27 @@ startup_menu :: proc(app: ^App, em: f32) {
 	}
 }
 
+// The items selected that can be turned `on` (or off) and are not already, in the order shown.
+startup_targets :: proc(app: ^App, on: bool) -> []Startup_Item {
+	s := &app.startup
+	out := make([dynamic]Startup_Item, context.temp_allocator)
+	if s.list == nil { return out[:] }
+	for r in selected_rows(&s.rows.table) {
+		if r >= len(s.list.items) { continue }
+		it := s.list.items[r]
+		if it.can_toggle && it.enabled != on { append(&out, it) }
+	}
+	return out[:]
+}
+
+// The items selected turned on (or off), those already so left as they are.
 startup_toggle :: proc(app: ^App, on: bool) {
-	it, ok := selected_startup(app)
-	if !ok { return }
+	items := startup_targets(app, on)
+	if len(items) == 0 { return }
 	app.startup.pending = true
-	say(app, on ? i18n.tr("Enabling %s…") : i18n.tr("Disabling %s…"), it.name)
-	startup_ask(app, true, it, on)
+	what := len(items) == 1 ? items[0].name : fmt.tprintf(i18n.tr(len(items), "%d item", "%d items"), len(items))
+	say(app, on ? i18n.tr("Enabling %s…") : i18n.tr("Disabling %s…"), what)
+	startup_ask(app, true, items, on)
 }
 
 startup_open :: proc(app: ^App) {
@@ -100,9 +118,22 @@ startup_open :: proc(app: ^App) {
 	say(app, i18n.tr("Opened the folder of %s"), it.path)
 }
 
+// The commands of the items selected, a line each.
 startup_copy :: proc(app: ^App) {
-	it, ok := selected_startup(app)
-	if !ok || it.command == "" { return }
-	platform.set_clipboard(app.main.win, it.command)
-	announce(app, fmt.tprintf(i18n.tr("Copied the command of %s"), it.name))
+	s := &app.startup
+	if s.list == nil { return }
+	lines := make([dynamic]string, context.temp_allocator)
+	name := ""
+	for r in selected_rows(&s.rows.table) {
+		if r >= len(s.list.items) || s.list.items[r].command == "" { continue }
+		append(&lines, s.list.items[r].command)
+		name = s.list.items[r].name
+	}
+	if len(lines) == 0 { return }
+	platform.set_clipboard(app.main.win, strings.join(lines[:], "\n", context.temp_allocator))
+	if len(lines) == 1 {
+		announce(app, fmt.tprintf(i18n.tr("Copied the command of %s"), name))
+	} else {
+		announce(app, fmt.tprintf(i18n.tr(len(lines), "Copied the command of %d item", "Copied the commands of %d items"), len(lines)))
+	}
 }

@@ -233,13 +233,14 @@ journal_entry_whole :: proc(app: ^App, e: Journal_Entry, em: f32) {
 			ui.spacer(ui.px(em * 0.8))
 			tag := JOURNAL_LEVEL_TAGS[e.priority]
 			if tag != "" { ui.push_tags(tag) }
-			ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
+			// (the entry's level, time and program are content, as its message: a drag copies them with it)
+			ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0, flags = {.Selectable}})
 			ui.label(fmt.tprintf("%s###je_level", JOURNAL_LEVEL_WORDS[e.priority]))
 			if tag != "" { ui.pop_tags() }
 			ui.spacer(ui.px(em * 0.8))
 			if ui.tags("weak") {
 				who := e.pid > 0 ? fmt.tprintf(i18n.tr("%s, process %d"), e.ident, e.pid) : e.ident
-				ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0})
+				ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0, flags = {.Selectable}})
 				ui.label(fmt.tprintf("%s  ·  %s###je_info", journal_time_text(app, e.usec, true), ui.text_shown(who)))
 			}
 			if tool_button("svc_journal_copy_entry", lucide.CLIPBOARD_COPY, cmd_tip(.Journal_Copy_Entry), true, em) { platform.set_clipboard(app.main.win, journal_entry_text(app, e)); announce(app, i18n.tr("Copied the entry")) }

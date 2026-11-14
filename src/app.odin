@@ -161,7 +161,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	table_layout_load(&app.table, app.settings)
 	app.table.tree = app.settings.tree
 	pins_load(&app.table, app.settings.pinned)
-	app.vl.multi = true   // (Ctrl and Shift clicks, Ctrl+A: End task and Kill act on every row marked)
+	app.vl.multi = true   // (Ctrl and Shift clicks, Shift and the moves, Ctrl+A: End task and Kill act on every row selected)
 	app.tab = opts.tab
 	app.cpu_grid = config.string_of(&app.prefs, "performance.cpu_view") == "logical"
 	sample_ask(app)
@@ -311,7 +311,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	return 0
 }
 
-// The rows again (a sample, a sort, the filter, a group opened), the same process selected when it is still shown.
+// The rows again (a sample, a sort, the filter, a group opened), the cursor on the same process when it is still shown
+// (the rows selected are ids: they stay; the list drops those no longer shown at its build).
 rows_again :: proc(app: ^App) {
 	keep := selected_id(app)
 	ui.vlist_invalidate(&app.vl)
@@ -321,7 +322,7 @@ rows_again :: proc(app: ^App) {
 	// a search with nothing selected selects its first process (a row of its own, not an app's): a process that came
 	// after the search was typed gets selected when a sample brings it
 	if app.vl.sel < 0 && app.table.query != "" {
-		for r, i in app.table.rows { if r.kind == .Process { app.vl.sel = i; app.vl.reveal = REVEAL_BUILDS; break } }
+		for r, i in app.table.rows { if r.kind == .Process { select_row(app, i); break } }
 	}
 }
 

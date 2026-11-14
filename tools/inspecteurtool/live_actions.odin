@@ -227,6 +227,12 @@ live_settings :: proc(l: ^Live) {
 	check(l, wait_page_pixel_not(c, before), "the window takes its colours at once")
 	check(l, cdp.click_name(c, "th1") && file_has(prefs, "appearance.theme\tGraphite"), "back to Graphite")
 	check(l, cdp.key(c, "ctrl+f") && cdp.type_text(c, "rules") && cdp.wait_for(c, "Draw a thin line under each row of the tables.", SESSION_WAIT), "a search finds a preference")
+	// the window's commands work in the settings, their search with the keyboard: the palette lists the settings, F1
+	check(l, cdp.key(c, "ctrl+k") && cdp.wait_name(c, "palette_top", SESSION_WAIT), "Ctrl+K in the settings opens the palette")
+	check(l, cdp.type_text(c, "rules") && cdp.wait_for(c, "Settings · ", SESSION_WAIT), "it lists the settings")
+	check(l, cdp.key(c, "Escape") && cdp.wait_name(c, "palette_top", SESSION_WAIT, gone = true), "Escape closes it")
+	check(l, cdp.key(c, "F1") && cdp.wait_for(c, "Keyboard shortcuts", SESSION_WAIT), "F1 in the settings shows the keys")
+	check(l, cdp.key(c, "Escape") && cdp.wait_for(c, "Keyboard shortcuts", SESSION_WAIT, gone = true), "Escape closes them")
 	check(l, cdp.click_name(c, "sw") && file_has(prefs, "view.rules\tfalse"), "its switch changes it, kept")
 	check(l, cdp.click_name(c, "sw") && file_has(prefs, "view.rules\ttrue"), "and back")
 	check(l, cdp.key(c, "Escape") && cdp.wait_name(c, "settings_button", SESSION_WAIT) && cdp.wait_for(c, "Draw a thin line", SESSION_WAIT, gone = true), "Escape goes back to the sections")

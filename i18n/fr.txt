@@ -423,6 +423,11 @@ fr Lecture…
 en No socket.
 fr Aucun socket.
 
+en %d processes
+en+ %d processes
+fr %d processus
+fr+ %d processus
+
 en PID %d has ended already
 fr Le PID %d est déjà terminé
 
@@ -431,6 +436,11 @@ fr Le PID %d est terminé
 
 en Copied
 fr Copié
+
+en %d address
+en+ %d addresses
+fr %d adresse
+fr+ %d adresses
 
 en Enabled
 fr Activé
@@ -813,11 +823,6 @@ en+ %s (%d instances)
 fr %s (%d instance)
 fr+ %s (%d instances)
 
-en %d processes
-en+ %d processes
-fr %d processus
-fr+ %d processus
-
 en %s and %d process under it
 en+ %s and %d processes under it
 fr %s et %d processus sous lui
@@ -925,14 +930,30 @@ fr Forcer l'arrêt
 en End
 fr Terminer
 
+en They stop, and their processes end; what needs them may stop too.
+fr Ils s'arrêtent, et leurs processus se terminent ; ce qui en dépend peut s'arrêter aussi.
+
 en It stops, and its processes end; what needs it may stop too.
 fr Il s'arrête, et ses processus se terminent ; ce qui en dépend peut s'arrêter aussi.
+
+en They stop, their processes end, and they start again.
+fr Ils s'arrêtent, leurs processus se terminent, et ils redémarrent.
 
 en It stops, its processes end, and it starts again.
 fr Il s'arrête, ses processus se terminent, et il redémarre.
 
+en Stop %d service?
+en+ Stop %d services?
+fr Arrêter %d service ?
+fr+ Arrêter %d services ?
+
 en Stop %s?
 fr Arrêter %s ?
+
+en Restart %d service?
+en+ Restart %d services?
+fr Redémarrer %d service ?
+fr+ Redémarrer %d services ?
 
 en Restart %s?
 fr Redémarrer %s ?
@@ -1454,6 +1475,16 @@ fr Description
 en Load
 fr Chargement
 
+en %d service
+en+ %d services
+fr %d service
+fr+ %d services
+
+en %s (and %d other failed)
+en+ %s (and %d others failed)
+fr %s (et %d autre a échoué)
+fr+ %s (et %d autres ont échoué)
+
 ctx systemd
 en active
 fr actif
@@ -1699,6 +1730,11 @@ fr inspecteur tourne dedans : inspecteur se termine avec lui.
 en PID %d is not in the processes' last sample
 fr Le PID %d n'est pas dans la dernière mesure des processus
 
+en %d name
+en+ %d names
+fr %d nom
+fr+ %d noms
+
 en Refresh
 fr Actualisation
 
@@ -1816,6 +1852,16 @@ fr %s activé : il démarre avec la session
 en Disabled %s: it no longer starts with the session
 fr %s désactivé : il ne démarre plus avec la session
 
+en Enabled %d item: it starts with the session
+en+ Enabled %d items: they start with the session
+fr %d élément activé : il démarre avec la session
+fr+ %d éléments activés : ils démarrent avec la session
+
+en Disabled %d item: it no longer starts with the session
+en+ Disabled %d items: they no longer start with the session
+fr %d élément désactivé : il ne démarre plus avec la session
+fr+ %d éléments désactivés : ils ne démarrent plus avec la session
+
 en Not in this desktop
 fr Pas dans ce bureau
 
@@ -1849,8 +1895,18 @@ fr Modification…
 en Nothing starts with the session.
 fr Rien ne démarre avec la session.
 
+en %d item
+en+ %d items
+fr %d élément
+fr+ %d éléments
+
 en Copied the command of %s
 fr Commande de %s copiée
+
+en Copied the command of %d item
+en+ Copied the commands of %d items
+fr Commande de %d élément copiée
+fr+ Commandes de %d éléments copiées
 
 en Pressure, %s
 fr Pression, %s

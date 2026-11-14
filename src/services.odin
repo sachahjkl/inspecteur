@@ -7,6 +7,9 @@ package inspecteur
 // authorization for seconds. The list is read while the section is shown, every services.refresh_ms, and at once after
 // an action.
 
+import "base:runtime"
+import "core:fmt"
+import "core:mem"
 import "core:mem/virtual"
 import "core:strings"
 import "core:sync"
@@ -31,7 +34,7 @@ SERVICE_ACTION_DONE := [Service_Action]string{.None = "", .Start = i18n.later("S
 MEMORY_UNKNOWN :: max(u64)
 // After an action, the next reading comes this soon.
 SERVICE_AFTER_ACTION :: 500 * time.Millisecond
-// The longest service name an action carries.
+// The longest service name the journal's ask carries.
 SERVICE_NAME_MAX :: 256
 
 Service :: struct {
@@ -52,8 +55,9 @@ Service_List :: struct {
 	problem: string,   // the manager cannot be reached: why
 	// the action this reading follows, and what came of it
 	action:  Service_Action,
-	unit:    string,
-	failure: string,   // "" when it was done
+	acted:   []string,   // the units it was asked for
+	failure: string,     // the first that failed, "unit: why"; "" when all were done
+	failures: int,       // how many failed
 	running, failed: int,   // the units that run, those that failed (counted when the window takes it)
 }
 
@@ -62,8 +66,7 @@ Service_List :: struct {
 Service_Ask :: struct {
 	manager: Manager,
 	action:  Service_Action,
-	unit:    [SERVICE_NAME_MAX]u8,
-	unit_len: int,
+	units:   [dynamic]string,   // the heap's (the worker takes them: ask_units_take)
 }
 
 // The details of one service (the Services section's pane, Ctrl+I): its unit file, since when it is in its state, its
@@ -153,6 +156,7 @@ services_init :: proc(s: ^Services, app: ^App) {
 
 // After the chores stopped (no reading runs).
 services_destroy :: proc(s: ^Services) {
+	ask_units_free(&s.ask.units)
 	service_bus_close(&s.bus)
 	journal_view_destroy(&s.pane)
 	delete(s.select_name)
@@ -167,18 +171,41 @@ service_list_free :: proc(l: ^Service_List) {
 	free(l)
 }
 
-// Asks for a reading of the manager shown, after `action` on `unit` when there is one.
-services_ask :: proc(app: ^App, action := Service_Action.None, unit := "") {
+// Asks for a reading of the manager shown, after `action` on each of `units` when there is one.
+services_ask :: proc(app: ^App, action := Service_Action.None, units: []string = nil) {
 	s := &app.services
 	sync.lock(&s.mutex)
 	s.ask.manager = s.manager
 	if action != .None {
 		s.ask.action = action
-		s.ask.unit_len = copy(s.ask.unit[:], unit)
+		ask_units_set(&s.ask.units, units)
 	}
 	sync.unlock(&s.mutex)
 	tasks.job_ask(ui.chores(), &s.job)
 	s.next = time.tick_add(time.tick_now(), time.Duration(app.settings.services_ms) * time.Millisecond)
+}
+
+// The units of an action, the heap's copies (the window asks, the worker takes them into its reading's arena).
+@(private = "file")
+ask_units_set :: proc(to: ^[dynamic]string, units: []string) {
+	ask_units_free(to)
+	to^ = make([dynamic]string, 0, len(units), runtime.heap_allocator())
+	for u in units { append(to, strings.clone(u, runtime.heap_allocator())) }
+}
+
+@(private = "file")
+ask_units_take :: proc(from: ^[dynamic]string, a: mem.Allocator) -> []string {
+	out := make([]string, len(from^), a)
+	for u, i in from^ { out[i] = strings.clone(u, a) }
+	ask_units_free(from)
+	return out
+}
+
+@(private = "file")
+ask_units_free :: proc(units: ^[dynamic]string) {
+	for u in units^ { delete(u, runtime.heap_allocator()) }
+	delete(units^)
+	units^ = nil
 }
 
 // Whether a reading is asked or under way.
@@ -187,21 +214,27 @@ services_busy :: proc(app: ^App) -> bool { return tasks.job_busy(ui.chores(), &a
 @(private = "file")
 services_work :: proc(data: rawptr) {
 	s := (^Services)(data)
-	sync.lock(&s.mutex)
-	ask := s.ask
-	s.ask.action = .None
-	sync.unlock(&s.mutex)
 	l := new(Service_List)
 	// (the reading's texts in its arena; the bus's connections keep the heap: they outlive the reading)
 	a := virtual.arena_allocator(&l.arena)
+	sync.lock(&s.mutex)
+	ask_manager, ask_action := s.ask.manager, s.ask.action
+	acted := ask_units_take(&s.ask.units, a)
+	s.ask.action = .None
+	sync.unlock(&s.mutex)
 	l.units = make([dynamic]Service, a)
-	l.manager = ask.manager
-	if ask.action != .None {
-		l.action = ask.action
-		l.unit = strings.clone(string(ask.unit[:ask.unit_len]), a)
-		l.failure = strings.clone(s.demo != nil ? DEMO_REFUSED : service_act(&s.bus, ask.manager, ask.action, l.unit), a)
+	l.manager = ask_manager
+	if ask_action != .None {
+		l.action, l.acted = ask_action, acted
+		// (one after the other: the manager queues each as a job of its own)
+		for unit in acted {
+			why := s.demo != nil ? DEMO_REFUSED : service_act(&s.bus, ask_manager, ask_action, unit)
+			if why == "" { continue }
+			if l.failures == 0 { l.failure = strings.concatenate({unit, ": ", why}, a) }
+			l.failures += 1
+		}
 	}
-	l.problem = strings.clone(s.demo != nil ? demo_services_read(s.demo, ask.manager, &l.units, a) : services_read(&s.bus, ask.manager, &l.units, a), a)
+	l.problem = strings.clone(s.demo != nil ? demo_services_read(s.demo, ask_manager, &l.units, a) : services_read(&s.bus, ask_manager, &l.units, a), a)
 	if !ui.post(s.state, services_posted, l) { service_list_free(l) }
 }
 
@@ -231,10 +264,12 @@ services_take :: proc(app: ^App, l: ^Service_List) {
 		s.pending = .None
 		// (the manager queued a job, which takes some time: its outcome shows at a reading soon after)
 		s.next = time.tick_add(time.tick_now(), SERVICE_AFTER_ACTION)
-		if l.failure == "" {
-			say(app, i18n.tr(SERVICE_ACTION_DONE[l.action]), l.unit)
-		} else {
-			say(app, "%s: %s", l.unit, l.failure)
+		n := len(l.acted)
+		switch {
+		case l.failures == 0 && n == 1: say(app, i18n.tr(SERVICE_ACTION_DONE[l.action]), l.acted[0])
+		case l.failures == 0:           say(app, i18n.tr(SERVICE_ACTION_DONE[l.action]), fmt.tprintf(i18n.tr(n, "%d service", "%d services"), n))
+		case l.failures == 1:           say(app, "%s", l.failure)
+		case:                           say(app, i18n.tr(l.failures - 1, "%s (and %d other failed)", "%s (and %d others failed)"), l.failure, l.failures - 1)
 		}
 	}
 	services_rows(app)

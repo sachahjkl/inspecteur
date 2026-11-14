@@ -29,6 +29,8 @@ Section_Table :: struct {
 section_table_init :: proc(st: ^Section_Table, app: ^App, columns: []ui.Table_Column) {
 	st.columns = columns
 	ui.table_init(&st.table, st.columns)
+	// (Ctrl and Shift clicks and keys, Ctrl+A: the acts that change something act on every row selected)
+	st.table.vl.multi = true
 	st.app = app
 	st.table.lead = row_icon_lead
 	st.table.lead_user = st
@@ -38,6 +40,17 @@ section_table_destroy :: proc(st: ^Section_Table) {
 	ui.table_destroy(&st.table)
 	ui.table_data_destroy(&st.data)
 	delete(st.icons)
+}
+
+// The data rows selected in a table, in the order shown; the cursor's row alone when none is (a row the program chose:
+// a search's first, a service gone to, before the build that selects it).
+selected_rows :: proc(t: ^ui.Table, allocator := context.temp_allocator) -> []int {
+	out := make([dynamic]int, allocator)
+	if len(t.vl.selected) > 0 {
+		for id, i in t.ids { if id in t.vl.selected { append(&out, t.rows[i]) } }
+	}
+	if len(out) == 0 { if r := ui.table_selected(t); r >= 0 { append(&out, r) } }
+	return out[:]
 }
 
 // A new reading: the rows follow (section_row, then ui.table_data_cell for each column).

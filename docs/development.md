@@ -53,7 +53,7 @@ user manager's `$XDG_RUNTIME_DIR/bus`), so that the Services and Startup section
 acts only on what it made itself, and checks it before it presses a key that acts:
 
 - processes it started (`sleep` with a mark of its own in its command line, found by the mark and checked by its pid; a
-  shell and two sleeps for End process tree): the rows marked, a tree's processes, the affinity and the dump act only
+  shell and two sleeps for End process tree): the rows selected, a tree's processes, the affinity and the dump act only
   once the confirmation, or the row selected, names those processes and no other;
 - a transient service (`systemd-run --user --unit=inspecteur-live-<pid>`), stopped and reset at the end;
 - an app of its own: a desktop entry in the session's data folder, and two sleeps in a scope named for it

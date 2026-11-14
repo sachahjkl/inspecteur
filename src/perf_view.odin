@@ -317,7 +317,7 @@ stats_big :: proc(big: []Stat, em: f32) {
 					ui.next({width = ui.fill(), height = ui.px(em * 1.3), font_size = em * 0.86, text_pad = 0})
 					ui.label(fmt.tprintf("%s###l", s.label))
 				}
-				ui.next({width = ui.fill(), height = ui.px(em * 1.8), font_size = em * 1.3, text_pad = 0})
+				ui.next({width = ui.fill(), height = ui.px(em * 1.8), font_size = em * 1.3, text_pad = 0, flags = {.Selectable}})
 				ui.label(fmt.tprintf("%s###v", ui.text_shown(s.value)))
 			}
 		}

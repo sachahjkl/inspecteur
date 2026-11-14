@@ -32,8 +32,9 @@ Information.
   a shell...) is never taken for an app. Or **every process under its parent**: Ctrl+T.
 - **End task** (Delete) asks a process to end; **Kill** (Shift+Delete) ends it at once; **End process tree**
   (Ctrl+Delete) ends it and every process under it. A kill and a tree are asked first: the confirmation lists each
-  process by its name and PID, and says when Inspecteur or the session would end with them. **Select many rows** with
-  Ctrl and Shift clicks or Ctrl+A: End task and Kill act on all of them.
+  process by its name and PID, and says when Inspecteur or the session would end with them. **Select many rows** in
+  every table with Ctrl and Shift clicks, Shift and the arrows, or Ctrl+A: what changes something acts on all of them,
+  after one question that counts them; Properties and the other views of one thing stay on the row of the cursor.
 - **Suspend or resume** (Ctrl+P), **the priority** (Ctrl+Up, Ctrl+Down), **the affinity** (Ctrl+Shift+A), **Go to
   service** (Ctrl+Shift+S), **Search online** (Ctrl+Shift+F), **Create dump file** (Ctrl+Shift+D, with gdb's gcore).
   **Properties** (Alt+Enter, Enter): its threads, open files, modules and environment, each with a filter (Ctrl+F).
@@ -97,6 +98,9 @@ The pictures show the demo's made-up machine (`inspecteur --demo`), not a real o
 | Ctrl+Space, Ctrl+Shift+R | pause or resume the refresh; its speed |
 | Ctrl+wheel, Ctrl+=, Ctrl+-, Ctrl+0 | zoom in, out, 100 % |
 | Up, Down, Page Up, Page Down, Home, End | move in a table (Ctrl+Home, Ctrl+End while the filter has text) |
+| Ctrl+click, Shift+click, Ctrl+Shift+click | the row added or taken out; the range from the last row clicked; the range added |
+| Shift with the moves, Ctrl+Shift with the moves | the range to the cursor; the range added to what is selected |
+| Escape on several rows | the cursor's row alone; Escape again clears the filter |
 | Menu, Shift+F10, a right click | the row's menu |
 | Enter, a double click | the row's default action: open an app's group or a process's Properties, Open in Processes, Open file location |
 | Ctrl+Shift+L | light or dark |
@@ -105,7 +109,7 @@ The pictures show the demo's made-up machine (`inspecteur --demo`), not a real o
 
 | Section | Keys |
 |---|---|
-| Processes | Delete End task, Shift+Delete Kill, Ctrl+Delete End process tree, Ctrl+A Select all (Ctrl and Shift clicks too), Ctrl+P Suspend or resume, Ctrl+Up and Ctrl+Down the priority, Ctrl+Shift+A Set affinity, Ctrl+Shift+S Go to service, Ctrl+Shift+F Search online, Ctrl+Shift+D Create dump file, Alt+Enter Properties, Ctrl+O Open file location, Ctrl+C Copy command line, Right and Left open and close a group, Ctrl+T the tree or the apps, Ctrl+Shift+C Columns |
+| Processes | Delete End task, Shift+Delete Kill, Ctrl+Delete End process tree (each on every row selected), Ctrl+A Select all, Ctrl+P Suspend or resume, Ctrl+Up and Ctrl+Down the priority, Ctrl+Shift+A Set affinity, Ctrl+Shift+S Go to service, Ctrl+Shift+F Search online, Ctrl+Shift+D Create dump file, Alt+Enter Properties, Ctrl+O Open file location, Ctrl+C Copy command line, Right and Left open and close a group, Ctrl+T the tree or the apps, Ctrl+Shift+C Columns |
 | Properties | Ctrl+Tab and Ctrl+Shift+Tab the tabs, Ctrl+F the filter of a list, Ctrl+P, Delete, Shift+Delete, Ctrl+Up, Ctrl+Down, Ctrl+Shift+A as in Processes, Escape closes |
 | Performance | Up and Down the devices, Ctrl+G one graph per logical processor |
 | Services | Ctrl+S Start, Delete Stop, Ctrl+R Restart, Ctrl+E Enable, Ctrl+D Disable, Enter Open in Processes, Ctrl+C Copy name, Ctrl+I the details and the journal, Ctrl+O Open unit file, Ctrl+U System or User; the journal: Ctrl+J search, Alt+L all, warnings, errors, Alt+B this boot or every boot, Alt+F follow, Alt+C copy the entries shown, Alt+Shift+C copy the entry, Ctrl+Shift+J the journal in its own window (closing the window puts it under the table; Ctrl+W closes it) |

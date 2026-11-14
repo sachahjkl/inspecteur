@@ -1,6 +1,6 @@
 package inspecteurtool
 
-// live's checks of the selection of many rows (Ctrl clicks, the kill of the rows marked), of End process tree, of the
+// live's checks of the selection of many rows (Ctrl clicks, the kill of the rows selected), of End process tree, of the
 // window's keys that change no process (the refresh paused, the text size, the tree), and of a process's affinity and
 // dump. As everywhere in live: a key that acts on processes is pressed only once the test has checked that what it acts
 // on is its own (its rows, the confirmation's list of the processes).
@@ -33,7 +33,7 @@ live_marks :: proc(l: ^Live) {
 	if !check(l, at >= 0, "the second is in view") { return }
 	time.sleep(DOUBLE_CLICK_GAP)
 	_, ok := cdp.call(c, "Toolkit.click", fmt.tprintf(`{{"name":"c1","index":%d,"modifiers":2}}`, at))
-	check(l, ok && cdp.wait_for(c, "Selected: 2 rows", SESSION_WAIT), "a Ctrl click marks it too: 2 rows (%q)", footer(c))
+	check(l, ok && cdp.wait_for(c, "Selected: 2 rows", SESSION_WAIT), "a Ctrl click selects it too: 2 rows (%q)", footer(c))
 	if !check(l, cdp.key(c, "shift+Delete") && cdp.wait_for(c, "Kill 2 processes?", SESSION_WAIT), "Shift+Delete asks to kill 2 processes") { return }
 	lines := [2]string{line_text(c, 0), line_text(c, 1)}
 	want := [2]string{fmt.tprintf("sleep, PID %s", pa), fmt.tprintf("sleep, PID %s", pb)}

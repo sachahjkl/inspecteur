@@ -237,7 +237,7 @@ build_rows :: proc(app: ^App, em: f32) {
 		if i == app.vl.sel { app.sel_rect = row.box.rect }
 		if row.double_clicked { default_action(app) }
 		if row.right_clicked {
-			// (the list made it the active row; a right click on a marked row keeps the marks: the menu acts on them)
+			// (the list made it the active row; a right click on a selected row keeps the selection: the menu acts on it)
 			app.vl.reveal = REVEAL_BUILDS
 			row_menu_open(app, ui.mouse_pos())
 		}

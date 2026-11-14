@@ -6,6 +6,7 @@ package inspecteur
 // chores, whose reading comes back to the window by ui.post: they read files and ask the user's service manager. The list
 // is read when the section is shown, on F5 and after a change.
 
+import "base:runtime"
 import "core:mem/virtual"
 import "core:strings"
 import "core:sync"
@@ -17,9 +18,6 @@ import "gt:ui"
 Startup_Kind :: enum u8 { Autostart, User_Service }
 
 STARTUP_KIND_TEXT := [Startup_Kind]string{.Autostart = i18n.later("Autostart entry"), .User_Service = i18n.later("User service")}
-
-// The longest id a change carries.
-STARTUP_ID_MAX :: 512
 
 Startup_Item :: struct {
 	kind:       Startup_Kind,
@@ -41,9 +39,16 @@ Startup_List :: struct {
 	// the change this reading follows, and what came of it
 	changed: bool,
 	on:      bool,
-	name:    string,
-	failure: string,
+	names:   []string,   // the items it was asked for
+	failure: string,     // the first that failed, "name: why"; "" when all were done
+	failures: int,
 	on_count: int,     // the items on (counted when the window takes it)
+}
+
+// An item to turn on or off: the heap's strings while the window asks, the reading's arena's once the worker takes it.
+Startup_Change :: struct {
+	kind: Startup_Kind,
+	id, name: string,
 }
 
 // What the window asks the job (under the startup's mutex).
@@ -51,11 +56,7 @@ Startup_List :: struct {
 Startup_Ask :: struct {
 	change: bool,
 	on:     bool,
-	kind:   Startup_Kind,
-	id:     [STARTUP_ID_MAX]u8,
-	id_len: int,
-	name:   [STARTUP_ID_MAX]u8,
-	name_len: int,
+	items:  [dynamic]Startup_Change,   // the heap's
 }
 
 Startup :: struct {
@@ -89,6 +90,7 @@ startup_init :: proc(s: ^Startup, app: ^App) {
 
 // After the chores stopped (no reading runs).
 startup_destroy :: proc(s: ^Startup) {
+	ask_changes_free(&s.ask.items)
 	startup_bus_close(&s.bus)
 	startup_list_free(s.list)
 	section_table_destroy(&s.rows)
@@ -101,35 +103,56 @@ startup_list_free :: proc(l: ^Startup_List) {
 	free(l)
 }
 
-// Asks for a reading, after turning `item` on or off when `change` is set.
-startup_ask :: proc(app: ^App, change := false, item := Startup_Item{}, on := false) {
+// Asks for a reading, after turning each of `items` on or off when `change` is set.
+startup_ask :: proc(app: ^App, change := false, items: []Startup_Item = nil, on := false) {
 	s := &app.startup
 	s.asked = true
 	sync.lock(&s.mutex)
 	if change {
-		s.ask.change, s.ask.on, s.ask.kind = true, on, item.kind
-		s.ask.id_len = copy(s.ask.id[:], item.id)
-		s.ask.name_len = copy(s.ask.name[:], item.name)
+		s.ask.change, s.ask.on = true, on
+		ask_changes_free(&s.ask.items)
+		heap := runtime.heap_allocator()
+		s.ask.items = make([dynamic]Startup_Change, 0, len(items), heap)
+		for it in items { append(&s.ask.items, Startup_Change{it.kind, strings.clone(it.id, heap), strings.clone(it.name, heap)}) }
 	}
 	sync.unlock(&s.mutex)
 	tasks.job_ask(ui.chores(), &s.job)
 }
 
 @(private = "file")
+ask_changes_free :: proc(items: ^[dynamic]Startup_Change) {
+	for it in items^ {
+		delete(it.id, runtime.heap_allocator())
+		delete(it.name, runtime.heap_allocator())
+	}
+	delete(items^)
+	items^ = nil
+}
+
+@(private = "file")
 startup_work :: proc(data: rawptr) {
 	s := (^Startup)(data)
-	sync.lock(&s.mutex)
-	ask := s.ask
-	s.ask.change = false
-	sync.unlock(&s.mutex)
 	l := new(Startup_List)
 	// (the reading's texts in its arena; the bus's connection keeps the heap: it outlives the reading)
 	a := virtual.arena_allocator(&l.arena)
+	sync.lock(&s.mutex)
+	change, on := s.ask.change, s.ask.on
+	asked := make([]Startup_Change, len(s.ask.items), a)
+	for it, i in s.ask.items { asked[i] = {it.kind, strings.clone(it.id, a), strings.clone(it.name, a)} }
+	ask_changes_free(&s.ask.items)
+	s.ask.change = false
+	sync.unlock(&s.mutex)
 	l.items = make([dynamic]Startup_Item, a)
-	if ask.change {
-		l.changed, l.on = true, ask.on
-		l.name = strings.clone(string(ask.name[:ask.name_len]), a)
-		l.failure = strings.clone(s.demo != nil ? DEMO_REFUSED : startup_set_enabled(&s.bus, ask.kind, string(ask.id[:ask.id_len]), ask.on), a)
+	if change {
+		l.changed, l.on = true, on
+		l.names = make([]string, len(asked), a)
+		for it, i in asked {
+			l.names[i] = it.name
+			why := s.demo != nil ? DEMO_REFUSED : startup_set_enabled(&s.bus, it.kind, it.id, on)
+			if why == "" { continue }
+			if l.failures == 0 { l.failure = strings.concatenate({it.name, ": ", why}, a) }
+			l.failures += 1
+		}
 	}
 	l.problem = strings.clone(s.demo != nil ? demo_startup_read(s.demo, &l.items, a) : startup_read(&s.bus, &l.items, a), a)
 	if !ui.post(s.state, startup_posted, l) { startup_list_free(l) }
@@ -147,10 +170,13 @@ startup_posted :: proc(data: rawptr, _: u64) {
 	for it in l.items { if it.enabled { l.on_count += 1 } }
 	if l.changed {
 		s.pending = false
-		if l.failure == "" {
-			say(app, l.on ? i18n.tr("Enabled %s: it starts with the session") : i18n.tr("Disabled %s: it no longer starts with the session"), l.name)
-		} else {
-			say(app, "%s: %s", l.name, l.failure)
+		n := len(l.names)
+		switch {
+		case l.failures == 0 && n == 1: say(app, l.on ? i18n.tr("Enabled %s: it starts with the session") : i18n.tr("Disabled %s: it no longer starts with the session"), l.names[0])
+		case l.failures == 0 && l.on:   say(app, i18n.tr(n, "Enabled %d item: it starts with the session", "Enabled %d items: they start with the session"), n)
+		case l.failures == 0:           say(app, i18n.tr(n, "Disabled %d item: it no longer starts with the session", "Disabled %d items: they no longer start with the session"), n)
+		case l.failures == 1:           say(app, "%s", l.failure)
+		case:                           say(app, i18n.tr(l.failures - 1, "%s (and %d other failed)", "%s (and %d others failed)"), l.failure, l.failures - 1)
 		}
 	}
 	startup_rows(app)

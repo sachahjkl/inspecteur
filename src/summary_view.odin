@@ -82,7 +82,8 @@ summary_tile :: proc(app: ^App, t: Tile, em: f32) {
 				ui.next({width = ui.fill(), height = ui.px(em * 1.2), font_size = em * 0.82, text_pad = 0})
 				ui.label(fmt.tprintf("%s###title", t.title))
 			}
-			ui.next({width = ui.fill(), height = ui.px(em * 1.35), text_pad = 0})
+			// (content: a click on the tile opens its tab, a drag selects the value)
+			ui.next({width = ui.fill(), height = ui.px(em * 1.35), text_pad = 0, flags = {.Selectable}})
 			ui.label(fmt.tprintf("%s###value", t.value))
 			ui.spacer(ui.fill())
 		}

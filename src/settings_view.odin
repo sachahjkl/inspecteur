@@ -17,10 +17,9 @@ settings_toggle :: proc(app: ^App) {
 	if app.settings_open { prefs_page.focus_search(&app.settings_page) }
 }
 
-// The keys of the settings: Ctrl+F gives the search the keyboard; Ctrl+, and Escape go back, unless an editor of a preference has the keyboard (Escape gives
-// it back to the page first).
+// The keys of the settings: Ctrl+F gives the search the keyboard; Escape goes back, unless an editor of a preference has
+// the keyboard (Escape gives it back to the page first). Ctrl+, and the window's other commands are window_keys'.
 settings_keys :: proc(app: ^App) {
-	if ui.key_press(.Comma, {.Ctrl}) { settings_toggle(app); return }
 	if ui.key_press(.F, {.Ctrl}) { prefs_page.focus_search(&app.settings_page) }   // (as the window's filter)
 	if prefs_page.escape_leaves(&app.settings_page) { app.settings_open = false }
 }
