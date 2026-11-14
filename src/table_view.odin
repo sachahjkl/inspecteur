@@ -280,7 +280,7 @@ build_section :: proc(app: ^App, r: Row, em: f32) {
 }
 
 // The cells of a row. Returns the whole text of the cell under the pointer when it is cut.
-@(private = "file")
+@(private)
 build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string) {
 	s := &app.sampler
 	t := &app.table
@@ -358,7 +358,8 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 			ui.next({width = ui.px(em * 1.6), height = ui.px(em * 1.4), font_size = em * 0.9, text_pad = 0})
 			if ui.button("win", icon = lucide.APP_WINDOW, o = {tip = fmt.tprintf("%s (%s)", window_tip(list), ui.command_shortcut(COMMANDS[.Show_Window]))}).clicked { window_show(app, row_entry(app, r)) }
 		}
-		ui.spacer(ui.fill())
+		// (no fill() spacer after them: a fill() is the cell's whole width, so the row was always too wide, and the name,
+		// the one part that may shrink, gave its share of that excess with the spacer: cut with the column half empty)
 	}
 
 	weak := r.kind == .App   // (an app's pid, user and the like are its first process's)
