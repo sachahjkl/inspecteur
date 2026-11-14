@@ -37,3 +37,12 @@ Every step is a command of `tools/inspecteurtool` (`help` lists them):
 - Automation is a command of `tools/inspecteurtool`, never a shell, batch, PowerShell, Python or Node script.
 - Comments and commit messages are in English. Comments say why.
 - Commits: author and committer `sachahjkl <sacha@sacha.house>`, no attribution trailer, no session link.
+
+## Roadmap
+
+- `ROADMAP.md`, beside `CHANGELOG.md`, holds inspecteur's planned work: `# Roadmap`, then `## Now`, `## Next` and
+  `## Later`, each a list. Each entry starts with a bold summary, then one or two sentences on what it gives the user. No
+  dates, no front matter.
+- When a work is done, remove its entry in the same commit as its changelog fragment.
+- Work that touches several programs goes in the roadmap of gui_toolkit.
+- `inspecteurtool check` checks its format with the changelog's.

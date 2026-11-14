@@ -39,7 +39,7 @@ views_start :: proc(app: ^App) {
 	h := &app.main
 	ui.views_init(&app.views, {path = views_file(app)})
 	ui.set_views(&h.state, &app.views)
-	ui.views_set_windows(&app.views, host.view_windows(h))
+	ui.views_set_windows(&app.views, host.view_windows(h.shared))
 	props_register(app)
 	affinity_register(app)
 	diagnosis_register(app)
