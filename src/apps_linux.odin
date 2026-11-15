@@ -1,19 +1,16 @@
 package inspecteur
 
 // The apps on Linux: the XDG desktop entries (applications/*.desktop under $XDG_DATA_HOME and each $XDG_DATA_DIRS) that
-// the desktop's menu shows: applications that have a window (not hidden, not run in a terminal).
+// the desktop's menu shows: applications that have a window (not hidden, not run in a terminal). The folders are the
+// toolkit's (desktop.xdg_roots: the user's data folder, then the system's, as the XDG Base Directory specification says).
 
 import "core:os"
 import "core:strings"
 import desktop "gt:desktop"
-import "gt:platform"
 
 catalog_load :: proc(c: ^Catalog) {
-	append(&c.dirs, platform.user_dir(.Data, ""))
-	dirs := os.get_env("XDG_DATA_DIRS", context.temp_allocator)
-	if dirs == "" { dirs = "/usr/local/share:/usr/share" }
-	for d in strings.split(dirs, ":", context.temp_allocator) {
-		if d == "" { continue }
+	// (a folder listed twice is read once: its entries would be added twice)
+	for d in desktop.xdg_roots().data {
 		seen := false
 		for e in c.dirs { if e == d { seen = true } }
 		if !seen { append(&c.dirs, strings.clone(d)) }

@@ -1,6 +1,17 @@
 package inspecteur
 
+import "core:slice"
 import "core:testing"
+import desktop "gt:desktop"
+
+// The autostart folders follow the toolkit's configuration roots, in their order: the user's first, so that its file
+// of a name hides the system's.
+@(test)
+the_autostart_folders_follow_the_roots :: proc(t: ^testing.T) {
+	got := autostart_dirs(desktop.Xdg_Roots{config = {"/home/u/.config", "/etc/xdg", "/opt/xdg"}})
+	testing.expectf(t, slice.equal(got, []string{"/home/u/.config/autostart", "/etc/xdg/autostart", "/opt/xdg/autostart"}), "%v", got)
+	testing.expect_value(t, len(autostart_dirs({})), 0)
+}
 
 @(test)
 an_autostart_entry_says_when_it_starts :: proc(t: ^testing.T) {

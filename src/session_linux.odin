@@ -39,6 +39,8 @@ display_server_pid :: proc() -> i32 {
 	if display == "" { return 0 }
 	path := display
 	if !strings.has_prefix(display, "/") {
+		// (Wayland's own rule, not a folder of a program's: the socket is under $XDG_RUNTIME_DIR alone, so
+		// platform.user_dir(.Runtime), which falls back to $TMPDIR and /tmp, is not it)
 		runtime := os.get_env("XDG_RUNTIME_DIR", context.temp_allocator)
 		if runtime == "" { return 0 }
 		path = strings.concatenate({runtime, "/", display}, context.temp_allocator)

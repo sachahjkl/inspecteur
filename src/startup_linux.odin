@@ -18,6 +18,7 @@ import "core:os"
 import "core:path/filepath"
 import "core:strings"
 import dbus "gt:dbus"
+import desktop "gt:desktop"
 import "gt:platform"
 import i18n "gt:i18n"
 
@@ -49,15 +50,11 @@ autostart_user_dir :: proc() -> string {
 	return strings.concatenate({platform.user_dir(.Config, "", context.temp_allocator), "/autostart"}, context.temp_allocator)
 }
 
-// The system's autostart folders, the first one first.
-@(private = "file")
-autostart_system_dirs :: proc() -> []string {
-	dirs := os.get_env("XDG_CONFIG_DIRS", context.temp_allocator)
-	if dirs == "" { dirs = "/etc/xdg" }
-	out := make([dynamic]string, context.temp_allocator)
-	for d in strings.split(dirs, ":", context.temp_allocator) {
-		if d != "" { append(&out, strings.concatenate({d, "/autostart"}, context.temp_allocator)) }
-	}
+// The autostart folders, the most important first: the user's, then the system's (the toolkit's configuration roots,
+// desktop.xdg_roots: $XDG_CONFIG_HOME, then each $XDG_CONFIG_DIRS, /etc/xdg without it).
+autostart_dirs :: proc(roots: desktop.Xdg_Roots) -> []string {
+	out := make([dynamic]string, 0, len(roots.config), context.temp_allocator)
+	for d in roots.config { append(&out, strings.concatenate({d, "/autostart"}, context.temp_allocator)) }
 	return out[:]
 }
 
@@ -70,11 +67,10 @@ startup_read :: proc(b: ^Startup_Bus, out: ^[dynamic]Startup_Item, a: runtime.Al
 @(private = "file")
 autostart_read :: proc(out: ^[dynamic]Startup_Item, a: runtime.Allocator) {
 	seen := make(map[string]bool, 64, context.temp_allocator)
-	desktops := strings.split(os.get_env("XDG_CURRENT_DESKTOP", context.temp_allocator), ":", context.temp_allocator)
-	dirs := make([dynamic]string, context.temp_allocator)
-	append(&dirs, autostart_user_dir())
-	append(&dirs, ..autostart_system_dirs())
-	for dir in dirs {
+	// (the desktops' names in lower case: an entry's are compared without case)
+	roots := desktop.xdg_roots()
+	desktops := roots.desktops
+	for dir in autostart_dirs(roots) {
 		fis, err := os.read_all_directory_by_path(dir, context.temp_allocator)
 		if err != nil { continue }
 		for fi in fis {
