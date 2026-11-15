@@ -220,7 +220,9 @@ autostart_set_enabled :: proc(id: string, on: bool) -> (failure: string) {
 	user_path := strings.concatenate({user_dir, "/", id}, context.temp_allocator)
 	system_text := ""
 	has_system := false
-	for d in autostart_system_dirs() {
+	// (the system's folders: every one but the user's, which comes first)
+	dirs := autostart_dirs(desktop.xdg_roots())
+	for d in dirs[min(1, len(dirs)):] {
 		if data, err := os.read_entire_file(strings.concatenate({d, "/", id}, context.temp_allocator), context.temp_allocator); err == nil {
 			system_text, has_system = string(data), true
 			break
