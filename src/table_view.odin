@@ -43,10 +43,6 @@ HEAT_MIX_MAX       :: f32(1.0)
 HEAT_DARK_PAGE :: 0.1
 // The outline of a busy cell: its colour this much darker (a cell stands apart from its neighbour of the same hue).
 HEAT_BORDER_SHADE :: 0.55
-// A background lighter than this (relative luminance, linear light: mid-grey) takes dark text, a darker one light text.
-HEAT_TEXT_LUMINANCE :: 0.2
-HEAT_TEXT_DARK      :: ui.Color{0.006, 0.006, 0.006, 1}
-HEAT_TEXT_LIGHT     :: ui.Color{1, 1, 1, 1}
 
 // A load's colour (0: green, 1: red), opaque, in linear light as the toolkit takes colours; `dark`: for a dark page.
 heat_hue :: proc(heat: f32, dark := false) -> ui.Color {
@@ -87,15 +83,14 @@ row_tint :: proc(app: ^App, r: Row, now: i64) -> (tint: Maybe(ui.Color)) {
 }
 
 // A busy cell's background (the hue mixed into the page, opaque), the text that reads on it and its outline, for a load
-// `heat` (1: red) over the page `page`.
-heat_colors :: proc(heat: f32, page: ui.Color) -> (bg, fg, border: ui.Color) {
+// `heat` (1: red) over the page `page`. Its text is the toolkit's ink on it (ui.ink_on: the theme's, readable).
+heat_colors :: proc(heat: f32, page: ui.Color) -> (bg, border: ui.Color) {
 	h := clamp(heat, 0, 1)
 	dark := ui.luminance(page) < HEAT_DARK_PAGE
 	hue := heat_hue(h, dark)
 	least := dark ? HEAT_MIX_MIN_DARK : HEAT_MIX_MIN_LIGHT
 	bg = page + (hue - page) * (least + (HEAT_MIX_MAX - least) * h)
 	bg.a = 1
-	fg = ui.luminance(bg) > HEAT_TEXT_LUMINANCE ? HEAT_TEXT_DARK : HEAT_TEXT_LIGHT
 	border = {bg.r * HEAT_BORDER_SHADE, bg.g * HEAT_BORDER_SHADE, bg.b * HEAT_BORDER_SHADE, 1}
 	return
 }
@@ -313,7 +308,10 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 	}
 	cell :: proc(t: ^Table, c: Column, text: string, tip: ^string, weak := false, heat: f32 = 0, page: ui.Color = {}) {
 		bg, fg, border: Maybe(ui.Color)
-		if heat >= HEAT_MIN { bg, fg, border = heat_colors(heat, page) }
+		if heat >= HEAT_MIN {
+			ground, edge := heat_colors(heat, page)
+			bg, fg, border = ground, ui.ink_on(ground), edge
+		}
 		if weak && fg == nil { ui.push_tags("weak") }
 		defer if weak && fg == nil { ui.pop_tags() }
 		if ui.table_cell(&t.layout, int(c), text, bg, fg, border) { tip^ = text }
