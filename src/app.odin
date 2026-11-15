@@ -198,7 +198,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	ui.palette_memory_open(&app.palette, &h.state, palette_choices_file(app))
 	h.after_input = FRAMES_AFTER_INPUT
 	// (the zoom, the rounding, the scrolling, the delays, partial redraw...: applied now, then each as it changes)
-	prefs_page.standard_watch(&app.standard, &app.prefs, &h.state, {renderer = &app.shared.r, fonts = &app.shared.fonts, partial_redraw = &h.partial_redraw})
+	prefs_page.standard_watch(&app.standard, &app.prefs, &h.state, {renderer = &app.shared.r, fonts = &app.shared.fonts, partial_redraw = &h.partial_redraw, pacer = &h.pacer})
 	licence_init(app)
 	h.params = app_params
 	app.devtools = devtools.start_from_env(win, "inspecteur")
