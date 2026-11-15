@@ -3,6 +3,15 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.13.0] - 2026-11-15 21:00
+
+### Added
+- **"By Froment Software" in the install**: the install's dialog and the settings' Installation page show the vendor's mark and name, a link to its site.
+- **Your own keys and aliases for commands**: in the command palette, Ctrl+Enter on a command records a key for it (one key, or two in a row such as Ctrl+M, T), and Alt+Enter makes the letters typed its alias. The menus, the tooltips and the sheet of the keys (F1) show your keys. The settings' new Keys page holds them; its reset removes them.
+
+### Changed
+- **Inspecteur's name capitalised, its files in the vendor's folder**: the window, the settings, the messages and the site write "Inspecteur". The settings, the views' memory, the palette's memory, the log, the crash reports, the licence and the dumps are now under `FromentSoftware/Inspecteur` (`~/.config/FromentSoftware/Inspecteur`, `~/.local/state/FromentSoftware/Inspecteur`, `~/.cache/FromentSoftware/Inspecteur`); the first start moves the old `inspecteur` folders there once. The palette's Recent list starts again for the commands.
+
 ## [0.12.0] - 2026-11-15 17:47
 
 ### Added
@@ -274,6 +283,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.13.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.13.0
 [0.12.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.12.0
 [0.11.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.11.0
 [0.10.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.10.0
