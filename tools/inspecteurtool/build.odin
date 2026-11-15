@@ -43,9 +43,12 @@ run_test :: proc(args: []string) -> int {
 
 run_check :: proc(args: []string) -> int {
 	p := project()
-	// (no check for Windows, toolbox.check_windows: every reader of the system is a *_linux.odin file, and Windows has
-	// none yet: src/md/infrastructure/porting.md)
 	if !toolbox.run(toolbox.odin_command(p, "check"), {echo = true}) { return 1 }
+	// (the other systems from Linux: their readers are the *_other.odin stubs, src/md/infrastructure/porting.md)
+	when ODIN_OS != .Windows {
+		if !toolbox.check_windows(p) { return 1 }
+		if !toolbox.check_darwin(p) { return 1 }
+	}
 	if !toolbox.run(toolbox.odin_command(p, "check", "tools/inspecteurtool"), {echo = true}) { return 1 }
 	if !toolbox.check_scopes("src") { return 1 }
 	if run_test(nil) != 0 { return 1 }

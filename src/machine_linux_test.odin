@@ -1,3 +1,4 @@
+#+build linux
 package inspecteur
 
 import "core:fmt"

@@ -522,6 +522,9 @@ fr le noyau ne laisse que les parents d'un processus ou root lire sa mémoire (k
 en gcore could not read it
 fr gcore n'a pas pu le lire
 
+en No dump can be written on this system.
+fr Aucun vidage ne peut être écrit sur ce système.
+
 ctx unit
 en B
 fr o
@@ -1969,6 +1972,9 @@ fr Ouvert tant que le filtre trouve certains de ses processus
 
 en CPU over the last %s: %s on average, %s at most
 fr CPU sur les dernières %s : %s en moyenne, %s au plus
+
+en not available on this system
+fr indisponible sur ce système
 
 en Every process under its parent
 fr Chaque processus sous son parent

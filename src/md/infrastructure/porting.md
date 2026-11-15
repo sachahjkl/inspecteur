@@ -19,6 +19,14 @@ The demo (`demo.odin`, `inspecteur --demo`) is a third source behind the same pr
 services, sockets and details. The pictures of the documentation are made with it, so they hold no data of the machine.
 Each new reader has its demo's counterpart.
 
+## The systems without a port
+
+Every reader has a `*_other.odin` stub (`#+build !linux`): it reads nothing (empty lists, `proc_reader_init` false: the
+window says the reading failed) and its acts answer "not available on this system" (`NOT_AVAILABLE`). The program then
+compiles for Windows and macOS, and `inspecteurtool check` checks both from Linux, so the portable code cannot grow a
+Linux-only name unseen. A port replaces a stub with its system's file (`#+build` of the stub narrowed to the systems still
+without one).
+
 ## Porting to Windows
 
 A port writes `*_windows.odin` files beside the `*_linux.odin` ones, with the same procs and the same structs filled. No
