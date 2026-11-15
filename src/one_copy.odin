@@ -3,7 +3,8 @@ package inspecteur
 // One Inspecteur at a time (the toolkit's gt:instance): a second start (Ctrl+Shift+Escape again, the CPU Meter's button,
 // the menu's entry) hands its section and its activation token to the one that runs, which shows that section and
 // comes to the front; the second start then ends. A copy of another executable (a Nix store's after an update, a build
-// beside it) runs on its own. The demo and --first-frame (the tools) are never forwarded.
+// beside it) runs on its own. The demo and --first-frame (the tools) are never forwarded. --status pings it and --quit
+// asks it to end (gui_toolkit's src/md/features/quit.md).
 
 import "core:fmt"
 import "core:strings"
@@ -15,9 +16,6 @@ import "gt:ui"
 // How long a second start waits for the first while it is starting or closing.
 @(private = "file") ONE_COPY_WAIT_MS :: 3000
 
-// What a start that only asks whether Inspecteur runs sends (--status): the running one does nothing with it.
-@(private = "file") ONE_COPY_PING :: "ping"
-
 @(private = "file")
 one_copy_options :: proc() -> instance.Instance_Options {
 	return {name = instance.key("inspecteur", platform.user_dir(.Config, "", context.temp_allocator)), identity = process.executable_path(), wait_ms = ONE_COPY_WAIT_MS}
@@ -25,7 +23,13 @@ one_copy_options :: proc() -> instance.Instance_Options {
 
 // Whether an Inspecteur runs and answers (--status: setup.Setup_Options.running).
 one_copy_running :: proc() -> bool {
-	return instance.send(one_copy_options(), transmute([]byte)string(ONE_COPY_PING)) == .Forwarded
+	return instance.send(one_copy_options(), transmute([]byte)string(instance.MESSAGE_PING)) == .Forwarded
+}
+
+// Asks the Inspecteur that runs to end as its own Quit does (--quit: setup.Setup_Options.quit); true when it took the
+// request. The setup's --quit then waits for the process to end.
+one_copy_quit :: proc() -> bool {
+	return instance.send(one_copy_options(), transmute([]byte)string(instance.MESSAGE_QUIT)) == .Forwarded
 }
 
 // At a start with the window: hands `tab` (asked: `asked`) to a running Inspecteur. `forwarded`: it took it, this start
@@ -55,13 +59,24 @@ one_copy_stop :: proc(app: ^App) {
 	if app.one_copy != nil { instance.serve_stop(app.one_copy) }
 }
 
-// (the interface's thread) The section a second start asked for, the window to the front.
+// (the interface's thread) What the server took, handed from its thread.
 @(private = "file")
 one_copy_show :: proc(data: rawptr, word: u64) {
 	text := string(([^]u8)(data)[:word])
 	defer delete(text)
-	app := the_app
-	if app == nil || text == ONE_COPY_PING { return }
+	if the_app != nil { one_copy_receive(the_app, text) }
+}
+
+// (the interface's thread) A message of another start: a ping (--status) asks nothing; a quit (--quit, an installer)
+// ends Inspecteur as closing its window does, so that the loop's end keeps the preferences and the views; anything
+// else is a second start's section and token: that section, the window to the front.
+one_copy_receive :: proc(app: ^App, text: string) {
+	switch text {
+	case instance.MESSAGE_PING: return
+	case instance.MESSAGE_QUIT:
+		platform.request_close(app.main.win)
+		return
+	}
 	section, _, token := strings.partition(text, "\n")
 	if t, ok := tab_of(section); ok && section != "" {
 		app.settings_open = false
