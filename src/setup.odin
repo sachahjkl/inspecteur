@@ -32,7 +32,7 @@ setup_options :: proc() -> setup.Setup_Options {
 	id.nix_runtime_name = "inspecteur-runtime"
 	id.nixos_libraries = NIXOS_LIBRARIES[:]
 	id.uninstall_arguments = "--setup"   // (Settings > Apps: the install's dialog, its Uninstall)
-	return setup.Setup_Options{identity = id, version = APP_VERSION, install_folder = APP_NAME, icons = identity.ICONS[:], running = one_copy_running, quit = one_copy_quit, vendor_url = "https://froment.software"}
+	return setup.Setup_Options{identity = id, version = APP_VERSION, icons = identity.ICONS[:], running = one_copy_running, quit = one_copy_quit, vendor_url = "https://froment.software"}
 }
 
 // The updates start once the start's reading of the install says which copy runs (an installed copy updates itself in
