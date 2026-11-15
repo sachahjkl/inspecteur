@@ -3,6 +3,13 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.8.0] - 2026-11-15
+
+### Changed
+- **Alternating rows and rules are on the Appearance page.** They are the toolkit's settings now, with the same words in every program; the Tables page is gone. A choice made before goes back to its default once (both on).
+- **The window's place is kept while it runs.** A crash or an update's restart now finds the window where it was, not only a normal close.
+- **The text on a busy cell is the theme's**: its ink is the toolkit's choice for that colour (ui.ink_on), always readable, in the theme's own dark or light.
+
 ## [0.7.2] - 2026-11-15
 
 ### Fixed
@@ -244,6 +251,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.8.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.8.0
 [0.7.2]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.7.2
 [0.7.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.7.1
 [0.7.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.7.0
