@@ -3,6 +3,11 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.7.2] - 2026-11-15
+
+### Fixed
+- **A window of its own closes again on Wayland**: the journal or the details moved to a window of their own went back in place with the window's close button; the window stayed on the screen before. The palette also puts the whole word first: @inspecteur goes to inspecteur, not to a longer name that starts with it.
+
 ## [0.7.1] - 2026-11-15
 
 ### Fixed
@@ -239,6 +244,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.7.2]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.7.2
 [0.7.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.7.1
 [0.7.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.7.0
 [0.6.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.6.0
