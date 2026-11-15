@@ -3,6 +3,14 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.11.0] - 2026-11-15 16:51
+
+### Added
+- **A license to buy.** The pricing page sells a license of inspecteur: a payment once through Paddle, the license by mail and on the thank-you page at once, its key or its file to give the program.
+
+### Fixed
+- **Zoom in with Ctrl++ on a French keyboard.** On an AZERTY keyboard + is Shift+=: the Zoom in command now answers Ctrl++, as it answers Ctrl+= and the keypad's Ctrl++.
+
 ## [0.10.0] - 2026-11-15 14:24
 
 ### Added
@@ -261,6 +269,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.11.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.11.0
 [0.10.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.10.0
 [0.9.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.9.0
 [0.8.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.8.0

@@ -16,7 +16,7 @@ import tk_log "gt:log"
 import process "gt:process"
 import setup "gt:setup"
 
-APP_VERSION :: "0.10.0"
+APP_VERSION :: "0.11.0"
 // What changed, version by version: the settings' What's new page (in the program, beside its site's changelog).
 CHANGELOG :: #load("../CHANGELOG.md", string)
 
