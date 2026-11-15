@@ -114,6 +114,7 @@ prefs_open :: proc(p: ^config.Prefs, args: []string) -> (rest: [dynamic]string, 
 	// (the descriptions that name the program live as long as the registry: the process's)
 	prefs_page.standard_register(p, prefs_page.STANDARD_ALL + {.Rows}, standard_defaults())
 	config.register(p, PREF_DEFS[:])
+	prefs_page.changelog_register(p)   // (the version last started: What's new after an update)
 	_, file_problems := config.load_file(p, prefs_file(), .User)
 	rest, problems = config.apply_args(p, args, context.temp_allocator)
 	append(&problems, ..file_problems[:])

@@ -89,6 +89,7 @@ App :: struct {
 	views:       ui.Views,          // the dialogs, the panels, the windows of their own, and how each was last shown (views.odin)
 	mission:     Mission_Control,   // the Mission Control section: its panels (mission_control.odin)
 	install:     prefs_page.Install,   // the install: its offer, its dialog, the settings' page (setup.odin)
+	changelog:   prefs_page.Changelog, // What's new: CHANGELOG.md on a page of the settings, said once after an update
 	setup_due:   bool,              // --setup: the install's view opens in the first build
 	updates_asked: bool,            // the updates started, once the install was read (setup_follow)
 	crash_bar:   crash_bar.Bar,     // the last run's crash report, said at the top of the window
@@ -216,6 +217,15 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	go_to_add(app)
 	// (the install is read on a task; the updates start once it says which copy runs: setup_follow. Never offered in the demo)
 	prefs_page.install_offer(&app.install, &h.state, offer = !opts.setup && app.demo == nil)
+	// (after an update, once: a message that stays opens the settings at What's new; never the demo's)
+	app.changelog.english = CHANGELOG
+	if app.demo == nil {
+		prefs_page.changelog_after_update(&app.changelog, &app.prefs, APP_VERSION, &app.announcer, proc(user: rawptr) {
+			app := (^App)(user)
+			app.settings_open = true
+			prefs_page.show(&app.settings_page, &app.prefs, settings_options(app), prefs_page.CHANGELOG_PAGE)
+		}, app)
+	}
 	app.setup_due = opts.setup
 	if opts.owns { one_copy_serve(app, opts.owner) }
 
@@ -284,6 +294,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	icons_destroy(&app.app_icons, &app.shared.r)
 	if app.logo.ok { render.destroy_texture(&app.shared.r, app.logo.tex) }
 	prefs_page.install_end(&app.install)
+	prefs_page.changelog_destroy(&app.changelog)
 	crash_bar.destroy(&app.crash_bar)
 	// (after the last build, while the window's State is there: which views were open is written, their windows close;
 	// then their data goes)

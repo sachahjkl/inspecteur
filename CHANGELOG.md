@@ -3,29 +3,29 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
-## [0.9.0] - 2026-11-15
+## [0.9.0] - 2026-11-15 12:55
 
 ### Added
 - **Frame rate in Settings.** Settings › Rendering › Frame rate caps how many pictures a second inspecteur draws when something moves: the screen's rate, 30 to 240, or no limit.
 
-## [0.8.0] - 2026-11-15
+## [0.8.0] - 2026-11-15 08:09
 
 ### Changed
 - **Alternating rows and rules are on the Appearance page.** They are the toolkit's settings now, with the same words in every program; the Tables page is gone. A choice made before goes back to its default once (both on).
 - **The window's place is kept while it runs.** A crash or an update's restart now finds the window where it was, not only a normal close.
 - **The text on a busy cell is the theme's**: its ink is the toolkit's choice for that colour (ui.ink_on), always readable, in the theme's own dark or light.
 
-## [0.7.2] - 2026-11-15
+## [0.7.2] - 2026-11-15 06:59
 
 ### Fixed
 - **A window of its own closes again on Wayland**: the journal or the details moved to a window of their own went back in place with the window's close button; the window stayed on the screen before. The palette also puts the whole word first: @inspecteur goes to inspecteur, not to a longer name that starts with it.
 
-## [0.7.1] - 2026-11-15
+## [0.7.1] - 2026-11-15 01:06
 
 ### Fixed
 - **Two copies open at once no longer hide each other's crash**: when two copies of Inspecteur ran at the same time, a crash or a forced end of one could go unreported, and its report could be hidden by the clean end of the other. Each copy now keeps its own trace, and the next start shows what it did not see.
 
-## [0.7.0] - 2026-11-14
+## [0.7.0] - 2026-11-14 23:45
 
 ### Added
 - **Go to a process or a service from the palette**: `@` in the palette (Ctrl+K) lists the processes and the services (also found by a search without it); choosing one selects its row, in Processes or in Services.
@@ -33,7 +33,7 @@ and the versions follow [semantic versioning](https://semver.org/).
 ### Changed
 - **The command palette is gui_toolkit's one palette**: its prefixes are the same in every program (`>` the commands and the views' moves, `:` the settings, `@` go to), the hint row at its foot says them, a switch of the settings flips in place and the palette stays open, the commands that cannot act now are greyed and listed last, and what was chosen before comes first under Recent, in every language. The choices made in the palette before are not kept: Recent starts empty.
 
-## [0.6.0] - 2026-11-14
+## [0.6.0] - 2026-11-14 19:21
 
 ### Added
 - **Select several items with Ctrl and Shift**: in Services, Startup and Connections as in Processes, Ctrl+click adds or takes out a row, Shift+click selects the range from the last row clicked, Ctrl+Shift+click adds a range, and Shift or Ctrl+Shift with the arrows, Page Up, Page Down, Home and End do the same from the keyboard. Start, Stop, Restart, Enable and Disable act on every service selected that they apply to, Enable and Disable on every startup item, End task and Kill on the processes of every socket; Copy copies every row, a line each. One question names how many: "Stop 3 services?", and End task on several processes asks too. Properties and the other views of one thing stay on the row of the cursor. Escape on several rows keeps the cursor's row alone; Escape again clears the filter.
@@ -50,12 +50,12 @@ and the versions follow [semantic versioning](https://semver.org/).
 - **Process names whole**: in the Processes tab, a name is no longer cut to a few letters or to "…" alone while its column has room. Its count and its window's button follow it; only a column too narrow cuts the name.
 - **The font settings apply.** The interface, monospace and reading fonts chosen in the settings changed nothing; they now show at once, in every window, and Default brings inspecteur's own back.
 
-## [0.5.1] - 2026-11-14
+## [0.5.1] - 2026-11-14 00:52
 
 ### Fixed
 - **Dialogs open without a jump**: a dialog shows at its final size and place from its first frame, and the shade behind it fades in with it.
 
-## [0.5.0] - 2026-11-13
+## [0.5.0] - 2026-11-13 23:50
 
 ### Added
 - **A Diagnostics page in the settings, with a Copy button.** It shows the versions, the system, the graphics adapter (and whether a software rasterizer draws), the window's size and scale, the last frames' times and how much partial redraw drew. If inspecteur is slow, copy it and send it.
@@ -72,17 +72,17 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Narrow windows and longer words cut no text.** In a narrow window, the Performance page puts its table of details under the big numbers instead of over them. The journal's bar wraps onto a second line, and the startup problem wraps under the bar. A process's name ends with "…" where it is cut. The journal's level and boot, the System and User choice and the CPU view's choice are as wide as their longest word in every language.
 - **French done right.** The services' states (active, running, enabled, static, loaded…) are in the language in use, in Services, their details and Mission Control. The settings' choices of the process view, the manager and the journal level are translated. Keys have the names that a French keyboard prints, and numbers use the French decimal mark and spacing. Some words are clearer ("Actualiser", "Fils", "État", "Carte graphique", "Fermeture en attente"), and the program writes its name "inspecteur" everywhere.
 
-## [0.4.2] - 2026-11-13
+## [0.4.2] - 2026-11-13 18:56
 
 ### Changed
 - **One licence at one price, and a new pricing page**: the inspecteur licence is now one edition at 15 €, paid once, taxes included; the Patron edition is gone. The pricing page shows inspecteur's icon and name, one card with the price, what the licence gives as a list, one button, then "Before you buy". The licence is named "inspecteur licence" on the site, at checkout and in the licence file.
 
-## [0.4.1] - 2026-11-13
+## [0.4.1] - 2026-11-13 18:05
 
 ### Fixed
 - **The Windows download is there again**: 0.4.0 had no Windows archive (its build stopped on a check that read the files with Windows line endings). This version has it.
 
-## [0.4.0] - 2026-11-13
+## [0.4.0] - 2026-11-13 17:58
 
 ### Added
 - **The palette remembers what you choose**: its Recent group holds the commands you choose often and lately. A command chosen often stays near the top for weeks, and while you type it comes before an equal match.
@@ -157,7 +157,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **The palette no longer crashes on a search that keeps nothing** (gui_toolkit 0.176.1).
 - **Resizing a column moves no other column a frame late** (gui_toolkit 0.169.0: the fill column is resolved in the same build); the stripes of the tables are fainter.
 
-## [0.2.0] - 2026-11-10
+## [0.2.0] - 2026-11-10 22:58
 
 ### Added
 
@@ -208,7 +208,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - The welcome page, `inspecteur setup` and the steps per desktop for the task manager's key: the install's dialog and
   `inspecteur install` replace them.
 
-## [0.1.0] - 2026-11-10
+## [0.1.0] - 2026-11-10 10:58
 
 ### Added
 - **Processes**: name with the app's icon, PID, user, CPU % (of the whole machine), private memory, disk read and write
