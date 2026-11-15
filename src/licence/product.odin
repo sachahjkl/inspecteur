@@ -13,7 +13,7 @@ PRODUCT :: licence.Product{
 	sign_context   = "inspecteur-licence-v1\n",
 	file_extension = ".inspecteurlicence",
 	// (`inspecteurtool licence keygen` makes the pair; empty until then: no licence of the real key is accepted)
-	public_key     = "",
+	public_key     = "ybWQ-6L7ppTvPpFJQ5emY2GKhVz0ft9iyldc34ieQwI",
 	// (the development pair: its seed is public on purpose, inspecteurtool's DEV_SEED; only a debug build accepts it)
 	dev_public_key = "AdStxVdn8FsJ4eil4es_IaBkqV0p0Vn1jV7sCbozGyA",
 	editions       = {0 = {id = "supporter", title = "Supporter"}},
