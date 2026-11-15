@@ -147,8 +147,17 @@ live_commands :: proc(l: ^Live) {
 	check(l, cdp.type_text(c, "zzqx") && cdp.wait_for(c, "Nothing matches", SESSION_WAIT), "a search that keeps nothing says so (no crash)")
 	check(l, cdp.key(c, "Escape") && cdp.wait_name(c, "palette_top", SESSION_WAIT, gone = true), "Escape closes it")
 	check(l, cdp.key(c, "F1") && cdp.wait_for(c, "Keyboard shortcuts", SESSION_WAIT), "F1 shows the keys")
-	check(l, cdp.wait_for(c, "Suspend or resume", SESSION_WAIT) && cdp.wait_for(c, "Ctrl+K, Ctrl+Shift+P", SESSION_WAIT), "with every command's keys")
+	// (the sheet builds only the rows in view: its end, the last commands, is scrolled to)
+	sheet_end :: proc(c: ^cdp.Client) -> bool {
+		w, h, ok := cdp.window_size(c)
+		if !ok { return false }
+		for _ in 0 ..< SHEET_WHEELS { cdp.call(c, "Input.dispatchMouseEvent", fmt.tprintf(`{{"type":"mouseWheel","x":%d,"y":%d,"deltaX":0,"deltaY":%d}}`, int(w / 2), int(h / 2), SHEET_WHEEL_DELTA)) }
+		return true
+	}
+	check(l, sheet_end(c) && cdp.wait_for(c, "Suspend or resume", SESSION_WAIT) && cdp.wait_for(c, "Ctrl+K, Ctrl+Shift+P", SESSION_WAIT), "with every command's keys")
 	check(l, cdp.key(c, "Escape") && cdp.wait_for(c, "Keyboard shortcuts", SESSION_WAIT, gone = true), "Escape closes them")
+	// (from Performance: the palette's Go to above showed Processes)
+	check(l, cdp.key(c, "ctrl+3") && cdp.wait_name(c, "cpu_graph", SESSION_WAIT), "Ctrl+3: Performance")
 	check(l, cdp.key(c, "ctrl+Tab") && cdp.wait_name(c, "svc_start", SESSION_WAIT), "Ctrl+Tab: the next section, Services")
 	check(l, cdp.key(c, "ctrl+shift+Tab") && cdp.wait_name(c, "cpu_graph", SESSION_WAIT), "Ctrl+Shift+Tab: back to Performance")
 	check(l, cdp.key(c, "ctrl+2") && cdp.key(c, "ctrl+shift+c") && cdp.wait_for(c, "Default columns", SESSION_WAIT), "Ctrl+Shift+C in Processes: the columns' menu")
@@ -229,7 +238,8 @@ live_settings :: proc(l: ^Live) {
 	before := page_pixel(c)
 	check(l, cdp.click_name(c, "th0") && file_has(prefs, "appearance.theme\tMidnight"), "the first theme's card: Midnight, kept")
 	check(l, wait_page_pixel_not(c, before), "the window takes its colours at once")
-	check(l, cdp.click_name(c, "th1") && file_has(prefs, "appearance.theme\tGraphite"), "back to Graphite")
+	// (by its name: the cards are in columns, the second card is not the second theme of the list)
+	check(l, cdp.click_text(c, "Graphite") && file_has(prefs, "appearance.theme\tGraphite"), "back to Graphite")
 	check(l, cdp.key(c, "ctrl+f") && cdp.type_text(c, "rules") && cdp.wait_for(c, "A thin line under each row of a table.", SESSION_WAIT), "a search finds a preference")
 	// the window's commands work in the settings, their search with the keyboard: the palette lists the settings, F1
 	check(l, cdp.key(c, "ctrl+k") && cdp.wait_name(c, "palette_top", SESSION_WAIT), "Ctrl+K in the settings opens the palette")

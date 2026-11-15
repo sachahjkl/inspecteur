@@ -22,6 +22,9 @@ PERF_POINTS_WAIT :: 8 * time.Second
 GRAPH_POLL :: 250 * time.Millisecond
 // The busy children end by themselves after this many seconds, whatever becomes of this tool.
 BUSY_SECONDS :: "30"
+// The wheel's notches, and their size in pixels, that take the shortcuts sheet to its end (it is longer than its view).
+SHEET_WHEELS :: 30
+SHEET_WHEEL_DELTA :: 400
 
 live_performance :: proc(l: ^Live) {
 	c := &l.c
