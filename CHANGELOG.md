@@ -3,6 +3,11 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.7.1] - 2026-11-15
+
+### Fixed
+- **Two copies open at once no longer hide each other's crash**: when two copies of Inspecteur ran at the same time, a crash or a forced end of one could go unreported, and its report could be hidden by the clean end of the other. Each copy now keeps its own trace, and the next start shows what it did not see.
+
 ## [0.7.0] - 2026-11-14
 
 ### Added
@@ -234,6 +239,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.7.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.7.1
 [0.7.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.7.0
 [0.6.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.6.0
 [0.5.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.5.1
