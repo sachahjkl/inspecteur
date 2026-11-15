@@ -30,15 +30,14 @@ settings_keys :: proc(app: ^App) {
 @(private = "file")
 GENERAL_NAMES := [?]string{prefs_page.MESSAGES_PREF, prefs_page.LANGUAGE_PREF}
 
-// The pages, their order and their icons: each a group of the registry (the first segment of a name). The tables' look
-// (view.zebra, view.rules) has a page of its own: the other view.* preferences are hidden. (Not rodata: it slices
-// GENERAL_NAMES, set when the program starts.)
+// The pages, their order and their icons: each a group of the registry (the first segment of a name). The view.*
+// preferences are hidden: no page (the tables' rows are the toolkit's appearance.rows, on Appearance). (Not rodata: it
+// slices GENERAL_NAMES, set when the program starts.)
 @(private = "file")
 SETTINGS_PAGES := [?]prefs_page.Page_Info{
 	{category = "general",     title = i18n.later("General"),          icon = lucide.SLIDERS_HORIZONTAL, names = GENERAL_NAMES[:]},
 	{category = "appearance",  title = i18n.later("Appearance"),       icon = lucide.PALETTE},
 	{category = "window",      title = i18n.later("Window"),           icon = lucide.APP_WINDOW},
-	{category = "view",        title = i18n.later("Tables"),           icon = lucide.TABLE},
 	{category = "processes",   title = i18n.later("Processes"),        icon = lucide.LAYOUT_LIST},
 	{category = "services",    title = i18n.later("Services"),         icon = lucide.SETTINGS},
 	{category = "connections", title = i18n.later("Connections"),      icon = lucide.GLOBE},

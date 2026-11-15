@@ -1795,23 +1795,8 @@ fr L'intervalle de lecture des sockets tant que Connexions ou Mission Control es
 en How often the services are read again while their section is shown, in milliseconds.
 fr L'intervalle de lecture des services tant que leur section est affichée, en millisecondes.
 
-en Zebra
-fr Lignes alternées
-
-en Shade every second row of the tables: a line of numbers reads across.
-fr Griser une ligne sur deux des tableaux : une ligne de nombres se lit d'un bout à l'autre.
-
-en Rules
-fr Lignes de séparation
-
-en Draw a thin line under each row of the tables.
-fr Tracer un fin trait sous chaque ligne des tableaux.
-
 en Appearance
 fr Apparence
-
-en Tables
-fr Tableaux
 
 en Scrolling
 fr Défilement

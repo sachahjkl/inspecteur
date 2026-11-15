@@ -51,7 +51,7 @@ site_project :: proc() -> tk_site.Project_Site {
 	m := SITE_META
 	m.ld_fields = SITE_LD[:]
 	m.shop = shop()
-	return {meta = m, dir = "site", pages = {version_mark = "{{version}}", downloads = SITE_DOWNLOADS[:]}}
+	return {meta = m, dir = "site", pages = {version_mark = "{{version}}", downloads = SITE_DOWNLOADS[:]}, images = tk_site.images_default()}
 }
 
 // The shop: inspecteur's licence (src/licence), sold through Paddle by the toolkit's licence Worker. Its pages (pricing,

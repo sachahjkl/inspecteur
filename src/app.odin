@@ -30,7 +30,7 @@ import i18n "gt:i18n"
 // Frames owed after an event (what it set off settles: the layout, the reveal of the selected row).
 FRAMES_AFTER_INPUT :: 3
 
-// The window's size at its first start, in logical pixels (then view.placement's).
+// The window's size at its first start, in logical pixels (then the toolkit's window.placement).
 WINDOW_SIZE :: [2]int{1100, 720}
 
 Tab :: enum u8 { Mission_Control, Processes, Performance, Services, Startup, Connections, Information }
@@ -45,6 +45,7 @@ App :: struct {
 	icons:       font.Font_Id,      // Lucide
 	prefs:       config.Prefs,
 	prefs_writer: config.User_Writer,   // writes the user's file off the loop: each round saves what changed
+	placement:    prefs_page.Placement_Keeper,   // the window's place, the toolkit's window.placement
 	settings:    Settings,
 	devtools:    ^devtools.Server,  // TOOLKIT_DEVTOOLS=<port>: driven and captured over the Chrome DevTools Protocol
 	theme_shown: ui.Theme_Shown,
@@ -220,7 +221,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 
 	t_window := time.tick_now()
 	// (the window as it was left: its size, maximized or not; its place too where the system lets a program set it)
-	if pl, ok := platform.placement_parse(config.string_of(&app.prefs, "view.placement")); ok { platform.set_placement(win, pl) }
+	prefs_page.placement_restore(&app.placement, &app.prefs, win)
 	platform.show_window(win)
 	host.host_frame(h)
 	if opts.first_frame {
@@ -246,6 +247,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 		zoom_follow(app)
 		app.frame_time += time.tick_since(t_frame)
 		app.frames += 1
+		// (the window's place kept as it moves: a crash or an update's restart finds it; never the demo's)
+		if app.demo == nil { prefs_page.placement_track(&app.placement, &app.prefs, win, ui.now_ms()) }
 		// (what this round changed in the preferences: the writer's thread writes the file)
 		config.user_writer_save(&app.prefs_writer, &app.prefs)
 		if config.user_writer_failed(&app.prefs_writer) { say(app, i18n.tr("The preferences cannot be written")) }
@@ -255,7 +258,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 		mean :: proc(d: time.Duration, n: int) -> f64 { return n > 0 ? time.duration_milliseconds(d) / f64(n) : 0 }
 		fmt.printfln("costs: %d samples, %.2f ms each; %d frames, %.2f ms each", app.refreshes, mean(app.refresh_time, app.refreshes), app.frames, mean(app.frame_time, app.frames))
 	}
-	if app.demo == nil { pref_set(&app.prefs, "view.placement", platform.placement_text(platform.get_placement(win))) }
+	if app.demo == nil { prefs_page.placement_keep(&app.placement, &app.prefs, win) }
+	prefs_page.placement_keeper_destroy(&app.placement)
 	if !config.user_writer_stop(&app.prefs_writer, &app.prefs) { log.error("the preferences cannot be written") }
 	// (what the chores still run ends first: their work reads and writes what is freed below; what they posted is taken,
 	// so that it is freed with the rest)

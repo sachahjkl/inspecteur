@@ -25,8 +25,13 @@ PROGRAM_CATALOGUES :: []i18n.Catalog{{"fr", #load("../i18n/fr.txt", string)}}
 standard_defaults :: proc() -> prefs_page.Standard_Defaults {
 	d := prefs_page.STANDARD_DEFAULTS
 	d.theme, d.update_base_url, d.app_name = "Graphite", UPDATE_FOLDER, "inspecteur"
+	// (tables of numbers: striped and ruled, so that a line reads across)
+	d.values = ROWS_DEFAULTS[:]
 	return d
 }
+
+@(rodata)
+ROWS_DEFAULTS := [?]prefs_page.Standard_Value{{prefs_page.ROWS_ZEBRA_PREF, "true"}, {prefs_page.ROWS_RULES_PREF, "true"}}
 
 // The index of processes.columns in PREF_DEFS (its default is the columns shown by default: processes.odin).
 PREF_COLUMNS :: 0
@@ -56,16 +61,13 @@ PREF_DEFS := [?]config.Def{
 	{name = "connections.sort", description = "The column the sockets are sorted by (process, pid, protocol, local_address, remote_address, state), a - before it for the largest (or Z) first.", kind = .String, default = {s = "process"}, hidden = true},
 	{name = "connections.refresh_ms", title = i18n.later("Refresh"), description = i18n.later("How often the sockets are read again while Connections or Mission Control is shown, in milliseconds. A reading goes through every process's open files: a longer period costs less."), kind = .Int, default = {i = 3000}, min = 1000, max = 60_000, bounded = true, unit = "ms", tags = {"network", "sockets", "speed", "interval"}},
 	{name = "services.refresh_ms", title = i18n.later("Refresh"), description = i18n.later("How often the services are read again while their section is shown, in milliseconds."), kind = .Int, default = {i = 3000}, min = 1000, max = 60_000, bounded = true, unit = "ms"},
-	{name = "view.zebra", title = i18n.later("Zebra"), description = i18n.later("Shade every second row of the tables: a line of numbers reads across."), kind = .Bool, default = {b = true}, tags = {"stripes", "rows"}},
-	{name = "view.rules", title = i18n.later("Rules"), description = i18n.later("Draw a thin line under each row of the tables."), kind = .Bool, default = {b = true}, tags = {"lines", "rows"}},
-	{name = "view.placement", description = "Where the window was left and its size, in physical pixels, and whether it was maximized (\"120 80 1400 900 maximized\"; empty: the first start's size). Written when it closes; Wayland lets a program set the size alone.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "view.section", description = "The section shown at the start: the one shown last (mission control, processes, performance, services, startup, connections, information). --section shows another.", kind = .String, default = {s = "processes"}, hidden = true},
 	{name = "performance.cpu_view", description = "The CPU's page in Performance: one graph for all the processors (overall), or one per logical processor (logical). Ctrl+G switches them.", kind = .String, default = {s = "overall"}, choices = {"overall", "logical"}, hidden = true},
 }
 
-// The look of a table's rows (view.zebra, view.rules): every list of the window takes it at each build.
+// The look of a table's rows (the toolkit's appearance.rows): every list of the window takes it at each build.
 rows_look :: proc(app: ^App, vl: ^ui.Virtual_List) {
-	vl.zebra, vl.rules = app.settings.zebra, app.settings.rules
+	vl.zebra, vl.rules = app.settings.rows.zebra, app.settings.rows.rules
 }
 
 // The standard preferences inspecteur reads by name and the toolkit gives no constant for.
@@ -90,10 +92,9 @@ Settings :: struct {
 	sort:       string,
 	descending: bool,
 	look:       prefs_page.Appearance,   // appearance.theme, mode, finish, glow, font_size (owned)
+	rows:       prefs_page.Rows_Look,    // appearance.rows.zebra, rules
 	system_title: bool,     // window.system_title
 	zoom:       f32,        // appearance.zoom
-	zebra:      bool,     // view.zebra
-	rules:      bool,     // view.rules
 	update_auto: bool,    // update.auto
 	update_base_url: string,   // owned: update.base_url (read at the start: the Updater keeps it)
 }
@@ -111,7 +112,7 @@ themes_file :: proc(allocator := context.temp_allocator) -> string {
 prefs_open :: proc(p: ^config.Prefs, args: []string) -> (rest: [dynamic]string, problems: [dynamic]string) {
 	p^ = config.prefs_make()
 	// (the descriptions that name the program live as long as the registry: the process's)
-	prefs_page.standard_register(p, prefs_page.STANDARD_ALL, standard_defaults())
+	prefs_page.standard_register(p, prefs_page.STANDARD_ALL + {.Rows}, standard_defaults())
 	config.register(p, PREF_DEFS[:])
 	_, file_problems := config.load_file(p, prefs_file(), .User)
 	rest, problems = config.apply_args(p, args, context.temp_allocator)
@@ -136,10 +137,9 @@ prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Sett
 	s.order = strings.clone(config.string_of(p, "processes.order"), allocator)
 	s.descending = config.bool_of(p, "processes.descending")
 	s.look = prefs_page.appearance_read(p, allocator)
+	s.rows = prefs_page.rows_look(p)
 	s.system_title = config.bool_of(p, prefs_page.SYSTEM_TITLE_PREF)
 	s.zoom = f32(config.float_of(p, ZOOM_PREF))
-	s.zebra = config.bool_of(p, "view.zebra")
-	s.rules = config.bool_of(p, "view.rules")
 	s.update_auto = config.bool_of(p, prefs_page.UPDATE_AUTO_PREF)
 	s.update_base_url = strings.clone(config.string_of(p, BASE_URL_PREF), allocator)
 	return

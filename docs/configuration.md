@@ -68,9 +68,6 @@ puts every one of them back as at the first start.
 | `connections.sort` | process | The column the sockets are sorted by: `process`, `pid`, `protocol`, `local_address`, `remote_address` or `state`; a `-` before it for the largest (or Z) first. |
 | `connections.refresh_ms` | 3000 | How often the sockets are read again while Connections or Mission Control is shown, in milliseconds (1000 to 60000). A reading goes through every process's open files: a longer period costs less. |
 | `services.refresh_ms` | 3000 | How often the services are read again while their section is shown, in milliseconds (1000 to 60000). |
-| `view.zebra` | true | Shade every second row of the tables (Processes, Services, Startup, Connections, the Properties' lists): a line of numbers reads across. |
-| `view.rules` | true | Draw a thin line under each row of the tables. |
-| `view.placement` | (empty) | Where the window was left and its size, in physical pixels, and whether it was maximized (`120 80 1400 900 maximized`; empty: the first start's size). Written when it closes; Wayland lets a program set the size alone. |
 | `view.section` | processes | The section shown at the start: the one shown last (`mission control`, `processes`, `performance`, `services`, `startup`, `connections`, `information`). `--section` shows another. |
 | `performance.cpu_view` | overall | The CPU's page in Performance: one graph for all the processors (`overall`), or one per logical processor (`logical`). Ctrl+G switches them. |
 | `setup.choice` | (empty) | What was answered to the install's dialog: `installed`, `standalone` (this copy runs on its own: not offered again), or dismissed for a version. |
