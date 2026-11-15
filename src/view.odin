@@ -72,7 +72,7 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 		page := ui.build_box({.Draw_Background}, "###page")
 		if ui.parent(page) {
 			build_title(app, em)
-			crash_bar.bar(&app.crash_bar, {name = "inspecteur", version = APP_VERSION, repository = "sachahjkl/inspecteur"})
+			crash_bar.bar(&app.crash_bar, {name = APP_TITLE, version = APP_VERSION, repository = "sachahjkl/inspecteur"})
 			ui.next({width = ui.fill(), height = ui.fill()})
 			if app.settings_open {
 				settings_build(app)
@@ -331,7 +331,7 @@ build_title :: proc(app: ^App, em: f32) {
 		ui.spacer(ui.px(em * 0.6))
 		if app.logo.ok { icon_box(app.logo, em * 1.7) } else { ui.icon(lucide.EYE, em * 1.7, ui.color("accent")) }
 		ui.next({width = ui.text_size(em * 0.4), height = ui.pct(1)})
-		ui.label("inspecteur###apptitle")
+		ui.label(APP_TITLE + "###apptitle")
 		ui.spacer(ui.fill())
 		refresh_button(app, em)
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})

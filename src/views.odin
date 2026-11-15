@@ -30,7 +30,7 @@ MISSION_SPACE  :: "mission"
 @(private = "file")
 views_file :: proc(app: ^App) -> string {
 	if app.demo != nil { return "" }
-	return strings.concatenate({platform.user_dir(.State, APP_NAME, context.temp_allocator), "/views.txt"}, context.temp_allocator)
+	return strings.concatenate({platform.user_dir(.State, APP_FOLDER, context.temp_allocator), "/views.txt"}, context.temp_allocator)
 }
 
 // Once the window is open, before its first frame: the memory read (on this thread, once), each view declared, the

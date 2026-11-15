@@ -16,7 +16,7 @@ import inspecteur_licence "../../src/licence"
 // Where the site is published, what it is: the one place that says it.
 SITE_META :: tk_site.Meta{
 	url         = "https://inspecteur.froment.software/",
-	name        = "inspecteur",
+	name        = "Inspecteur",
 	repository  = REPOSITORY,
 	tagline     = "A fast native task manager for Linux",
 	changes     = CHANGELOG,
@@ -61,7 +61,7 @@ site_project :: proc() -> tk_site.Project_Site {
 
 shop :: proc() -> tk_site.Shop {
 	return {
-		name           = "inspecteur",
+		name           = "Inspecteur",
 		icon           = "../img/logo.png",
 		product_title  = "Inspecteur User License",
 		price          = "15&nbsp;&euro;",
@@ -73,13 +73,13 @@ shop :: proc() -> tk_site.Shop {
 		worker         = "https://inspecteur-licence.sacha-42a.workers.dev",
 		thanks         = "https://inspecteur.froment.software/thanks/",
 		help           = REPOSITORY + "/issues/new",
-		register       = "Open inspecteur's settings (Ctrl+,), the <strong>General</strong> page, <strong>Licence</strong>: paste the key, or choose the file.",
+		register       = "Open Inspecteur's settings (Ctrl+,), the <strong>General</strong> page, <strong>Licence</strong>: paste the key, or choose the file.",
 		extension      = inspecteur_licence.PRODUCT.file_extension,
 		repository     = REPOSITORY,
 		seller         = SELLER,
 		code_licence   = "MIT License",
 		platform       = "Linux, x64 (Wayland).",
-		network        = "inspecteur connects to the network for its updates only: the installed copy asks GitHub for the latest release a while after it starts and then once a day, and puts an update in place only if it is signed by Froment Software. Another copy asks only when you press <em>Check now</em> in the settings.",
+		network        = "Inspecteur connects to the network for its updates only: the installed copy asks GitHub for the latest release a while after it starts and then once a day, and puts an update in place only if it is signed by Froment Software. Another copy asks only when you press <em>Check now</em> in the settings.",
 		stylesheet     = "../style.css",
 		home           = "../",
 		updated        = "2026-11-13",

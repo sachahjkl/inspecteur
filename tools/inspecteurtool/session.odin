@@ -49,7 +49,7 @@ session_start :: proc(s: ^Session, dir: string, port: int, args: []string = nil,
 	why = toolbox.sway_start(&s.sway, dir, {config = SWAY_CONFIG, renderer = renderer, homes = true, cache = own_cache})
 	s.dir = s.sway.dir
 	if why != "" { return }
-	prefs_dir := fmt.tprintf("%s/config/inspecteur", s.dir)
+	prefs_dir := fmt.tprintf("%s/config/FromentSoftware/Inspecteur", s.dir)
 	if err := os.make_directory_all(prefs_dir); err != nil && err != .Exist { return fmt.tprintf("%s cannot be made", prefs_dir) }
 	if before != nil { before(s.dir) }   // (what the test puts in the session's folders before inspecteur reads them)
 

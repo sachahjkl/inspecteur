@@ -82,7 +82,7 @@ diagnose :: proc(app: ^App) -> []Finding {
 	}
 	if m.throttled > m.throttled_before {
 		n := int(m.throttled - m.throttled_before)
-		add(&out, .Bad, i18n.tr(n, "The processor slowed for its heat %d time since inspecteur started.", "The processor slowed for its heat %d times since inspecteur started."), n)
+		add(&out, .Bad, i18n.tr(n, "The processor slowed for its heat %d time since Inspecteur started.", "The processor slowed for its heat %d times since Inspecteur started."), n)
 	}
 	if len(out) == 0 {
 		add(&out, .Fine, i18n.tr("Nothing stands out: the processors are %.0f%% busy and the memory has room."), m.cpu)

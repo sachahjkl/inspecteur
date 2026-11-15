@@ -46,6 +46,7 @@ SETTINGS_PAGES := [?]prefs_page.Page_Info{
 	{category = "timing",      title = i18n.later("Delays and menus"), icon = lucide.TIMER},
 	{category = "update",      title = i18n.later("Updates"),          icon = lucide.DOWNLOAD},
 	{category = "rendering",   title = i18n.later("Rendering"),        icon = lucide.MONITOR},
+	{category = "keys",        title = i18n.later("Keys"),             icon = lucide.COMMAND},
 }
 
 // The page, as large as the body.
@@ -61,7 +62,7 @@ settings_options :: proc(app: ^App) -> prefs_page.Page_Options {
 		user = app, changed = settings_changed, preview = settings_preview, problem = settings_problem,
 		updater = app.updater, restart = proc(user: rawptr) { updates_restart((^App)(user)) },
 		pages = SETTINGS_PAGES[:], icon_font = app.icons, search_icon = lucide.SEARCH, reset_icon = lucide.ROTATE_CCW,
-		version = "inspecteur " + APP_VERSION,
+		version = APP_TITLE + " " + APP_VERSION,
 		file = prefs_file(),
 		themes = app.themes_file.all[:], themes_light = app.theme_shown.light, themes_file = &app.themes_file,
 		changelog = &app.changelog, licence = &app.licence, install = &app.install, diagnostics = &app.main,
@@ -73,7 +74,7 @@ settings_options :: proc(app: ^App) -> prefs_page.Page_Options {
 settings_problem :: proc(user: rawptr, name: string) -> string {
 	app := (^App)(user)
 	if name == prefs_page.SYSTEM_TITLE_PREF && app.settings.system_title && !platform.system_title_available(app.main.win) {
-		return i18n.tr("This desktop draws no title bar for inspecteur's window (GNOME): inspecteur keeps its own.")
+		return i18n.tr("This desktop draws no title bar for Inspecteur's window (GNOME): Inspecteur keeps its own.")
 	}
 	return ""
 }

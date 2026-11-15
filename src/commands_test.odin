@@ -54,6 +54,13 @@ go_to_ids_read_back :: proc(t: ^testing.T) {
 	testing.expect(t, !other)
 }
 
+// Every command has a well-formed id of its own: the person's keys, aliases and the palette's memory are stored under it.
+@(test)
+the_command_ids :: proc(t: ^testing.T) {
+	problems := ui.command_ids_check(slice.enumerated_array(&COMMANDS))
+	testing.expectf(t, len(problems) == 0, "command ids: %v", problems)
+}
+
 // Every command has its icon (the palette shows it before the label) and its label.
 @(test)
 every_command_has_an_icon :: proc(t: ^testing.T) {

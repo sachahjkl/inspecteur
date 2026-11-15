@@ -85,7 +85,7 @@ live_end_tree :: proc(l: ^Live) {
 // The keys that change no process: the refresh paused and resumed, the text size, the tree; each kept or said.
 live_view_keys :: proc(l: ^Live) {
 	c := &l.c
-	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
+	prefs := fmt.tprintf("%s/config/FromentSoftware/Inspecteur/prefs", l.dir)
 	check(l, cdp.key(c, "Escape") && cdp.key(c, "ctrl+2"), "the Processes section")
 	check(l, cdp.key(c, "ctrl+space") && cdp.wait_for(c, "Refresh paused", SESSION_WAIT), "Ctrl+Space pauses the refresh")
 	check(l, cdp.wait_for(c, "Paused", SESSION_WAIT), "the footer says Paused")
@@ -127,7 +127,7 @@ live_affinity_dump :: proc(l: ^Live) {
 		if strings.has_prefix(f, "Wrote the dump") || strings.has_prefix(f, "No dump:") { said = f }
 		time.sleep(SESSION_POLL)
 	}
-	dumps := fmt.tprintf("%s/cache/inspecteur/dumps", l.dir)
+	dumps := fmt.tprintf("%s/cache/FromentSoftware/Inspecteur/dumps", l.dir)
 	if strings.has_prefix(said, "Wrote the dump") {
 		check(l, strings.contains(said, dumps), "the dump is in the session's cache (%q)", said)
 	} else {
@@ -164,7 +164,7 @@ wait_allowed :: proc(pid: int, want: string) -> bool {
 // window must say that one.
 live_pin :: proc(l: ^Live) {
 	c := &l.c
-	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
+	prefs := fmt.tprintf("%s/config/FromentSoftware/Inspecteur/prefs", l.dir)
 	child, mark, started := start_child("8")
 	if !check(l, started, "a child to pin (%s)", mark) { return }
 	defer {

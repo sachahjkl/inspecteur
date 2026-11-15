@@ -28,29 +28,29 @@ fr Accès refusé : seul son propriétaire, ou %s, peut changer l'affinité de %
 en The affinity of %s cannot be changed
 fr L'affinité de %s ne peut pas être changée
 
-en inspecteur does not suspend itself: nothing could resume it
-fr inspecteur ne se suspend pas lui-même : rien ne pourrait le reprendre
+en Inspecteur does not suspend itself: nothing could resume it
+fr Inspecteur ne se suspend pas lui-même : rien ne pourrait le reprendre
 
-en %s runs inspecteur: suspended, it would stop inspecteur too
-fr %s exécute inspecteur : suspendu, il arrêterait aussi inspecteur
+en %s runs Inspecteur: suspended, it would stop Inspecteur too
+fr %s exécute Inspecteur : suspendu, il arrêterait aussi Inspecteur
 
 en %s draws the desktop: suspended, it would freeze every window, this one too
 fr %s dessine le bureau : suspendu, il figerait toutes les fenêtres, celle-ci aussi
 
-en %s is %s's: inspecteur may not end it (only its owner, or %s, may)
-fr %s appartient à %s : inspecteur ne peut pas le terminer (seul son propriétaire, ou %s, le peut)
+en %s is %s's: Inspecteur may not end it (only its owner, or %s, may)
+fr %s appartient à %s : Inspecteur ne peut pas le terminer (seul son propriétaire, ou %s, le peut)
 
 en %s cannot be ended (error %d)
 fr %s ne peut pas être terminé (erreur %d)
 
-en %s is %s's: inspecteur may not suspend it (only its owner, or %s, may)
-fr %s appartient à %s : inspecteur ne peut pas le suspendre (seul son propriétaire, ou %s, le peut)
+en %s is %s's: Inspecteur may not suspend it (only its owner, or %s, may)
+fr %s appartient à %s : Inspecteur ne peut pas le suspendre (seul son propriétaire, ou %s, le peut)
 
 en %s cannot be suspended (error %d)
 fr %s ne peut pas être suspendu (erreur %d)
 
-en %s is %s's: inspecteur may not resume it (only its owner, or %s, may)
-fr %s appartient à %s : inspecteur ne peut pas le reprendre (seul son propriétaire, ou %s, le peut)
+en %s is %s's: Inspecteur may not resume it (only its owner, or %s, may)
+fr %s appartient à %s : Inspecteur ne peut pas le reprendre (seul son propriétaire, ou %s, le peut)
 
 en %s cannot be resumed (error %d)
 fr %s ne peut pas être repris (erreur %d)
@@ -478,10 +478,10 @@ fr Le GPU %s est occupé à %.0f %%.
 en The processor is hot: %.0f °C.
 fr Le processeur est chaud : %.0f °C.
 
-en The processor slowed for its heat %d time since inspecteur started.
-en+ The processor slowed for its heat %d times since inspecteur started.
-fr Le processeur a ralenti à cause de sa chaleur %d fois depuis le lancement d'inspecteur.
-fr+ Le processeur a ralenti à cause de sa chaleur %d fois depuis le lancement d'inspecteur.
+en The processor slowed for its heat %d time since Inspecteur started.
+en+ The processor slowed for its heat %d times since Inspecteur started.
+fr Le processeur a ralenti à cause de sa chaleur %d fois depuis le lancement d'Inspecteur.
+fr+ Le processeur a ralenti à cause de sa chaleur %d fois depuis le lancement d'Inspecteur.
 
 en Nothing stands out: the processors are %.0f%% busy and the memory has room.
 fr Rien ne ressort : les processeurs sont occupés à %.0f %% et la mémoire a de la place.
@@ -504,8 +504,8 @@ fr Pas d'image mémoire : %s
 en Wrote the dump %s
 fr Image mémoire écrite : %s
 
-en gdb's gcore writes it into ~/.cache/inspecteur/dumps.
-fr gcore de gdb l'écrit dans ~/.cache/inspecteur/dumps.
+en gdb's gcore writes it into ~/.cache/FromentSoftware/Inspecteur/dumps.
+fr gcore de gdb l'écrit dans ~/.cache/FromentSoftware/Inspecteur/dumps.
 
 en gcore is not installed: it comes with gdb
 fr gcore n'est pas installé : il est fourni avec gdb
@@ -894,8 +894,8 @@ fr Utilisateur 1 (SIGUSR1)
 en User 2 (SIGUSR2)
 fr Utilisateur 2 (SIGUSR2)
 
-en Not stopped: it is inspecteur, runs it or draws the desktop, and nothing could resume it
-fr Pas suspendu : c'est inspecteur, il l'exécute ou dessine le bureau, et rien ne pourrait le reprendre
+en Not stopped: it is Inspecteur, runs it or draws the desktop, and nothing could resume it
+fr Pas suspendu : c'est Inspecteur, il l'exécute ou dessine le bureau, et rien ne pourrait le reprendre
 
 en The demo's processes are not the system's: nothing was sent
 fr Les processus de la démo ne sont pas ceux du système : rien n'a été envoyé
@@ -906,8 +906,8 @@ fr %s, PID %d
 en It draws the desktop: the session ends with it, and every program of the session with it. 
 fr Il dessine le bureau : la session se termine avec lui, et tous les programmes de la session avec elle. 
 
-en inspecteur ends with it: it runs under it. 
-fr inspecteur se termine avec lui : il tourne sous lui. 
+en Inspecteur ends with it: it runs under it. 
+fr Inspecteur se termine avec lui : il tourne sous lui. 
 
 en They end at once, without the chance to save their work. End task asks them to end on their own.
 fr Ils s'arrêtent aussitôt, sans pouvoir enregistrer leur travail. Terminer la tâche leur demande de s'arrêter d'eux-mêmes.
@@ -1113,10 +1113,10 @@ fr %.0f à %.0f °C
 en Slowed for its heat
 fr Ralenti par la chaleur
 
-en %d time since inspecteur started
-en+ %d times since inspecteur started
-fr %d fois depuis le lancement d'inspecteur
-fr+ %d fois depuis le lancement d'inspecteur
+en %d time since Inspecteur started
+en+ %d times since Inspecteur started
+fr %d fois depuis le lancement d'Inspecteur
+fr+ %d fois depuis le lancement d'Inspecteur
 
 en Utilization
 fr Utilisation
@@ -1727,11 +1727,11 @@ fr Masquer les détails
 en It runs the desktop: the session ends with it.
 fr Il fait tourner le bureau : la session se termine avec lui.
 
-en inspecteur runs under it: inspecteur ends with it.
-fr inspecteur tourne sous lui : inspecteur se termine avec lui.
+en Inspecteur runs under it: Inspecteur ends with it.
+fr Inspecteur tourne sous lui : Inspecteur se termine avec lui.
 
-en inspecteur runs in it: inspecteur ends with it.
-fr inspecteur tourne dedans : inspecteur se termine avec lui.
+en Inspecteur runs in it: Inspecteur ends with it.
+fr Inspecteur tourne dedans : Inspecteur se termine avec lui.
 
 en %d name
 en+ %d names
@@ -1816,8 +1816,11 @@ fr Mises à jour
 en Rendering
 fr Rendu
 
-en This desktop draws no title bar for inspecteur's window (GNOME): inspecteur keeps its own.
-fr Ce bureau ne dessine pas de barre de titre pour la fenêtre d'inspecteur (GNOME) : inspecteur garde la sienne.
+en Keys
+fr Touches
+
+en This desktop draws no title bar for Inspecteur's window (GNOME): Inspecteur keeps its own.
+fr Ce bureau ne dessine pas de barre de titre pour la fenêtre d'Inspecteur (GNOME) : Inspecteur garde la sienne.
 
 en Autostart entry
 fr Démarrage auto

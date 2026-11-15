@@ -13,14 +13,14 @@ import process "gt:process"
 import i18n "gt:i18n"
 
 // What the confirmation says of how the dump is written.
-DUMP_HOW := i18n.later("gdb's gcore writes it into ~/.cache/inspecteur/dumps.")
+DUMP_HOW := i18n.later("gdb's gcore writes it into ~/.cache/FromentSoftware/Inspecteur/dumps.")
 
 // Writes a core file of the process (pid, start) named for `name`. Returns its path, or why there is none (temporary).
 process_dump :: proc(pid: i32, start: u64, name: string) -> (path: string, why: string) {
 	gcore := program_in_path("gcore")
 	if gcore == "" { return "", i18n.tr("gcore is not installed: it comes with gdb") }
 	if s, ok := process.process_start_time(pid); !ok || s != start { return "", i18n.tr("the process has ended") }
-	dir := fmt.tprintf("%s/dumps", platform.user_dir(.Cache, APP_NAME, context.temp_allocator))
+	dir := fmt.tprintf("%s/dumps", platform.user_dir(.Cache, APP_FOLDER, context.temp_allocator))
 	_ = os.make_directory_all(dir)
 	y, mo, d := time.date(time.now())
 	h, mi, sec := time.clock_from_time(time.now())

@@ -1,6 +1,6 @@
 package inspecteur
 
-// The preferences: one registry (gt:config). The user's file is $XDG_CONFIG_HOME/inspecteur/prefs; `--pref name=value`
+// The preferences: one registry (gt:config). The user's file is $XDG_CONFIG_HOME/FromentSoftware/Inspecteur/prefs; `--pref name=value`
 // overrides a preference for one run. The look, the text, the scrolling, the input, the delays, the rendering, the
 // updates and the messages are the toolkit's standard settings (prefs_page.standard_register, gui_toolkit
 // docs/settings.md); inspecteur's own come after them, each with its line in docs/configuration.md (settings_test.odin
@@ -14,7 +14,12 @@ import prefs_page "gt:prefs_page"
 import "gt:platform"
 import "gt:ui"
 
-APP_NAME :: "inspecteur"
+// The technical name (the binary, the package, the instance's socket, the URLs); APP_TITLE is the name a person reads.
+APP_NAME  :: "inspecteur"
+APP_TITLE :: "Inspecteur"
+// The program's folders: its vendor's, then its own (gui_toolkit src/md/features/folders.md). The runtime folder keeps
+// APP_NAME, so an older and a newer copy still meet there.
+APP_FOLDER :: "FromentSoftware" + platform.USER_DIR_SEPARATOR + APP_TITLE
 
 // inspecteur's own texts in other languages (i18n/, written by `inspecteurtool i18n fr`); the toolkit's come with it.
 PROGRAM_CATALOGUES :: []i18n.Catalog{{"fr", #load("../i18n/fr.txt", string)}}
@@ -24,7 +29,7 @@ PROGRAM_CATALOGUES :: []i18n.Catalog{{"fr", #load("../i18n/fr.txt", string)}}
 @(private = "file")
 standard_defaults :: proc() -> prefs_page.Standard_Defaults {
 	d := prefs_page.STANDARD_DEFAULTS
-	d.theme, d.update_base_url, d.app_name = "Graphite", UPDATE_FOLDER, "inspecteur"
+	d.theme, d.update_base_url, d.app_name = "Graphite", UPDATE_FOLDER, APP_TITLE
 	// (tables of numbers: striped and ruled, so that a line reads across)
 	d.values = ROWS_DEFAULTS[:]
 	return d
@@ -100,12 +105,12 @@ Settings :: struct {
 }
 
 prefs_file :: proc(allocator := context.temp_allocator) -> string {
-	return strings.concatenate({platform.user_dir(.Config, APP_NAME, context.temp_allocator), "/prefs"}, allocator)
+	return strings.concatenate({platform.user_dir(.Config, APP_FOLDER, context.temp_allocator), "/prefs"}, allocator)
 }
 
 // The user's own themes, beside the preferences (prefs_page.Themes_File).
 themes_file :: proc(allocator := context.temp_allocator) -> string {
-	return strings.concatenate({platform.user_dir(.Config, APP_NAME, context.temp_allocator), "/themes.txt"}, allocator)
+	return strings.concatenate({platform.user_dir(.Config, APP_FOLDER, context.temp_allocator), "/themes.txt"}, allocator)
 }
 
 // The registry with the user's file and `args`' --pref read in. Returns the arguments that are not preferences.

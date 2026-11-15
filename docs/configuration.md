@@ -1,6 +1,6 @@
 # Configuration
 
-Inspecteur reads its preferences from `$XDG_CONFIG_HOME/inspecteur/prefs` (a line `name<TAB>value` each, after the
+Inspecteur reads its preferences from `$XDG_CONFIG_HOME/FromentSoftware/Inspecteur/prefs` (a line `name<TAB>value` each, after the
 first line). The settings (Ctrl+, or the title bar's button) show them on a page, searched as you type, each change
 applied at once; the layouts of the tables are not there (the tables set them). `inspecteur prefs` lists them all with their
 values. `--pref name=value` sets one for a single run:
@@ -31,13 +31,22 @@ The ones Inspecteur reads itself, with their defaults:
 `general.menu` and `general.autostart` are registered but no page shows them: the install (`inspecteur --install`, the
 install's dialog, the settings' Installation page) puts the menu entry in place, and Inspecteur does not start with the session.
 
-The user's own themes are in `$XDG_CONFIG_HOME/inspecteur/themes.txt`: the settings' Appearance page shows its path
+`keys.custom` and `keys.aliases` (the settings' Keys page) hold the keys and the aliases you set from the command palette:
+Ctrl+Enter on a command records a key for it, Alt+Enter makes the letters typed its alias. Each names a command by its
+id, the command's name in lower case with `_` between words (`show_processes`, `end_task`, `journal_window`). The
+reset of a field removes them all.
+
+An older Inspecteur kept its files in `inspecteur` folders (`$XDG_CONFIG_HOME/inspecteur`, `$XDG_STATE_HOME/inspecteur`,
+`$XDG_CACHE_HOME/inspecteur`). The first start of this version moves each to `FromentSoftware/Inspecteur`. A folder
+whose new name exists already stays where it is.
+
+The user's own themes are in `$XDG_CONFIG_HOME/FromentSoftware/Inspecteur/themes.txt`: the settings' Appearance page shows its path
 under the themes' cards; a click makes it (with its instructions in comments) and opens it. A change to it is shown in
 the next two seconds.
 
 Where each dialog and each panel is shown (a dialog, floating in the window, in a window of its own, docked), the sizes
 the user gave them, the layout of Mission Control and of the Services section, and which ones were open at the last
-quit are kept in `$XDG_STATE_HOME/inspecteur/views.txt` (gui_toolkit's views). It is not a preference: deleting it
+quit are kept in `$XDG_STATE_HOME/FromentSoftware/Inspecteur/views.txt` (gui_toolkit's views). It is not a preference: deleting it
 puts every one of them back as at the first start.
 
 ## Inspecteur's settings
@@ -77,4 +86,4 @@ puts every one of them back as at the first start.
 Inspecteur is free. A licence says that its holder supports its work; it changes nothing of what Inspecteur does. The
 settings' General page shows it: who it is registered to, or a link to buy one, a field to paste the key, **Choose a
 file…** and **Remove the licence**. The key is checked on the computer, with no network, and kept in
-`$XDG_CONFIG_HOME/inspecteur/licence.inspecteurlicence`. The shop is not open yet.
+`$XDG_CONFIG_HOME/FromentSoftware/Inspecteur/licence.inspecteurlicence`. The shop is not open yet.

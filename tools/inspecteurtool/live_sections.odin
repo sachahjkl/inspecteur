@@ -329,7 +329,7 @@ wait_named_prefix :: proc(c: ^cdp.Client, name, prefix: string) -> bool {
 	return false
 }
 
-prefs_path :: proc(l: ^Live) -> string { return fmt.tprintf("%s/config/inspecteur/prefs", l.dir) }
+prefs_path :: proc(l: ^Live) -> string { return fmt.tprintf("%s/config/FromentSoftware/Inspecteur/prefs", l.dir) }
 
 // swaymsg on the session's sway (its IPC socket).
 @(private = "file")

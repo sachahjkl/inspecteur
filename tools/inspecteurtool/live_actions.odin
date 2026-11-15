@@ -57,7 +57,7 @@ live_guards :: proc(l: ^Live) {
 	}
 	if !check(l, clicked && got == fmt.tprintf("inspecteur, PID %s", pid), "the row selected is Inspecteur's own process (%q)", got) { return }
 	check(l, cdp.key(c, "ctrl+p"), "Ctrl+P: Suspend")
-	check(l, cdp.wait_for(c, "inspecteur does not suspend itself", SESSION_WAIT), "it is refused (%q)", footer(c))
+	check(l, cdp.wait_for(c, "Inspecteur does not suspend itself", SESSION_WAIT), "it is refused (%q)", footer(c))
 	stopped := wait_state(l.program.pid, 'T', 500 * time.Millisecond)
 	if stopped { _ = linux.kill(linux.Pid(l.program.pid), .SIGCONT) }   // (the test's own child: resumed whatever happened)
 	check(l, !stopped, "Inspecteur still runs")
@@ -134,7 +134,7 @@ live_group_kill :: proc(l: ^Live) {
 // Ctrl+Shift+C opens the columns' menu, Ctrl+Shift+L switches light and dark.
 live_commands :: proc(l: ^Live) {
 	c := &l.c
-	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
+	prefs := fmt.tprintf("%s/config/FromentSoftware/Inspecteur/prefs", l.dir)
 	check(l, cdp.key(c, "Escape") && cdp.key(c, "ctrl+2"), "the Processes section")
 	check(l, cdp.key(c, "ctrl+k") && cdp.wait_name(c, "palette_top", SESSION_WAIT), "Ctrl+K opens the palette")
 	// (Enter waits for the ranking of what was typed: the first row is the section's command)
@@ -177,7 +177,7 @@ live_commands :: proc(l: ^Live) {
 // The install's dialog, at the first start of a copy that is not installed: Keep standalone closes it for good.
 live_setup_offer :: proc(l: ^Live) {
 	c := &l.c
-	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
+	prefs := fmt.tprintf("%s/config/FromentSoftware/Inspecteur/prefs", l.dir)
 	check(l, cdp.wait_for(c, "Install Inspecteur", SESSION_WAIT), "the install's dialog shows at the first start")
 	check(l, cdp.click_name(c, "setup_standalone") && cdp.wait_for(c, "Install Inspecteur", SESSION_WAIT, gone = true), "Keep standalone closes it")
 	check(l, file_has(prefs, "install.choice\tstandalone"), "it is not offered again")
@@ -228,7 +228,7 @@ live_setup :: proc(l: ^Live) {
 // standard settings and inspecteur's own; a switch there changes a preference, kept; Escape goes back.
 live_settings :: proc(l: ^Live) {
 	c := &l.c
-	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
+	prefs := fmt.tprintf("%s/config/FromentSoftware/Inspecteur/prefs", l.dir)
 	check(l, cdp.key(c, "ctrl+,") && cdp.wait_for(c, "Appearance", SESSION_WAIT) && cdp.wait_for(c, "Updates", SESSION_WAIT), "Ctrl+,: the settings, their pages")
 	// the toolkit's Licence page (the test's profile has none); clicked: the settings open on the page seen last
 	// (Installation, in live_install)
@@ -256,7 +256,7 @@ live_settings :: proc(l: ^Live) {
 // of its own, kept, and back in the section when its window closes.
 live_mission :: proc(l: ^Live) {
 	c := &l.c
-	views := fmt.tprintf("%s/state/inspecteur/views.txt", l.dir)
+	views := fmt.tprintf("%s/state/FromentSoftware/Inspecteur/views.txt", l.dir)
 	check(l, cdp.key(c, "ctrl+1") && cdp.wait_name(c, "mc_machine", SESSION_WAIT) && cdp.wait_name(c, "mc_health", SESSION_WAIT) && cdp.wait_name(c, "mc_cpu", SESSION_WAIT), "Ctrl+1: Mission Control, its panels")
 	check(l, cdp.wait_name(c, "mc_cpu_0", SESSION_WAIT), "the busiest processes are listed")
 	check(l, cdp.click_name(c, "mission_panels") && cdp.wait_for(c, "Busiest: memory", SESSION_WAIT), "the panels' menu")

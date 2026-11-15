@@ -406,7 +406,7 @@ cpu_page :: proc(app: ^App, em: f32) {
 	if m.temp_count > 1 { for &t in m.temps[1:m.temp_count] { append(&details, Stat{temp_label(&t), fmt.tprintf("%.0f °C", t.celsius)}) } }
 	// (each core's is in the logical processors' view)
 	if low, high, ok := core_celsius_range(m); ok { append(&details, Stat{i18n.tr("Core temperatures"), fmt.tprintf(i18n.tr("%.0f to %.0f °C"), low, high)}) }
-	if m.throttled > m.throttled_before { append(&details, Stat{i18n.tr("Slowed for its heat"), fmt.tprintf(i18n.tr(int(m.throttled - m.throttled_before), "%d time since inspecteur started", "%d times since inspecteur started"), m.throttled - m.throttled_before)}) }
+	if m.throttled > m.throttled_before { append(&details, Stat{i18n.tr("Slowed for its heat"), fmt.tprintf(i18n.tr(int(m.throttled - m.throttled_before), "%d time since Inspecteur started", "%d times since Inspecteur started"), m.throttled - m.throttled_before)}) }
 	big := make([dynamic]Stat, context.temp_allocator)
 	append(&big, Stat{i18n.tr("Utilization"), percent_text(f64(m.cpu))}, Stat{i18n.tr("Speed"), mhz_text(m.mhz)})
 	if m.temp_count > 0 { append(&big, Stat{i18n.tr("Temperature"), fmt.tprintf("%.0f °C", m.temps[0].celsius)}) }

@@ -138,7 +138,7 @@ logical_processors :: proc() -> int {
 // The columns: one shown and hidden again from the header's menu, one resized; both are in the preferences.
 live_columns :: proc(l: ^Live) {
 	c := &l.c
-	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
+	prefs := fmt.tprintf("%s/config/FromentSoftware/Inspecteur/prefs", l.dir)
 	_, ok := cdp.call(c, "Toolkit.click", `{"name":"hd_0","button":"right"}`)
 	check(l, ok && cdp.wait_for(c, "Default columns", SESSION_WAIT), "a right click on the header opens the columns' menu")
 	check(l, click_last(c, "Parent PID"), "show Parent PID")
@@ -171,7 +171,7 @@ live_columns :: proc(l: ^Live) {
 // The theme's menu: light chosen, written; back to the system's.
 live_theme :: proc(l: ^Live) {
 	c := &l.c
-	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
+	prefs := fmt.tprintf("%s/config/FromentSoftware/Inspecteur/prefs", l.dir)
 	check(l, cdp.click_name(c, "theme") && cdp.wait_for(c, "As the system", SESSION_WAIT), "the theme's menu opens")
 	check(l, cdp.click_text(c, "Light"), "choose Light")
 	check(l, file_has(prefs, "appearance.mode\tlight"), "it is in the preferences")
@@ -341,7 +341,7 @@ wait_state :: proc(pid: int, want: u8, within := SESSION_WAIT) -> bool {
 // third click), the section shown last and the CPU's view.
 live_restart :: proc(l: ^Live) {
 	c := &l.c
-	prefs := fmt.tprintf("%s/config/inspecteur/prefs", l.dir)
+	prefs := fmt.tprintf("%s/config/FromentSoftware/Inspecteur/prefs", l.dir)
 	check(l, cdp.key(c, "Escape") && cdp.key(c, "ctrl+2") && cdp.wait_for(c, "Background processes", SESSION_WAIT), "Processes, before a restart")
 	cdp.wait_idle(c, SESSION_WAIT)
 	// CPU's title (column 6) dragged to the left of PID's (column 1)
@@ -428,6 +428,6 @@ live_app_window :: proc(l: ^Live) {
 	c := &l.c
 	check(l, cdp.key(c, "Escape") && cdp.key(c, "ctrl+2") && cdp.type_text(c, "inspecteur"), "Processes, filtered to Inspecteur")
 	if !check(l, cdp.wait_name(c, "win", READER_WAIT), "its row has the window's button") { _ = cdp.key(c, "Escape"); return }
-	check(l, cdp.click_name(c, "win") && wait_sway_title(l, "inspecteur", true) && cdp.wait_name(c, "win", SESSION_WAIT), "clicked: its window is there and answers on")
+	check(l, cdp.click_name(c, "win") && wait_sway_title(l, "Inspecteur", true) && cdp.wait_name(c, "win", SESSION_WAIT), "clicked: its window is there and answers on")
 	check(l, cdp.key(c, "Escape"), "Escape clears the filter")
 }

@@ -64,7 +64,7 @@ their ids, so a new sample or reading keeps them.
   refresh, so the cursor does not move alone there; Shift and Ctrl+Shift extend.
 - **Escape takes several rows back to the cursor's row**, and the next Escape clears the filter: the toolkit's rule
   (`item_selection_escape`, read in `view_keys` because the filter has the keyboard, not the table).
-- **A dump file** is gdb's `gcore` of the process, written into `$XDG_CACHE_HOME/inspecteur/dumps`, asked first: it
+- **A dump file** is gdb's `gcore` of the process, written into `$XDG_CACHE_HOME/FromentSoftware/Inspecteur/dumps`, asked first: it
   holds whatever the process had in memory. Without gcore, or when `kernel.yama.ptrace_scope` refuses, the footer says
   so.
 

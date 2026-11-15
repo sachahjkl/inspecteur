@@ -13,6 +13,7 @@ import cli "gt:cli"
 import config "gt:config"
 import crash "gt:crash"
 import tk_log "gt:log"
+import "gt:platform"
 import process "gt:process"
 import setup "gt:setup"
 
@@ -50,6 +51,9 @@ main :: proc() {
 }
 
 run :: proc(all_args: []string) -> cli.Exit {
+	// (once, before anything reads the folders: the preferences just below, the log, the licence, the views' memory;
+	// no log is open yet, so a problem goes to stderr)
+	if _, why := platform.user_dirs_move(APP_NAME, APP_FOLDER); why != "" { fmt.eprintfln("inspecteur: the folders were not all moved to %s: %s", APP_FOLDER, why) }
 	prefs: config.Prefs
 	given, problems := prefs_open(&prefs, all_args)
 	defer config.prefs_destroy(&prefs)
@@ -109,10 +113,11 @@ run :: proc(all_args: []string) -> cli.Exit {
 // The window's run, with its log (gt:log, in the state folder) and its crash reports (gt:crash): a crash leaves a report,
 // which the next start says (Run_Options.last_crash). Nothing is sent anywhere.
 app_run_kept :: proc(prefs: ^config.Prefs, opts: Run_Options) -> (ok: bool) {
-	logger := tk_log.install({program = APP_NAME, echo = true})
+	// (the files keep the technical name; their folders are the vendor's)
+	logger := tk_log.install({program = APP_NAME, dir = tk_log.default_dir(APP_FOLDER, context.temp_allocator), echo = true})
 	{
 		context.logger = logger
-		crash.install({program = APP_NAME, version = APP_VERSION, log_tail = {tk_log.tail, logger.data}})
+		crash.install({program = APP_NAME, report_dir = crash.default_report_dir(APP_FOLDER, context.temp_allocator), version = APP_VERSION, log_tail = {tk_log.tail, logger.data}})
 		crash.begin_session()
 		o := opts
 		last, crashed := crash.last_report(context.temp_allocator)

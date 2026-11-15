@@ -311,11 +311,11 @@ service_danger :: proc(app: ^App, u: Service) -> string {
 	if u.pid > 0 {
 		switch guard_of(app, u.pid) {
 		case .Display_Server:  return i18n.tr("It runs the desktop: the session ends with it.")
-		case .Self, .Ancestor: return i18n.tr("inspecteur runs under it: inspecteur ends with it.")
+		case .Self, .Ancestor: return i18n.tr("Inspecteur runs under it: Inspecteur ends with it.")
 		case .None:
 		}
 	}
-	for unit in app.own_units { if unit == u.name { return i18n.tr("inspecteur runs in it: inspecteur ends with it.") } }
+	for unit in app.own_units { if unit == u.name { return i18n.tr("Inspecteur runs in it: Inspecteur ends with it.") } }
 	return ""
 }
 

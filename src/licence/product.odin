@@ -8,7 +8,7 @@ import licence "gt:licence"
 
 PRODUCT :: licence.Product{
 	name           = "inspecteur",
-	title          = "inspecteur",
+	title          = "Inspecteur",
 	version_tag    = "INSPECTEUR1",
 	sign_context   = "inspecteur-licence-v1\n",
 	file_extension = ".inspecteurlicence",

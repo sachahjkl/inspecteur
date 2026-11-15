@@ -101,7 +101,7 @@ builds it where the user puts it: a dialog, floating in the window, in a window 
 opens on the main window's `Shared`, framed after it), or docked in a dock space. The window's frame is one
 (`ui.views_frame` around the whole page); the Services section has one around its table (`services`), Mission Control
 one of panels only (`mission`: the top, the left, the centre, the right and the bottom zones, each a row of stacks).
-One `ui.Views` holds them all, its memory in `$XDG_STATE_HOME/inspecteur/views.txt` (none in the demo): the
+One `ui.Views` holds them all, its memory in `$XDG_STATE_HOME/FromentSoftware/Inspecteur/views.txt` (none in the demo): the
 presentation the user chose, the sizes, the docks' layouts, which were open at the last quit (`view_restore` opens the
 details and the panels again at the start). The palette lists the moves of each open view (the toolkit's moves source). A
 dialog holds the window's keys (`ui.views_hold_keys`); a floating or docked view with the keyboard leaves the window's

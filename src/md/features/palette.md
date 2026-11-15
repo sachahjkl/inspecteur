@@ -29,8 +29,18 @@ All of them are in the plain search too. With nothing typed: Recent, then the co
   and a counter bumped at every place that changes a selection (the toolkit's tables change theirs themselves: a place
   would be forgotten).
 - **The table is made again with the section only.** A section's commands are in it while the section shows, as in
-  the keys. A choice is run by its index (`palette_chosen_command`) and checked by its id (the command's enum name): a
-  choice of a table made for another section is not run.
+  the keys. A choice is run by its index (`palette_chosen_command`) and checked by its `Command.id`: a choice of a
+  table made for another section is not run.
+- **A command's id is its enum's name in lower case, written in `COMMANDS`.** The usage memory (`command:<id>`) and
+  the person's keys and aliases (`keys.custom`, `keys.aliases`) are stored under it. Before, the palette took the enum's
+  name by reflection (`Palette_Commands_Options.names`); the toolkit removed that option, and the explicit string makes
+  a rename of the enum visible in the diff instead of a silent loss of stored data. The case changed once
+  (`Show_Processes` became `show_processes`), as the id rule asks: the memory of choices made before starts again.
+  `the_command_ids` (commands_test.odin) checks every id with `ui.command_ids_check`.
+- **The person's keys: one `ui.Keymap` for the process** (`app.keymap`), read by the main window
+  (`ui.keymap_use`), known from `COMMANDS` before the first frame, kept in the settings by `prefs_page.standard_watch`.
+  Ctrl+Enter on a command in the palette sets a key, Alt+Enter an alias (gui_toolkit's `src/md/features/keymap.md`).
+  The settings' Keys page shows the two texts and their reset.
 - **The palette's own command is the toolkit's whole.** `COMMANDS` has no line for it: `ui.palette_keys` reads its
   keys, the sheet lists it, the title bar's button calls `ui.palette_toggle` with the tooltip of `ui.palette_command()`.
   A test checks that no command of inspecteur takes its keys.

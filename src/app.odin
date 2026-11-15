@@ -6,6 +6,7 @@ package inspecteur
 
 import "core:fmt"
 import "core:log"
+import "core:slice"
 import "core:strings"
 import "core:time"
 import "core:time/datetime"
@@ -86,6 +87,7 @@ App :: struct {
 	rows_made:   int,               // counts rows_again: what the commands can act on may have changed
 	sheet:       ui.Shortcuts_Sheet,   // the sheet of the keys (commands.odin)
 	sheet_commands: [dynamic]ui.Command,   // its list, made at its first opening
+	keymap:      ui.Keymap,         // the person's keys and aliases of the commands (keys.custom, keys.aliases), set from the palette
 	views:       ui.Views,          // the dialogs, the panels, the windows of their own, and how each was last shown (views.odin)
 	mission:     Mission_Control,   // the Mission Control section: its panels (mission_control.odin)
 	install:     prefs_page.Install,   // the install: its offer, its dialog, the settings' page (setup.odin)
@@ -173,7 +175,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 
 	t_read := time.tick_now()
 	platform.set_app_id(APP_NAME)
-	if !host.host_open(&app.main, &app.shared, {title = "inspecteur", size = WINDOW_SIZE, integrated_title = !app.settings.system_title}, view_build, app) {
+	if !host.host_open(&app.main, &app.shared, {title = APP_TITLE, size = WINDOW_SIZE, integrated_title = !app.settings.system_title}, view_build, app) {
 		log.error("no window")
 		return false
 	}
@@ -189,18 +191,23 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 	}
 	sampling_attach(app, &h.state)
 	app.icons, _ = font.load_embedded(&app.shared.fonts, lucide.DATA)
-	if img, ok := platform.clipboard_image_decode("image/png", identity.ICONS[4].png, context.temp_allocator); ok {
-		app.logo.tex = render.create_texture_rgba(&app.shared.r, img.size.x, img.size.y)
-		render.update_texture_rgba(&app.shared.r, app.logo.tex, 0, 0, img.size.x, img.size.y, img.rgba)
-		app.logo.ok = true
-		app.install.logo = setup.Logo{app.logo.tex, {f32(img.size.x), f32(img.size.y)}}
+	if logo, ok := setup.logo_make(&app.shared.r, identity.ICONS[4].png); ok {
+		app.logo = {tex = logo.texture, ok = true}
+		app.install.logo = logo
 	}
+	// (the vendor signs the install's dialog and page: "By <mark> Froment Software")
+	if mark, ok := setup.logo_make(&app.shared.r, #load("../assets/froment-software-64.png"), {16, 16}); ok { app.install.vendor_mark = mark }
 	h.state.icon_font = app.icons
+	// (the ids known before the first command_pressed: else a person's key on one acts only from a later frame, and the
+	// command's own key acts once in between)
+	ui.keymap_known(&app.keymap, slice.enumerated_array(&COMMANDS))
+	ui.keymap_use(&h.state, &app.keymap)
 	// (the file is read by a task: the window's state is made, its chores run it)
 	ui.palette_memory_open(&app.palette, &h.state, palette_choices_file(app))
 	h.after_input = FRAMES_AFTER_INPUT
-	// (the zoom, the rounding, the scrolling, the delays, partial redraw...: applied now, then each as it changes)
-	prefs_page.standard_watch(&app.standard, &app.prefs, &h.state, {renderer = &app.shared.r, fonts = &app.shared.fonts, partial_redraw = &h.partial_redraw, pacer = &h.pacer})
+	// (the zoom, the rounding, the scrolling, the delays, partial redraw, the person's keys...: applied now, then each as
+	// it changes)
+	prefs_page.standard_watch(&app.standard, &app.prefs, &h.state, {renderer = &app.shared.r, fonts = &app.shared.fonts, partial_redraw = &h.partial_redraw, pacer = &h.pacer, keymap = &app.keymap})
 	licence_init(app)
 	h.params = app_params
 	app.devtools = devtools.start_from_env(win, "inspecteur")
@@ -294,6 +301,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 	delete(app.query)
 	icons_destroy(&app.app_icons, &app.shared.r)
 	if app.logo.ok { render.destroy_texture(&app.shared.r, app.logo.tex) }
+	setup.logo_destroy(&app.shared.r, &app.install.vendor_mark)
 	prefs_page.install_end(&app.install)
 	prefs_page.changelog_destroy(&app.changelog)
 	crash_bar.destroy(&app.crash_bar)
@@ -324,6 +332,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 	delete(app.sheet_commands)
 	settings_free(&app.settings)
 	prefs_page.standard_unwatch(&app.standard)
+	// (after the watch, whose writer of keys.custom it calls, and after the window and the palette that read it)
+	ui.keymap_destroy(&app.keymap)
 	config.prefs_destroy(&app.prefs)
 	// (an update in place: the new program, once this one has let go of the window)
 	if app.restart && !setup.launch(process.executable_path(), nil) { log.error("the new program does not start") }
