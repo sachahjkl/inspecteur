@@ -66,11 +66,11 @@ shop :: proc() -> tk_site.Shop {
 		product_title  = "Inspecteur User License",
 		price          = "15&nbsp;&euro;",
 		price_note     = "",
-		environment    = "sandbox",
-		client_token   = "",   // Paddle's client-side token: "" keeps the shop shut ("Coming soon")
+		environment    = "production",
+		client_token   = "live_65ec2d26698921b7c4a38413fb6",   // Paddle's client-side token (public: it is in the page)
 		edition        = "supporter",
-		price_id       = "",   // what `inspecteurtool paddle -apply` prints ("": not made yet)
-		worker         = "",   // the licence Worker's address (gui_toolkit licence-worker/README.md)
+		price_id       = "pri_01m7fyapvwx2x8qa5m20sbxyjf",   // what `inspecteurtool paddle -apply` printed
+		worker         = "https://inspecteur-licence.sacha-42a.workers.dev",
 		thanks         = "https://inspecteur.froment.software/thanks/",
 		help           = REPOSITORY + "/issues/new",
 		register       = "Open inspecteur's settings (Ctrl+,), the <strong>General</strong> page, <strong>Licence</strong>: paste the key, or choose the file.",
