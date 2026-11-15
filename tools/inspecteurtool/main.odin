@@ -9,12 +9,11 @@
 package inspecteurtool
 
 import changelog "gt:changelog"
+import cli "gt:cli"
 import release "gt:release"
 import toolbox "gt:toolbox"
 import inspecteur_licence "../../src/licence"
 import inspecteur_update "../../src/update"
-
-EXIT_USAGE :: toolbox.EXIT_USAGE
 
 // The development pair's private key, public on purpose ("inspecteur-dev-licence-seed-01!!"): the tests, the pictures
 // and the shop's sandbox register with it; only a debug build of inspecteur accepts it (src/licence/product.odin).
@@ -44,7 +43,7 @@ main :: proc() {
 		{name = "desktop_files", usage = "<prefix>: the desktop entry and the icons under <prefix>/share (the Nix package's)", run = run_desktop_files},
 		toolbox.notices_command(p),
 		r[0], r[1], r[2],
-		{name = "update", usage = "keygen <file> | pubkey | manifest <program> <version> - <out> | verify <manifest> -: inspecteur's update key and manifests", run = proc(args: []string) -> int { return toolbox.update_command(inspecteur_update.PRODUCT, args) }},
+		{name = "update", usage = "keygen <file> | pubkey | manifest <program> <version> - <out> | verify <manifest> -: inspecteur's update key and manifests", run = proc(args: []string) -> cli.Exit { return toolbox.update_command(inspecteur_update.PRODUCT, args) }},
 		changelog.command(p),
 		toolbox.i18n_command({dirs = {"src"}, folder = "i18n"}),
 		site_command(),

@@ -14,6 +14,8 @@ import "core:strconv"
 import "core:strings"
 import "core:time"
 import cdp "gt:cdp"
+import cli "gt:cli"
+import toolbox "gt:toolbox"
 
 LIVE_DIR  :: "build/live"
 LIVE_PORT :: 9371
@@ -32,14 +34,14 @@ check :: proc(l: ^Live, ok: bool, what: string, args: ..any) -> bool {
 	return ok
 }
 
-run_live :: proc(args: []string) -> int {
+run_live :: proc(args: []string) -> cli.Exit {
 	keep := len(args) > 0 && args[0] == "--keep"
-	if run_build(nil) != 0 { return 1 }
+	if run_build(nil) != .Done { return .Failed }
 	l: Live
 	if why := session_start(&l.session, LIVE_DIR, LIVE_PORT, user_bus = true, setup = true, own_cache = true, before = live_app_entry); why != "" {
 		fmt.eprintfln("inspecteurtool live: %s", why)
 		session_stop(&l.session)
-		return 1
+		return .Failed
 	}
 	dir := strings.clone(l.dir, context.temp_allocator)
 	output := strings.clone(l.output, context.temp_allocator)
@@ -57,7 +59,7 @@ run_live :: proc(args: []string) -> int {
 	check(&l, problem == "", "inspecteur wrote no error, no panic (%s)%s", output, problem != "" ? fmt.tprintf(": %q", problem) : "")
 	fmt.printfln("live: %d checks, %d failed", l.checks, l.failures)
 	if !keep && l.failures == 0 { _ = os.remove_all(dir) }
-	return l.failures == 0 ? 0 : 1
+	return toolbox.ended(l.failures == 0)
 }
 
 @(private = "file")

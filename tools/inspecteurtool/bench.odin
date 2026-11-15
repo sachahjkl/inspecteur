@@ -21,6 +21,7 @@ import "core:strconv"
 import "core:strings"
 import "core:time"
 import cdp "gt:cdp"
+import cli "gt:cli"
 
 BENCH_DIR    :: "build/bench"
 BENCH_PORT   :: 9372
@@ -28,23 +29,23 @@ BENCH_STARTS :: 3
 BENCH_SETTLE :: 2 * time.Second   // after the first frame, before the CPU is measured
 CLOCK_TICKS  :: 100               // USER_HZ: the unit of /proc/<pid>/stat's times
 
-run_bench :: proc(args: []string) -> int {
+run_bench :: proc(args: []string) -> cli.Exit {
 	seconds := 10
 	if len(args) > 0 { seconds = strconv.parse_int(args[0], 10) or_else seconds }
-	if run_build({"release"}) != 0 { return 1 }
+	if run_build({"release"}) != .Done { return .Failed }
 	starts: [BENCH_STARTS]f64
 	for k in 0 ..< BENCH_STARTS {
 		s: Session
 		if why := session_start(&s, BENCH_DIR, BENCH_PORT, {"--first-frame"}, renderer = "vulkan"); why != "" {
 			fmt.eprintfln("inspecteurtool bench: %s", why)
 			session_stop(&s)
-			return 1
+			return .Failed
 		}
 		ms, detail, ok := first_frame_ms(&s)
 		if !ok {
 			fmt.eprintfln("inspecteurtool bench: no first frame (%s)", s.output)
 			session_stop(&s)
-			return 1
+			return .Failed
 		}
 		starts[k] = ms
 		fmt.printfln("start %d: first frame after %.1f ms (in the process, ms: %s)", k + 1, ms, detail)
@@ -66,7 +67,7 @@ run_bench :: proc(args: []string) -> int {
 	slice.sort(starts[:])
 	fmt.printfln("cold start: %.1f ms (median of %d; %.1f to %.1f)", starts[BENCH_STARTS / 2], BENCH_STARTS, starts[0], starts[BENCH_STARTS - 1])
 	_ = os.remove_all(BENCH_DIR)
-	return 0
+	return .Done
 }
 
 // The milliseconds from the start of the process to its first frame (its line "first-frame <unix ns>").

@@ -137,7 +137,8 @@ Run_Options :: struct {
 // The App of the process (a call posted from another thread finds it).
 the_app: ^App
 
-app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
+// False when the window does not open.
+app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 	app := new(App)
 	defer free(app)
 	the_app = app
@@ -174,7 +175,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	platform.set_app_id(APP_NAME)
 	if !host.host_open(&app.main, &app.shared, {title = "inspecteur", size = WINDOW_SIZE, integrated_title = !app.settings.system_title}, view_build, app) {
 		log.error("no window")
-		return 1
+		return false
 	}
 	// (from here the program ends through the loop's end, which stops the writer)
 	config.user_writer_start(&app.prefs_writer, &app.prefs, prefs_file())
@@ -327,7 +328,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 	// (an update in place: the new program, once this one has let go of the window)
 	if app.restart && !setup.launch(process.executable_path(), nil) { log.error("the new program does not start") }
 	prefs_page.install_launch(&app.install)   // (the installed copy the install's dialog opened, likewise)
-	return 0
+	return true
 }
 
 // The rows again (a sample, a sort, the filter, a group opened), the cursor on the same process when it is still shown

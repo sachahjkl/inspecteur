@@ -11,6 +11,8 @@ import "core:fmt"
 import "core:os"
 import "core:time"
 import cdp "gt:cdp"
+import cli "gt:cli"
+import toolbox "gt:toolbox"
 
 SHOTS_DIR  :: "build/shots"
 SHOTS_PORT :: 9373
@@ -18,15 +20,15 @@ SHOTS_OUT  :: "docs/screenshots"
 // The Performance section's graphs, a few samples old before their pictures.
 PERF_SETTLE :: 8 * time.Second
 
-run_shots :: proc(args: []string) -> int {
+run_shots :: proc(args: []string) -> cli.Exit {
 	out := SHOTS_OUT
 	if len(args) == 2 && args[0] == "--out" { out = args[1] }
-	if run_build({"release"}) != 0 { return 1 }
+	if run_build({"release"}) != .Done { return .Failed }
 	s: Session
 	defer session_stop(&s)
-	if why := session_start(&s, SHOTS_DIR, SHOTS_PORT, {"--demo", "--pref", "appearance.mode=dark"}); why != "" { fmt.eprintfln("inspecteurtool shots: %s", why); return 1 }
+	if why := session_start(&s, SHOTS_DIR, SHOTS_PORT, {"--demo", "--pref", "appearance.mode=dark"}); why != "" { fmt.eprintfln("inspecteurtool shots: %s", why); return .Failed }
 	c, ok := window_connect(&s)
-	if !ok { fmt.eprintln("inspecteurtool shots: the window does not answer"); return 1 }
+	if !ok { fmt.eprintln("inspecteurtool shots: the window does not answer"); return .Failed }
 	defer cdp.close(&c)
 	_ = os.make_directory_all(out)
 	failed := false
@@ -201,7 +203,7 @@ run_shots :: proc(args: []string) -> int {
 	cdp.wait_idle(&c, SESSION_WAIT)
 	shot(&c, out, "processes_large_text", &failed)
 	if !failed && out == SHOTS_OUT && !site_pictures(out) { failed = true }
-	return failed ? 1 : 0
+	return toolbox.ended(!failed)
 }
 
 // The site's pictures (site/img) and the documentation's they are copies of: shots writes them both, so neither falls

@@ -9,6 +9,7 @@ import "core:fmt"
 import "core:os"
 import "core:strings"
 import ascii "gt:ascii"
+import cli "gt:cli"
 import config "gt:config"
 import crash "gt:crash"
 import tk_log "gt:log"
@@ -45,10 +46,10 @@ tab_of :: proc(name: string) -> (Tab, bool) {
 }
 
 main :: proc() {
-	os.exit(run(os.args[1:]))
+	cli.exit(run(os.args[1:]))
 }
 
-run :: proc(all_args: []string) -> int {
+run :: proc(all_args: []string) -> cli.Exit {
 	prefs: config.Prefs
 	given, problems := prefs_open(&prefs, all_args)
 	defer config.prefs_destroy(&prefs)
@@ -68,14 +69,14 @@ run :: proc(all_args: []string) -> int {
 			case "--first-frame": opts.first_frame = true
 			case "--demo":        opts.demo = true
 			case "--section":
-				if i + 1 >= len(args) { fmt.eprint(USAGE); return 2 }
+				if i + 1 >= len(args) { fmt.eprint(USAGE); return .Usage }
 				i += 1
 				tab, ok := tab_of(args[i])
-				if !ok { fmt.eprintfln("inspecteur: no section %s", args[i]); return 2 }
+				if !ok { fmt.eprintfln("inspecteur: no section %s", args[i]); return .Usage }
 				opts.tab = tab
 			case:
 				fmt.eprint(USAGE)
-				return 2
+				return .Usage
 			}
 		}
 		// (one Inspecteur at a time: a second start hands its section to the first, and ends)
@@ -84,32 +85,31 @@ run :: proc(all_args: []string) -> int {
 		if !opts.demo && !opts.first_frame {
 			forwarded: bool
 			forwarded, opts.owner, opts.owns = one_copy_acquire(opts.tab, asked)
-			if forwarded { return 0 }
+			if forwarded { return .Done }
 		}
-		return app_run_kept(&prefs, opts)
+		return app_run_kept(&prefs, opts) ? .Done : .Failed
 	case "prefs":
 		for name in config.sorted_names(&prefs) {
 			r := config.ref_of(&prefs, name)
 			e := config.entry(&prefs, r)
 			fmt.printfln("%s = %s%s\n    %s", name, config.value_string(&prefs, r), config.is_default(&prefs, r) ? "" : "   (changed)", e.def.description)
 		}
-		return 0
+		return .Done
 	case "version", "--version":
 		fmt.printfln("inspecteur %s", APP_VERSION)
-		return 0
+		return .Done
 	case "help", "-h", "--help":
 		fmt.print(USAGE)
-		return 0
+		return .Done
 	}
 	fmt.eprint(USAGE)
-	return 2
+	return .Usage
 }
 
 // The window's run, with its log (gt:log, in the state folder) and its crash reports (gt:crash): a crash leaves a report,
 // which the next start says (Run_Options.last_crash). Nothing is sent anywhere.
-app_run_kept :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
+app_run_kept :: proc(prefs: ^config.Prefs, opts: Run_Options) -> (ok: bool) {
 	logger := tk_log.install({program = APP_NAME, echo = true})
-	code: int
 	{
 		context.logger = logger
 		crash.install({program = APP_NAME, version = APP_VERSION, log_tail = {tk_log.tail, logger.data}})
@@ -117,10 +117,10 @@ app_run_kept :: proc(prefs: ^config.Prefs, opts: Run_Options) -> int {
 		o := opts
 		last, crashed := crash.last_report(context.temp_allocator)
 		if crashed { o.last_crash = strings.clone(last) }
-		code = app_run(prefs, o)
+		ok = app_run(prefs, o)
 		delete(o.last_crash)
 		crash.end_session()
 	}
 	tk_log.close(logger)
-	return code
+	return ok
 }
