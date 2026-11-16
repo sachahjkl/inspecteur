@@ -3,6 +3,18 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.16.0] - 2026-11-16 18:02
+
+### Added
+- **Your licence as a card.** The Licence page of the settings shows a registered licence as a card: an engraved iridescent foil, your name raised in silver, a seal in relief; it tilts towards the pointer and turns over to show its back.
+
+### Changed
+- **The palette asks a command's value and shows its button**: Send a signal, Refresh speed and the new Set the priority
+ask their value in the palette (a signal, a period, a priority). Send a signal and Set the priority act on the
+selection, as their menus do. Shift+Enter on a command shows its button and lights it: a section's tool, a button of
+the Properties, the title bar's, a section of the sidebar. A value changed in the palette shows in the window in the
+same frame. In the demo, the footer says which signal or priority it did not apply.
+
 ## [0.15.0] - 2026-11-16 13:58
 
 ### Changed
@@ -293,6 +305,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.16.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.16.0
 [0.15.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.15.0
 [0.14.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.14.0
 [0.13.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.13.0
