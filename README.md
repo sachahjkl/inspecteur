@@ -55,7 +55,8 @@ Information.
 - **Information**: the system, the processor, the memory, the GPUs, the disks and file systems, the network interfaces,
   the screens and the batteries. **Copy all** copies it as text.
 - **Every action has its key**, said in its menu line and its button's tooltip. The **command palette** (Ctrl+K,
-  Ctrl+Shift+P) finds any action or section by its words, and a setting; `@` in it goes to a process or a service;
+  Ctrl+Shift+P) finds any action or section by its words, and a setting; `@` in it goes to a process or a service.
+  Send a signal, Set the priority and Refresh speed ask their value in it. Shift+Enter on an action shows its button.
   **F1** lists every key.
 - **Sort** by any column: click its title; click again to reverse, a third time for the rows as they are read. **Move a
   column** by dragging its title sideways. Hold **Ctrl** to stop the refresh while you look (the footer says so).

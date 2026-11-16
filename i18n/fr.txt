@@ -214,6 +214,9 @@ fr Augmenter la priorité
 en Lower the priority
 fr Baisser la priorité
 
+en Set the priority
+fr Définir la priorité
+
 en Set affinity…
 fr Définir l'affinité…
 
@@ -333,6 +336,15 @@ fr Onglet précédent
 
 en Close
 fr Fermer
+
+en Signal
+fr Signal
+
+en Priority
+fr Priorité
+
+en Refresh every
+fr Intervalle d'actualisation
 
 en Checking for updates…
 fr Recherche de mises à jour…
@@ -964,6 +976,12 @@ fr+ Redémarrer %d services ?
 en Restart %s?
 fr Redémarrer %s ?
 
+en The demo's processes are not the system's: %s was not sent to %s
+fr Les processus de la démo ne sont pas ceux du système : %s n'a pas été envoyé à %s
+
+en The demo's processes are not the system's: %s does not run at %s
+fr Les processus de la démo ne sont pas ceux du système : %s ne tourne pas à %s
+
 en %s runs at the highest priority offered already
 fr %s tourne déjà à la plus haute priorité proposée
 
@@ -1351,9 +1369,6 @@ fr Accès refusé (processus d'un autre utilisateur)
 
 en Parent
 fr Parent
-
-en Priority
-fr Priorité
 
 en processors %s
 fr processeurs %s
@@ -2078,9 +2093,6 @@ fr Pause
 
 en Read again now
 fr Actualiser maintenant
-
-en Refresh every
-fr Intervalle d'actualisation
 
 en Zoom %s
 fr Zoom %s

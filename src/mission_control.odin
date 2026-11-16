@@ -199,10 +199,10 @@ mission_out :: proc(app: ^App) -> bool { return app.frames - app.mission.out_fra
 // The bar's right: the panels' menu, the layout as at first.
 @(private = "file")
 mission_bar_right :: proc(app: ^App, em: f32) {
-	if tool_button("mission_panels", lucide.LAYOUT_GRID, cmd_tip(.Mission_Panels), true, em) {
+	if tool_button("mission_panels", lucide.LAYOUT_GRID, cmd_tip(.Mission_Panels), true, em, Cmd.Mission_Panels) {
 		ui.menu_open(MISSION_MENU, ui.mouse_pos())
 	}
-	if tool_button("mission_reset", lucide.ROTATE_CCW, cmd_tip(.Mission_Reset), true, em) { mission_reset(app) }
+	if tool_button("mission_reset", lucide.ROTATE_CCW, cmd_tip(.Mission_Reset), true, em, Cmd.Mission_Reset) { mission_reset(app) }
 	ui.space(ui.SPACE_2)
 }
 

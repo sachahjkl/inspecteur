@@ -15,7 +15,8 @@ section, the views, the tests) is [docs/architecture.md](../../docs/architecture
 - Each section has a neutral model, a Linux reader (`*_linux.odin`) and a view. The demo (`--demo`) is a third source
   behind the same procs.
 - Every action is a command of `COMMANDS` (`src/commands.odin`); every dialog and panel is a toolkit view
-  (`src/views.odin`).
+  (`src/views.odin`). A command that asks one value takes it in the palette's form; a button names the command it runs
+  ([features/palette.md](features/palette.md)).
 
 ## State machines
 
@@ -52,4 +53,5 @@ section, the views, the tests) is [docs/architecture.md](../../docs/architecture
 - [features/connections.md](features/connections.md): a socket's process, the scan of descriptors skipped when every
   socket is known
 - [features/palette.md](features/palette.md): the palette's sources (the toolkit's commands and settings, Go to: the
-  processes and the services), what can act as a version, Go to's ids and its answers made on a chore
+  processes and the services), the commands with arguments and the dialogs kept, the buttons that name their command
+  for Shift+Enter, what can act as a version, Go to's ids and its answers made on a chore

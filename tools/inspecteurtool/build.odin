@@ -39,7 +39,8 @@ run_test :: proc(args: []string) -> cli.Exit {
 	p := project()
 	if !toolbox.build_native(p) { return .Failed }
 	_ = os.make_directory("build")
-	return toolbox.ended(toolbox.run(toolbox.odin_command(p, "test", "", {"-out:build/test_inspecteur"}), {echo = true}))
+	// (one thread: the tests that build a window's interface each take the toolkit's one test session)
+	return toolbox.ended(toolbox.run(toolbox.odin_command(p, "test", "", {"-out:build/test_inspecteur", "-define:ODIN_TEST_THREADS=1"}), {echo = true}))
 }
 
 run_check :: proc(args: []string) -> cli.Exit {

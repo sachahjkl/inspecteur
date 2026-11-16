@@ -11,9 +11,14 @@ package inspecteur
 //
 // A command of a section acts in that section only; one of the Window or Sections groups, wherever the window is. A
 // command of the Properties group acts while the Properties are open (props_view.odin reads its keys).
+//
+// A button that runs a command states it at its build (ui.act_command, through cmd_button and tool_button): Shift+Enter
+// on the command in the palette goes to that button.
 
+import "core:fmt"
 import "core:slice"
 import "core:strings"
+import config "gt:config"
 import i18n "gt:i18n"
 import lucide "gt:lucide"
 import "gt:platform"
@@ -29,7 +34,7 @@ Cmd :: enum u8 {
 	Show_Mission_Control, Show_Processes, Show_Performance, Show_Services, Show_Startup, Show_Connections, Show_Information, Next_Section, Previous_Section,
 	// Processes
 	End_Task, Kill, End_Tree, Select_All, Suspend, Properties, Open_Location, Copy_Command, Default_Action, Open_Group,
-	Close_Group, Raise_Priority, Lower_Priority, Affinity, Send_Signal, Show_Window, Go_To_Service, Dump, Search_Online, Tree_View, Columns, Summary, Pin,
+	Close_Group, Raise_Priority, Lower_Priority, Set_Priority, Affinity, Send_Signal, Show_Window, Go_To_Service, Dump, Search_Online, Tree_View, Columns, Summary, Pin,
 	// Performance
 	Cpu_Grid, Next_Device, Previous_Device,
 	// Mission Control
@@ -54,7 +59,7 @@ COMMANDS := [Cmd]ui.Command{
 	.Clear_Filter     = {id = "clear_filter", icon = lucide.X, label = i18n.later("Clear the filter"), group = i18n.later("Window"), keys = {{.Escape, {}}}},
 	.Read_Again       = {id = "read_again", icon = lucide.REFRESH_CW, label = i18n.later("Read again"), group = i18n.later("Window"), keys = {{.F5, {}}}, tags = {"refresh", "reload"}},
 	.Pause_Refresh    = {id = "pause_refresh", icon = lucide.PAUSE, label = i18n.later("Pause or resume the refresh"), group = i18n.later("Window"), keys = {{.Space, {.Ctrl}}}, tags = {"freeze", "stop updating"}},
-	.Refresh_Speed    = {id = "refresh_speed", icon = lucide.GAUGE, label = i18n.later("Refresh speed…"), group = i18n.later("Window"), keys = {{.R, {.Ctrl, .Shift}}}, tags = {"interval", "update", "period"}},
+	.Refresh_Speed    = {id = "refresh_speed", icon = lucide.GAUGE, label = i18n.later("Refresh speed…"), group = i18n.later("Window"), keys = {{.R, {.Ctrl, .Shift}}}, tags = {"interval", "update", "period"}, arguments = REFRESH_ARGUMENTS[:]},
 	.Zoom_In          = {id = "zoom_in", icon = lucide.ZOOM_IN, label = i18n.later("Zoom in"), group = i18n.later("Window"), keys = ui.ZOOM_IN_KEYS[:]},
 	.Zoom_Out         = {id = "zoom_out", icon = lucide.ZOOM_OUT, label = i18n.later("Zoom out"), group = i18n.later("Window"), keys = ui.ZOOM_OUT_KEYS[:]},
 	.Zoom_Reset       = {id = "zoom_reset", icon = lucide.SEARCH, label = i18n.later("Zoom: 100 %"), group = i18n.later("Window"), keys = ui.ZOOM_RESET_KEYS[:]},
@@ -86,8 +91,9 @@ COMMANDS := [Cmd]ui.Command{
 	.Close_Group      = {id = "close_group", icon = lucide.CHEVRON_UP, label = i18n.later("Close the group"), group = i18n.later("Processes"), keys = {{.Left, {}}}},
 	.Raise_Priority   = {id = "raise_priority", icon = lucide.ARROW_UP, label = i18n.later("Raise the priority"), group = i18n.later("Processes"), keys = {{.Up, {.Ctrl}}}, tags = {"nice", "renice"}},
 	.Lower_Priority   = {id = "lower_priority", icon = lucide.ARROW_DOWN, label = i18n.later("Lower the priority"), group = i18n.later("Processes"), keys = {{.Down, {.Ctrl}}}, tags = {"nice", "renice", "background"}},
+	.Set_Priority     = {id = "set_priority", icon = lucide.ARROW_UP_DOWN, label = i18n.later("Set the priority"), group = i18n.later("Processes"), tags = {"nice", "renice", "high", "low", "idle"}, arguments = PRIORITY_ARGUMENTS[:]},
 	.Affinity         = {id = "affinity", icon = lucide.MICROCHIP, label = i18n.later("Set affinity…"), group = i18n.later("Processes"), keys = {{.A, {.Ctrl, .Shift}}}, tags = {"cpu", "cores", "pin"}},
-	.Send_Signal      = {id = "send_signal", icon = lucide.ZAP, label = i18n.later("Send a signal"), group = i18n.later("Processes"), tags = {"signal", "sighup", "sigusr1", "sigint", "reload", "hang up"}},
+	.Send_Signal      = {id = "send_signal", icon = lucide.ZAP, label = i18n.later("Send a signal"), group = i18n.later("Processes"), tags = {"signal", "sighup", "sigusr1", "sigint", "reload", "hang up"}, arguments = SIGNAL_ARGUMENTS[:]},
 	.Show_Window      = {id = "show_window", icon = lucide.APP_WINDOW, label = i18n.later("Show its window"), group = i18n.later("Processes"), keys = {{.W, {.Ctrl, .Shift}}}, tags = {"window", "focus", "switch", "raise", "front"}},
 	.Go_To_Service    = {id = "go_to_service", icon = lucide.SERVER, label = i18n.later("Go to service"), group = i18n.later("Processes"), keys = {{.S, {.Ctrl, .Shift}}}},
 	.Dump             = {id = "dump", icon = lucide.SAVE, label = i18n.later("Create dump file…"), group = i18n.later("Processes"), keys = {{.D, {.Ctrl, .Shift}}}, tags = {"core", "gcore", "debug"}},
@@ -144,6 +150,53 @@ COMMANDS := [Cmd]ui.Command{
 	.Props_Next_Tab       = {id = "props_next_tab", icon = lucide.ARROW_RIGHT, label = i18n.later("Next tab"), group = i18n.later("Properties"), keys = {{.Tab, {.Ctrl}}}},
 	.Props_Previous_Tab   = {id = "props_previous_tab", icon = lucide.ARROW_LEFT, label = i18n.later("Previous tab"), group = i18n.later("Properties"), keys = {{.Tab, {.Ctrl, .Shift}}}},
 	.Props_Close          = {id = "props_close", icon = lucide.X, label = i18n.later("Close"), group = i18n.later("Properties"), keys = {{.Escape, {}}}},
+}
+
+// What the commands with arguments take (ui.Command.arguments): in the palette, Enter on one of them opens its form,
+// and the choice comes with the value (cmd_run_with). Each is a closed list that inspecteur fills (command_choices):
+// its tables (SIGNAL_ITEMS, PRIORITIES, REFRESH_SPEEDS) stay the one place of their values, shared with the menus. A
+// default is one of the list's values. Their names are unique among the commands: command_choices goes by the name.
+// (Without a form, a key the person gave one of them, the command runs as before: its menu or its dialog.)
+SIGNAL_ARGUMENTS := [?]config.Def{{name = "signal", title = i18n.later("Signal"), kind = .String, default = {s = "SIGHUP"}}}
+PRIORITY_ARGUMENTS := [?]config.Def{{name = "priority", title = i18n.later("Priority"), kind = .String, default = {s = "0"}}}
+REFRESH_ARGUMENTS := [?]config.Def{{name = "period", title = i18n.later("Refresh every"), kind = .String, default = {s = "1000"}}}
+
+// The values an argument may take, and their labels (English, i18n.later: the palette translates them), for the
+// palette's form (Palette_Commands_Options.choices). Temporary memory: the form reads them again at each build.
+command_choices :: proc(user: rawptr, index: int, argument: string) -> (labels, values: []string) {
+	switch argument {
+	case "signal":
+		labels, values = make([]string, len(SIGNAL_ITEMS), context.temp_allocator), make([]string, len(SIGNAL_ITEMS), context.temp_allocator)
+		for s, i in SIGNAL_ITEMS { labels[i], values[i] = s.label, s.name }
+	case "priority":
+		labels, values = make([]string, len(PRIORITIES), context.temp_allocator), make([]string, len(PRIORITIES), context.temp_allocator)
+		for q, i in PRIORITIES { labels[i], values[i] = q.name, fmt.tprintf("%d", q.nice) }
+	case "period":
+		labels, values = make([]string, len(REFRESH_SPEEDS), context.temp_allocator), make([]string, len(REFRESH_SPEEDS), context.temp_allocator)
+		for sp, i in REFRESH_SPEEDS { labels[i], values[i] = sp.name, fmt.tprintf("%d", sp.ms) }
+	}
+	return
+}
+
+// Runs `c` with the values of its form, in the order of its arguments (the palette's choice). No value: the command as
+// its key runs it. A value that is not one of its list's does nothing. The command is checked against the selection
+// first, as a key is: between the choice and this build the selection may have moved.
+cmd_run_with :: proc(app: ^App, c: Cmd, arguments: []string) {
+	if len(arguments) == 0 || len(COMMANDS[c].arguments) == 0 { cmd_run(app, c); return }
+	if !cmd_can(app, c) { return }
+	value := arguments[0]
+	#partial switch c {
+	case .Send_Signal:
+		for s in SIGNAL_ITEMS { if s.name == value { signal_selected(app, s.sig); return } }
+	case .Set_Priority:
+		p := selected_proc(app)
+		if p == nil || !selected_is_process(app) { return }
+		for q in PRIORITIES { if fmt.tprintf("%d", q.nice) == value { set_priority(app, p, q.nice); return } }
+	case .Refresh_Speed:
+		for sp in REFRESH_SPEEDS { if fmt.tprintf("%d", sp.ms) == value { refresh_speed_set(app, sp.ms); return } }
+	case:
+		cmd_run(app, c)
+	}
 }
 
 // The section a command acts in (nil: everywhere).
@@ -302,7 +355,7 @@ palette_list_keep :: proc(app: ^App) {
 		for c, i in l.cmds { l.disabled[i] = !cmd_can(app, c) }
 		l.version += 1
 	}
-	ui.palette_commands(&app.palette, l.table[:], l.disabled[:], {version = l.version})
+	ui.palette_commands(&app.palette, l.table[:], l.disabled[:], {version = l.version, choices = command_choices, user = app})
 }
 
 palette_list_destroy :: proc(l: ^Palette_List) {
@@ -312,8 +365,10 @@ palette_list_destroy :: proc(l: ^Palette_List) {
 	l^ = {}
 }
 
-// Each build: the commands source kept, and the choice of inspecteur's sources run (the toolkit's run their own: a
-// setting, a view's move).
+// Each build, at its top, before the content and the views: the commands source kept, and the choice of inspecteur's
+// sources run (the toolkit's run their own: a setting, a view's move, Shift+Enter's go to). The run mode's writes are
+// made in ui.palette_chosen too: called before the content, a value written in the palette shows on the page in the
+// same frame.
 palette_build :: proc(app: ^App) {
 	l := &app.palette_list
 	palette_list_keep(app)
@@ -321,7 +376,7 @@ palette_build :: proc(app: ^App) {
 	if !ok { return }
 	if i, is := ui.palette_chosen_command(&app.palette, c); is {
 		// (by its id too: the table is made again with the section, a choice of the table before is not run)
-		if i < len(l.cmds) && l.table[i].id == c.id { cmd_run(app, l.cmds[i]) }
+		if i < len(l.cmds) && l.table[i].id == c.id { cmd_run_with(app, l.cmds[i], c.arguments) }
 		return
 	}
 	go_to_chosen(app, c)
@@ -372,7 +427,7 @@ cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 	case .Copy_Command: return p != nil && p.cmdline != ""
 	case .Default_Action: return p != nil
 	case .Open_Group, .Close_Group: return group_can_toggle(app, c == .Open_Group)
-	case .Raise_Priority, .Lower_Priority: return p != nil && selected_is_process(app)
+	case .Raise_Priority, .Lower_Priority, .Set_Priority: return p != nil && selected_is_process(app)
 	case .Columns, .Summary: return true
 	case .Cpu_Grid, .Next_Device, .Previous_Device: return true
 	case .Mission_Panels, .Mission_Reset: return true
@@ -434,6 +489,8 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Close_Group:      group_set(app, false)
 	case .Raise_Priority:   if p := selected_proc(app); p != nil { priority_step(app, p, -1) }
 	case .Lower_Priority:   if p := selected_proc(app); p != nil { priority_step(app, p, 1) }
+	// (without its form's value: the Properties, whose foot chooses the priority)
+	case .Set_Priority:     props_selected(app)
 	case .Affinity:         if p := selected_proc(app); p != nil { affinity_open(app, p) }
 	case .Go_To_Service:    if p := selected_proc(app); p != nil { go_to_service(app, p) }
 	case .Show_Window:      if r, ok := selected_row(app); ok { window_show(app, row_entry(app, r)) }

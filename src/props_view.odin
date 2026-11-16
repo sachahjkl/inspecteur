@@ -353,9 +353,12 @@ props_actions :: proc(app: ^App, p: ^Proc, em: f32) {
 }
 
 // A button of the foot: its icon and its label, its colour as strong as what it does (`intent`); its tooltip says its key.
+// It runs its command `c`, which it states (ui.act_command).
 @(private = "file")
 props_button :: proc(app: ^App, id, icon, label: string, c: Cmd, em: f32, intent := ui.Intent.Neutral) -> bool {
-	return ui.button(id, label, icon, {intent = intent, height = ui.dense(em * 2.1), tip = fmt.tprintf("%s (%s)", label, ui.command_shortcut(COMMANDS[c]))}).clicked
+	sig := ui.button(id, label, icon, {intent = intent, height = ui.dense(em * 2.1), tip = fmt.tprintf("%s (%s)", label, ui.command_shortcut(COMMANDS[c]))})
+	ui.act_command(sig.box, COMMANDS[c].id)
+	return sig.clicked
 }
 
 // The keys of the dialog (the Properties group of commands.odin). While its filter has the keyboard and some text, the

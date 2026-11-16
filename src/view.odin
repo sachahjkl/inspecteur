@@ -52,6 +52,9 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 		app.setup_due = false
 		prefs_page.install_open(&app.install)
 	}
+	// (the palette's choice before the content and the views: a value its run mode writes shows on the page in the
+	// same frame, and a choice of the last frame acts on what this one builds)
+	palette_build(app)
 	// (the views docked at the window's edges and floating in it are built first: they read their keys first)
 	if ui.views_frame(&app.views) {
 		// (the window's commands first, in every page, whatever has the keyboard, over a dialog too; not while a menu is
@@ -100,7 +103,6 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 		mission_line_menu(app, em)
 		mission_closed_say(app)
 		row_menu_build(app, em)
-		palette_build(app)
 		if prefs_page.install_frame(&app.install) == .Launched { platform.request_close(app.main.win) }   // (the installed copy runs)
 	}
 	ui.wake_within(&app.main.state, min(until_sample(app), services_due_ms(app), connections_due_ms(app), journals_due_ms(app)))
@@ -338,11 +340,15 @@ build_title :: proc(app: ^App, em: f32) {
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
 		if ui.button("palette_button", icon = lucide.COMMAND, o = {tip = ui.command_tip(ui.palette_command())}).clicked { ui.palette_toggle(&app.palette) }
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
-		if ui.button("help_button", icon = lucide.KEYBOARD, o = {tip = cmd_tip(.Shortcuts)}).clicked { shortcuts_open(app) }
+		help := ui.button("help_button", icon = lucide.KEYBOARD, o = {tip = cmd_tip(.Shortcuts)})
+		ui.act_command(help.box, COMMANDS[.Shortcuts].id)
+		if help.clicked { shortcuts_open(app) }
 		theme_button(app, em)
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
 		// (the settings shown: the button is held down)
-		if ui.button("settings_button", icon = lucide.SLIDERS_HORIZONTAL, o = {tip = cmd_tip(.Settings), face = app.settings_open ? .Toggled : .Ghost}).clicked { settings_toggle(app) }
+		settings := ui.button("settings_button", icon = lucide.SLIDERS_HORIZONTAL, o = {tip = cmd_tip(.Settings), face = app.settings_open ? .Toggled : .Ghost})
+		ui.act_command(settings.box, COMMANDS[.Settings].id)
+		if settings.clicked { settings_toggle(app) }
 		ui.space(ui.CONTROL_GAP)
 		_, _ = ui.window_buttons()
 	}
@@ -366,6 +372,7 @@ build_sidebar :: proc(app: ^App, em: f32) {
 			sig: ui.Signal
 			if ui.row(.Center, flags, fmt.tprintf("###side_%d", int(tab))) {
 				sig = ui.signal(ui.parent_box())
+				ui.act_command(ui.parent_box(), COMMANDS[Cmd(int(Cmd.Show_Mission_Control) + int(tab))].id)
 				ui.space(ui.SPACE_2)
 				if !on { ui.push_tags("weak") }
 				ui.icon(TAB_ICONS[tab], em * 1.6, on ? ui.color("accent") : nil)
@@ -586,6 +593,8 @@ refresh_button :: proc(app: ^App, em: f32) {
 	tip := app.paused ? fmt.tprintf(i18n.tr("Refresh: paused. %s (%s), Resume (%s)"), cmd_label(.Refresh_Speed), ui.command_shortcut(COMMANDS[.Refresh_Speed]), ui.command_shortcut(COMMANDS[.Pause_Refresh])) : fmt.tprintf(i18n.tr("Refresh: every %s. %s (%s), Pause (%s)"), refresh_text(app), cmd_label(.Refresh_Speed), ui.command_shortcut(COMMANDS[.Refresh_Speed]), ui.command_shortcut(COMMANDS[.Pause_Refresh]))
 	sig := ui.button("refresh", icon = app.paused ? lucide.PAUSE : lucide.REFRESH_CW, o = {tip = tip, lit = ui.menu_is_open(REFRESH_MENU)})
 	app.refresh_rect = sig.box.rect
+	// (Refresh speed's key opens this menu: the button is the command's place)
+	ui.act_command(sig.box, COMMANDS[.Refresh_Speed].id)
 	if sig.clicked { refresh_menu_open(app) }
 	if ui.menu(REFRESH_MENU) {
 		if ui.menu_item(app.paused ? i18n.tr("Resume") : i18n.tr("Pause"), ui.command_shortcut(COMMANDS[.Pause_Refresh]), checked = app.paused).clicked { refresh_pause(app, !app.paused) }

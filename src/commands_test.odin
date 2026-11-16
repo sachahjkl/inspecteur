@@ -1,7 +1,11 @@
 package inspecteur
 
 import "core:slice"
+import "core:strings"
 import "core:testing"
+import config "gt:config"
+import lucide "gt:lucide"
+import "gt:testkit/session"
 import "gt:ui"
 
 // A key that types text works only while no field has the keyboard (gui_toolkit's src/md/features/commands.md): Space
@@ -68,4 +72,130 @@ every_command_has_an_icon :: proc(t: ^testing.T) {
 		testing.expectf(t, COMMANDS[c].icon != "", "%v has an icon", c)
 		testing.expectf(t, COMMANDS[c].label != "", "%v has a label", c)
 	}
+}
+
+// What the build of a command's button stated: its act name, and a button's that runs no command.
+@(private = "file")
+Act_Probe :: struct {
+	app:          ^App,
+	named, plain: bool,
+}
+
+// A command's button states its act name at its build (ui.act_command): the palette's Shift+Enter on the command goes
+// to it. A tool button given no command states none.
+@(test)
+a_command_s_button_states_its_act_name :: proc(t: ^testing.T) {
+	app := new(App)
+	defer free(app)
+	probe := Act_Probe{app = app}
+	s := session.start(t, {size = {800, 200}, user = &probe, no_renderer = true, build = proc(s: ^session.Session) {
+		pr := (^Act_Probe)(s.user)
+		// (what the last frame stated: a frame's act names are the window's at its end)
+		pr.named = ui.act_shown("command:properties")
+		pr.plain = ui.act_shown("command:kill")
+		em := ui.font_size()
+		ui.next({width = ui.fill(), height = ui.px(em * BAR_EM)})
+		if ui.row(.Center, id = "###bar") {
+			cmd_button(pr.app, "properties", lucide.INFO, .Properties, em)
+			_ = tool_button("kill", lucide.ZAP, "", true, em)
+		}
+	}})
+	session.frames(s, 2)
+	testing.expect_value(t, COMMANDS[.Properties].id, "properties")
+	testing.expect(t, probe.named, "the Properties button states command:properties")
+	testing.expect(t, !probe.plain, "a button given no command states none")
+}
+
+// Processes of the demo's kind for the commands with arguments: no process of the system (app.demo set: nothing is
+// sent, set or written to a process; the footer says what would have been), the first background process selected.
+@(private = "file")
+demo_rows :: proc() -> ^App {
+	app := new(App)
+	app.demo = new(Demo)
+	append(&app.sampler.procs,
+		Proc{pid = 20, ppid = 1, entry = -1, name = "a", search = "a", start = 1},
+		Proc{pid = 21, ppid = 1, entry = -1, name = "b", search = "b", start = 1})
+	table_columns_init(&app.table)
+	table_group(&app.table, app.sampler.procs[:])
+	table_rows(&app.table, &app.sampler, &app.catalog)
+	for r, i in app.table.rows {
+		if r.kind == .Process && app.sampler.procs[r.index].pid == 20 { select_row(app, i); break }
+	}
+	return app
+}
+
+@(private = "file")
+demo_rows_free :: proc(app: ^App) {
+	delete(app.status)
+	free(app.demo)
+	catalog_destroy(&app.catalog)
+	table_destroy(&app.table)
+	delete(app.sampler.procs)
+	ui.vlist_destroy(&app.vl)
+	free(app)
+}
+
+// Each command with arguments offers a closed list, its default among it: the form opens on a value it can run.
+@(test)
+every_argument_offers_its_default :: proc(t: ^testing.T) {
+	for c in Cmd {
+		for a in COMMANDS[c].arguments {
+			labels, values := command_choices(nil, 0, a.name)
+			testing.expectf(t, len(values) > 0 && len(labels) == len(values), "%v: %s is a closed list", c, a.name)
+			testing.expectf(t, slice.contains(values, a.default.s), "%v: %s's default %q is one of its values", c, a.name, a.default.s)
+		}
+	}
+}
+
+// Send a signal with its form's value: that signal goes to the row selected, and to it alone.
+@(test)
+send_a_signal_takes_its_form_s_signal :: proc(t: ^testing.T) {
+	app := demo_rows()
+	defer demo_rows_free(app)
+	_, values := command_choices(app, 0, "signal")
+	testing.expect(t, slice.contains(values, "SIGUSR1"), "SIGUSR1 is offered")
+	testing.expect(t, cmd_can(app, .Send_Signal), "a process is selected")
+	cmd_run_with(app, .Send_Signal, {"SIGUSR1"})
+	testing.expectf(t, strings.contains(app.status, "SIGUSR1") && strings.contains(app.status, "a (PID 20)") && !strings.contains(app.status, "PID 21"), "the footer: %q", app.status)
+}
+
+// Set the priority with its form's value: the row selected gets that priority.
+@(test)
+set_the_priority_takes_its_form_s_priority :: proc(t: ^testing.T) {
+	app := demo_rows()
+	defer demo_rows_free(app)
+	_, values := command_choices(app, 0, "priority")
+	if !testing.expect(t, len(values) == len(PRIORITIES), "every priority is offered") { return }
+	last := PRIORITIES[len(PRIORITIES) - 1]
+	testing.expect(t, cmd_can(app, .Set_Priority), "a process is selected")
+	cmd_run_with(app, .Set_Priority, {values[len(values) - 1]})
+	testing.expectf(t, strings.contains(app.status, priority_text(last.nice)) && strings.contains(app.status, "a (PID 20)"), "the footer: %q", app.status)
+	// (nothing selected: the command cannot act, and nothing is said)
+	delete(app.status)
+	app.status = ""
+	app.vl.sel = -1
+	cmd_run_with(app, .Set_Priority, {values[0]})
+	testing.expect_value(t, app.status, "")
+}
+
+// Refresh speed with its form's value: the refresh takes that period, written to the preferences; a value the list does
+// not offer changes nothing.
+@(test)
+refresh_speed_takes_its_form_s_period :: proc(t: ^testing.T) {
+	app := new(App)
+	defer free(app)
+	defer delete(app.status)
+	app.prefs = config.prefs_make()
+	defer config.prefs_destroy(&app.prefs)
+	config.register(&app.prefs, PREF_DEFS[:])
+	app.settings.refresh_ms = 1000
+	app.paused = true
+	_, values := command_choices(app, 0, "period")
+	testing.expect(t, slice.contains(values, "2000"), "2 s is offered")
+	cmd_run_with(app, .Refresh_Speed, {"2000"})
+	testing.expect_value(t, app.settings.refresh_ms, 2000)
+	testing.expect_value(t, config.int_of(&app.prefs, "processes.refresh_ms"), 2000)
+	testing.expect(t, !app.paused, "the refresh resumes")
+	cmd_run_with(app, .Refresh_Speed, {"1234"})
+	testing.expect_value(t, app.settings.refresh_ms, 2000)
 }

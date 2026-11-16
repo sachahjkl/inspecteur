@@ -8,7 +8,7 @@ own. The code is `src/commands.odin` (the commands) and `src/go_to.odin` (Go to)
 
 | Prefix | Source | Whose | What choosing does |
 |---|---|---|---|
-| `>` | the commands of the window, of the sections and of the section shown | the toolkit's commands source, inspecteur's table | `cmd_run` |
+| `>` | the commands of the window, of the sections and of the section shown | the toolkit's commands source, inspecteur's table | `cmd_run_with`: a command with arguments opens its form first |
 | `>` | the views' moves (float, dock, a window of its own, re-attach, close) | the toolkit's | the toolkit runs it |
 | `:` | the settings | the toolkit's settings source (`prefs_page.palette_settings_add`) | a switch flips, another setting opens the settings on it |
 | `@` | the processes of the last sample | inspecteur's | selects its row in Processes (the filter cleared, its group open) |
@@ -16,7 +16,55 @@ own. The code is `src/commands.odin` (the commands) and `src/go_to.odin` (Go to)
 
 All of them are in the plain search too. With nothing typed: Recent, then the commands.
 
+## Commands with arguments
+
+A command that asks one value before it acts takes it in the palette's form (`ui.Command.arguments`): Enter opens the
+form, Enter on its value runs it.
+
+| Command | Its argument | Its list | What it does |
+|---|---|---|---|
+| Send a signal | `signal` | `SIGNAL_ITEMS` (menu.odin) | `signal_selected`: the rows selected, with the guards of the row's menu |
+| Set the priority | `priority` | `PRIORITIES` (system_linux.odin) | `set_priority` on the process selected (not an app's row) |
+| Refresh speed | `period` | `REFRESH_SPEEDS` (view.odin) | `refresh_speed_set`: the period, written; the refresh resumes |
+
+- **Each list is the program's table, given by `Palette_Commands_Options.choices`** (`command_choices`), not copied
+  into `config.Def.choices`: the menus and the form read one table, and PRIORITIES is the system's file's. An
+  argument's name is unique among the commands, so `command_choices` goes by the name, not by the table's index (the
+  table is made again with the section).
+- **A choice is checked against the selection when it runs** (`cmd_run_with` calls `cmd_can` first), as a key is: the
+  form may stay open while a sample moves the rows. A value that is not in its list does nothing.
+- **Without a value the command runs as before.** A key that the person gives Send a signal or Set the priority has no
+  form: Send a signal opens the row's menu (its Send a signal list), Set the priority the Properties (their foot holds
+  the priority), Refresh speed (Ctrl+Shift+R) its menu.
+- **Refused: a form's value from the setting.** Refresh speed could take the `processes.refresh_ms` setting's Def (any
+  period from 250 ms to 10 s). The setting is in the palette already (`:`); the command offers the four periods of its
+  menu, and resumes a paused refresh, as the menu does.
+- **The dialogs kept.** Set affinity asks several processors at once: a set, not one value, so its dialog stays. Kill,
+  End process tree, Create dump file, Stop and Restart a service ask a question (what ends with it), not a value: their
+  confirmations stay. Columns and Mission Control's panels are several switches: their menus stay.
+
+## Go to a command's button
+
+Shift+Enter on a command goes to the element that runs it: each one states `command:<id>` at its build
+(`ui.act_command`). The rule: an element names a command only when its click runs that very command on what the command
+acts on.
+
+- `cmd_button` names every section's tool; `tool_button` names a command given to it (Mission Control's two, Read again
+  in Information, the journal's). The title bar's Keyboard shortcuts, Settings and refresh button (Refresh speed's
+  menu), the sidebar's sections (Show …) and the Properties' foot (`props_button`) name theirs.
+- Not named: a journal in its own window (the journal commands act on the details' journal), the details' close button
+  (the bar's Details and journal names that command), a row's window button (it acts on its row, not on the selection),
+  the journal's level and boot choices (they set a value; the commands step through them), the theme button (it opens a
+  menu, not Light or dark).
+- The Properties' commands are not in the palette's table (they act in their view); their buttons name them all the
+  same, so a table that lists them later reaches them.
+
 ## Decisions
+
+- **The choice is read at the top of the main window's build** (`palette_build`, before `ui.views_frame` and the
+  content): the run mode's writes are made in `ui.palette_chosen`, so a value changed in the palette shows on the page
+  in the same frame. The main window alone has a palette: a view's window opens the same palette, and its choices come
+  out in the main window's build.
 
 - **The commands' `disabled` follows a version, not a compare.** What can act depends on the selection and on the
   readings. The palette compares the commands source's version only. inspecteur makes a `Palette_Can` at each build:

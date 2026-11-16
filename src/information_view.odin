@@ -188,7 +188,7 @@ info_line :: proc(l: Info_Line, i: int, em: f32) {
 @(private = "file")
 info_actions :: proc(app: ^App, em: f32) {
 	cmd_button(app, "copy_all", lucide.COPY, .Info_Copy, em)
-	if tool_button("read_again", lucide.REFRESH_CW, cmd_tip(.Read_Again), !information_busy(&app.information), em) { refresh_now(app) }
+	if tool_button("read_again", lucide.REFRESH_CW, cmd_tip(.Read_Again), !information_busy(&app.information), em, Cmd.Read_Again) { refresh_now(app) }
 }
 
 info_copy :: proc(app: ^App) {

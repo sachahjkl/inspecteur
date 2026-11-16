@@ -152,15 +152,19 @@ build_bar :: proc(app: ^App, em: f32) {
 }
 
 // A button of a toolbar: the toolkit's icon button (a ghost, its tooltip saying what it does and its key) at the bars'
-// size. A button that cannot act now is greyed (its tooltip still says what it would do).
-tool_button :: proc(id, icon, tip: string, enabled: bool, em: f32) -> bool {
+// size. A button that cannot act now is greyed (its tooltip still says what it would do). `command`: the command its
+// click runs, stated at its build (ui.act_command): the palette's Shift+Enter on that command comes to it. Only a
+// button that runs that very command on what the command acts on names it.
+tool_button :: proc(id, icon, tip: string, enabled: bool, em: f32, command: Maybe(Cmd) = nil) -> bool {
 	ui.next({width = ui.px(em * 2.2), height = ui.px(ui.dense(em * 2))})
-	return ui.button(id, icon = icon, o = {tip = tip, disabled = !enabled}).clicked && enabled
+	sig := ui.button(id, icon = icon, o = {tip = tip, disabled = !enabled})
+	if c, ok := command.?; ok { ui.act_command(sig.box, COMMANDS[c].id) }
+	return sig.clicked && enabled
 }
 
 // The button of a command: greyed when it cannot act; clicked, it runs.
 cmd_button :: proc(app: ^App, id, icon: string, c: Cmd, em: f32) {
-	if tool_button(id, icon, cmd_tip(c), cmd_can(app, c), em) { cmd_run(app, c) }
+	if tool_button(id, icon, cmd_tip(c), cmd_can(app, c), em, c) { cmd_run(app, c) }
 }
 
 // The columns' titles (the toolkit's header: a click sorts, again reverses, a third gives none; a title dragged sideways

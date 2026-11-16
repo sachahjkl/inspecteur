@@ -56,7 +56,7 @@ journal_build :: proc(app: ^App, v: ^Journal_View, name: string, manager: Manage
 	}
 	v.last = newest
 	journal_list(app, v, shown, ids, em)
-	if e, has := journal_selected(app, v); has { journal_entry_whole(app, e, em) }
+	if e, has := journal_selected(app, v); has { journal_entry_whole(app, e, em, in_window) }
 }
 
 // The entries' list. (A procedure of its own: the list is the parent until the end of the scope it is opened in)
@@ -141,7 +141,10 @@ journal_bar :: proc(app: ^App, v: ^Journal_View, shown: int, em: f32, in_window:
 			follow := app.settings.journal_follow
 			ui.next({width = ui.px(em * 2.2), height = ui.px(bar_h)})
 			tip := follow ? fmt.tprintf(i18n.tr("Following: new entries come in at the end (%s stops)"), ui.command_shortcut(COMMANDS[.Journal_Follow])) : cmd_tip(.Journal_Follow)
-			if ui.button("svc_journal_follow", icon = follow ? lucide.ARROW_DOWN : lucide.PAUSE, o = {tip = tip, intent = follow ? .Primary : .Neutral, face = follow ? .Raised : .Ghost}).clicked { journal_run_on(app, v, .Journal_Follow) }
+			follow_button := ui.button("svc_journal_follow", icon = follow ? lucide.ARROW_DOWN : lucide.PAUSE, o = {tip = tip, intent = follow ? .Primary : .Neutral, face = follow ? .Raised : .Ghost})
+			// (the commands act on the details' journal: a journal in its own window does not name them)
+			if !in_window { ui.act_command(follow_button.box, COMMANDS[.Journal_Follow].id) }
+			if follow_button.clicked { journal_run_on(app, v, .Journal_Follow) }
 		}
 		ui.next({width = ui.children_sum(), height = ui.px(ui.dense(em * 2.3))})
 		if ui.row(.Center, {}, "###svc_journal_tools") {
@@ -157,8 +160,8 @@ journal_bar :: proc(app: ^App, v: ^Journal_View, shown: int, em: f32, in_window:
 				ui.next({width = ui.text_size(em * 0.4), height = ui.px(bar_h), text_pad = 0, font_size = em * 0.9})
 				ui.label(fmt.tprintf("%s###svc_journal_count", n))
 			}
-			if tool_button("svc_journal_copy", lucide.COPY, cmd_tip(.Journal_Copy), len(d.journal) > 0, em) { journal_run_on(app, v, .Journal_Copy) }
-			if !in_window && tool_button("svc_journal_window", lucide.EXTERNAL_LINK, cmd_tip(.Journal_Window), true, em) { journal_window_open(app, d.manager, d.name) }
+			if tool_button("svc_journal_copy", lucide.COPY, cmd_tip(.Journal_Copy), len(d.journal) > 0, em, in_window ? Maybe(Cmd){} : Cmd.Journal_Copy) { journal_run_on(app, v, .Journal_Copy) }
+			if !in_window && tool_button("svc_journal_window", lucide.EXTERNAL_LINK, cmd_tip(.Journal_Window), true, em, Cmd.Journal_Window) { journal_window_open(app, d.manager, d.name) }
 			ui.space(ui.SPACE_2)
 		}
 	}
@@ -220,9 +223,10 @@ journal_selected :: proc(app: ^App, v: ^Journal_View) -> (e: Journal_Entry, ok: 
 }
 
 // The selected entry whole, under the list: its date and time, its level, its program and process; its message
-// wrapped, its text selectable.
+// wrapped, its text selectable. `in_window`: a journal on its own (its copy button does not name the command, which
+// acts on the details' journal).
 @(private = "file")
-journal_entry_whole :: proc(app: ^App, e: Journal_Entry, em: f32) {
+journal_entry_whole :: proc(app: ^App, e: Journal_Entry, em: f32, in_window: bool) {
 	// (a height of its own: the list takes the rest. A longer message scrolls in it)
 	ui.next({width = ui.fill(), height = ui.px(em * ENTRY_EM), axis = .Y, bg = surface("bar")})
 	box := ui.build_box({.Draw_Background, .Draw_Side_Top, .Clip}, "###svc_journal_entry")
@@ -243,7 +247,7 @@ journal_entry_whole :: proc(app: ^App, e: Journal_Entry, em: f32) {
 				ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0, flags = {.Selectable}})
 				ui.label(fmt.tprintf("%s  ·  %s###je_info", journal_time_text(app, e.usec, true), ui.text_shown(who)))
 			}
-			if tool_button("svc_journal_copy_entry", lucide.CLIPBOARD_COPY, cmd_tip(.Journal_Copy_Entry), true, em) { platform.set_clipboard(app.main.win, journal_entry_text(app, e)); announce(app, i18n.tr("Copied the entry")) }
+			if tool_button("svc_journal_copy_entry", lucide.CLIPBOARD_COPY, cmd_tip(.Journal_Copy_Entry), true, em, in_window ? Maybe(Cmd){} : Cmd.Journal_Copy_Entry) { platform.set_clipboard(app.main.win, journal_entry_text(app, e)); announce(app, i18n.tr("Copied the entry")) }
 			ui.space(ui.SPACE_2)
 		}
 		ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})

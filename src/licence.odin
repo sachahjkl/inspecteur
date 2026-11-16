@@ -17,6 +17,7 @@ licence_init :: proc(app: ^App) {
 	prefs_page.licence_init(&app.licence, &app.main.state, {
 		store = {product = inspecteur_licence.PRODUCT, program = APP_FOLDER, memory = app.demo != nil, accept_dev = ODIN_DEBUG},
 		name = APP_TITLE, pricing_url = PRICING_URL, owner = app.main.win,
+		logo = #load("../assets/logo_256.png"), vendor = "Froment Software",   // (the licence card: its logo, its back)
 	})
 }
 

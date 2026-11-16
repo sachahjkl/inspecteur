@@ -266,11 +266,18 @@ copy_command :: proc(app: ^App, p: ^Proc) {
 	announce(app, fmt.tprintf(i18n.tr("Copied the command line of %s"), p.name))
 }
 
-// The signals the row's menu sends (Send a signal), each by its name and its number's.
-SIGNAL_ITEMS := [?]struct { sig: process.Signal, label: string }{
-	{.Hangup, i18n.later("Hang up (SIGHUP)")}, {.Interrupt, i18n.later("Interrupt (SIGINT)")}, {.Quit, i18n.later("Quit (SIGQUIT)")},
-	{.Terminate, i18n.later("Terminate (SIGTERM)")}, {.Kill, i18n.later("Kill (SIGKILL)…")}, {.Stop, i18n.later("Stop (SIGSTOP)")}, {.Continue, i18n.later("Continue (SIGCONT)")},
-	{.User1, i18n.later("User 1 (SIGUSR1)")}, {.User2, i18n.later("User 2 (SIGUSR2)")},
+// The signals that Send a signal sends (the row's menu, the palette's form), each by its words and its name. The name is
+// the value of the palette's form (SIGNAL_ARGUMENTS) and what the demo says it did not send.
+SIGNAL_ITEMS := [?]struct { sig: process.Signal, label: string, name: string }{
+	{.Hangup, i18n.later("Hang up (SIGHUP)"), "SIGHUP"}, {.Interrupt, i18n.later("Interrupt (SIGINT)"), "SIGINT"}, {.Quit, i18n.later("Quit (SIGQUIT)"), "SIGQUIT"},
+	{.Terminate, i18n.later("Terminate (SIGTERM)"), "SIGTERM"}, {.Kill, i18n.later("Kill (SIGKILL)…"), "SIGKILL"}, {.Stop, i18n.later("Stop (SIGSTOP)"), "SIGSTOP"},
+	{.Continue, i18n.later("Continue (SIGCONT)"), "SIGCONT"}, {.User1, i18n.later("User 1 (SIGUSR1)"), "SIGUSR1"}, {.User2, i18n.later("User 2 (SIGUSR2)"), "SIGUSR2"},
+}
+
+// A signal's name ("SIGHUP"); "" for a signal Send a signal does not offer.
+signal_name :: proc(sig: process.Signal) -> string {
+	for s in SIGNAL_ITEMS { if s.sig == sig { return s.name } }
+	return ""
 }
 
 // Sends `sig` to the selected processes (an app's row: its first processes, as End task), with the guards of the others:
@@ -446,7 +453,8 @@ confirm_act :: proc(app: ^App) {
 
 // Sends `sig` to each process chosen that is still that process (acts.odin); what came of it is said when it is done.
 send_signal :: proc(app: ^App, c: ^Chosen, sig: process.Signal) {
-	if app.demo != nil { say(app, i18n.tr("The demo's processes are not the system's: nothing was sent")); return }
+	// (the demo says what it would have sent, and to which: the act is seen with no process of the system touched)
+	if app.demo != nil { say(app, i18n.tr("The demo's processes are not the system's: %s was not sent to %s"), signal_name(sig), c.name); return }
 	a := act_new(.Signal, c.name)
 	a.sig = sig
 	for t in c.targets {
@@ -481,8 +489,9 @@ default_action :: proc(app: ^App) {
 // Sets a process's priority (a nice value), on each of its threads. A user may only lower a priority: a higher one
 // needs the administrator (PRIORITY_DENIED).
 set_priority :: proc(app: ^App, p: ^Proc, nice: i8) {
-	if app.demo != nil { say(app, i18n.tr("The demo's processes are not the system's: nothing was changed")); return }
-	a := act_new(.Priority, fmt.tprintf(i18n.tr("%s (PID %d)"), p.name, p.pid))
+	name := fmt.tprintf(i18n.tr("%s (PID %d)"), p.name, p.pid)
+	if app.demo != nil { say(app, i18n.tr("The demo's processes are not the system's: %s does not run at %s"), name, priority_text(nice)); return }
+	a := act_new(.Priority, name)
 	append(&a.targets, Target{p.pid, p.start})
 	a.nice = nice
 	act_start(app, a)
