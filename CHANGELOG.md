@@ -3,6 +3,11 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.16.1] - 2026-11-16 22:14
+
+### Fixed
+- **The command palette appears at once, with its rows.** Ctrl+K showed it after a few empty frames, faded it in before its rows came, and jumped when a frame was late; now it comes in the frame its rows are ready, and fades in over 70 ms.
+
 ## [0.16.0] - 2026-11-16 18:02
 
 ### Added
@@ -305,6 +310,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.16.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.16.1
 [0.16.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.16.0
 [0.15.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.15.0
 [0.14.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.14.0
