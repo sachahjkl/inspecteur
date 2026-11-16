@@ -147,14 +147,16 @@ live_commands :: proc(l: ^Live) {
 	check(l, cdp.type_text(c, "zzqx") && cdp.wait_for(c, "Nothing matches", SESSION_WAIT), "a search that keeps nothing says so (no crash)")
 	check(l, cdp.key(c, "Escape") && cdp.wait_name(c, "palette_top", SESSION_WAIT, gone = true), "Escape closes it")
 	check(l, cdp.key(c, "F1") && cdp.wait_for(c, "Keyboard shortcuts", SESSION_WAIT), "F1 shows the keys")
-	// (the sheet builds only the rows in view: its end, the last commands, is scrolled to)
+	// (the sheet builds only the rows in view: the window's commands, the palette's among them, are at its start; its
+	// end, the last section's commands, is scrolled to)
+	check(l, cdp.wait_for(c, "Ctrl+K / Ctrl+Shift+P", SESSION_WAIT), "it starts with the window's commands, the palette's")
 	sheet_end :: proc(c: ^cdp.Client) -> bool {
 		w, h, ok := cdp.window_size(c)
 		if !ok { return false }
 		for _ in 0 ..< SHEET_WHEELS { cdp.call(c, "Input.dispatchMouseEvent", fmt.tprintf(`{{"type":"mouseWheel","x":%d,"y":%d,"deltaX":0,"deltaY":%d}}`, int(w / 2), int(h / 2), SHEET_WHEEL_DELTA)) }
 		return true
 	}
-	check(l, sheet_end(c) && cdp.wait_for(c, "Suspend or resume", SESSION_WAIT) && cdp.wait_for(c, "Ctrl+K, Ctrl+Shift+P", SESSION_WAIT), "with every command's keys")
+	check(l, sheet_end(c) && cdp.wait_for(c, "Suspend or resume", SESSION_WAIT), "its end has the last section's commands")
 	check(l, cdp.key(c, "Escape") && cdp.wait_for(c, "Keyboard shortcuts", SESSION_WAIT, gone = true), "Escape closes them")
 	// (from Performance: the palette's Go to above showed Processes)
 	check(l, cdp.key(c, "ctrl+3") && cdp.wait_name(c, "cpu_graph", SESSION_WAIT), "Ctrl+3: Performance")
@@ -178,18 +180,18 @@ live_commands :: proc(l: ^Live) {
 live_setup_offer :: proc(l: ^Live) {
 	c := &l.c
 	prefs := fmt.tprintf("%s/config/FromentSoftware/Inspecteur/prefs", l.dir)
-	check(l, cdp.wait_for(c, "Install Inspecteur", SESSION_WAIT), "the install's dialog shows at the first start")
-	check(l, cdp.click_name(c, "setup_standalone") && cdp.wait_for(c, "Install Inspecteur", SESSION_WAIT, gone = true), "Keep standalone closes it")
+	check(l, cdp.wait_name(c, "setup_standalone", SESSION_WAIT), "the install's dialog shows at the first start")
+	check(l, cdp.click_name(c, "setup_standalone") && cdp.wait_name(c, "setup_standalone", SESSION_WAIT, gone = true), "Do not install closes it")
 	check(l, file_has(prefs, "install.choice\tstandalone"), "it is not offered again")
 }
 
-// The settings' Installation page installs Inspecteur in the session's own data folder: the program, its menu entry and
-// its icons; Uninstall takes it all away. So do `inspecteur --install` and `--uninstall` in a folder of this test, and
-// `--status` says each state.
+// The settings' Installation page installs Inspecteur in the session's own folders: the program in its HOME's
+// ~/.local/opt, its menu entry and its icons in its data folder; Uninstall takes it all away. So do
+// `inspecteur --install` and `--uninstall` with a data folder of this test, and `--status` says each state.
 live_setup :: proc(l: ^Live) {
 	c := &l.c
 	data := fmt.tprintf("%s/data", l.dir)
-	program := fmt.tprintf("%s/inspecteur/inspecteur", data)
+	program := fmt.tprintf("%s/home/.local/opt/FromentSoftware/Inspecteur/inspecteur", l.dir)
 	entry := fmt.tprintf("%s/applications/inspecteur.desktop", data)
 	icon := fmt.tprintf("%s/icons/hicolor/64x64/apps/inspecteur.png", data)
 	check(l, cdp.key(c, "ctrl+,") && cdp.wait_for(c, "Appearance", SESSION_WAIT), "Ctrl+,: the settings")
@@ -207,7 +209,7 @@ live_setup :: proc(l: ^Live) {
 
 	// the command line, in a data folder of this test
 	cli := fmt.tprintf("%s/data-cli", l.dir)
-	env := toolbox.env_with({"XDG_DATA_HOME"}, fmt.tprintf("XDG_DATA_HOME=%s", cli))
+	env := toolbox.env_with({"XDG_DATA_HOME", "HOME"}, fmt.tprintf("XDG_DATA_HOME=%s", cli), fmt.tprintf("HOME=%s/home", l.dir))
 	run :: proc(args: []string, env: []string) -> int {
 		cmd := make([dynamic]string, context.temp_allocator)
 		append(&cmd, PROGRAM)
@@ -219,7 +221,7 @@ live_setup :: proc(l: ^Live) {
 	}
 	cli_entry := fmt.tprintf("%s/applications/inspecteur.desktop", cli)
 	check(l, run({"--status"}, env) == 1, "inspecteur --status: not installed (1)")
-	check(l, run({"--install"}, env) == 0 && os.exists(cli_entry) && os.exists(fmt.tprintf("%s/inspecteur/inspecteur", cli)), "inspecteur --install copies it and writes %s", cli_entry)
+	check(l, run({"--install"}, env) == 0 && os.exists(cli_entry) && os.exists(program), "inspecteur --install copies it and writes %s", cli_entry)
 	check(l, run({"--status"}, env) == 0, "--status: installed (0)")
 	check(l, run({"--uninstall"}, env) == 0 && !os.exists(cli_entry), "inspecteur --uninstall takes it away")
 }

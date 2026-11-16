@@ -56,6 +56,7 @@
       fontconfig
       freetype
       dbus
+      curl # gt:http opens libcurl at run time: the updates, and the live check's DevTools WebSocket
     ];
 
     # APP_VERSION of src/main.odin
