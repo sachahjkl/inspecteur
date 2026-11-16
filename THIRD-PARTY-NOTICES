@@ -11,7 +11,7 @@ licence, whose text follows. This file is written by the notices command of the 
 - The Nix snowflake (the setup's screen for a copy from the Nix store): CC-BY-4.0
 - Odin's core library: BSD-3-Clause
 - wgpu-native (wgpu, naga): MIT OR Apache-2.0
-- the Rust crates of gui_toolkit's native libraries (native/text):
+- the Rust crates of the native libraries (gui_toolkit's native/text):
   - bitflags 2.13.2: MIT OR Apache-2.0
   - bytemuck 1.25.2: Zlib OR Apache-2.0 OR MIT
   - core_maths 0.1.1: MIT
