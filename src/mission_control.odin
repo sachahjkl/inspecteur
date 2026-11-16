@@ -203,7 +203,7 @@ mission_bar_right :: proc(app: ^App, em: f32) {
 		ui.menu_open(MISSION_MENU, ui.mouse_pos())
 	}
 	if tool_button("mission_reset", lucide.ROTATE_CCW, cmd_tip(.Mission_Reset), true, em) { mission_reset(app) }
-	ui.spacer(ui.px(em * 0.4))
+	ui.space(ui.SPACE_2)
 }
 
 // Each panel, shown or not (a click brings a closed one back beside the others, or closes a shown one); the layout as
@@ -238,7 +238,7 @@ mission_panel :: proc(app: ^App, p: Mission_Panel, em: f32) {
 	body := ui.build_box({.Draw_Background, .Clip, .View_Scroll_Y, .View_Clamp_Y}, fmt.tprintf("###mc_%s", MISSION_NAMES[p]))
 	// (the body is the parent for the block's length: `if !ui.parent(...) { return }` would let it go at once)
 	if ui.parent(body) {
-		ui.spacer(ui.px(em * 0.4))
+		ui.space(ui.SPACE_2)
 		switch p {
 		case .Machine:  mission_machine(app, em)
 		case .Health:   mission_health(app, em)
@@ -259,15 +259,15 @@ mission_machine :: proc(app: ^App, em: f32) {
 	summary_build(app, em)
 	ui.next({width = ui.fill(), height = ui.px(em * 9), axis = .X})
 	if ui.row(id = "###mc_graphs") {
-		ui.spacer(ui.px(em * 0.8))
+		ui.space(ui.SPACE_3)
 		ui.next({width = ui.fill(), height = ui.pct(1), axis = .Y})
 		if ui.column(id = "###mc_cpu") { captioned_graph(app, "mc_cpu_graph", i18n.tr("CPU"), {{&m.cpu_hist, hue(app, HUE_CPU), ""}}, 100, percent_top, em, ui.fill()) }
-		ui.spacer(ui.px(em * 0.8))
+		ui.space(ui.SPACE_3)
 		ui.next({width = ui.fill(), height = ui.pct(1), axis = .Y})
 		if ui.column(id = "###mc_mem") { captioned_graph(app, "mc_mem_graph", i18n.tr("Memory"), {{&m.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, percent_top, em, ui.fill()) }
-		ui.spacer(ui.px(em * 0.8))
+		ui.space(ui.SPACE_3)
 	}
-	ui.spacer(ui.px(em * 0.4))
+	ui.space(ui.SPACE_2)
 }
 
 // The machine's pulse: a word for the state the diagnosis finds, in its colour; the (i) whose tooltip says each finding;
@@ -282,12 +282,12 @@ mission_health :: proc(app: ^App, em: f32) {
 	word := worst == .Bad ? i18n.tr("Struggling") : worst == .Warn ? i18n.tr("Under strain") : i18n.tr("Healthy")
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.2)), axis = .X, cross = .Center})
 	if ui.row(.Center, {}, "###mc_health_head") {
-		ui.spacer(ui.px(em * 0.8))
+		ui.space(ui.SPACE_3)
 		if ui.tags(tag) {
 			ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0, font_size = em * 1.25})
 			ui.label(fmt.tprintf("%s###mc_health_word", word))
 		}
-		ui.spacer(ui.px(em * 0.6))
+		ui.space(ui.SPACE_2)
 		if ui.tags("weak") {
 			ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
 			ui.label(fmt.tprintf("%s###mc_health_cpu", fmt.tprintf(i18n.tr("CPU %s"), percent_text(f64(app.machine.cpu)))))
@@ -314,7 +314,7 @@ mission_health :: proc(app: ^App, em: f32) {
 				}
 			}
 		}
-		ui.spacer(ui.px(em * 0.4))
+		ui.space(ui.SPACE_2)
 	}
 	d := ui.frame_new(Pulse_Draw)
 	d.values = ui.value_history_values(&app.machine.cpu_hist, ui.frame_allocator())
@@ -475,7 +475,7 @@ mission_system :: proc(app: ^App, em: f32) {
 		if f[1] == "" { continue }
 		ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 1.7)), axis = .X, cross = .Center})
 		if ui.row(.Center, {}, fmt.tprintf("###mc_sys_%d", i)) {
-			ui.spacer(ui.px(em * 0.8))
+			ui.space(ui.SPACE_3)
 			if ui.tags("weak") {
 				ui.next({width = ui.px(em * 7), height = ui.pct(1), text_pad = 0})
 				ui.label(fmt.tprintf("%s###k", f[0]))
@@ -487,7 +487,7 @@ mission_system :: proc(app: ^App, em: f32) {
 	for g, i in info.gpus {
 		ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 1.7)), axis = .X, cross = .Center})
 		if ui.row(.Center, {}, fmt.tprintf("###mc_gpu_%d", i)) {
-			ui.spacer(ui.px(em * 0.8))
+			ui.space(ui.SPACE_3)
 			if ui.tags("weak") {
 				ui.next({width = ui.px(em * 7), height = ui.pct(1), text_pad = 0})
 				ui.label(fmt.tprintf("%s###k", fmt.tprintf(i18n.tr("GPU %d"), i)))
@@ -520,7 +520,7 @@ mission_line :: proc(app: ^App, id, name, detail, value: string, share: f32, tag
 	bar := b.size.x <= 0 || b.size.x >= em * MISSION_BAR_EM
 	if sig.right_clicked { mission_line_menu_open(app, line, ui.mouse_pos()) }
 	if ui.parent(b) {
-		ui.spacer(ui.px(em * 0.8))
+		ui.space(ui.SPACE_3)
 		if tag != "" { ui.push_tags(tag) }
 		ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0})
 		n := ui.label(fmt.tprintf("%s###n", ui.text_shown(name)))
@@ -528,7 +528,7 @@ mission_line :: proc(app: ^App, id, name, detail, value: string, share: f32, tag
 		d: ui.Signal
 		if detail != "" && wide {
 			if ui.tags("weak") {
-				ui.spacer(ui.px(em * 0.5))
+				ui.space(ui.SPACE_2)
 				ui.next({width = ui.px(em * 6), height = ui.pct(1), text_pad = 0, font_size = em * 0.9})
 				d = ui.label(fmt.tprintf("%s###d", ui.text_shown(detail)))
 			}
@@ -538,15 +538,15 @@ mission_line :: proc(app: ^App, id, name, detail, value: string, share: f32, tag
 			tip_after(sig, detail == "" ? name : fmt.tprintf("%s, %s", name, detail))
 		}
 		if share >= 0 && bar {
-			ui.spacer(ui.px(em * 0.5))
+			ui.space(ui.SPACE_2)
 			ui.next({width = ui.px(em * 4.5), height = ui.px(em * 0.5)})
 			ui.meter_bar("###bar", clamp(share, 0, 1))
 		}
 		// (the value as wide as its text: never cut)
-		ui.spacer(ui.px(em * 0.6))
+		ui.space(ui.SPACE_2)
 		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
 		ui.label(fmt.tprintf("%s###v", value))
-		ui.spacer(ui.px(em * 0.8))
+		ui.space(ui.SPACE_3)
 	}
 	return sig.clicked
 }
@@ -634,10 +634,10 @@ mission_note :: proc(text: string, em: f32) {
 // A link at a panel's end to its section ("Why is it slow? (F2)").
 @(private = "file")
 mission_more :: proc(app: ^App, id, text: string, em: f32) -> (clicked: bool) {
-	ui.spacer(ui.px(em * 0.3))
+	ui.space(ui.SPACE_1)
 	ui.next({width = ui.fill(), height = ui.px(em * 1.8), axis = .X, cross = .Center})
 	if ui.row(.Center, {}, fmt.tprintf("###%s_row", id)) {
-		ui.spacer(ui.px(em * 0.8))
+		ui.space(ui.SPACE_3)
 		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0, cursor = .Hand, fg = ui.color("link")})
 		clicked = ui.signal(ui.build_box({.Clickable, .Draw_Text}, fmt.tprintf("%s →###%s", text, id))).clicked
 	}

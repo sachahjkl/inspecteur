@@ -28,12 +28,12 @@ build_startup :: proc(app: ^App, em: f32) {
 	if !s.pending && s.list != nil && s.list.problem != "" {
 		ui.next({width = ui.fill(), height = ui.children_sum()})
 		if ui.row(.Start, {.Draw_Side_Bottom}, "###startup_problem") {
-			ui.spacer(ui.px(em * 0.8))
+			ui.space(ui.SPACE_3)
 			if ui.tags("weak") {
 				ui.next({width = ui.fill()})
 				ui.paragraph(fmt.tprintf("%s###startup_problem_text", s.list.problem))
 			}
-			ui.spacer(ui.px(em * 0.8))
+			ui.space(ui.SPACE_3)
 		}
 	}
 	ev := section_table_build(&s.rows, s.list != nil ? i18n.tr("Nothing starts with the session.") : "")

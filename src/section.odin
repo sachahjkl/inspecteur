@@ -118,24 +118,24 @@ row_icon_lead :: proc(t: ^ui.Table, row: int, size: f32) {
 section_bar :: proc(app: ^App, title, note: string, em: f32, actions: proc(app: ^App, em: f32) = nil, right: proc(app: ^App, em: f32) = nil) {
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * BAR_EM))})
 	if ui.row(.Center, {.Draw_Side_Bottom}, "###bar") {
-		ui.spacer(ui.px(em * 0.4))
+		ui.space(ui.SPACE_2)
 		if actions != nil {
 			actions(app, em)
 			vrule(em)
-			ui.spacer(ui.px(em * 0.3))
+			ui.space(ui.SPACE_1)
 		} else {
-			ui.spacer(ui.px(em * 0.4))
+			ui.space(ui.SPACE_2)
 		}
 		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
 		ui.label(fmt.tprintf("%s###bar_title", title))
-		ui.spacer(ui.px(em * 0.8))
+		ui.space(ui.SPACE_3)
 		if ui.tags("weak") {
 			ui.next({width = ui.fill(), height = ui.pct(1)})
 			ui.label_tip(fmt.tprintf("%s###counts", ui.text_shown(note)))
 		}
 		if right != nil {
 			right(app, em)
-			ui.spacer(ui.px(em * 0.6))
+			ui.space(ui.SPACE_2)
 		}
 	}
 }

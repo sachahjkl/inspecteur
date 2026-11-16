@@ -15,6 +15,8 @@ import "gt:render"
 import "gt:ui"
 import i18n "gt:i18n"
 
+// The name cell's inset before its chevron (the header's lead room counts it too), in ems.
+NAME_LEAD_EM :: ui.SPACE_1
 // The indent of a group's process, the chevron's and the icon's width, in ems.
 INDENT_EM  :: 1.6
 CHEVRON_EM :: 1.4
@@ -123,7 +125,7 @@ build_bar :: proc(app: ^App, em: f32) {
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * BAR_EM))})
 	if ui.row(.Center, {.Draw_Side_Bottom}, "###bar") {
 		app.bar_rect = ui.parent_box().rect
-		ui.spacer(ui.px(em * 0.4))
+		ui.space(ui.SPACE_2)
 		cmd_button(app, "end_task", lucide.X, .End_Task, em)
 		cmd_button(app, "kill", lucide.ZAP, .Kill, em)
 		cmd_button(app, "end_tree", lucide.GIT_FORK, .End_Tree, em)
@@ -136,10 +138,10 @@ build_bar :: proc(app: ^App, em: f32) {
 		vrule(em)
 		cmd_button(app, "tree_view", app.table.tree ? lucide.APP_WINDOW : lucide.LIST_TREE, .Tree_View, em)
 		vrule(em)
-		ui.spacer(ui.px(em * 0.3))
+		ui.space(ui.SPACE_1)
 		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
 		ui.label(fmt.tprintf("%s###bar_title", i18n.tr("Processes")))
-		ui.spacer(ui.px(em * 0.8))
+		ui.space(ui.SPACE_3)
 		if ui.tags("weak") {
 			counts := fmt.tprintf("%s, %s", fmt.tprintf(i18n.tr(app.table.shown_apps, "%d app", "%d apps"), app.table.shown_apps), fmt.tprintf(i18n.tr(app.table.shown_background, "%d background process", "%d background processes"), app.table.shown_background))
 			if app.table.tree { counts = fmt.tprintf(i18n.tr(app.table.shown_tree, "%d process, as a tree", "%d processes, as a tree"), app.table.shown_tree) }
@@ -167,7 +169,7 @@ cmd_button :: proc(app: ^App, id, icon: string, c: Cmd, em: f32) {
 build_header :: proc(app: ^App, em: f32) -> (view: ui.Key) {
 	t := &app.table
 	ui.next({bg = surface("bar")})
-	ev := ui.table_header("###header", &t.layout, 0.3 + CHEVRON_EM)
+	ev := ui.table_header("###header", &t.layout, NAME_LEAD_EM + CHEVRON_EM)
 	view = ev.view
 	if ev.sorted {
 		rows_again(app)
@@ -263,7 +265,7 @@ row_label :: proc(app: ^App, r: Row) -> string {
 @(private = "file")
 build_section :: proc(app: ^App, r: Row, em: f32) {
 	t := &app.table
-	ui.spacer(ui.px(em * 0.8))
+	ui.space(ui.SPACE_3)
 	text: string
 	switch r.index {
 	case SECTION_APPS:   text = fmt.tprintf("%s###sec", fmt.tprintf(i18n.tr("Apps (%d)"), t.shown_apps))
@@ -321,7 +323,7 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 	// (the name column's width as the header's, cut: a narrow window does not let a name run over the next columns)
 	ui.next({width = ui.table_width(&t.layout, int(Column.Name)), height = ui.pct(1), axis = .X, cross = .Center})
 	if ui.row(flags = {.Clip}, id = "###c_name") {
-		ui.spacer(ui.px(em * (0.3 + INDENT_EM * f32(r.depth))))
+		ui.spacer(ui.px(em * (NAME_LEAD_EM + INDENT_EM * f32(r.depth))))
 		if r.kind == .App || r.branch {
 			open := t.query != "" || (r.kind == .App ? t.expanded[t.groups[r.index].key] : !t.collapsed[proc_key(p)])
 			if ui.tags("weak") {
@@ -340,7 +342,7 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 		} else if ui.tags("weak") {
 			ui.icon(r.kind == .App ? lucide.APP_WINDOW : lucide.SQUARE_TERMINAL, em * ICON_EM)
 		}
-		ui.spacer(ui.px(em * 0.5))
+		ui.space(ui.ICON_GAP)
 		// (the name gives way first, and ends with "…" where it is cut: its count and its window's button stay whole)
 		ui.next({width = ui.text_size(0, 0), height = ui.pct(1), text_pad = 0})
 		if lit := ui.word_ranges(name, t.query); len(lit) > 0 { ui.matched_label("###n", name, lit) } else { ui.label(fmt.tprintf("%s###n", ui.text_shown(name))) }
@@ -352,7 +354,7 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 		}
 		// its app's window, a click away (an app's row, or a process of an app with a window)
 		if list := windows_of(app, row_entry(app, r)); len(list) > 0 {
-			ui.spacer(ui.px(em * 0.3))
+			ui.space(ui.SPACE_1)
 			ui.next({width = ui.px(em * 1.6), height = ui.px(em * 1.4), font_size = em * 0.9, text_pad = 0})
 			if ui.button("win", icon = lucide.APP_WINDOW, o = {tip = fmt.tprintf("%s (%s)", window_tip(list), ui.command_shortcut(COMMANDS[.Show_Window]))}).clicked { window_show(app, row_entry(app, r)) }
 		}

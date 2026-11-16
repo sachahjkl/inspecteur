@@ -71,7 +71,7 @@ summary_tile :: proc(app: ^App, t: Tile, em: f32) {
 		stripe := t.load >= 0 ? heat_hue(t.load, ui.luminance(ui.color("background")) < HEAT_DARK_PAGE) : ui.color("accent")
 		ui.next({width = ui.px(max(3, em * 0.22)), height = ui.pct(0.6), bg = stripe})
 		ui.build_box({.Draw_Background}, "###stripe")
-		ui.spacer(ui.px(em * 0.5))
+		ui.space(ui.ICON_GAP)
 		// (the words as wide as the wider of the two: the sparkline takes what is left)
 		font := app.shared.font
 		words := max(ui.text_width(font, em * 0.82, t.title), ui.text_width(font, em, t.value))
@@ -87,10 +87,10 @@ summary_tile :: proc(app: ^App, t: Tile, em: f32) {
 			ui.label(fmt.tprintf("%s###value", t.value))
 			ui.spacer(ui.fill())
 		}
-		ui.spacer(ui.px(em * 0.5))
+		ui.space(ui.SPACE_2)
 		ui.next({width = ui.fill(), height = ui.pct(0.62)})
 		ui.sparkline("###spark", line_series(t.series), t.top, HISTORY_POINTS, t.floor)
-		ui.spacer(ui.px(em * 0.5))
+		ui.space(ui.SPACE_2)
 	}
 	tip_after(sig, fmt.tprintf(i18n.tr("%s: %s. Show it in Performance"), t.title, t.value))
 	if sig.clicked {

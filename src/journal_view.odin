@@ -122,7 +122,7 @@ journal_bar :: proc(app: ^App, v: ^Journal_View, shown: int, em: f32, in_window:
 	if ui.flow({0, 0}, "###svc_journal_bar", .Center) {
 		ui.next({width = ui.children_sum(), height = ui.px(ui.dense(em * 2.3))})
 		if ui.row(.Center, {}, "###svc_journal_choices") {
-			ui.spacer(ui.px(em * 0.8))
+			ui.space(ui.SPACE_3)
 			// (in the order of Journal_Level)
 			labels := [3]string{fmt.tprintf(i18n.tr("All %d"), len(d.journal)), fmt.tprintf(i18n.tr("Warnings %d"), warnings + errors), fmt.tprintf(i18n.tr("Errors %d"), errors)}
 			key := ui.command_shortcut(COMMANDS[.Journal_Level])
@@ -130,14 +130,14 @@ journal_bar :: proc(app: ^App, v: ^Journal_View, shown: int, em: f32, in_window:
 			sel := int(app.settings.journal_level)
 			ui.next({height = ui.px(bar_h)})   // (as wide as its labels: ui.segmented's own width)
 			if ui.segmented("svc_journal_level", labels[:], &sel, tips[:]) { journal_level_set(app, Journal_Level(sel)) }
-			ui.spacer(ui.px(em * 0.6))
+			ui.space(ui.CONTROL_GAP)
 			boot := app.settings.journal_boot ? 0 : 1
 			bkey := ui.command_shortcut(COMMANDS[.Journal_Boot])
 			btips := [2]string{fmt.tprintf(i18n.tr("The entries of this boot (%s)"), bkey), fmt.tprintf(i18n.tr("The last entries, from any boot (%s)"), bkey)}
 			boot_labels := [2]string{i18n.tr("This boot"), i18n.tr("Every boot")}
 			ui.next({height = ui.px(bar_h)})
 			if ui.segmented("svc_journal_boot", boot_labels[:], &boot, btips[:]) { journal_boot_set(app, boot == 0) }
-			ui.spacer(ui.px(em * 0.6))
+			ui.space(ui.CONTROL_GAP)
 			follow := app.settings.journal_follow
 			ui.next({width = ui.px(em * 2.2), height = ui.px(bar_h)})
 			tip := follow ? fmt.tprintf(i18n.tr("Following: new entries come in at the end (%s stops)"), ui.command_shortcut(COMMANDS[.Journal_Follow])) : cmd_tip(.Journal_Follow)
@@ -145,13 +145,13 @@ journal_bar :: proc(app: ^App, v: ^Journal_View, shown: int, em: f32, in_window:
 		}
 		ui.next({width = ui.children_sum(), height = ui.px(ui.dense(em * 2.3))})
 		if ui.row(.Center, {}, "###svc_journal_tools") {
-			ui.spacer(ui.px(em * 0.6))
+			ui.space(ui.CONTROL_GAP)
 			// (the field as wide as its placeholder, at least JOURNAL_SEARCH_EM: the words are never cut)
 			placeholder := fmt.tprintf(i18n.tr("Search the journal (%s)"), ui.command_shortcut(COMMANDS[.Journal_Search]))
 			ui.next({width = ui.px(max(em * JOURNAL_SEARCH_EM, ui.text_width(ui.top_style().font, em, placeholder) + em * 2)), height = ui.px(bar_h)})
 			res := ui.line_edit("###svc_journal_search", &v.search, {placeholder = placeholder})
 			v.search_key = res.box.key
-			ui.spacer(ui.px(em * 0.4))
+			ui.space(ui.SPACE_2)
 			if ui.tags("weak") {
 				n := shown == len(d.journal) ? fmt.tprintf(i18n.tr(shown, "%d entry", "%d entries"), shown) : fmt.tprintf(i18n.tr("%d of %d"), shown, len(d.journal))
 				ui.next({width = ui.text_size(em * 0.4), height = ui.px(bar_h), text_pad = 0, font_size = em * 0.9})
@@ -159,7 +159,7 @@ journal_bar :: proc(app: ^App, v: ^Journal_View, shown: int, em: f32, in_window:
 			}
 			if tool_button("svc_journal_copy", lucide.COPY, cmd_tip(.Journal_Copy), len(d.journal) > 0, em) { journal_run_on(app, v, .Journal_Copy) }
 			if !in_window && tool_button("svc_journal_window", lucide.EXTERNAL_LINK, cmd_tip(.Journal_Window), true, em) { journal_window_open(app, d.manager, d.name) }
-			ui.spacer(ui.px(em * 0.4))
+			ui.space(ui.SPACE_2)
 		}
 	}
 }
@@ -177,7 +177,7 @@ journal_row :: proc(app: ^App, v: ^Journal_View, e: Journal_Entry, i: int, em: f
 	tip := ""
 	if ui.parent(row.box) {
 		fs := em * 0.92
-		ui.spacer(ui.px(em * 0.8))
+		ui.space(ui.SPACE_3)
 		if ui.tags("weak") {
 			ui.next({width = ui.px(em * (d.boot ? TIME_EM : DATE_TIME_EM)), height = ui.pct(1), text_pad = 0, font_size = fs})
 			ui.label(fmt.tprintf("%s###jt", journal_time_text(app, e.usec, !d.boot)))
@@ -227,37 +227,37 @@ journal_entry_whole :: proc(app: ^App, e: Journal_Entry, em: f32) {
 	ui.next({width = ui.fill(), height = ui.px(em * ENTRY_EM), axis = .Y, bg = surface("bar")})
 	box := ui.build_box({.Draw_Background, .Draw_Side_Top, .Clip}, "###svc_journal_entry")
 	if ui.parent(box) {
-		ui.spacer(ui.px(em * 0.4))
+		ui.space(ui.SPACE_2)
 		ui.next({width = ui.fill(), height = ui.px(em * 1.6)})
 		if ui.row(.Center, {}, "###je_head") {
-			ui.spacer(ui.px(em * 0.8))
+			ui.space(ui.SPACE_3)
 			tag := JOURNAL_LEVEL_TAGS[e.priority]
 			if tag != "" { ui.push_tags(tag) }
 			// (the entry's level, time and program are content, as its message: a drag copies them with it)
 			ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0, flags = {.Selectable}})
 			ui.label(fmt.tprintf("%s###je_level", JOURNAL_LEVEL_WORDS[e.priority]))
 			if tag != "" { ui.pop_tags() }
-			ui.spacer(ui.px(em * 0.8))
+			ui.space(ui.SPACE_3)
 			if ui.tags("weak") {
 				who := e.pid > 0 ? fmt.tprintf(i18n.tr("%s, process %d"), e.ident, e.pid) : e.ident
 				ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0, flags = {.Selectable}})
 				ui.label(fmt.tprintf("%s  ·  %s###je_info", journal_time_text(app, e.usec, true), ui.text_shown(who)))
 			}
 			if tool_button("svc_journal_copy_entry", lucide.CLIPBOARD_COPY, cmd_tip(.Journal_Copy_Entry), true, em) { platform.set_clipboard(app.main.win, journal_entry_text(app, e)); announce(app, i18n.tr("Copied the entry")) }
-			ui.spacer(ui.px(em * 0.4))
+			ui.space(ui.SPACE_2)
 		}
 		ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
 		body := ui.build_box({.Clip, .View_Scroll_Y, .View_Clamp_Y, .Allow_Overflow_Y}, "###je_body")
 		if ui.parent(body) {
 			ui.next({width = ui.fill(), height = ui.children_sum(), axis = .X})
 			if ui.row(id = "###je_text") {
-				ui.spacer(ui.px(em * 0.8))
+				ui.space(ui.SPACE_3)
 				ui.next({width = ui.fill(), font_size = em * 0.95})
 				ui.paragraph(fmt.tprintf("%s###je_message", ui.text_shown(e.message)))
-				ui.spacer(ui.px(em * 0.8))
+				ui.space(ui.SPACE_3)
 			}
 		}
-		ui.spacer(ui.px(em * 0.3))
+		ui.space(ui.SPACE_1)
 	}
 }
 

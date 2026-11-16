@@ -306,11 +306,12 @@ tree_view_switch :: proc(app: ^App) {
 // Pieces
 
 // A thin vertical line between two things of a row (the columns' titles, the footer's counters).
+// (its gaps from `em`, not ui.space: the footer builds it in a smaller text, and its rules stay as far as the bars')
 vrule :: proc(em: f32, height: f32 = 1.2) {
-	ui.spacer(ui.px(em * 0.35))
+	ui.spacer(ui.px(em * ui.SPACE_1))
 	ui.next({width = ui.px(max(1, ui.scale())), height = ui.px(em * height), bg = ui.color("border")})
 	ui.build_box({.Draw_Background}, fmt.tprintf("###rule%d", ui.parent_box().child_count))
-	ui.spacer(ui.px(em * 0.35))
+	ui.spacer(ui.px(em * ui.SPACE_1))
 }
 
 // The colour of a surface of the theme: "bar" (the title bar, the headers, the footer), "well" (the sidebar).
@@ -328,7 +329,7 @@ surface :: proc(name: string) -> ui.Color {
 build_title :: proc(app: ^App, em: f32) {
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * TITLE_EM)), bg = surface("bar")})
 	if ui.title_bar("###titlebar", {.Draw_Background, .Draw_Side_Bottom}) {
-		ui.spacer(ui.px(em * 0.6))
+		ui.space(ui.SPACE_2)
 		if app.logo.ok { icon_box(app.logo, em * 1.7) } else { ui.icon(lucide.EYE, em * 1.7, ui.color("accent")) }
 		ui.next({width = ui.text_size(em * 0.4), height = ui.pct(1)})
 		ui.label(APP_TITLE + "###apptitle")
@@ -342,7 +343,7 @@ build_title :: proc(app: ^App, em: f32) {
 		ui.next({width = ui.px(em * 2.4), height = ui.px(em * 2.1)})
 		// (the settings shown: the button is held down)
 		if ui.button("settings_button", icon = lucide.SLIDERS_HORIZONTAL, o = {tip = cmd_tip(.Settings), face = app.settings_open ? .Toggled : .Ghost}).clicked { settings_toggle(app) }
-		ui.spacer(ui.px(em * 0.4))
+		ui.space(ui.CONTROL_GAP)
 		_, _ = ui.window_buttons()
 	}
 }
@@ -356,7 +357,7 @@ build_sidebar :: proc(app: ^App, em: f32) {
 	side := ui.build_box({.Clip, .Draw_Background, .Draw_Side_Right}, "###sidebar")
 	if ui.parent(side) {
 		build_filter(app, em)
-		ui.spacer(ui.px(em * 0.3))
+		ui.space(ui.SPACE_1)
 		for tab in Tab {
 			on := app.tab == tab
 			flags := ui.Box_Flags{.Clickable, .Draw_Hot_Effects, .Hot_Within}
@@ -365,10 +366,10 @@ build_sidebar :: proc(app: ^App, em: f32) {
 			sig: ui.Signal
 			if ui.row(.Center, flags, fmt.tprintf("###side_%d", int(tab))) {
 				sig = ui.signal(ui.parent_box())
-				ui.spacer(ui.px(em * 0.6))
+				ui.space(ui.SPACE_2)
 				if !on { ui.push_tags("weak") }
 				ui.icon(TAB_ICONS[tab], em * 1.6, on ? ui.color("accent") : nil)
-				ui.spacer(ui.px(em * 0.4))
+				ui.space(ui.ICON_GAP)
 				ui.next({width = ui.fill(), height = ui.pct(1)})
 				ui.label(fmt.tprintf("%s###t", i18n.tr(TAB_LABELS[tab])))
 				if !on { ui.pop_tags() }
@@ -408,21 +409,21 @@ tab_listed :: proc(tab: Tab) -> bool { return tab != .Performance && tab != .Inf
 @(private = "file")
 build_meters :: proc(app: ^App, em: f32) {
 	ui.hline(ui.fill())
-	ui.spacer(ui.px(em * 0.5))
+	ui.space(ui.SPACE_2)
 	// (the share of every logical processor, as the CPU % of the processes: "of 16 CPUs" as Linux counts them)
 	meter(app, "cpu", lucide.CPU, i18n.tr("CPU"), fmt.tprintf(i18n.tr(len(app.machine.core_total), "%s of %d CPUs", "%s of %d CPUs"), percent_text(f64(app.machine.cpu)), len(app.machine.core_total)), app.machine.cpu / 100, em)
 	mem := app.machine.mem.total > 0 ? f32(f64(mem_used(&app.machine)) / f64(app.machine.mem.total)) : 0
 	meter(app, "memory", lucide.LAYERS_2, i18n.tr("Memory"), fmt.tprintf(i18n.tr("%s of %s"), size_text(mem_used(&app.machine)), size_text(app.machine.mem.total)), mem, em)
-	ui.spacer(ui.px(em * 0.7))
+	ui.space(ui.SPACE_3)
 }
 
 @(private = "file")
 meter :: proc(app: ^App, id, icon, title, value: string, used: f32, em: f32) {
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.7))})
 	if ui.row(.Center, {}, fmt.tprintf("###meter_%s", id)) {
-		ui.spacer(ui.px(em * 0.6))
+		ui.space(ui.SPACE_2)
 		if ui.tags("weak") { ui.icon(icon, em * 1.6) }
-		ui.spacer(ui.px(em * 0.4))
+		ui.space(ui.ICON_GAP)
 		ui.next({width = ui.fill(), height = ui.pct(1), axis = .Y})
 		if ui.column() {
 			ui.spacer(ui.fill())
@@ -436,12 +437,12 @@ meter :: proc(app: ^App, id, icon, title, value: string, used: f32, em: f32) {
 					ui.label(fmt.tprintf("%s###v", value))
 				}
 			}
-			ui.spacer(ui.px(em * 0.2))
+			ui.space(ui.SPACE_1)
 			ui.next({width = ui.fill(), height = ui.px(max(3, em * 0.25))})
 			ui.meter_bar("###bar", used, METER_FULL)
 			ui.spacer(ui.fill())
 		}
-		ui.spacer(ui.px(em * 0.8))
+		ui.space(ui.SPACE_3)
 	}
 }
 
@@ -453,11 +454,11 @@ meter :: proc(app: ^App, id, icon, title, value: string, used: f32, em: f32) {
 build_footer :: proc(app: ^App, em: f32) {
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * FOOTER_EM)), bg = surface("bar")})
 	if ui.row(.Center, {.Draw_Background, .Draw_Side_Top}, "###footer") {
-		ui.spacer(ui.px(em * 0.8))
+		ui.space(ui.SPACE_3)
 		// (an update on offer, coming or in place: the one place that shows it, as in every program of the toolkit)
 		if app.updater != nil {
 			ui.next({height = ui.px(ui.dense(em * (FOOTER_EM - 0.45)))})
-			if prefs_page.update_badge(app.updater, proc(user: rawptr) { updates_restart((^App)(user)) }, app) != nil { ui.spacer(ui.px(em * 0.6)) }
+			if prefs_page.update_badge(app.updater, proc(user: rawptr) { updates_restart((^App)(user)) }, app) != nil { ui.space(ui.SPACE_2) }
 		}
 		if ui.style({font_size = em * 0.92}) {
 			msg := app.status
@@ -485,20 +486,21 @@ build_footer :: proc(app: ^App, em: f32) {
 			counter(app, "f_procs", lucide.LAYOUT_LIST, fmt.tprintf("%d", len(app.sampler.procs)), em)
 			counter(app, "f_refresh", app.paused || app.held ? lucide.PAUSE : lucide.REFRESH_CW, refresh_text(app), em)
 		}
-		ui.spacer(ui.px(em * 0.6))
+		ui.space(ui.SPACE_2)
 	}
 }
 
+// (its gaps from `em`, not ui.space: it is built in the footer's smaller text, and keeps the window's gaps)
 @(private = "file")
 counter :: proc(app: ^App, id, icon, value: string, em: f32) {
 	ui.next({width = ui.children_sum(), height = ui.pct(1)})
 	if ui.row(.Center, {}, fmt.tprintf("###%s", id)) {
 		vrule(em)
-		ui.spacer(ui.px(em * 0.3))
+		ui.spacer(ui.px(em * ui.SPACE_1))
 		if ui.tags("weak") { ui.icon(icon, em * 1.5) }
 		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = em * 0.3})
 		ui.label(fmt.tprintf("%s###v", value))
-		ui.spacer(ui.px(em * 0.4))
+		ui.spacer(ui.px(em * ui.SPACE_2))
 	}
 }
 

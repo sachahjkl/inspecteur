@@ -175,23 +175,22 @@ diagnosis_open :: proc(app: ^App) { ui.view_open(&app.views, DIAGNOSIS_VIEW, app
 @(private = "file")
 diagnosis_view :: proc(v: ^ui.View, app: ^App) {
 	em := ui.font_size()
-	pad := em * 1.4
 	ui.next({width = ui.fill(), height = ui.children_sum(), axis = .Y})
 	if ui.column(id = "###diagnosis") {
-		ui.spacer(ui.px(em * 0.8))
+		ui.space(ui.SPACE_3)
 		for f, i in diagnose(app) {
 			ui.next({width = ui.fill(), height = ui.children_sum(), cross = .Start})
 			if ui.row(id = fmt.tprintf("###diag_row%d", i)) {
-				ui.spacer(ui.px(pad))
+				ui.space(ui.SPACE_6)
 				heat := f.level == .Bad ? f32(1) : f.level == .Warn ? f32(0.55) : f32(0)
 				ui.next({width = ui.px(em * 0.7), height = ui.px(em * 0.7), radius = em * 0.35, bg = heat_hue(heat)})
 				ui.build_box({.Draw_Background}, fmt.tprintf("###diag_dot%d", i))
-				ui.spacer(ui.px(em * 0.6))
+				ui.space(ui.ICON_GAP)
 				ui.next({width = ui.fill()})
 				ui.paragraph(fmt.tprintf("%s###diag_text%d", f.text, i))
-				ui.spacer(ui.px(pad))
+				ui.space(ui.SPACE_6)
 			}
-			ui.spacer(ui.px(em * 0.5))
+			ui.space(ui.LINE_GAP)
 		}
 	}
 	if ui.dialog_buttons("diag_foot") {

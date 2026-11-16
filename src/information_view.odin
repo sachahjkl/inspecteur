@@ -150,19 +150,19 @@ build_information :: proc(app: ^App, em: f32) {
 	groups := info_report(app)
 	ui.next({width = ui.fill(), height = ui.fill()})
 	if ui.scroll_y("###info") {
-		ui.spacer(ui.px(em * 0.6))
+		ui.space(ui.SPACE_2)
 		for g, k in groups {
 			// (the lines straight in the scroll: a wrapped paragraph's height is known only there)
 			ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.2))})
 			if ui.row(.Center, {}, fmt.tprintf("###head_%d", k)) {
-				ui.spacer(ui.px(em * 0.8))
+				ui.space(ui.SPACE_3)
 				ui.icon(g.icon, em * 1.6, ui.color("accent"))
-				ui.spacer(ui.px(em * 0.4))
+				ui.space(ui.ICON_GAP)
 				ui.next({width = ui.text_size(), height = ui.pct(1), font_size = em * 1.15, text_pad = 0})
 				ui.label(fmt.tprintf("%s###title", g.title))
 			}
 			for l, i in g.lines { info_line(l, k * 1000 + i, em) }
-			ui.spacer(ui.px(em * 0.6))
+			ui.space(ui.SPACE_2)
 		}
 	}
 }
@@ -177,12 +177,12 @@ info_line :: proc(l: Info_Line, i: int, em: f32) {
 			ui.next({width = ui.px(em * INFO_KEY_EM)})
 			if ui.style({text_pad = 0}) { ui.paragraph(fmt.tprintf("%s###k", ui.text_shown(l.key))) }
 		}
-		ui.spacer(ui.px(em * 0.6))
+		ui.space(ui.SPACE_2)
 		ui.next({width = ui.px(em * INFO_WIDTH_EM)})
 		if ui.style({text_pad = 0}) { ui.paragraph(fmt.tprintf("%s###v", ui.text_shown(l.value))) }
 		ui.spacer(ui.fill())
 	}
-	ui.spacer(ui.px(em * 0.3))
+	ui.space(ui.SPACE_1)
 }
 
 @(private = "file")

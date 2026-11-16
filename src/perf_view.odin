@@ -26,7 +26,6 @@ SPARK_H_EM      :: 2.6
 GRAPH_MIN_EM    :: 8      // a graph's least height
 STAT_W_EM       :: 9.5    // a number of the page's
 KEYS_W_EM       :: 26     // the page's table of details
-CPU_GRID_GAP_EM :: 0.4
 ADDRESSES_SHOWN :: 3    // an interface's addresses of each kind shown
 
 // The hues of the devices (hue).
@@ -44,7 +43,7 @@ build_performance :: proc(app: ^App, em: f32) {
 	device_check(app)
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * BAR_EM))})
 	if ui.row(.Center, {.Draw_Side_Bottom}, "###bar") {
-		ui.spacer(ui.px(em * 0.8))
+		ui.space(ui.SPACE_3)
 		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
 		ui.label(fmt.tprintf("%s###bar_title", i18n.tr("Performance")))
 		ui.spacer(ui.fill())
@@ -57,7 +56,7 @@ build_performance :: proc(app: ^App, em: f32) {
 			tips := []string{fmt.tprintf(i18n.tr("One graph for all the processors (%s)"), key), fmt.tprintf(i18n.tr("One graph per logical processor (%s)"), key)}
 			if ui.segmented("###cpu_view", labels, &sel, tips) { cpu_grid_set(app, sel == 1) }
 		}
-		ui.spacer(ui.px(em * 0.6))
+		ui.space(ui.SPACE_2)
 	}
 	ui.next({width = ui.fill(), height = ui.fill()})
 	if ui.row(id = "###perf") {
@@ -90,10 +89,10 @@ build_performance :: proc(app: ^App, em: f32) {
 		}
 		ui.next({width = ui.fill(), height = ui.pct(1), axis = .Y})
 		if ui.column(id = "###device") {
-			ui.spacer(ui.px(em * 0.8))
+			ui.space(ui.SPACE_3)
 			ui.next({width = ui.fill(), height = ui.fill()})
 			if ui.row(id = "###device_pad") {
-				ui.spacer(ui.px(em * 1.2))
+				ui.space(ui.SPACE_4)
 				ui.next({width = ui.fill(), height = ui.pct(1), axis = .Y})
 				if ui.column(id = "###device_page") {
 					switch app.device.kind {
@@ -105,9 +104,9 @@ build_performance :: proc(app: ^App, em: f32) {
 					case .Pressure: pressure_page(app, em)
 					}
 				}
-				ui.spacer(ui.px(em * 1.2))
+				ui.space(ui.SPACE_4)
 			}
-			ui.spacer(ui.px(em * 0.8))
+			ui.space(ui.SPACE_3)
 		}
 	}
 }
@@ -180,14 +179,14 @@ device_row :: proc(app: ^App, d: Device, title, sub: string, series: []Series, t
 	sig: ui.Signal
 	if ui.row(.Center, flags, fmt.tprintf("###dev_%d_%d", int(d.kind), d.index)) {
 		sig = ui.signal(ui.parent_box())
-		ui.spacer(ui.px(em * 0.6))
+		ui.space(ui.SPACE_2)
 		ui.next({width = ui.px(em * SPARK_W_EM), height = ui.px(em * SPARK_H_EM)})
 		frame := ui.build_box({.Draw_Border}, "###spark_frame")
 		if ui.parent(frame) {
 			ui.next({width = ui.fill(), height = ui.fill()})
 			ui.sparkline("###spark", line_series(series), top, HISTORY_POINTS, floor)
 		}
-		ui.spacer(ui.px(em * 0.6))
+		ui.space(ui.ICON_GAP)
 		ui.next({width = ui.fill(), height = ui.pct(1), axis = .Y})
 		if ui.column() {
 			ui.spacer(ui.fill())
@@ -201,7 +200,7 @@ device_row :: proc(app: ^App, d: Device, title, sub: string, series: []Series, t
 			}
 			ui.spacer(ui.fill())
 		}
-		ui.spacer(ui.px(em * 0.4))
+		ui.space(ui.SPACE_2)
 	}
 	if sig.clicked {
 		app.device = d
@@ -225,7 +224,7 @@ page_title :: proc(title, what: string, em: f32) {
 			ui.label(fmt.tprintf("%s###what", ui.text_shown(what)))
 		}
 	}
-	ui.spacer(ui.px(em * 0.5))
+	ui.space(ui.LINE_GAP)
 }
 
 // A graph with its captions: what it shows and its top above it, its span and its bottom under it.
@@ -241,7 +240,8 @@ captioned_graph :: proc(app: ^App, id, what: string, series: []Series, top: f32,
 				ui.label(fmt.tprintf("%s###l", what))
 				for s, i in series {
 					if s.name == "" { continue }
-					ui.spacer(ui.px(em))
+					// (from `em`: ui.space would measure in the captions' smaller text)
+					ui.spacer(ui.px(em * ui.ITEM_GAP))
 					ui.next({width = ui.px(em * 0.75), height = ui.px(em * 0.75), bg = s.color})
 					ui.build_box({.Draw_Background}, fmt.tprintf("###swatch%d", i))
 					ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = em * 0.3})
@@ -282,23 +282,23 @@ Stat :: struct { label, value: string }
 
 @(private = "file")
 stats_block :: proc(big: []Stat, details: []Stat, em: f32) {
-	ui.spacer(ui.px(em * 0.8))
+	ui.space(ui.SPACE_3)
 	ui.next({width = ui.fill(), height = ui.children_sum(), axis = .Y})
 	if ui.column(id = "###stats") {
 		// (side by side when the page is wide enough for two big numbers and the table; under each other when it is not,
 		// as the last layout measured it: side by side, the table drew over the numbers in a narrow window)
 		r := ui.parent_box().rect
 		width := r.max.x - r.min.x
-		if width > 0 && width < em * (2 * STAT_W_EM + 1 + KEYS_W_EM) {
+		if width > 0 && width < em * (2 * STAT_W_EM + ui.SPACE_4 + KEYS_W_EM) {
 			stats_big(big, em)
-			ui.spacer(ui.px(em * 0.8))
+			ui.space(ui.SPACE_3)
 			ui.next({width = ui.fill(), height = ui.children_sum(), axis = .Y})
 			stats_details(details, em)
 		} else {
 			ui.next({width = ui.fill(), height = ui.children_sum()})
 			if ui.row(id = "###stats_side") {
 				stats_big(big, em)
-				ui.spacer(ui.px(em))
+				ui.space(ui.SPACE_4)
 				ui.next({width = ui.px(em * KEYS_W_EM), height = ui.children_sum(), axis = .Y})
 				stats_details(details, em)
 			}
@@ -309,7 +309,7 @@ stats_block :: proc(big: []Stat, details: []Stat, em: f32) {
 @(private = "file")
 stats_big :: proc(big: []Stat, em: f32) {
 	ui.next({width = ui.fill(), height = ui.children_sum()})
-	if ui.flow({em * 0.4, em * 0.6}, "###big") {
+	if ui.flow({em * ui.SPACE_2, em * ui.SPACE_2}, "###big") {
 		for s, i in big {
 			ui.next({width = ui.px(em * STAT_W_EM), height = ui.children_sum(), axis = .Y})
 			if ui.column(id = fmt.tprintf("###big%d", i)) {
@@ -336,7 +336,7 @@ stats_details :: proc(details: []Stat, em: f32) {
 					ui.next({width = ui.px(em * STAT_LABEL_EM)})
 					if ui.style({text_pad = 0}) { ui.paragraph(fmt.tprintf("%s###l", s.label)) }
 				}
-				ui.spacer(ui.px(em * 0.5))
+				ui.space(ui.SPACE_2)
 				ui.next({width = ui.fill()})
 				if ui.style({text_pad = 0}) { ui.paragraph(fmt.tprintf("%s###v", ui.text_shown(s.value))) }
 			}
@@ -361,12 +361,12 @@ cpu_page :: proc(app: ^App, em: f32) {
 		ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
 		if ui.column(id = "###grid") {
 			for r in 0 ..< rows {
-				if r > 0 { ui.spacer(ui.px(em * CPU_GRID_GAP_EM)) }
+				if r > 0 { ui.space(ui.SPACE_2) }
 				ui.next({width = ui.fill(), height = ui.fill()})
 				if ui.row(id = fmt.tprintf("###grid_row%d", r)) {
 					for k in 0 ..< cols {
 						i := r * cols + k
-						if k > 0 { ui.spacer(ui.px(em * CPU_GRID_GAP_EM)) }
+						if k > 0 { ui.space(ui.SPACE_2) }
 						ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
 						if i >= n { ui.spacer(ui.fill()); continue }
 						if ui.column(id = fmt.tprintf("###core_box%d", i)) {
@@ -387,7 +387,7 @@ cpu_page :: proc(app: ^App, em: f32) {
 	} else {
 		captioned_graph(app, "cpu_graph", i18n.tr("% Utilization"), {{&m.cpu_hist, c, ""}}, 100, percent_top, em, ui.fill())
 		if m.temp_count > 0 {
-			ui.spacer(ui.px(em * 0.4))
+			ui.space(ui.SPACE_2)
 			captioned_graph(app, "cpu_temp", fmt.tprintf(i18n.tr("Temperature (%s)"), temp_label(&m.temps[0])), {{&m.temp_hist, hue(app, HUE_HEAT), ""}}, TEMP_TOP, celsius_top, em, ui.px(em * SMALL_GRAPH_EM))
 		}
 	}
@@ -425,7 +425,7 @@ memory_page :: proc(app: ^App, em: f32) {
 	// free memory), free; the graph's "in use" is the same
 	in_use := mem_used(m)
 	reclaimable := mem.available - min(mem.available, mem.free)
-	ui.spacer(ui.px(em * 0.6))
+	ui.space(ui.SPACE_2)
 	caption(i18n.tr("Memory composition"), "", em)
 	parts := []Bar_Part{{in_use, c, i18n.tr("In use")}, {reclaimable, faded(c, 0.45), i18n.tr("Cache, given back when needed")}, {min(mem.free, mem.available), ui.color("border"), i18n.tr("Free")}}
 	composition_bar(parts, mem.total, em)
@@ -446,7 +446,7 @@ disk_page :: proc(app: ^App, d: ^Disk, em: f32) {
 	page_title(fmt.tprintf(i18n.tr("Disk %d (%s)"), app.device.index, d.name), d.model, em)
 	c := hue(app, HUE_DISK)
 	captioned_graph(app, "disk_active", i18n.tr("Active time"), {{&d.active_hist, c, ""}}, 100, percent_top, em, ui.fill())
-	ui.spacer(ui.px(em * 0.4))
+	ui.space(ui.SPACE_2)
 	captioned_graph(app, "disk_rate", i18n.tr("Transfer rate"), {{&d.read_hist, c, i18n.tr("Read")}, {&d.write_hist, hue(app, HUE_SECOND), i18n.tr("Write")}}, 0, rate_top, em, ui.fill(), DISK_FLOOR)
 	mounts := strings.join(d.mounts[:], ", ", context.temp_allocator)
 	stats_block({
@@ -487,11 +487,11 @@ gpu_page :: proc(app: ^App, g: ^Gpu, em: f32) {
 		captioned_graph(app, "gpu_util", i18n.tr("Utilization"), {{&g.util_hist, hue(app, HUE_GPU), ""}}, 100, percent_top, em, ui.fill(), period_ms = gpu_ms)
 	}
 	if r.has_mem {
-		ui.spacer(ui.px(em * 0.4))
+		ui.space(ui.SPACE_2)
 		captioned_graph(app, "gpu_mem", i18n.tr("Dedicated memory usage"), {{&g.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, proc(v: f32) -> string { return percent_text(100) }, em, ui.fill(), period_ms = gpu_ms)
 	}
 	if r.has_temp && g.temp_hist.count > 0 {
-		ui.spacer(ui.px(em * 0.4))
+		ui.space(ui.SPACE_2)
 		captioned_graph(app, "gpu_temp", i18n.tr("Temperature"), {{&g.temp_hist, hue(app, HUE_HEAT), ""}}, TEMP_TOP, celsius_top, em, ui.px(em * SMALL_GRAPH_EM), period_ms = gpu_ms)
 	}
 	if !r.has_util && !r.has_mem {
@@ -567,7 +567,7 @@ composition_bar :: proc(parts: []Bar_Part, total: u64, em: f32) {
 			ui.build_box({.Draw_Background, .Draw_Border}, fmt.tprintf("###part%d", i))
 		}
 	}
-	ui.spacer(ui.px(em * 0.3))
+	ui.space(ui.SPACE_1)
 	ui.next({width = ui.fill(), height = ui.px(em * 1.5)})
 	if ui.row(.Center, {}, "###legend") {
 		for p, i in parts {
@@ -577,7 +577,7 @@ composition_bar :: proc(parts: []Bar_Part, total: u64, em: f32) {
 				ui.next({width = ui.text_size(), height = ui.pct(1), font_size = em * 0.86, text_pad = em * 0.35})
 				ui.label(fmt.tprintf("%s %s###legend%d", p.label, size_text(p.bytes), i))
 			}
-			ui.spacer(ui.px(em))
+			ui.space(ui.ITEM_GAP)
 		}
 	}
 }

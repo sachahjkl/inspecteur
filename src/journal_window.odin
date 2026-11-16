@@ -95,7 +95,7 @@ journal_window_view :: proc(v: ^ui.View, w: ^Journal_Window) {
 		ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.2))})
 		if ui.row(.Center, {}, "###jw_head") {
 			ui.view_drag_handle(v, ui.parent_box())
-			ui.spacer(ui.px(em * 0.8))
+			ui.space(ui.SPACE_3)
 			if ui.tags("weak") {
 				// (in a window of its own, what its commands said: the main window's footer is elsewhere)
 				msg := journal_window_info(app, w)
@@ -103,7 +103,7 @@ journal_window_view :: proc(v: ^ui.View, w: ^Journal_Window) {
 				ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0})
 				ui.label_tip(fmt.tprintf("%s###jw_info", ui.text_shown(msg)))
 			}
-			ui.spacer(ui.px(em * 0.4))
+			ui.space(ui.SPACE_2)
 		}
 		journal_build(app, &w.view, w.name, w.manager, true, em, in_window = true)
 	}

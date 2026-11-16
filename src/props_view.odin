@@ -37,7 +37,7 @@ props_view :: proc(v: ^ui.View, app: ^App) {
 		props_title(app, p, em)
 		ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.4))})
 		if ui.row(.Center, {.Draw_Side_Bottom}, "###props_tabs") {
-			ui.spacer(ui.px(em * 0.4))
+			ui.space(ui.SPACE_2)
 			labels := PROPS_TAB_LABELS
 			for &l in labels { l = i18n.tr(l) }
 			sel := int(pp.tab)
@@ -76,7 +76,7 @@ props_slice :: proc(labels: ^[Props_Tab]string) -> []string { return (cast([^]st
 props_title :: proc(app: ^App, p: ^Proc, em: f32) {
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.6))})
 	if ui.row(.Center, {}, "###props_title") {
-		ui.spacer(ui.px(em))
+		ui.space(ui.SPACE_4)
 		name := p != nil ? p.name : "?"
 		// (content: its name, its PID and state, to copy)
 		ui.next({width = ui.text_size(), height = ui.pct(1), font_size = em * 1.25, text_pad = 0, flags = {.Selectable}})
@@ -85,13 +85,13 @@ props_title :: proc(app: ^App, p: ^Proc, em: f32) {
 			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = em * 0.6, flags = {.Selectable}})
 			ui.label(fmt.tprintf("%s%s###props_pid", fmt.tprintf(i18n.tr("PID %d"), app.props.pid), p != nil ? fmt.tprintf("  ·  %s", state_text(p.state)) : ""))
 		}
-		ui.spacer(ui.px(em * 0.6))
+		ui.space(ui.SPACE_2)
 	}
 }
 
 @(private = "file")
 props_note :: proc(text: string, em: f32) {
-	ui.spacer(ui.px(em * 2))
+	ui.space(ui.SPACE_6)
 	if ui.tags("weak") {
 		ui.next({width = ui.fill(), height = ui.px(em * 2)})
 		if ui.style({text_align = .Center}) { ui.label(fmt.tprintf("%s###note", text)) }
@@ -103,7 +103,7 @@ props_note :: proc(text: string, em: f32) {
 props_line :: proc(label, value: string, em: f32) {
 	ui.next({width = ui.fill(), height = ui.children_sum()})
 	if ui.row(.Start, {}, fmt.tprintf("###line_%s", label)) {
-		ui.spacer(ui.px(em))
+		ui.space(ui.SPACE_4)
 		// (both paragraphs: their first lines share a baseline)
 		if ui.tags("weak") {
 			ui.next({width = ui.px(em * PROPS_KEY_EM)})
@@ -111,9 +111,9 @@ props_line :: proc(label, value: string, em: f32) {
 		}
 		ui.next({width = ui.fill()})
 		if ui.style({text_pad = 0}) { ui.paragraph(fmt.tprintf("%s###v", ui.text_shown(value))) }
-		ui.spacer(ui.px(em))
+		ui.space(ui.SPACE_4)
 	}
-	ui.spacer(ui.px(em * 0.25))
+	ui.space(ui.SPACE_1)
 }
 
 @(private = "file")
@@ -121,7 +121,7 @@ props_general :: proc(app: ^App, p: ^Proc, em: f32) {
 	pp := &app.props
 	ui.next({width = ui.fill(), height = ui.fill()})
 	if ui.scroll_y("###general") {
-		ui.spacer(ui.px(em * 0.8))
+		ui.space(ui.SPACE_3)
 		parent := i18n.tr("none")
 		if q := find_pid(&app.sampler, p.ppid); q != nil { parent = fmt.tprintf(i18n.tr("%s (PID %d)"), q.name, q.pid) }
 		cwd, cpus := "…", ""
@@ -165,14 +165,14 @@ props_history :: proc(app: ^App, p: ^Proc, em: f32) {
 	period := app.settings.refresh_ms
 	ui.next({width = ui.fill(), height = ui.fill(), axis = .Y})
 	if ui.column(id = "###history") {
-		ui.spacer(ui.px(em * 0.6))
+		ui.space(ui.SPACE_2)
 		graph :: proc(id, what: string, hist: ^ui.Value_History(PROC_HISTORY_POINTS), color: ui.Color, top, floor: f32, value: proc(v: f32) -> string, period: int, em: f32) {
 			values := ui.value_history_values(hist)
 			series := []ui.Line_Series{{values, color}}
 			shown_top := ui.line_graph_top(series, {top = top, floor = floor})
 			ui.next({width = ui.fill(), height = ui.px(em * 1.5)})
 			if ui.row(.Center, {}, fmt.tprintf("###%s_caption", id)) {
-				ui.spacer(ui.px(em))
+				ui.space(ui.SPACE_4)
 				ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
 				ui.label(fmt.tprintf("%s  %s###l", what, value(ui.value_history_last(hist))))
 				ui.spacer(ui.fill())
@@ -180,17 +180,17 @@ props_history :: proc(app: ^App, p: ^Proc, em: f32) {
 					ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0, font_size = em * 0.85})
 					ui.label(fmt.tprintf("%s###r", fmt.tprintf(i18n.tr("%s, top %s"), span_text(hist.count, period), value(shown_top))))
 				}
-				ui.spacer(ui.px(em))
+				ui.space(ui.SPACE_4)
 			}
 			ui.next({width = ui.fill(), height = ui.fill()})
 			if ui.row(id = fmt.tprintf("###%s_row", id)) {
-				ui.spacer(ui.px(em))
+				ui.space(ui.SPACE_4)
 				ui.next({width = ui.fill(), height = ui.pct(1)})
 				// (the whole history across the width, at least a minute's points: it spreads as it grows)
 				ui.line_graph(fmt.tprintf("###%s", id), series, {top = shown_top, points = max(hist.count, HISTORY_POINTS), grid = true})
-				ui.spacer(ui.px(em))
+				ui.space(ui.SPACE_4)
 			}
-			ui.spacer(ui.px(em * 0.5))
+			ui.space(ui.SPACE_2)
 		}
 		graph("hist_cpu", i18n.tr("CPU"), &h.cpu, hue(app, HUE_CPU), 0, 5, proc(v: f32) -> string { return percent_text(f64(v), 1) }, period, em)
 		graph("hist_memory", i18n.tr("Private memory"), &h.memory, hue(app, HUE_MEMORY), 0, 16 * 1024 * 1024, proc(v: f32) -> string { return size_text(u64(v)) }, period, em)
@@ -213,7 +213,7 @@ props_list :: proc(app: ^App, id: string, titles: []string, widths: []f32, count
 	}
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * HEADER_EM)), bg = surface("bar")})
 	if ui.row(.Center, {.Draw_Background, .Draw_Side_Bottom}, fmt.tprintf("###%s_head", id)) {
-		ui.spacer(ui.px(em * 0.6))
+		ui.space(ui.SPACE_2)
 		if ui.tags("weak") {
 			for t, i in titles {
 				ui.next({width = widths[i] > 0 ? ui.px(em * widths[i]) : ui.fill(), height = ui.pct(1), text_pad = 0})
@@ -251,7 +251,7 @@ props_list :: proc(app: ^App, id: string, titles: []string, widths: []f32, count
 		row := ui.list_row(vl, i, "")
 		tip := ""
 		if ui.parent(row.box) {
-			ui.spacer(ui.px(em * 0.6))
+			ui.space(ui.SPACE_2)
 			for _, k in titles {
 				if k > 0 { ui.push_tags("weak") }
 				text := cell(app, shown[i], k)
@@ -318,22 +318,22 @@ props_actions :: proc(app: ^App, p: ^Proc, em: f32) {
 	pp := &app.props
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 3.2))})
 	if ui.row(.Center, {.Draw_Side_Top}, "###props_actions") {
-		ui.spacer(ui.px(em))
+		ui.space(ui.SPACE_4)
 		if p != nil && !pp.gone {
 			if ui.tags("weak") {
 				ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
 				ui.label(fmt.tprintf("%s###prio_label", i18n.tr("Priority")))
 			}
-			ui.spacer(ui.px(em * 0.5))
+			ui.space(ui.CONTROL_GAP)
 			names: [len(PRIORITIES)]string
 			for q, i in PRIORITIES { names[i] = i18n.tr(q.name) }
 			if !ui.menu_any_open() { pp.nice_sel = priority_index(p.nice) }
 			ui.next({width = ui.px(em * 11), height = ui.px(ui.dense(em * 2.1))})
 			if ui.dropdown("###priority", names[:], &pp.nice_sel) { set_priority(app, p, PRIORITIES[pp.nice_sel].nice) }
 			hover_tip("priority", fmt.tprintf("%s (%s), %s (%s)", cmd_label(.Props_Raise_Priority), ui.command_shortcut(COMMANDS[.Props_Raise_Priority]), cmd_label(.Props_Lower_Priority), ui.command_shortcut(COMMANDS[.Props_Lower_Priority])))
-			ui.spacer(ui.px(em * 0.4))
+			ui.space(ui.CONTROL_GAP)
 			if props_button(app, "props_affinity", lucide.MICROCHIP, i18n.tr("Affinity…"), .Props_Affinity, em) { cmd_run(app, .Props_Affinity) }
-			ui.spacer(ui.px(em * 0.8))
+			ui.space(ui.SPACE_3)
 			if ui.tags("weak") {
 				msg := ui.now_ms() < app.status_until ? app.status : ""
 				ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0, font_size = em * 0.9})
@@ -341,14 +341,14 @@ props_actions :: proc(app: ^App, p: ^Proc, em: f32) {
 			}
 			stopped := p.state == .Stopped
 			if props_button(app, "props_suspend", stopped ? lucide.PLAY : lucide.SQUARE, stopped ? i18n.tr("Resume") : i18n.tr("Suspend"), .Props_Suspend, em, .Primary) { props_suspend(app) }
-			ui.spacer(ui.px(em * 0.4))
+			ui.space(ui.CONTROL_GAP)
 			if props_button(app, "props_end", lucide.X, i18n.tr("End task"), .Props_End_Task, em, .Warning) { props_signal(app, false) }
-			ui.spacer(ui.px(em * 0.4))
+			ui.space(ui.CONTROL_GAP)
 			if props_button(app, "props_kill", lucide.ZAP, i18n.tr("Kill…"), .Props_Kill, em, .Danger) { props_signal(app, true) }
 		} else {
 			ui.spacer(ui.fill())
 		}
-		ui.spacer(ui.px(em))
+		ui.space(ui.SPACE_4)
 	}
 }
 
@@ -379,7 +379,7 @@ props_filter_field :: proc(app: ^App, em: f32) {
 	res := ui.line_edit("###props_filter", &pp.filter, {placeholder = i18n.tr("Filter the list…")})
 	pp.filter_key = res.box.key
 	tip_after(res, cmd_tip(.Props_Filter))
-	ui.spacer(ui.px(em * 0.6))
+	ui.space(ui.SPACE_2)
 }
 
 // Ctrl+F in the dialog: its filter gets the keyboard (on the General tab, the Threads tab is shown first).

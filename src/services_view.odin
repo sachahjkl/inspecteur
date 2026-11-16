@@ -91,11 +91,11 @@ service_details_body :: proc(app: ^App, v: ^ui.View, em: f32) {
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.2))})
 	if ui.row(.Center, {}, "###svc_details_head") {
 		ui.view_drag_handle(v, ui.parent_box())
-		ui.spacer(ui.px(em * 0.8))
+		ui.space(ui.SPACE_3)
 		title := selected ? u.name : i18n.tr("No service selected")
 		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
 		ui.label(fmt.tprintf("%s###svc_details_name", ui.text_shown(title)))
-		ui.spacer(ui.px(em * 0.8))
+		ui.space(ui.SPACE_3)
 		if ui.tags("weak") {
 			info := ""
 			if selected && d != nil && d.name == u.name && d.manager == s.manager {
@@ -116,7 +116,7 @@ service_details_body :: proc(app: ^App, v: ^ui.View, em: f32) {
 			tool := tool_button("svc_details_close", lucide.X, fmt.tprintf(i18n.tr("Hide the details (%s)"), ui.command_shortcut(COMMANDS[.Service_Details])), true, em)
 			if tool { service_details_switch(app) }
 		}
-		ui.spacer(ui.px(em * 0.4))
+		ui.space(ui.SPACE_2)
 	}
 	journal_build(app, &s.pane, u.name, s.manager, selected, em)
 }
