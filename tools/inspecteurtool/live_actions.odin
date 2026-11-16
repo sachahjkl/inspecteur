@@ -185,13 +185,13 @@ live_setup_offer :: proc(l: ^Live) {
 	check(l, file_has(prefs, "install.choice\tstandalone"), "it is not offered again")
 }
 
-// The settings' Installation page installs Inspecteur in the session's own folders: the program in its HOME's
+// The settings' Installation page installs Inspecteur in the session's own folders: the program in its HOME's (the session's folder)
 // ~/.local/opt, its menu entry and its icons in its data folder; Uninstall takes it all away. So do
 // `inspecteur --install` and `--uninstall` with a data folder of this test, and `--status` says each state.
 live_setup :: proc(l: ^Live) {
 	c := &l.c
 	data := fmt.tprintf("%s/data", l.dir)
-	program := fmt.tprintf("%s/home/.local/opt/FromentSoftware/Inspecteur/inspecteur", l.dir)
+	program := fmt.tprintf("%s/.local/opt/FromentSoftware/Inspecteur/inspecteur", l.dir)
 	entry := fmt.tprintf("%s/applications/inspecteur.desktop", data)
 	icon := fmt.tprintf("%s/icons/hicolor/64x64/apps/inspecteur.png", data)
 	check(l, cdp.key(c, "ctrl+,") && cdp.wait_for(c, "Appearance", SESSION_WAIT), "Ctrl+,: the settings")
@@ -209,7 +209,7 @@ live_setup :: proc(l: ^Live) {
 
 	// the command line, in a data folder of this test
 	cli := fmt.tprintf("%s/data-cli", l.dir)
-	env := toolbox.env_with({"XDG_DATA_HOME", "HOME"}, fmt.tprintf("XDG_DATA_HOME=%s", cli), fmt.tprintf("HOME=%s/home", l.dir))
+	env := toolbox.env_with({"XDG_DATA_HOME", "HOME"}, fmt.tprintf("XDG_DATA_HOME=%s", cli), fmt.tprintf("HOME=%s", l.dir))
 	run :: proc(args: []string, env: []string) -> int {
 		cmd := make([dynamic]string, context.temp_allocator)
 		append(&cmd, PROGRAM)
