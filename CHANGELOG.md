@@ -3,6 +3,11 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.14.0] - 2026-11-16 09:30
+
+### Changed
+- **Settings read their values as times and shares**: the three Refresh periods take a time with its unit ("1.5 s" gives 1500 ms) and refuse what is not one; the glow is set from 0 to 100 %; a group's last line has no rule under it.
+
 ## [0.13.0] - 2026-11-15 21:00
 
 ### Added
@@ -283,6 +288,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.14.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.14.0
 [0.13.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.13.0
 [0.12.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.12.0
 [0.11.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.11.0
