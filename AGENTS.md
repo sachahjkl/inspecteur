@@ -24,8 +24,6 @@ Every step is a command of `tools/inspecteurtool` (`help` lists them):
 - What more than one program needs goes in gui_toolkit, generic, with its docs, test and changelog fragment; inspecteur
   then points to the toolkit's new tag.
 - A preference is a `config.Def` in `src/settings.odin` with its line in `docs/configuration.md` (a test checks it).
-- A change a user can see is a fragment of `changelog.d/` (`inspecteurtool changelog new`, its README), in the same
-  commit; `CHANGELOG.md` is never edited by hand: `ship` assembles the fragments.
 - Tests never touch the person's desktop: `live`, `shots` and `bench` run in a sway of their own. A test sends a signal
   only to a process it started itself, found by a mark in its command line and checked by its pid; it acts on a service,
   an autostart entry, an app's group or a desktop entry only when it made it itself (an app's group: a scope it made,
@@ -38,6 +36,14 @@ Every step is a command of `tools/inspecteurtool` (`help` lists them):
 - Automation is a command of `tools/inspecteurtool`, never a shell, batch, PowerShell, Python or Node script.
 - Comments and commit messages are in English. Comments say why.
 - Commits: author and committer `sachahjkl <sacha@sacha.house>`, no attribution trailer, no session link.
+
+## Changelog
+
+- `CHANGELOG.md` follows Keep a Changelog and semantic versioning. It is never edited by hand.
+- A change a person sees is one fragment in `changelog.d/` (its README says the format), written by
+  `inspecteurtool changelog new <type> <text>`, in the same commit as the change.
+- `inspecteurtool ship` assembles the fragments into the version's section; `inspecteurtool check` checks the fragments
+  and the file.
 
 ## Roadmap
 
@@ -57,3 +63,14 @@ This project follows <https://srcmd.org>, with the Markdown in `src/md`. Read `s
 - Keep there what the code does not show: the purpose, the decisions, the refused alternatives, the subtle points.
 - `src/md/README.md` lists every other file of the folder in its `## File Index`.
 - The user's documentation and the developer's how-to stay in `docs/`; `src/md` links to them.
+
+## Key prompts
+
+Apply these to every task, before you write code:
+
+- "Exercise abstract thinking when considering this task."
+- "Reduce this problem to its irreducible constraints and rebuild it from zero."
+- "What would a principal architect immediately rewrite before even starting this?"
+- "Design the single test that breaks this design on day one."
+- "What higher-level abstraction would make this entire problem disappear?"
+- "Find all of the implicit state machines in my app."

@@ -1,20 +1,20 @@
 # changelog.d
 
-One file per change a user can see, assembled into `CHANGELOG.md` when a version is published (`inspecteurtool ship`).
-A change adds its fragment here and never edits `CHANGELOG.md` nor `APP_VERSION`: two branches never conflict on them.
-A change with no effect a user can see has no fragment.
+One file per change that a user can see, assembled into `CHANGELOG.md` by `inspecteurtool ship <patch|minor|major|x.y.z>`,
+which then deletes them. Do not edit `CHANGELOG.md` by hand.
 
 A fragment is `changelog.d/<yyyyMMdd-HHmmss>-<subject>.md` (subject: lowercase letters, digits and `-`):
 
 ```
-type: Added
+type: Fixed
 
-**A short bold summary**: what changed for the user, not how the code changed.
+**Short summary**: what changed for the user, in one entry (no leading "- ").
 ```
 
-`type` is `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed` or `Security`. The text is one entry of the list; it may
-span lines, with no blank line and no heading.
+- `type` is `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed` or `Security` ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/)).
+- The text is one entry of the list. It can span lines; sub-items are indented `  - ` lines; no blank line, no heading.
+- A change that no user can see has no fragment.
 
-`inspecteurtool changelog new <type> <subject> <text>` writes one; `changelog check` (run by `check`) says whether they
-are all well formed; `changelog preview` prints what the next version brings. The format is gui_toolkit's
-(`gt:changelog`, its docs/changelog.md).
+`inspecteurtool changelog new <type> <text> [-subject:<subject>]` writes one; `inspecteurtool check` refuses a malformed
+one; `inspecteurtool changelog preview` prints what the next version brings. gui_toolkit's `gt:changelog` reads and
+assembles them (its docs/changelog.md).
