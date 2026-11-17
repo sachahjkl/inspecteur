@@ -3,6 +3,11 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.19.0] - 2026-11-17 18:18
+
+### Added
+- **Something engraved on the back of the licence card**: turn the card over and look at it from the right angle.
+
 ## [0.18.0] - 2026-11-17 12:49
 
 ### Changed
@@ -320,6 +325,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.19.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.19.0
 [0.18.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.18.0
 [0.17.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.17.0
 [0.16.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.16.1
