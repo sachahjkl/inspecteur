@@ -141,7 +141,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 	app.prefs = prefs^
 	prefs^ = {}
 	app.settings = prefs_read(&app.prefs)
-	prefs_page.install_init(&app.install, &app.prefs, setup_options())
+	prefs_page.install_init(&app.install, &app.prefs, setup_options(), &app.announcer)
 	// (the language before anything is formatted for display: the first build, the window's toasts, the demo's texts)
 	prefs_page.language_start(&app.prefs, PROGRAM_CATALOGUES)
 	// (no file read here: the user's themes come at the first builds, read by a task)
