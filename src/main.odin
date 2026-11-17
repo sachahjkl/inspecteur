@@ -7,12 +7,10 @@ package inspecteur
 
 import "core:fmt"
 import "core:os"
-import "core:strings"
 import ascii "gt:ascii"
 import cli "gt:cli"
 import config "gt:config"
-import crash "gt:crash"
-import tk_log "gt:log"
+import "gt:host"
 import "gt:platform"
 import process "gt:process"
 import setup "gt:setup"
@@ -110,22 +108,15 @@ run :: proc(all_args: []string) -> cli.Exit {
 	return .Usage
 }
 
-// The window's run, with its log (gt:log, in the state folder) and its crash reports (gt:crash): a crash leaves a report,
-// which the next start says (Run_Options.last_crash). Nothing is sent anywhere.
+// The window's run, with its log (gt:log, in the state folder) and its crash reports (gt:crash), started by the
+// toolkit's host.program_start: a crash leaves a report, which the next start says (Run_Options.last_crash). Nothing
+// is sent anywhere.
 app_run_kept :: proc(prefs: ^config.Prefs, opts: Run_Options) -> (ok: bool) {
 	// (the files keep the technical name; their folders are the vendor's)
-	logger := tk_log.install({program = APP_NAME, dir = tk_log.default_dir(APP_FOLDER, context.temp_allocator), echo = true})
-	{
-		context.logger = logger
-		crash.install({program = APP_NAME, report_dir = crash.default_report_dir(APP_FOLDER, context.temp_allocator), version = APP_VERSION, log_tail = {tk_log.tail, logger.data}})
-		crash.begin_session()
-		o := opts
-		last, crashed := crash.last_report(context.temp_allocator)
-		if crashed { o.last_crash = strings.clone(last) }
-		ok = app_run(prefs, o)
-		delete(o.last_crash)
-		crash.end_session()
-	}
-	tk_log.close(logger)
-	return ok
+	p := host.program_start({name = APP_NAME, folder = APP_FOLDER, version = APP_VERSION})
+	defer host.program_end(&p)
+	context.logger = p.logger
+	o := opts
+	o.last_crash = p.last_crash
+	return app_run(prefs, o)
 }

@@ -1,15 +1,13 @@
 package inspecteur
 
 import "core:testing"
+import timefmt "gt:timefmt"
 
+// (the sizes and rates themselves are the toolkit's, tested there: a cell's rule is inspecteur's)
 @(test)
-sizes_are_human :: proc(t: ^testing.T) {
-	testing.expect_value(t, size_text(512), "512 B")
-	testing.expect_value(t, size_text(1536), "1.5 KB")
-	testing.expect_value(t, size_text(300 * 1024 * 1024), "300 MB")
-	testing.expect_value(t, size_text(u64(5) * 1024 * 1024 * 1024), "5.0 GB")
+a_still_rate_is_an_empty_cell :: proc(t: ^testing.T) {
 	testing.expect_value(t, rate_text(0.5), "")
-	testing.expect_value(t, rate_text(2048), "2.0 KB/s")
+	testing.expect_value(t, rate_text(2048), timefmt.rate(2048))
 }
 
 @(test)

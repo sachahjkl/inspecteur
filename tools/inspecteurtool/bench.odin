@@ -22,9 +22,9 @@ import "core:strings"
 import "core:time"
 import cdp "gt:cdp"
 import cli "gt:cli"
+import toolbox "gt:toolbox"
 
 BENCH_DIR    :: "build/bench"
-BENCH_PORT   :: 9372
 BENCH_STARTS :: 3
 BENCH_SETTLE :: 2 * time.Second   // after the first frame, before the CPU is measured
 CLOCK_TICKS  :: 100               // USER_HZ: the unit of /proc/<pid>/stat's times
@@ -32,24 +32,24 @@ CLOCK_TICKS  :: 100               // USER_HZ: the unit of /proc/<pid>/stat's tim
 run_bench :: proc(args: []string) -> cli.Exit {
 	seconds := 10
 	if len(args) > 0 { seconds = strconv.parse_int(args[0], 10) or_else seconds }
-	if run_build({"release"}) != .Done { return .Failed }
+	if !toolbox.program_build(build_options(), release = true) { return .Failed }
 	starts: [BENCH_STARTS]f64
 	for k in 0 ..< BENCH_STARTS {
-		s: Session
-		if why := session_start(&s, BENCH_DIR, BENCH_PORT, {"--first-frame"}, renderer = "vulkan"); why != "" {
+		s: toolbox.Program_Session
+		if why := session_start(&s, BENCH_DIR, {"--first-frame"}, renderer = "vulkan"); why != "" {
 			fmt.eprintfln("inspecteurtool bench: %s", why)
-			session_stop(&s)
+			toolbox.program_session_stop(&s)
 			return .Failed
 		}
 		ms, detail, ok := first_frame_ms(&s)
 		if !ok {
-			fmt.eprintfln("inspecteurtool bench: no first frame (%s)", s.output)
-			session_stop(&s)
+			fmt.eprintfln("inspecteurtool bench: no first frame (%s)", s.log)
+			toolbox.program_session_stop(&s)
 			return .Failed
 		}
 		starts[k] = ms
 		fmt.printfln("start %d: first frame after %.1f ms (in the process, ms: %s)", k + 1, ms, detail)
-		output := strings.clone(s.output, context.temp_allocator)
+		output := strings.clone(s.log, context.temp_allocator)
 		if k == BENCH_STARTS - 1 {
 			rest(&s, seconds, "at rest")
 			// (the sections that read on threads of their own, shown: what they cost while they are on the screen)
@@ -57,7 +57,7 @@ run_bench :: proc(args: []string) -> cli.Exit {
 				if show(&s, section.key) { rest(&s, seconds, fmt.tprintf("%s shown", section.name)) }
 			}
 		}
-		session_stop(&s)
+		toolbox.program_session_stop(&s)
 		if k == BENCH_STARTS - 1 {
 			// (what the program measured of itself, written as it ended)
 			data, _ := os.read_entire_file(output, context.temp_allocator)
@@ -72,10 +72,10 @@ run_bench :: proc(args: []string) -> cli.Exit {
 
 // The milliseconds from the start of the process to its first frame (its line "first-frame <unix ns>").
 @(private = "file")
-first_frame_ms :: proc(s: ^Session) -> (ms: f64, detail: string, ok: bool) {
+first_frame_ms :: proc(s: ^toolbox.Program_Session) -> (ms: f64, detail: string, ok: bool) {
 	deadline := time.tick_add(time.tick_now(), SESSION_WAIT)
 	for time.tick_diff(time.tick_now(), deadline) > 0 {
-		data, _ := os.read_entire_file(s.output, context.temp_allocator)
+		data, _ := os.read_entire_file(s.log, context.temp_allocator)
 		text := string(data)
 		if i := strings.index(text, "first-frame "); i >= 0 {
 			line := text[i + len("first-frame "):]
@@ -95,16 +95,16 @@ first_frame_ms :: proc(s: ^Session) -> (ms: f64, detail: string, ok: bool) {
 
 // Presses `key` in the window (a section's shortcut).
 @(private = "file")
-show :: proc(s: ^Session, key: string) -> bool {
-	c, ok := window_connect(s)
-	if !ok { return false }
+show :: proc(s: ^toolbox.Program_Session, key: string) -> bool {
+	c, why := toolbox.program_session_connect(s)
+	if why != "" { return false }
 	defer cdp.close(&c)
 	return cdp.key(&c, key)
 }
 
 // The CPU use of the window over `seconds`, nobody touching it, and its memory. `what`: what the window shows.
 @(private = "file")
-rest :: proc(s: ^Session, seconds: int, what: string) {
+rest :: proc(s: ^toolbox.Program_Session, seconds: int, what: string) {
 	time.sleep(BENCH_SETTLE)
 	pid := s.program.pid
 	b0 := builds(s)
@@ -143,9 +143,9 @@ thread_ticks :: proc(pid: int) -> map[int]Thread_Ticks {
 
 // The window's count of builds (Toolkit.state; the question itself makes one).
 @(private = "file")
-builds :: proc(s: ^Session) -> int {
-	c, ok := window_connect(s)
-	if !ok { return 0 }
+builds :: proc(s: ^toolbox.Program_Session) -> int {
+	c, why := toolbox.program_session_connect(s)
+	if why != "" { return 0 }
 	defer cdp.close(&c)
 	r, rok := cdp.call(&c, "Toolkit.state")
 	if !rok { return 0 }

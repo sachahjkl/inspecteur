@@ -60,7 +60,7 @@ settings_build :: proc(app: ^App) {
 settings_options :: proc(app: ^App) -> prefs_page.Page_Options {
 	return {
 		user = app, changed = settings_changed, preview = settings_preview, problem = settings_problem,
-		updater = app.updater, restart = proc(user: rawptr) { updates_restart((^App)(user)) },
+		updater = app.updates.updater, restart = proc(user: rawptr) { updates_restart((^App)(user)) },
 		pages = SETTINGS_PAGES[:], icon_font = app.icons, search_icon = lucide.SEARCH, reset_icon = lucide.ROTATE_CCW,
 		version = APP_TITLE + " " + APP_VERSION,
 		file = prefs_file(),
@@ -113,5 +113,4 @@ settings_changed :: proc(user: rawptr, name: string) {
 		platform.set_integrated_title(app.main.win, !app.settings.system_title)
 	}
 	settings_free(&old)
-	updates_auto(app)
 }

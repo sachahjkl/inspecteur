@@ -10,6 +10,7 @@ import "core:slice"
 import lucide "gt:lucide"
 import "gt:ui"
 import i18n "gt:i18n"
+import timefmt "gt:timefmt"
 
 // When a part counts as busy: past WARN it is said, past BAD it is the cause.
 DIAG_CPU_WARN, DIAG_CPU_BAD           :: f32(60), f32(90)       // percent of the machine
@@ -58,13 +59,13 @@ diagnose :: proc(app: ^App) -> []Finding {
 	if m.mem.total > 0 {
 		used := f64(m.mem.total - min(m.mem.available, m.mem.total)) / f64(m.mem.total)
 		if used >= DIAG_MEM_WARN {
-			add(&out, used >= DIAG_MEM_BAD ? .Bad : .Warn, i18n.tr("The memory is %.0f%% in use (%s of %s). The largest: %s."), used * 100, size_text(m.mem.total - m.mem.available), size_text(m.mem.total), busiest(app, .Memory))
+			add(&out, used >= DIAG_MEM_BAD ? .Bad : .Warn, i18n.tr("The memory is %.0f%% in use (%s of %s). The largest: %s."), used * 100, timefmt.size(i64(m.mem.total - m.mem.available)), timefmt.size(i64(m.mem.total)), busiest(app, .Memory))
 		}
 	}
 	if m.mem.swap_total > 0 {
 		swapped := f64(m.mem.swap_total - min(m.mem.swap_free, m.mem.swap_total)) / f64(m.mem.swap_total)
 		if swapped >= DIAG_SWAP_WARN {
-			add(&out, .Warn, i18n.tr("%s of the swap is in use: pages wait on the disk."), size_text(m.mem.swap_total - m.mem.swap_free))
+			add(&out, .Warn, i18n.tr("%s of the swap is in use: pages wait on the disk."), timefmt.size(i64(m.mem.swap_total - m.mem.swap_free)))
 		}
 	}
 	for &d in m.disks {
@@ -147,8 +148,8 @@ busiest :: proc(app: ^App, by: Busy_By) -> string {
 		shown: string
 		switch by {
 		case .Cpu:    shown = percent_text(f64(p.cpu))
-		case .Memory: shown = size_text(p.private)
-		case .Disk:   shown = fmt.tprintf("%s/s", size_text(u64(p.read_rate + p.write_rate)))
+		case .Memory: shown = timefmt.size(i64(p.private))
+		case .Disk:   shown = timefmt.rate(f64(p.read_rate + p.write_rate))
 		}
 		append(&parts, fmt.tprintf("%s (%s)", p.name, shown))
 	}

@@ -17,6 +17,7 @@ import "core:time"
 import lucide "gt:lucide"
 import tasks "gt:tasks"
 import i18n "gt:i18n"
+import timefmt "gt:timefmt"
 import "gt:ui"
 
 Manager :: enum u8 { System, User }
@@ -338,7 +339,7 @@ services_rows :: proc(app: ^App) {
 			tone := ui.Table_Tone.Normal
 			if u.active == "failed" { tone = .Bad } else if u.active != "active" && u.active != "activating" && u.active != "reloading" { tone = .Dim }
 			pid := u.pid > 0 ? uint_text(u64(u.pid)) : ""
-			memory := u.memory != MEMORY_UNKNOWN && u.memory > 0 ? size_text(u.memory) : ""
+			memory := u.memory != MEMORY_UNKNOWN && u.memory > 0 ? timefmt.size(i64(u.memory)) : ""
 			// (the filter finds a row by the words shown and by systemd's own, which its documentation and journal use)
 			section_row(st, name_id(u.name), strings.join({u.name, u.description, state, file, u.active, u.sub, u.file, pid}, " ", context.temp_allocator), service_icon(app, u), tone)
 			ui.table_data_cell(&st.data, u.name)

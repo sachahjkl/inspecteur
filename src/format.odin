@@ -1,35 +1,18 @@
 package inspecteur
 
-// Numbers as the window shows them: sizes, rates, durations, frequencies (pure: format_test.odin reads them).
+// Numbers as the window shows them: durations, frequencies (pure: format_test.odin reads them). Sizes, rates and the
+// uptime are the toolkit's (gt:timefmt: size, rate, stopwatch).
 
 import "core:fmt"
 import "core:strconv"
 import "core:strings"
 import ascii "gt:ascii"
 import i18n "gt:i18n"
+import timefmt "gt:timefmt"
 
-// "1.5 GB", "320 MB", "12 KB", "0 B": a size in powers of 1024, as most system monitors show it.
-size_text :: proc(n: u64, allocator := context.temp_allocator) -> string {
-	// (French writes octets: "Mo", "Go")
-	units := [?]string{i18n.tr("unit", "B"), i18n.tr("unit", "KB"), i18n.tr("unit", "MB"), i18n.tr("unit", "GB"), i18n.tr("unit", "TB")}
-	v := f64(n)
-	u := 0
-	for v >= 1024 && u < len(units) - 1 { v /= 1024; u += 1 }
-	if u == 0 { return strings.concatenate({uint_text(n), " ", units[0]}, allocator) }
-	buf: [32]u8
-	digits := v < 10 ? 1 : 0
-	s := strconv.write_float(buf[:], v, 'f', digits, 64)
-	// (the language's decimal mark, in place: this runs for every row's sizes, so no formatting call of its own)
-	if mark := i18n.decimal_mark(); mark != '.' { for &c in buf { if c == '.' { c = mark } } }
-	if len(s) > 0 && s[0] == '+' { s = s[1:] }
-	return strings.concatenate({s, " ", units[u]}, allocator)
-}
-
-// A rate in bytes per second: "" when nothing moves (an empty cell reads faster than a column of zeros).
-rate_text :: proc(bytes_per_s: f64, allocator := context.temp_allocator) -> string {
-	if bytes_per_s < 1 { return "" }
-	return strings.concatenate({size_text(u64(bytes_per_s), context.temp_allocator), "/s"}, allocator)
-}
+// A rate in bytes per second in a table's cell: "" when nothing moves (an empty cell reads faster than a column of
+// zeros).
+rate_text :: proc(bytes_per_s: f64) -> string { return bytes_per_s < 1 ? "" : timefmt.rate(bytes_per_s) }
 
 uint_text :: proc(n: u64, allocator := context.temp_allocator) -> string {
 	buf: [24]u8
@@ -68,12 +51,6 @@ bits_text :: proc(bytes_per_s: f64) -> string {
 	case b >= 1e3: return fmt.tprintf("%.0f kbit/s", b / 1e3)
 	}
 	return fmt.tprintf("%.0f bit/s", b)
-}
-
-// "3:04:12:09" (days:hours:minutes:seconds), as Task Manager.
-uptime_text :: proc(seconds: f64) -> string {
-	s := i64(seconds)
-	return fmt.tprintf("%d:%02d:%02d:%02d", s / 86400, (s / 3600) % 24, (s / 60) % 60, s % 60)
 }
 
 // A duration in words: "3 days, 4 h 12 min", "10 h 47 min", "5 min", "40 s".

@@ -22,6 +22,7 @@ import lucide "gt:lucide"
 import "gt:platform"
 import "gt:ui"
 import i18n "gt:i18n"
+import timefmt "gt:timefmt"
 
 Mission_Panel :: enum u32 { Machine = 1, Health, Cpu, Memory, Services, Network, Startup, System }
 
@@ -388,7 +389,7 @@ mission_busiest :: proc(app: ^App, em: f32, memory: bool) {
 	if len(top) > 0 { most = memory ? max(f32(procs[top[0]].private), 1) : max(procs[top[0]].cpu, 1) }
 	for i, k in top {
 		p := procs[i]
-		value := memory ? size_text(p.private) : percent_text(f64(p.cpu), 1)
+		value := memory ? timefmt.size(i64(p.private)) : percent_text(f64(p.cpu), 1)
 		share := memory ? f32(p.private) / most : p.cpu / most
 		if mission_line(app, fmt.tprintf("mc_%s_%d", memory ? "mem" : "cpu", k), p.name, fmt.tprintf(i18n.tr("PID %d"), p.pid), value, share, "", em, {kind = .Process, pid = p.pid, start = p.start}) {
 			processes_reveal(app, p.pid, p.start)
@@ -467,8 +468,8 @@ mission_system :: proc(app: ^App, em: f32) {
 		{i18n.tr("Computer"), info.hostname},
 		{i18n.tr("System"), fmt.tprintf(i18n.tr("%s, kernel %s"), info.os_name, info.kernel)},
 		{i18n.tr("Processor"), info.cpu.model},
-		{i18n.tr("Memory"), size_text(m.mem.total)},
-		{i18n.tr("Up for"), uptime_text(m.uptime)},
+		{i18n.tr("Memory"), timefmt.size(i64(m.mem.total))},
+		{i18n.tr("Up for"), timefmt.stopwatch(m.uptime * 1000, {days = true})},
 		{i18n.tr("Desktop"), info.desktop},
 	}
 	for f, i in facts {

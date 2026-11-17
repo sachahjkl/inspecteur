@@ -537,26 +537,6 @@ fr gcore n'a pas pu le lire
 en No dump can be written on this system.
 fr Aucun vidage ne peut être écrit sur ce système.
 
-ctx unit
-en B
-fr o
-
-ctx unit
-en KB
-fr Ko
-
-ctx unit
-en MB
-fr Mo
-
-ctx unit
-en GB
-fr Go
-
-ctx unit
-en TB
-fr To
-
 en %d day, %d h %d min
 en+ %d days, %d h %d min
 fr %d jour, %d h %d min

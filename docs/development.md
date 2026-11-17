@@ -22,9 +22,9 @@ odin run tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/insp
 
 | Command | What it does |
 |---|---|
-| `build [release]` | the toolkit's text library (when its sources changed), then `build/inspecteur` |
-| `test` | the unit tests of `src` |
-| `check` | `odin check -vet` of the program and of the tool, the ui scopes (`toolbox.check_scopes`), the tests, the changelog's fragments, THIRD-PARTY-NOTICES up to date, a release build |
+| `build [release]` | the toolkit's text library (when its sources changed), then `build/inspecteur` (a debug build, unoptimised; `release`: optimised) |
+| `test [names]` | the unit tests of `src`; `names` (`inspecteur.test_a,inspecteur.test_b`): those tests alone |
+| `check` | the changelog's fragments and the roadmap, the ui scopes (`toolbox.check_scopes`), the French catalogue, THIRD-PARTY-NOTICES up to date, `odin check -vet` of the program for Linux, Windows and macOS and of the tool, the tests, a release build |
 | `live [--keep]` | the real program in a headless sway, driven over the DevTools protocol (310 checks); its pictures stay in `build/live` |
 | `shots [--out folder]` | the pictures of the documentation, the program's own frames, of the demo's made-up machine |
 | `bench [seconds]` | a release build in a headless sway that draws on the GPU: the time to the first frame, the CPU use at rest, then with Services and with Connections shown |
@@ -39,9 +39,11 @@ odin run tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/insp
 
 `GT=<folder>` builds against another checkout of gui_toolkit.
 
-The commands are given to the toolkit's dispatcher (`toolbox.tool_main`); `changelog`, `site`, `logo`, `notices`,
-`package`, `notes` and `ship` are the toolkit's own commands over the project (`toolbox.Project`, `tools/inspecteurtool/build.odin`).
-`live`, `shots` and `bench` run in the toolkit's headless sway (`toolbox.sway_start`).
+The commands are given to the toolkit's dispatcher (`toolbox.tool_main`); `build`, `test`, `check`, `changelog`,
+`site`, `logo`, `notices`, `package`, `notes` and `ship` are the toolkit's own commands over the project
+(`toolbox.Project` and `toolbox.Build_Options`, `tools/inspecteurtool/build.odin`). `live`, `shots` and `bench` run in
+the toolkit's program session (`toolbox.Program_Session`: its headless sway, the DevTools server on a port the system
+has free, so two runs at once never drive each other's window); each wait is for a condition, with a bound.
 
 The headless sway of `live` and `shots` draws on the CPU (pixman): inspecteur then draws with Mesa's software Vulkan.
 `bench` uses sway's Vulkan renderer, so that inspecteur draws on the GPU as on a desktop.
@@ -72,7 +74,8 @@ would act on the person's desktop.
 items, sockets, the system's details, a process's properties) comes from `src/demo.odin`, made up, in place of the
 system's, and the demo acts on nothing. So the pictures show no host or user name, no home folder, no address or MAC
 (the demo's are of the ranges kept for documentation: 192.0.2.0/24, 2001:db8::/32, 00:00:5e:00:53:xx), no service or app
-of the machine. The demo fills its graphs' last minute before its first frame. Nothing else of the session is used:
+of the machine. The demo fills its graphs' last minute before its first frame, so `shots` takes the pictures of the
+graphs at once. Nothing else of the session is used:
 no session bus. `live`'s own pictures (of the real machine) stay in `build/live`, which is not committed.
 
 ## Measures

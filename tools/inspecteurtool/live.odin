@@ -17,11 +17,10 @@ import cdp "gt:cdp"
 import cli "gt:cli"
 import toolbox "gt:toolbox"
 
-LIVE_DIR  :: "build/live"
-LIVE_PORT :: 9371
+LIVE_DIR :: "build/live"
 
 Live :: struct {
-	using session: Session,
+	using session: toolbox.Program_Session,
 	c:             cdp.Client,
 	failures:      int,
 	checks:        int,
@@ -36,23 +35,23 @@ check :: proc(l: ^Live, ok: bool, what: string, args: ..any) -> bool {
 
 run_live :: proc(args: []string) -> cli.Exit {
 	keep := len(args) > 0 && args[0] == "--keep"
-	if run_build(nil) != .Done { return .Failed }
+	if !toolbox.program_build(build_options()) { return .Failed }
 	l: Live
-	if why := session_start(&l.session, LIVE_DIR, LIVE_PORT, user_bus = true, setup = true, own_cache = true, before = live_app_entry); why != "" {
+	if why := session_start(&l.session, LIVE_DIR, user_bus = true, setup = true, own_cache = true, files = live_app_files()); why != "" {
 		fmt.eprintfln("inspecteurtool live: %s", why)
-		session_stop(&l.session)
+		toolbox.program_session_stop(&l.session)
 		return .Failed
 	}
 	dir := strings.clone(l.dir, context.temp_allocator)
-	output := strings.clone(l.output, context.temp_allocator)
+	output := strings.clone(l.log, context.temp_allocator)
 	fmt.printfln("live: inspecteur runs in a headless sway (%s)", dir)
-	ok: bool
-	l.c, ok = window_connect(&l.session)
-	if check(&l, ok, "the window serves the DevTools protocol") {
+	why: string
+	l.c, why = toolbox.program_session_connect(&l.session)
+	if check(&l, why == "", "the window serves the DevTools protocol%s", why != "" ? fmt.tprintf(" (%s)", why) : "") {
 		live_window(&l)
 		cdp.close(&l.c)
 	}
-	code := session_stop(&l.session)
+	code := toolbox.program_session_stop(&l.session)
 	check(&l, code == 0, "inspecteur closed: it ends, with 0 (%d)", code)
 	log, _ := os.read_entire_file(output, context.temp_allocator)
 	problem := log_problem(string(log))

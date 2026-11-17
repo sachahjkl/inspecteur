@@ -15,8 +15,6 @@ LOGO_MASTER :: 1024
 LOGO_SIZES  :: [?]int{16, 24, 32, 48, 64, 128, 256, 512}
 // The drawing's own units: a square of LOGO_UNITS, scaled to the canvas.
 LOGO_UNITS  :: 512.0
-// Small sizes are drawn from a master this many times larger, in one step of the cubic filter at most this factor.
-LOGO_SHRINK_STEP :: 4
 
 // The lens: its centre, the ring's outer radius and the glass's radius, in units.
 LENS_X     :: 212.0
@@ -40,9 +38,11 @@ detail_for :: proc(size: int) -> int { return size <= 24 ? 0 : size <= 48 ? 1 : 
 @(private = "file")
 circle :: proc(p: ^paint.Path, cx, cy, r: f32) { paint.ellipse(p, cx - r, cy - r, r * 2, r * 2) }
 
-logo_draw :: proc(size: int, detail: int) -> paint.Canvas {
-	c := paint.canvas_make(size, size)
-	k := f32(size) / LOGO_UNITS
+// The mark `pixels` wide, with the details that read once it is shrunk to `size` (toolbox.write_logo shrinks it).
+logo_draw :: proc(pixels, size: int, _: rawptr) -> paint.Canvas {
+	detail := detail_for(size)
+	c := paint.canvas_make(pixels, pixels)
+	k := f32(pixels) / LOGO_UNITS
 	c.transform = paint.scale(paint.IDENTITY, k, k)
 
 	// the handle, under the ring: a thick bar with round ends, from the ring down to the bottom right corner
@@ -100,20 +100,6 @@ logo_draw :: proc(size: int, detail: int) -> paint.Canvas {
 	return c
 }
 
-// The picture at `size`: drawn large, then shrunk in steps the cubic filter keeps clean.
-logo_render :: proc(size: int) -> paint.Canvas {
-	n := size
-	for n < LOGO_MASTER { n *= LOGO_SHRINK_STEP }
-	c := logo_draw(n, detail_for(size))
-	for n > size {
-		next := max(n / LOGO_SHRINK_STEP, size)
-		small := paint.resize(c, next, next)
-		paint.canvas_destroy(&c)
-		c, n = small, next
-	}
-	return c
-}
-
 // What the logo command writes (toolbox.write_logo): assets/logo.png, the sizes, inspecteur.ico (resource 1 of
 // inspecteur.exe, which the toolkit's build links: Explorer, the shortcuts, every window), .project/image.png.
 @(rodata)
@@ -121,7 +107,7 @@ LOGO_SIZE_LIST := LOGO_SIZES
 
 logo :: proc() -> toolbox.Logo {
 	return {
-		render = proc(size: int, user: rawptr) -> paint.Canvas { return logo_render(size) },
+		draw = logo_draw,
 		dir = LOGO_DIR, master = LOGO_MASTER, sizes = LOGO_SIZE_LIST[:], ico = "assets/inspecteur.ico", project_image = true,
 	}
 }

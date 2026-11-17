@@ -34,11 +34,3 @@ setup_options :: proc() -> setup.Setup_Options {
 	id.uninstall_arguments = "--setup"   // (Settings > Apps: the install's dialog, its Uninstall)
 	return setup.Setup_Options{identity = id, version = APP_VERSION, icons = identity.ICONS[:], running = one_copy_running, quit = one_copy_quit, vendor_url = "https://froment.software"}
 }
-
-// The updates start once the start's reading of the install says which copy runs (an installed copy updates itself in
-// place; another copy says where the new one is).
-setup_follow :: proc(app: ^App) {
-	if app.updates_asked || !app.install.known { return }
-	app.updates_asked = true
-	updates_start(app, app.install.running_it, app.install.running)
-}

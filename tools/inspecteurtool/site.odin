@@ -13,27 +13,6 @@ import tk_site "gt:site"
 import toolbox "gt:toolbox"
 import inspecteur_licence "../../src/licence"
 
-// Where the site is published, what it is: the one place that says it.
-SITE_META :: tk_site.Meta{
-	url         = "https://inspecteur.froment.software/",
-	name        = "Inspecteur",
-	repository  = REPOSITORY,
-	tagline     = "A fast native task manager for Linux",
-	changes     = CHANGELOG,
-	card        = "img/main.png",
-	logo        = "img/logo.png",
-	logo_file   = "site/img/logo.png",
-	theme       = "#0d1620",
-	accent      = "#5be7c4",
-	author      = "Sacha Froment",
-	author_url  = "https://froment.software",
-	publisher   = "Froment Software",
-	ld_type     = "SoftwareApplication",
-	root_domain = false,   // (github.io answers for /robots.txt and /favicon.ico, not the site)
-	publisher_logo = "img/froment-software-64.png",
-	licence     = "MIT",
-}
-
 // The home page's download: the one system the release builds for.
 @(rodata)
 SITE_DOWNLOADS := [?]tk_site.Download{
@@ -48,7 +27,8 @@ SITE_LD := [?][2]string{
 
 // The site as the toolkit's command takes it (its slices live as long as the tool: SITE_LD and SITE_DOWNLOADS are globals).
 site_project :: proc() -> tk_site.Project_Site {
-	m := SITE_META
+	// (where the site is published, what it is: the one place that says it; the vendor's fields are the toolkit's)
+	m := tk_site.meta_default("Inspecteur", "https://inspecteur.froment.software/", REPOSITORY, "A fast native task manager for Linux", "#0d1620", "#5be7c4")
 	m.ld_fields = SITE_LD[:]
 	m.shop = shop()
 	return {meta = m, dir = "site", pages = {version_mark = "{{version}}", downloads = SITE_DOWNLOADS[:]}, images = tk_site.images_default()}
@@ -76,30 +56,14 @@ shop :: proc() -> tk_site.Shop {
 		register       = "Open Inspecteur's settings (Ctrl+,), the <strong>General</strong> page, <strong>Licence</strong>: paste the key, or choose the file.",
 		extension      = inspecteur_licence.PRODUCT.file_extension,
 		repository     = REPOSITORY,
-		seller         = SELLER,
+		seller         = tk_site.SELLER_FROMENT,
 		code_licence   = "MIT License",
 		platform       = "Linux, x64 (Wayland).",
-		network        = "Inspecteur connects to the network for its updates only: the installed copy asks GitHub for the latest release a while after it starts and then once a day, and puts an update in place only if it is signed by Froment Software. Another copy asks only when you press <em>Check now</em> in the settings.",
+		network        = tk_site.NETWORK_UPDATES_ONLY,
 		stylesheet     = "../style.css",
 		home           = "../",
 		updated        = "2026-11-13",
 	}
-}
-
-// The seller, as Wren's imprint names it: the same block in every program of Froment Software.
-SELLER :: tk_site.Seller{
-	name       = "Froment Software",
-	owner      = "Sacha Froment",
-	status     = "sole proprietor (<em>entrepreneur individuel</em>)",
-	address    = "7 Lieu-dit les Renardi&egrave;res, 72220 Marign&eacute;-Laill&eacute;, France",
-	email      = "contact@froment.software",
-	url        = "https://froment.software",
-	siren      = "131 941 718",
-	siret      = "131 941 718 00010",
-	ape        = "6201Z, computer programming",
-	registry   = "the French national register of companies (RNE)",
-	registered = "23 October 2026",
-	vat        = "not applicable, article 293 B of the French General Tax Code (<em>franchise en base de TVA</em>)",
 }
 
 // The site's command: the toolkit's, the shop's pages among the others (Meta.shop).

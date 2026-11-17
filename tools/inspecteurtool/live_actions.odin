@@ -20,15 +20,15 @@ import toolbox "gt:toolbox"
 live_app_id :: proc() -> string { return fmt.tprintf("inspecteurlive%d", os.get_pid()) }
 live_app_name :: proc() -> string { return fmt.tprintf("Inspecteur live app %d", os.get_pid()) }
 
-live_app_entry :: proc(dir: string) {
-	apps := fmt.tprintf("%s/data/applications", dir)
-	_ = os.make_directory_all(apps)
+live_app_files :: proc() -> []toolbox.Program_File {
 	entry := fmt.tprintf("[Desktop Entry]\nType=Application\nName=%s\nExec=inspecteur-live-app-%d\n", live_app_name(), os.get_pid())
-	_ = os.write_entire_file(fmt.tprintf("%s/%s.desktop", apps, live_app_id()), entry)
 	// Inspecteur's own window is an app's (its app id, inspecteur, the window class of this entry): its row has the
 	// window's button (live_app_window), on a runner where Inspecteur is not installed too
 	own := "[Desktop Entry]\nType=Application\nName=Inspecteur\nExec=inspecteur-live-none\nStartupWMClass=inspecteur\n"
-	_ = os.write_entire_file(fmt.tprintf("%s/%swindow.desktop", apps, live_app_id()), own)
+	files := make([]toolbox.Program_File, 2, context.temp_allocator)
+	files[0] = {fmt.tprintf("data/applications/%s.desktop", live_app_id()), entry}
+	files[1] = {fmt.tprintf("data/applications/%swindow.desktop", live_app_id()), own}
+	return files
 }
 
 // Inspecteur's own row: Suspend is refused, and the process does not stop.
@@ -283,10 +283,7 @@ live_mission :: proc(l: ^Live) {
 live_one_copy :: proc(l: ^Live) {
 	c := &l.c
 	// (the session's whole environment: its display, its runtime folder, its homes, where the first one is found)
-	env := make([dynamic]string, context.temp_allocator)
-	append(&env, ..l.session.sway.env)
-	append(&env, ..l.session.env)
-	p, err := os.process_start({command = {PROGRAM, "--section", "startup"}, env = env[:]})
+	p, err := os.process_start({command = {PROGRAM, "--section", "startup"}, env = l.session.env})
 	if !check(l, err == nil, "a second start, --section startup") { return }
 	st, werr := os.process_wait(p, SESSION_WAIT)
 	check(l, werr == nil && st.exited && st.exit_code == 0, "it ends at once, handed over (%v)", st.exit_code)

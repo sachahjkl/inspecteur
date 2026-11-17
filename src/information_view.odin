@@ -9,6 +9,7 @@ import lucide "gt:lucide"
 import "gt:platform"
 import "gt:ui"
 import i18n "gt:i18n"
+import timefmt "gt:timefmt"
 
 INFO_KEY_EM :: 13   // the labels' column
 INFO_WIDTH_EM :: 60  // the text's width at most: long lines read badly
@@ -51,9 +52,9 @@ info_report :: proc(app: ^App) -> []Info_Group {
 	}
 	group(&groups, &lines, i18n.tr("Processor"), lucide.CPU)
 
-	add(&lines, i18n.tr("Installed"), size_text(m.mem.total))
-	add(&lines, i18n.tr("Available now"), size_text(m.mem.available))
-	add(&lines, i18n.tr("Swap"), m.mem.swap_total > 0 ? size_text(m.mem.swap_total) : i18n.tr("none"))
+	add(&lines, i18n.tr("Installed"), timefmt.size(i64(m.mem.total)))
+	add(&lines, i18n.tr("Available now"), timefmt.size(i64(m.mem.available)))
+	add(&lines, i18n.tr("Swap"), m.mem.swap_total > 0 ? timefmt.size(i64(m.mem.swap_total)) : i18n.tr("none"))
 	group(&groups, &lines, i18n.tr("Memory"), lucide.LAYERS_2)
 
 	if s != nil {
@@ -67,11 +68,11 @@ info_report :: proc(app: ^App) -> []Info_Group {
 	group(&groups, &lines, i18n.tr("Graphics"), lucide.APP_WINDOW)
 
 	for &d in m.disks {
-		add(&lines, d.name, strings.join({d.model != "" ? d.model : i18n.tr("Disk"), i18n.tr(d.kind), size_text(d.capacity)}, ", ", context.temp_allocator))
+		add(&lines, d.name, strings.join({d.model != "" ? d.model : i18n.tr("Disk"), i18n.tr(d.kind), timefmt.size(i64(d.capacity))}, ", ", context.temp_allocator))
 	}
 	if s != nil {
 		for f in s.fss {
-			add(&lines, f.mount, fmt.tprintf(i18n.tr("%s free of %s (%s, %s)"), size_text(f.free), size_text(f.size), f.kind, f.device))
+			add(&lines, f.mount, fmt.tprintf(i18n.tr("%s free of %s (%s, %s)"), timefmt.size(i64(f.free)), timefmt.size(i64(f.size)), f.kind, f.device))
 		}
 	}
 	group(&groups, &lines, i18n.tr("Storage"), lucide.HARD_DRIVE)

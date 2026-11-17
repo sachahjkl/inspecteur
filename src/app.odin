@@ -22,14 +22,10 @@ import "gt:ui"
 import prefs_page "gt:prefs_page"
 import process "gt:process"
 import setup "gt:setup"
-import update "gt:update"
 import crash_bar "gt:crash_bar"
 import instance "gt:instance"
 import identity "identity"
 import i18n "gt:i18n"
-
-// Frames owed after an event (what it set off settles: the layout, the reveal of the selected row).
-FRAMES_AFTER_INPUT :: 3
 
 // The window's size at its first start, in logical pixels (then the toolkit's window.placement).
 WINDOW_SIZE :: [2]int{1100, 720}
@@ -93,13 +89,10 @@ App :: struct {
 	install:     prefs_page.Install,   // the install: its offer, its dialog, the settings' page (setup.odin)
 	changelog:   prefs_page.Changelog, // What's new: CHANGELOG.md on a page of the settings, said once after an update
 	setup_due:   bool,              // --setup: the install's view opens in the first build
-	updates_asked: bool,            // the updates started, once the install was read (setup_follow)
 	crash_bar:   crash_bar.Bar,     // the last run's crash report, said at the top of the window
 	settings_open: bool,            // the settings' page shows in place of the sections (settings_view.odin)
 	settings_page: prefs_page.Page,
-	updater:     ^update.Updater,   // the updates (updates.odin); nil in the demo
-	update_serial: int,             // the updater's state last said
-	installed_copy: bool,           // this copy is the installed one: it updates itself (update.auto)
+	updates:     prefs_page.Updates,   // the updates (updates.odin); its updater nil in the demo
 	restart:     bool,              // at the end, the new program starts (an update in place)
 	closing:     bool,              // the window closed: what the chores posted is freed, not shown
 	journals:    [dynamic]^Journal_Window,   // the services' journals on their own, a view each (journal_window.odin)
@@ -185,10 +178,8 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 	win := h.win
 	app.announcer.window = win
 	app.announcer.state = &app.main.state   // (a command runs between builds too: its toast goes to this window)
-	if opts.last_crash != "" {
-		log.warnf("the last run ended without its clean end: %s", opts.last_crash)
-		crash_bar.init(&app.crash_bar, opts.last_crash)
-	}
+	// (program_start wrote its warning in the log)
+	if opts.last_crash != "" { crash_bar.init(&app.crash_bar, opts.last_crash) }
 	sampling_attach(app, &h.state)
 	app.icons, _ = font.load_embedded(&app.shared.fonts, lucide.DATA)
 	if logo, ok := setup.logo_make(&app.shared.r, identity.ICONS[4].png); ok {
@@ -196,7 +187,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 		app.install.logo = logo
 	}
 	// (the vendor signs the install's dialog and page: "By <mark> Froment Software")
-	if mark, ok := setup.logo_make(&app.shared.r, #load("../assets/froment-software-64.png"), {16, 16}); ok { app.install.vendor_mark = mark }
+	prefs_page.install_vendor_mark(&app.install, &app.shared.r, #load("../assets/froment-software-64.png"))
 	h.state.icon_font = app.icons
 	// (the ids known before the first command_pressed: else a person's key on one acts only from a later frame, and the
 	// command's own key acts once in between)
@@ -204,7 +195,6 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 	ui.keymap_use(&h.state, &app.keymap)
 	// (the file is read by a task: the window's state is made, its chores run it)
 	ui.palette_memory_open(&app.palette, &h.state, palette_choices_file(app))
-	h.after_input = FRAMES_AFTER_INPUT
 	// (the zoom, the rounding, the scrolling, the delays, partial redraw, the person's keys...: applied now, then each as
 	// it changes)
 	prefs_page.standard_watch(&app.standard, &app.prefs, &h.state, {renderer = &app.shared.r, fonts = &app.shared.fonts, partial_redraw = &h.partial_redraw, pacer = &h.pacer, keymap = &app.keymap})
@@ -223,8 +213,10 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 	// (the palette's sources but the commands', which its first build gives)
 	palette_settings_add(app)
 	go_to_add(app)
-	// (the install is read on a task; the updates start once it says which copy runs: setup_follow. Never offered in the demo)
+	// (the install is read on a task: until it says this copy is the installed one, the updates check nothing by
+	// themselves. Never offered in the demo)
 	prefs_page.install_offer(&app.install, &h.state, offer = !opts.setup && app.demo == nil)
+	updates_start(app)
 	// (after an update, once: a message that stays opens the settings at What's new; never the demo's)
 	app.changelog.english = CHANGELOG
 	if app.demo == nil {
@@ -258,7 +250,6 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 			connections_tick(app)
 		}
 		journals_tick(app)
-		setup_follow(app)
 		updates_follow(app)
 		t_frame := time.tick_now()
 		host.host_frame(h)
@@ -288,7 +279,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 	one_copy_stop(app)
 	app_windows_clear(app)
 	delete(app.windows)
-	updates_stop(app)
+	prefs_page.updates_stop(&app.updates)
 	// (the chores have stopped: no task of theirs holds the themes file or the licence's store)
 	prefs_page.themes_file_destroy(&app.themes_file)
 	licence_destroy(app)
@@ -301,8 +292,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 	delete(app.query)
 	icons_destroy(&app.app_icons, &app.shared.r)
 	if app.logo.ok { render.destroy_texture(&app.shared.r, app.logo.tex) }
-	setup.logo_destroy(&app.shared.r, &app.install.vendor_mark)
-	prefs_page.install_end(&app.install)
+	prefs_page.install_end(&app.install)   // (and the vendor's mark)
 	prefs_page.changelog_destroy(&app.changelog)
 	crash_bar.destroy(&app.crash_bar)
 	// (after the last build, while the window's State is there: which views were open is written, their windows close;

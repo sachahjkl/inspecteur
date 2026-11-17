@@ -11,6 +11,8 @@ import "core:strings"
 import "core:sys/linux"
 import "core:time"
 import cdp "gt:cdp"
+import json "gt:json"
+import toolbox "gt:toolbox"
 
 // The share of a graph's pixels in colour (drawn_share), at least, for it to count as drawn.
 GRAPH_DRAWN_SHARE :: 0.01
@@ -281,7 +283,7 @@ props_is :: proc(c: ^cdp.Client, pid: string) -> bool {
 click_last :: proc(c: ^cdp.Client, text: string) -> bool {
 	boxes := cdp.find(c, text)
 	if len(boxes) == 0 { return false }
-	_, ok := cdp.call(c, "Toolkit.click", fmt.tprintf(`{{"text":%s,"index":%d}}`, cdp.quote(text), len(boxes) - 1))
+	_, ok := cdp.call(c, "Toolkit.click", fmt.tprintf(`{{"text":%s,"index":%d}}`, json.quote(text), len(boxes) - 1))
 	return ok
 }
 
@@ -368,7 +370,12 @@ live_restart :: proc(l: ^Live) {
 	check(l, cdp.key(c, "ctrl+3") && cdp.key(c, "ctrl+g") && cdp.wait_name(c, "core_box0", SESSION_WAIT), "Performance, a graph per logical processor")
 	check(l, file_has(prefs, "view.section\tperformance") && file_has(prefs, "performance.cpu_view\tlogical"), "the section and the CPU's view are kept")
 	if !check(l, len(pid_before) == 1 && len(name_before) == 1, "the Name and PID titles were there") { return }
-	if !check(l, program_restart(&l.session, c), "inspecteur closed and started again") { return }
+	// (closed as the person's would: its own window over the protocol; what it kept is read again at its new start)
+	cdp.close(c)
+	code, why := toolbox.program_session_restart(&l.session)
+	if why == "" && code != 0 { why = fmt.tprintf("it ended with %d", code) }
+	if why == "" { c^, why = toolbox.program_session_connect(&l.session) }
+	if !check(l, why == "", "inspecteur closed and started again%s", why != "" ? fmt.tprintf(" (%s)", why) : "") { return }
 	check(l, cdp.wait_name(c, "core_box0", SESSION_WAIT), "it comes back on Performance, a graph per logical processor")
 	check(l, cdp.key(c, "ctrl+2") && cdp.wait_for(c, "Background processes", SESSION_WAIT), "Processes")
 	cdp.wait_idle(c, SESSION_WAIT)

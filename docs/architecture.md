@@ -78,11 +78,12 @@ the sheet of the keys (F1) lists them all. A test checks that no key does two th
 `--section <name>`, and `StartupWMClass`, the window's class), its icons (`assets/logo_<n>.png`). `setup.odin` gives it to
 the toolkit's `gt:setup` through `prefs_page.Install`: the install's dialog, offered at the start of a copy that is not
 installed (once per version, `install.choice`), the settings' Installation page, and `--install`, `--uninstall`,
-`--setup`. The updates start once that reading says which copy runs (`setup_follow`). On NixOS a classic install builds a profile of
+`--setup`. The updates start with the window; they act by themselves only once that reading says this copy is the
+installed one. On NixOS a classic install builds a profile of
 `NIXOS_LIBRARIES` and points the copy at it; a copy from the Nix store is never offered an install. `inspecteurtool
 desktop_files` writes the same entry and icons for the Nix package.
 
-`updates.odin` runs the toolkit's `gt:update`: the installed copy checks the latest release's manifest, signed with the
+`updates.odin` runs the toolkit's updates (`prefs_page.updates_start`, over `gt:update`): the installed copy checks the latest release's manifest, signed with the
 key of `src/update/product.odin` (its private half is the release workflow's secret `UPDATE_SIGNING_KEY`, and
 `secrets/production.yaml` with SOPS), downloads the program and puts it in place; it runs at the next start.
 `settings_view.odin` shows the preferences' registry with the toolkit's `gt:prefs_page` (the layouts of the tables are
@@ -115,7 +116,7 @@ tasks of the chores, shown under the settings' General page.
 
 - Unit tests (`src`; those of the Linux readers' formats in `*_linux_test.odin`): the formats of `/proc`, `/proc/net`, unit files, desktop entries, `os-release`, `pci.ids`, EDID and
   `mountinfo`; the rates, a pid used again, the devices that come and go, the rows' filter and sort, the columns kept,
-  the priorities' steps, the apps of a scope, launchers and interpreters; names, sizes, durations; no key doing two things; the preferences'
+  the priorities' steps, the apps of a scope, launchers and interpreters; names, durations, an empty cell for a still rate; no key doing two things; the preferences'
   documentation.
 - `inspecteurtool live`: the real program in a sway with no screen, driven over the DevTools protocol (see
   [development.md](development.md)). A key that changes something is pressed only once the selected row, as the

@@ -11,6 +11,7 @@ import "core:time"
 import "gt:draw"
 import "gt:ui"
 import i18n "gt:i18n"
+import timefmt "gt:timefmt"
 
 Device_Kind :: enum u8 { Cpu, Memory, Disk, Network, Gpu, Pressure }
 
@@ -66,7 +67,7 @@ build_performance :: proc(app: ^App, em: f32) {
 			ui.next({width = ui.fill(), height = ui.fill()})
 			if ui.scroll_y("###devices_scroll") {
 				device_row(app, {.Cpu, 0}, i18n.tr("CPU"), fmt.tprintf("%s  %s%s", percent_text(f64(m.cpu)), mhz_text(m.mhz), m.temp_count > 0 ? fmt.tprintf("  %.0f °C", m.temps[0].celsius) : ""), {{&m.cpu_hist, hue(app, HUE_CPU), ""}}, 100, 0, em)
-				device_row(app, {.Memory, 0}, i18n.tr("Memory"), fmt.tprintf("%s / %s (%s)", size_text(mem_used(m)), size_text(m.mem.total), percent_text(f64(ui.value_history_last(&m.mem_hist)))), {{&m.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, 0, em)
+				device_row(app, {.Memory, 0}, i18n.tr("Memory"), fmt.tprintf("%s / %s (%s)", timefmt.size(i64(mem_used(m))), timefmt.size(i64(m.mem.total)), percent_text(f64(ui.value_history_last(&m.mem_hist)))), {{&m.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, 0, em)
 				for &d, i in m.disks {
 					device_row(app, {.Disk, i}, fmt.tprintf(i18n.tr("Disk %d (%s)"), i, d.name), fmt.tprintf("%s  %s", i18n.tr(d.kind), percent_text(f64(d.active))), {{&d.active_hist, hue(app, HUE_DISK), ""}}, 100, 0, em)
 				}
@@ -275,7 +276,7 @@ caption :: proc(left, right: string, em: f32) {
 
 percent_top :: proc(v: f32) -> string { return percent_text(f64(v)) }
 celsius_top :: proc(v: f32) -> string { return fmt.tprintf("%.0f °C", v) }
-rate_top :: proc(v: f32) -> string { return fmt.tprintf("%s/s", size_text(u64(v))) }
+rate_top :: proc(v: f32) -> string { return timefmt.rate(f64(v)) }
 
 // The numbers under the graphs: big ones on the left, a table of details on the right.
 Stat :: struct { label, value: string }
@@ -394,7 +395,7 @@ cpu_page :: proc(app: ^App, em: f32) {
 	threads := app.ranking.threads   // (summed at the sample)
 	caches := make([dynamic]Stat, context.temp_allocator)
 	for size, level in m.info.cache {
-		if size > 0 { append(&caches, Stat{fmt.tprintf(i18n.tr("L%d cache"), level + 1), size_text(size)}) }
+		if size > 0 { append(&caches, Stat{fmt.tprintf(i18n.tr("L%d cache"), level + 1), timefmt.size(i64(size))}) }
 	}
 	details := make([dynamic]Stat, context.temp_allocator)
 	if m.info.base_mhz > 0 { append(&details, Stat{i18n.tr("Base speed"), mhz_text(m.info.base_mhz)}) }
@@ -410,7 +411,7 @@ cpu_page :: proc(app: ^App, em: f32) {
 	big := make([dynamic]Stat, context.temp_allocator)
 	append(&big, Stat{i18n.tr("Utilization"), percent_text(f64(m.cpu))}, Stat{i18n.tr("Speed"), mhz_text(m.mhz)})
 	if m.temp_count > 0 { append(&big, Stat{i18n.tr("Temperature"), fmt.tprintf("%.0f °C", m.temps[0].celsius)}) }
-	append(&big, Stat{i18n.tr("Up time"), uptime_text(m.uptime)}, Stat{i18n.tr("Processes"), fmt.tprintf("%d", len(app.sampler.procs))}, Stat{i18n.tr("Threads"), fmt.tprintf("%d", threads)}, Stat{i18n.tr("Open files"), fmt.tprintf("%d", m.handles)})
+	append(&big, Stat{i18n.tr("Up time"), timefmt.stopwatch(m.uptime * 1000, {days = true})}, Stat{i18n.tr("Processes"), fmt.tprintf("%d", len(app.sampler.procs))}, Stat{i18n.tr("Threads"), fmt.tprintf("%d", threads)}, Stat{i18n.tr("Open files"), fmt.tprintf("%d", m.handles)})
 	stats_block(big[:], details[:], em)
 }
 
@@ -418,7 +419,7 @@ cpu_page :: proc(app: ^App, em: f32) {
 memory_page :: proc(app: ^App, em: f32) {
 	m := &app.machine
 	mem := m.mem
-	page_title(i18n.tr("Memory"), fmt.tprintf("%s", size_text(mem.total)), em)
+	page_title(i18n.tr("Memory"), fmt.tprintf("%s", timefmt.size(i64(mem.total))), em)
 	c := hue(app, HUE_MEMORY)
 	captioned_graph(app, "memory_graph", i18n.tr("Memory usage"), {{&m.mem_hist, c, ""}}, 100, proc(v: f32) -> string { return percent_text(100) }, em, ui.fill())
 	// the composition: in use (what the kernel cannot take back), the cache it takes back when asked (available beyond the
@@ -433,11 +434,11 @@ memory_page :: proc(app: ^App, em: f32) {
 	// (the numbers of the composition, and what the kernel keeps besides: the files it caches, the buffers of the disks,
 	// what processes share, what is still to be written)
 	stats_block({
-		{i18n.tr("In use"), size_text(in_use)}, {i18n.tr("Available"), size_text(mem.available)}, {i18n.tr("Free"), size_text(mem.free)},
-		{i18n.tr("Committed"), fmt.tprintf("%s / %s", size_text(mem.committed), size_text(mem.commit_limit))}, {i18n.tr("Swap"), fmt.tprintf("%s / %s", size_text(swap_used), size_text(mem.swap_total))},
+		{i18n.tr("In use"), timefmt.size(i64(in_use))}, {i18n.tr("Available"), timefmt.size(i64(mem.available))}, {i18n.tr("Free"), timefmt.size(i64(mem.free))},
+		{i18n.tr("Committed"), fmt.tprintf("%s / %s", timefmt.size(i64(mem.committed)), timefmt.size(i64(mem.commit_limit)))}, {i18n.tr("Swap"), fmt.tprintf("%s / %s", timefmt.size(i64(swap_used)), timefmt.size(i64(mem.swap_total)))},
 	}, {
-		{i18n.tr("Total"), size_text(mem.total)}, {i18n.tr("Files cached"), size_text(mem.cached)}, {i18n.tr("Disk buffers"), size_text(mem.buffers)},
-		{i18n.tr("Kernel, reclaimable"), size_text(mem.reclaimable)}, {i18n.tr("Shared memory"), size_text(mem.shared)}, {i18n.tr("To be written"), size_text(mem.dirty)},
+		{i18n.tr("Total"), timefmt.size(i64(mem.total))}, {i18n.tr("Files cached"), timefmt.size(i64(mem.cached))}, {i18n.tr("Disk buffers"), timefmt.size(i64(mem.buffers))},
+		{i18n.tr("Kernel, reclaimable"), timefmt.size(i64(mem.reclaimable))}, {i18n.tr("Shared memory"), timefmt.size(i64(mem.shared))}, {i18n.tr("To be written"), timefmt.size(i64(mem.dirty))},
 	}, em)
 }
 
@@ -450,9 +451,9 @@ disk_page :: proc(app: ^App, d: ^Disk, em: f32) {
 	captioned_graph(app, "disk_rate", i18n.tr("Transfer rate"), {{&d.read_hist, c, i18n.tr("Read")}, {&d.write_hist, hue(app, HUE_SECOND), i18n.tr("Write")}}, 0, rate_top, em, ui.fill(), DISK_FLOOR)
 	mounts := strings.join(d.mounts[:], ", ", context.temp_allocator)
 	stats_block({
-		{i18n.tr("Active time"), percent_text(f64(d.active))}, {i18n.tr("Read speed"), fmt.tprintf("%s/s", size_text(u64(d.read_rate)))}, {i18n.tr("Write speed"), fmt.tprintf("%s/s", size_text(u64(d.write_rate)))},
+		{i18n.tr("Active time"), percent_text(f64(d.active))}, {i18n.tr("Read speed"), timefmt.rate(f64(d.read_rate))}, {i18n.tr("Write speed"), timefmt.rate(f64(d.write_rate))},
 	}, {
-		{i18n.tr("Capacity"), size_text(d.capacity)}, {i18n.tr("Type"), i18n.tr(d.kind)}, {i18n.tr("Model"), d.model}, {i18n.tr("Mounted on"), mounts != "" ? mounts : i18n.tr("nothing")},
+		{i18n.tr("Capacity"), timefmt.size(i64(d.capacity))}, {i18n.tr("Type"), i18n.tr(d.kind)}, {i18n.tr("Model"), d.model}, {i18n.tr("Mounted on"), mounts != "" ? mounts : i18n.tr("nothing")},
 	}, em)
 }
 
@@ -507,7 +508,7 @@ gpu_page :: proc(app: ^App, g: ^Gpu, em: f32) {
 	}
 	big := make([dynamic]Stat, context.temp_allocator)
 	if r.has_util { append(&big, Stat{i18n.tr("Utilization"), percent_text(f64(r.util))}) }
-	if r.has_mem { append(&big, Stat{i18n.tr("Dedicated memory"), fmt.tprintf("%s / %s", size_text(r.mem_used), size_text(r.mem_total))}) }
+	if r.has_mem { append(&big, Stat{i18n.tr("Dedicated memory"), fmt.tprintf("%s / %s", timefmt.size(i64(r.mem_used)), timefmt.size(i64(r.mem_total)))}) }
 	if r.has_temp { append(&big, Stat{i18n.tr("Temperature"), fmt.tprintf("%.0f °C", r.temp_c)}) }
 	if r.has_power { append(&big, Stat{i18n.tr("Power"), fmt.tprintf("%.0f W", r.power_w)}) }
 	details := make([dynamic]Stat, context.temp_allocator)
@@ -575,7 +576,7 @@ composition_bar :: proc(parts: []Bar_Part, total: u64, em: f32) {
 			ui.build_box({.Draw_Background}, fmt.tprintf("###swatch%d", i))
 			if ui.tags("weak") {
 				ui.next({width = ui.text_size(), height = ui.pct(1), font_size = em * 0.86, text_pad = em * 0.35})
-				ui.label(fmt.tprintf("%s %s###legend%d", p.label, size_text(p.bytes), i))
+				ui.label(fmt.tprintf("%s %s###legend%d", p.label, timefmt.size(i64(p.bytes)), i))
 			}
 			ui.space(ui.ITEM_GAP)
 		}

@@ -28,6 +28,10 @@ section, the views, the tests) is [docs/architecture.md](../../docs/architecture
   ([features/gpus.md](features/gpus.md)).
 - An act on a process: asked (for a kill, a tree, the desktop's processes), then sent through a pidfd only if the
   process is still the same.
+- The updates: started with the window (never in the demo), checking nothing by themselves until the install's reading
+  says this copy is the installed one and update.auto is on; the toolkit's `prefs_page.updates_follow` applies it at
+  each turn of the loop. Starting them only once the install was read, as before, kept a state of the program's own
+  for what the toolkit now decides.
 
 ## Subtleties
 

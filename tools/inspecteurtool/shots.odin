@@ -14,21 +14,21 @@ import cdp "gt:cdp"
 import cli "gt:cli"
 import toolbox "gt:toolbox"
 
-SHOTS_DIR  :: "build/shots"
-SHOTS_PORT :: 9373
-SHOTS_OUT  :: "docs/screenshots"
-// The Performance section's graphs, a few samples old before their pictures.
-PERF_SETTLE :: 8 * time.Second
+SHOTS_DIR :: "build/shots"
+SHOTS_OUT :: "docs/screenshots"
+// How long the window's picture stays the same before a shot whose last change the box tree does not show (the icons of
+// the rows, the themes' cards). Shorter than a sample's period: the demo's numbers change at each sample.
+SHOTS_STILL :: 300 * time.Millisecond
 
 run_shots :: proc(args: []string) -> cli.Exit {
 	out := SHOTS_OUT
 	if len(args) == 2 && args[0] == "--out" { out = args[1] }
-	if run_build({"release"}) != .Done { return .Failed }
-	s: Session
-	defer session_stop(&s)
-	if why := session_start(&s, SHOTS_DIR, SHOTS_PORT, {"--demo", "--pref", "appearance.mode=dark"}); why != "" { fmt.eprintfln("inspecteurtool shots: %s", why); return .Failed }
-	c, ok := window_connect(&s)
-	if !ok { fmt.eprintln("inspecteurtool shots: the window does not answer"); return .Failed }
+	if !toolbox.program_build(build_options(), release = true) { return .Failed }
+	s: toolbox.Program_Session
+	defer toolbox.program_session_stop(&s)
+	if why := session_start(&s, SHOTS_DIR, {"--demo", "--pref", "appearance.mode=dark"}); why != "" { fmt.eprintfln("inspecteurtool shots: %s", why); return .Failed }
+	c, why := toolbox.program_session_connect(&s)
+	if why != "" { fmt.eprintfln("inspecteurtool shots: %s", why); return .Failed }
 	defer cdp.close(&c)
 	_ = os.make_directory_all(out)
 	failed := false
@@ -43,7 +43,8 @@ run_shots :: proc(args: []string) -> cli.Exit {
 	}
 	need(cdp.wait_for(&c, "Background processes", SESSION_WAIT), "no table", &failed)
 	click_header(&c, "CPU")   // the busiest first
-	time.sleep(2500 * time.Millisecond)   // (some samples: every row has its CPU %)
+	// (the demo's minute before the start gives every row its CPU % at once: its column, c6, shows them)
+	need(cdp.wait_name(&c, "c6", SESSION_WAIT, text = "%"), "no CPU %", &failed)
 	shot(&c, out, "processes", &failed)
 
 	// the first app's group, open, and its menu
@@ -121,10 +122,9 @@ run_shots :: proc(args: []string) -> cli.Exit {
 		cdp.wait_for(&c, "Why is it slow?", SESSION_WAIT, gone = true)
 	}
 
-	// the Performance section: the graphs need some history (a few samples)
+	// the Performance section: its graphs are full at once (the demo reads the minute before its start: demo_preroll)
 	cdp.key(&c, "ctrl+3")
 	cdp.wait_name(&c, "cpu_graph", SESSION_WAIT)
-	time.sleep(PERF_SETTLE)
 	shot(&c, out, "performance_cpu", &failed)
 	cdp.key(&c, "ctrl+g")
 	cdp.wait_name(&c, "core_0", SESSION_WAIT)
@@ -141,7 +141,7 @@ run_shots :: proc(args: []string) -> cli.Exit {
 	// Mission Control, once every section has read
 	cdp.key(&c, "ctrl+1")
 	if need(cdp.wait_name(&c, "mc_svc_0", SESSION_WAIT), "no Mission Control", &failed) {
-		time.sleep(1500 * time.Millisecond)
+		cdp.wait_still(&c, SHOTS_STILL, SESSION_WAIT)   // (the other sections' readings and the icons, come on chores)
 		shot(&c, out, "mission_control", &failed)
 	}
 
@@ -155,7 +155,7 @@ run_shots :: proc(args: []string) -> cli.Exit {
 	for sec in sections {
 		cdp.key(&c, sec.key)
 		if !need(cdp.wait_for(&c, sec.ready, SESSION_WAIT), fmt.tprintf("%s is not read", sec.picture), &failed) { continue }
-		time.sleep(500 * time.Millisecond)   // (the icons of the rows, loaded at their first frame)
+		cdp.wait_still(&c, SHOTS_STILL, SESSION_WAIT)   // (the icons of the rows, loaded at their first frame)
 		shot(&c, out, sec.picture, &failed)
 	}
 
@@ -185,7 +185,7 @@ run_shots :: proc(args: []string) -> cli.Exit {
 		// (the first page is General; the picture shows the look's page)
 		cdp.click_text(&c, "Appearance")
 		need(cdp.wait_for(&c, "Light or dark", SESSION_WAIT), "no Appearance page", &failed)
-		time.sleep(500 * time.Millisecond)   // (the themes' cards)
+		cdp.wait_still(&c, SHOTS_STILL, SESSION_WAIT)   // (the themes' cards)
 		shot(&c, out, "settings", &failed)
 		cdp.key(&c, "Escape")
 		cdp.key(&c, "Escape")
@@ -195,7 +195,7 @@ run_shots :: proc(args: []string) -> cli.Exit {
 	need(cdp.wait_for(&c, "Background processes", SESSION_WAIT), "no Processes section", &failed)
 	cdp.key(&c, "ctrl+shift+l")
 	cdp.wait_for(&c, "Light colours", SESSION_WAIT)
-	time.sleep(1500 * time.Millisecond)   // (the colours fade to the light version)
+	cdp.wait_still(&c, SHOTS_STILL, SESSION_WAIT)   // (the colours fade to the light version)
 	shot(&c, out, "processes_light", &failed)
 	// last: the footer says the text's size for a while after (it was in the next pictures)
 	// larger text, as a narrow window: the name column keeps its width, the last columns go past the edge

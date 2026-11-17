@@ -27,6 +27,7 @@ import "core:time"
 import "gt:platform"
 import "gt:ui"
 import i18n "gt:i18n"
+import timefmt "gt:timefmt"
 
 // After a signal, the next sample comes this soon: the row goes as the process ends.
 SAMPLE_AFTER_SIGNAL :: 300 * time.Millisecond
@@ -202,7 +203,7 @@ dump_ask :: proc(app: ^App, p: ^Proc) {
 	m.chosen.name = fmt.aprintf(i18n.tr("%s (PID %d)"), p.name, p.pid)
 	ui.confirm_open(CONFIRM_VIEW, {
 		title = fmt.tprintf(i18n.tr("Create a dump file of %s?"), m.chosen.name),
-		note = fmt.tprintf(i18n.tr("Its memory is written to a file of %s at most: anything it held, passwords and documents too. %s"), size_text(p.resident), i18n.tr(DUMP_HOW)),
+		note = fmt.tprintf(i18n.tr("Its memory is written to a file of %s at most: anything it held, passwords and documents too. %s"), timefmt.size(i64(p.resident)), i18n.tr(DUMP_HOW)),
 		act = i18n.tr("Create"), enter_confirms = true,
 	})
 }

@@ -11,6 +11,7 @@ import "core:strings"
 import lucide "gt:lucide"
 import "gt:ui"
 import i18n "gt:i18n"
+import timefmt "gt:timefmt"
 
 PROPS_W_EM, PROPS_H_EM         :: 58, 40
 PROPS_MIN_W_EM, PROPS_MIN_H_EM :: 36, 24
@@ -145,11 +146,11 @@ props_general :: proc(app: ^App, p: ^Proc, em: f32) {
 		props_line(i18n.tr("Command line"), p.cmdline != "" ? p.cmdline : i18n.tr("none"), em)
 		props_line(i18n.tr("Working folder"), cwd, em)
 		props_line(i18n.tr("CPU"), fmt.tprintf(i18n.tr("%s of the machine"), percent_text(f64(p.cpu), 1)), em)
-		props_line(i18n.tr("Memory"), fmt.tprintf(i18n.tr("%s private, %s resident (with the pages it shares with other processes)"), size_text(p.private), size_text(p.resident)), em)
-		if p.gpu_mem > 0 { props_line(i18n.tr("GPU memory"), size_text(p.gpu_mem), em) }
+		props_line(i18n.tr("Memory"), fmt.tprintf(i18n.tr("%s private, %s resident (with the pages it shares with other processes)"), timefmt.size(i64(p.private)), timefmt.size(i64(p.resident))), em)
+		if p.gpu_mem > 0 { props_line(i18n.tr("GPU memory"), timefmt.size(i64(p.gpu_mem)), em) }
 		if p.gpu > 0 { props_line(i18n.tr("GPU"), fmt.tprintf(i18n.tr("%s of a GPU's time"), percent_text(f64(p.gpu))), em) }
 		props_line(i18n.tr("Threads"), fmt.tprintf("%d", p.threads), em)
-		props_line(i18n.tr("Disk"), !p.io_known ? i18n.tr("Access denied (another user's process)") : fmt.tprintf(i18n.tr("%s read, %s written since it started"), size_text(p.io_read), size_text(p.io_write)), em)
+		props_line(i18n.tr("Disk"), !p.io_known ? i18n.tr("Access denied (another user's process)") : fmt.tprintf(i18n.tr("%s read, %s written since it started"), timefmt.size(i64(p.io_read)), timefmt.size(i64(p.io_write))), em)
 	}
 }
 
@@ -193,9 +194,9 @@ props_history :: proc(app: ^App, p: ^Proc, em: f32) {
 			ui.space(ui.SPACE_2)
 		}
 		graph("hist_cpu", i18n.tr("CPU"), &h.cpu, hue(app, HUE_CPU), 0, 5, proc(v: f32) -> string { return percent_text(f64(v), 1) }, period, em)
-		graph("hist_memory", i18n.tr("Private memory"), &h.memory, hue(app, HUE_MEMORY), 0, 16 * 1024 * 1024, proc(v: f32) -> string { return size_text(u64(v)) }, period, em)
+		graph("hist_memory", i18n.tr("Private memory"), &h.memory, hue(app, HUE_MEMORY), 0, 16 * 1024 * 1024, proc(v: f32) -> string { return timefmt.size(i64(v)) }, period, em)
 		if p.io_known {
-			graph("hist_disk", i18n.tr("Disk"), &h.disk, hue(app, HUE_DISK), 0, DISK_FLOOR, proc(v: f32) -> string { return fmt.tprintf("%s/s", size_text(u64(v))) }, period, em)
+			graph("hist_disk", i18n.tr("Disk"), &h.disk, hue(app, HUE_DISK), 0, DISK_FLOOR, proc(v: f32) -> string { return timefmt.rate(f64(v)) }, period, em)
 		}
 	}
 }
@@ -298,7 +299,7 @@ props_files :: proc(app: ^App, em: f32) {
 props_modules :: proc(app: ^App, em: f32) {
 	props_list(app, "modules", {i18n.tr("File mapped"), i18n.tr("Size")}, {0, 8}, proc(d: ^Props_Data) -> int { return len(d.modules) }, proc(app: ^App, row, col: int) -> string {
 		m := app.props.data.modules[row]
-		return col == 0 ? m.path : size_text(m.size)
+		return col == 0 ? m.path : timefmt.size(i64(m.size))
 	}, em)
 }
 

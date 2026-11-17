@@ -28,16 +28,16 @@ ICONS := [?]desktop.Icon{
 	{512, #load("../../assets/logo_512.png")},
 }
 
-identity :: proc() -> desktop.Identity {
-	return desktop.Identity{
-		name = "Inspecteur", key = "Inspecteur", slug = SLUG,
-		description = "What runs on this computer: its processes, performance, services, startup and connections.",
-		vendor = "Froment Software",
-		entry_marker = "X-Inspecteur-Integration", registry_mark = "InspecteurIntegration", vendor_key = "FromentSoftware",
-		manifest_name = "inspecteur_install.txt",
-		generic_name = "Task Manager", categories = "System;Monitor;",
-		keywords = "task;manager;process;monitor;cpu;memory;kill;services;startup;network;",
-		env_prefix = "INSPECTEUR_DESKTOP_",
-		actions = ACTIONS[:],
-	}
+// The marks (the entry's, the registry's, the manifest's name, the environment's prefix) follow the toolkit's rule
+// (desktop.identity_of): the installed copies carry the same. Its strings are allocated: a caller makes it once per use
+// (the setup's options, the Nix package's entry). Its uninstall_arguments are the setup's (setup.odin): only the setup
+// writes an uninstall entry; the Nix package's has none.
+identity :: proc(allocator := context.allocator) -> desktop.Identity {
+	id := desktop.identity_of("Froment Software", "Inspecteur", SLUG, allocator)
+	id.description = "What runs on this computer: its processes, performance, services, startup and connections."
+	id.generic_name = "Task Manager"
+	id.categories = "System;Monitor;"
+	id.keywords = "task;manager;process;monitor;cpu;memory;kill;services;startup;network;"
+	id.actions = ACTIONS[:]
+	return id
 }

@@ -25,6 +25,7 @@ import "gt:platform"
 import crash_bar "gt:crash_bar"
 import "gt:ui"
 import i18n "gt:i18n"
+import timefmt "gt:timefmt"
 
 // Heights in ems: the title bar, a section's bar, the header, a row, a line of the sidebar, the footer.
 TITLE_EM   :: 2.6
@@ -46,7 +47,7 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	// the compositor's Ctrl+Shift+Escape that opened it)
 	app.held = ui.key_held(.Ctrl)
 	// (the user's themes file: a task looks at it now and then and reads it when it changed; app_params shows it)
-	if prefs_page.themes_file_poll(&app.themes_file, &h.state) { h.settle = max(h.settle, FRAMES_AFTER_INPUT) }
+	if prefs_page.themes_file_poll(&app.themes_file, &h.state) { host.host_settle(h) }
 	// (--setup: the install's view, opened in the first build: its owner is this window)
 	if app.setup_due {
 		app.setup_due = false
@@ -420,7 +421,7 @@ build_meters :: proc(app: ^App, em: f32) {
 	// (the share of every logical processor, as the CPU % of the processes: "of 16 CPUs" as Linux counts them)
 	meter(app, "cpu", lucide.CPU, i18n.tr("CPU"), fmt.tprintf(i18n.tr(len(app.machine.core_total), "%s of %d CPUs", "%s of %d CPUs"), percent_text(f64(app.machine.cpu)), len(app.machine.core_total)), app.machine.cpu / 100, em)
 	mem := app.machine.mem.total > 0 ? f32(f64(mem_used(&app.machine)) / f64(app.machine.mem.total)) : 0
-	meter(app, "memory", lucide.LAYERS_2, i18n.tr("Memory"), fmt.tprintf(i18n.tr("%s of %s"), size_text(mem_used(&app.machine)), size_text(app.machine.mem.total)), mem, em)
+	meter(app, "memory", lucide.LAYERS_2, i18n.tr("Memory"), fmt.tprintf(i18n.tr("%s of %s"), timefmt.size(i64(mem_used(&app.machine))), timefmt.size(i64(app.machine.mem.total))), mem, em)
 	ui.space(ui.SPACE_3)
 }
 
@@ -463,9 +464,9 @@ build_footer :: proc(app: ^App, em: f32) {
 	if ui.row(.Center, {.Draw_Background, .Draw_Side_Top}, "###footer") {
 		ui.space(ui.SPACE_3)
 		// (an update on offer, coming or in place: the one place that shows it, as in every program of the toolkit)
-		if app.updater != nil {
+		if app.updates.updater != nil {
 			ui.next({height = ui.px(ui.dense(em * (FOOTER_EM - 0.45)))})
-			if prefs_page.update_badge(app.updater, proc(user: rawptr) { updates_restart((^App)(user)) }, app) != nil { ui.space(ui.SPACE_2) }
+			if prefs_page.update_badge(app.updates.updater, proc(user: rawptr) { updates_restart((^App)(user)) }, app) != nil { ui.space(ui.SPACE_2) }
 		}
 		if ui.style({font_size = em * 0.92}) {
 			msg := app.status

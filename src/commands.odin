@@ -322,7 +322,7 @@ palette_can :: proc(app: ^App) -> Palette_Can {
 	sv, tv := &s.rows.table.vl, &st.rows.table.vl
 	return {
 		tab = app.tab, refreshes = app.refreshes, rows = app.rows_made, selection = {u64(app.vl.sel), app.vl.version},
-		tree = app.table.tree, filtered = len(app.search.buf) > 0, paused = app.paused, updater = app.updater != nil,
+		tree = app.table.tree, filtered = len(app.search.buf) > 0, paused = app.paused, updater = app.updates.updater != nil,
 		zoom = ui.zoom(&app.main.state),
 		services = {u64(sv.sel), sv.version, u64(s.pending)}, services_list = s.list,
 		details = service_details_shown(app), pane = s.pane.serial,
@@ -406,7 +406,7 @@ cmd_can :: proc(app: ^App, c: Cmd) -> bool {
 	p := selected_proc(app)
 	switch c {
 	case .Shortcuts, .Filter, .Read_Again, .Light_Dark, .Settings, .Pause_Refresh, .Refresh_Speed, .Diagnose: return true
-	case .Check_Updates: return app.updater != nil
+	case .Check_Updates: return app.updates.updater != nil
 	case .Zoom_In:    return ui.zoom(&app.main.state) < ui.ZOOM_MAX
 	case .Zoom_Out:   return ui.zoom(&app.main.state) > ui.ZOOM_MIN
 	case .Zoom_Reset: return ui.zoom(&app.main.state) != 1
@@ -465,7 +465,7 @@ cmd_run :: proc(app: ^App, c: Cmd) {
 	case .Zoom_Reset:       ui.set_zoom(&app.main.state, 1)
 	case .Light_Dark:       light_dark_switch(app)
 	case .Settings:         settings_toggle(app)
-	case .Check_Updates:    update.check_now(app.updater); say(app, i18n.tr("Checking for updates…"))
+	case .Check_Updates:    update.check_now(app.updates.updater); say(app, i18n.tr("Checking for updates…"))
 	case .Diagnose:         diagnosis_open(app)
 	case .Show_Mission_Control: tab_show(app, .Mission_Control)
 	case .Show_Processes:   tab_show(app, .Processes)

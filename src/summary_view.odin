@@ -8,6 +8,7 @@ package inspecteur
 import "core:fmt"
 import "gt:ui"
 import i18n "gt:i18n"
+import timefmt "gt:timefmt"
 
 SUMMARY_EM       :: 3.0   // its height
 // The temperature at which a tile's stripe is green, and red (degrees Celsius); the pressure at which it is red.
@@ -28,11 +29,11 @@ summary_build :: proc(app: ^App, em: f32) {
 	tiles := make([dynamic]Tile, context.temp_allocator)
 	mem := m.mem.total > 0 ? f32(f64(mem_used(m)) / f64(m.mem.total)) : 0
 	append(&tiles, Tile{"cpu", i18n.tr("CPU"), percent_text(f64(m.cpu)), {{&m.cpu_hist, hue(app, HUE_CPU), ""}}, 100, 0, m.cpu / 100, {.Cpu, 0}})
-	append(&tiles, Tile{"memory", i18n.tr("Memory"), size_text(mem_used(m)), {{&m.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, 0, mem, {.Memory, 0}})
+	append(&tiles, Tile{"memory", i18n.tr("Memory"), timefmt.size(i64(mem_used(m))), {{&m.mem_hist, hue(app, HUE_MEMORY), ""}}, 100, 0, mem, {.Memory, 0}})
 	busiest, active := 0, f32(0)
 	for d, i in m.disks { if d.active > active { busiest, active = i, d.active } }
 	if len(m.disks) > 0 {
-		append(&tiles, Tile{"disk", i18n.tr("Disk"), fmt.tprintf("%s/s", size_text(u64(m.disk_rate))), {{&m.disk_hist, hue(app, HUE_DISK), ""}}, 0, DISK_FLOOR, active / 100, {.Disk, busiest}})
+		append(&tiles, Tile{"disk", i18n.tr("Disk"), timefmt.rate(f64(m.disk_rate)), {{&m.disk_hist, hue(app, HUE_DISK), ""}}, 0, DISK_FLOOR, active / 100, {.Disk, busiest}})
 	}
 	if len(m.nets) > 0 {
 		append(&tiles, Tile{"network", i18n.tr("Network"), bits_text(m.net_rate), {{&m.net_hist, hue(app, HUE_NETWORK), ""}}, 0, NET_FLOOR, -1, {.Network, 0}})

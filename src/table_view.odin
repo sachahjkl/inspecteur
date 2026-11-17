@@ -14,6 +14,7 @@ import "core:time/timezone"
 import "gt:render"
 import "gt:ui"
 import i18n "gt:i18n"
+import timefmt "gt:timefmt"
 
 // The name cell's inset before its chevron (the header's lead room counts it too), in ems.
 NAME_LEAD_EM :: ui.SPACE_1
@@ -381,10 +382,10 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 		case .CPU:        cell(t, c, percent_text(f64(cpu), 1), &tip, heat = cpu / HEAT_CPU_FULL, page = page)
 		case .CPU_Graph:
 			if text := cpu_graph_cell(app, r, page, em); text != "" { tip = text }
-		case .Memory:     cell(t, c, size_text(private), &tip, heat = app.machine.mem.total > 0 ? f32(f64(private) / f64(app.machine.mem.total) / HEAT_MEM_FULL) : 0, page = page)
-		case .Resident:   cell(t, c, size_text(resident), &tip, weak = true)
+		case .Memory:     cell(t, c, timefmt.size(i64(private)), &tip, heat = app.machine.mem.total > 0 ? f32(f64(private) / f64(app.machine.mem.total) / HEAT_MEM_FULL) : 0, page = page)
+		case .Resident:   cell(t, c, timefmt.size(i64(resident)), &tip, weak = true)
 		case .GPU:        cell(t, c, gpu > 0 ? percent_text(f64(gpu)) : "", &tip, heat = gpu / HEAT_GPU_FULL, page = page)
-		case .GPU_Memory: cell(t, c, gpu_mem > 0 ? size_text(gpu_mem) : "", &tip)
+		case .GPU_Memory: cell(t, c, gpu_mem > 0 ? timefmt.size(i64(gpu_mem)) : "", &tip)
 		case .Read:       cell(t, c, io_dash ? "–" : rate_text(read), &tip, weak = io_dash)
 		case .Write:      cell(t, c, io_dash ? "–" : rate_text(write), &tip, weak = io_dash)
 		case .Threads:    cell(t, c, fmt.tprintf("%d", threads), &tip, weak = weak)

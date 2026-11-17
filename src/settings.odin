@@ -24,12 +24,12 @@ APP_FOLDER :: "FromentSoftware" + platform.USER_DIR_SEPARATOR + APP_TITLE
 // inspecteur's own texts in other languages (i18n/, written by `inspecteurtool i18n fr`); the toolkit's come with it.
 PROGRAM_CATALOGUES :: []i18n.Catalog{{"fr", #load("../i18n/fr.txt", string)}}
 
-// inspecteur's identity in the standard settings: its theme, its name and its update address. The rest is the toolkit's,
-// as in its other programs (prefs_page.STANDARD_DEFAULTS).
+// inspecteur's identity in the standard settings: its theme and its name. The rest is the toolkit's, as in its other
+// programs (prefs_page.STANDARD_DEFAULTS; update.base_url empty: the repository's latest release, updates.odin).
 @(private = "file")
 standard_defaults :: proc() -> prefs_page.Standard_Defaults {
 	d := prefs_page.STANDARD_DEFAULTS
-	d.theme, d.update_base_url, d.app_name = "Graphite", UPDATE_FOLDER, APP_TITLE
+	d.theme, d.app_name = "Graphite", APP_TITLE
 	// (tables of numbers: striped and ruled, so that a line reads across)
 	d.values = ROWS_DEFAULTS[:]
 	return d
@@ -76,8 +76,7 @@ rows_look :: proc(app: ^App, vl: ^ui.Virtual_List) {
 }
 
 // The standard preferences inspecteur reads by name and the toolkit gives no constant for.
-ZOOM_PREF     :: "appearance.zoom"
-BASE_URL_PREF :: "update.base_url"
+ZOOM_PREF :: "appearance.zoom"
 
 // The values the program reads, copied out of the registry (prefs_read).
 Settings :: struct {
@@ -100,8 +99,6 @@ Settings :: struct {
 	rows:       prefs_page.Rows_Look,    // appearance.rows.zebra, rules
 	system_title: bool,     // window.system_title
 	zoom:       f32,        // appearance.zoom
-	update_auto: bool,    // update.auto
-	update_base_url: string,   // owned: update.base_url (read at the start: the Updater keeps it)
 }
 
 prefs_file :: proc(allocator := context.temp_allocator) -> string {
@@ -146,14 +143,11 @@ prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Sett
 	s.rows = prefs_page.rows_look(p)
 	s.system_title = config.bool_of(p, prefs_page.SYSTEM_TITLE_PREF)
 	s.zoom = f32(config.float_of(p, ZOOM_PREF))
-	s.update_auto = config.bool_of(p, prefs_page.UPDATE_AUTO_PREF)
-	s.update_base_url = strings.clone(config.string_of(p, BASE_URL_PREF), allocator)
 	return
 }
 
 settings_free :: proc(s: ^Settings) {
 	prefs_page.appearance_destroy(&s.look)
-	delete(s.update_base_url)
 	delete(s.columns)
 	delete(s.widths)
 	delete(s.sort)

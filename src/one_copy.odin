@@ -8,6 +8,7 @@ package inspecteur
 
 import "core:fmt"
 import "core:strings"
+import "gt:host"
 import instance "gt:instance"
 import "gt:platform"
 import process "gt:process"
@@ -22,15 +23,11 @@ one_copy_options :: proc() -> instance.Instance_Options {
 }
 
 // Whether an Inspecteur runs and answers (--status: setup.Setup_Options.running).
-one_copy_running :: proc() -> bool {
-	return instance.send(one_copy_options(), transmute([]byte)string(instance.MESSAGE_PING)) == .Forwarded
-}
+one_copy_running :: proc() -> bool { return instance.running(one_copy_options()) }
 
 // Asks the Inspecteur that runs to end as its own Quit does (--quit: setup.Setup_Options.quit); true when it took the
 // request. The setup's --quit then waits for the process to end.
-one_copy_quit :: proc() -> bool {
-	return instance.send(one_copy_options(), transmute([]byte)string(instance.MESSAGE_QUIT)) == .Forwarded
-}
+one_copy_quit :: proc() -> bool { return instance.quit(one_copy_options()) }
 
 // At a start with the window: hands `tab` (asked: `asked`) to a running Inspecteur. `forwarded`: it took it, this start
 // ends; else `owner` is this one's to serve (First), or nothing (another copy, or one that does not answer).
@@ -83,5 +80,5 @@ one_copy_receive :: proc(app: ^App, text: string) {
 		tab_show(app, t)
 	}
 	platform.raise_window_token(app.main.win, token)
-	app.main.settle = max(app.main.settle, FRAMES_AFTER_INPUT)
+	host.host_settle(&app.main)
 }
