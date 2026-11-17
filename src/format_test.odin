@@ -19,8 +19,6 @@ numbers_read_as_words :: proc(t: ^testing.T) {
 	testing.expect_value(t, bits_text(1_550_000), "12.4 Mbit/s")
 	testing.expect_value(t, bits_text(0), "0 bit/s")
 	testing.expect_value(t, uptime_text(3 * 86400 + 4 * 3600 + 12 * 60 + 9), "3:04:12:09")
-	testing.expect_value(t, count_text(1, "app", "apps"), "1 app")
-	testing.expect_value(t, count_text(3, "app", "apps"), "3 apps")
 }
 
 // A graph's span follows the period of its readings (processes.refresh_ms, GPU_PERIOD).

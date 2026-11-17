@@ -39,9 +39,6 @@ uint_text :: proc(n: u64, allocator := context.temp_allocator) -> string {
 // A name in lower case for the catalog's keys (ASCII: names and ids, not prose).
 key_of :: proc(name: string, allocator := context.temp_allocator) -> string { return ascii.lower(name, allocator) }
 
-// "1 app", "3 apps": English only (the window counts with i18n.tr(n, one, other)).
-count_text :: proc(n: int, one, many: string) -> string { return fmt.tprintf("%d %s", n, n == 1 ? one : many) }
-
 // CPU time: "12.34 s", "3:05.20" (minutes), "2:03:05" (hours).
 cpu_time_text :: proc(ns: u64) -> string {
 	s := f64(ns) / 1e9
