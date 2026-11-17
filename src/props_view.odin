@@ -83,7 +83,8 @@ props_title :: proc(app: ^App, p: ^Proc, em: f32) {
 		ui.next({width = ui.text_size(), height = ui.pct(1), font_size = em * 1.25, text_pad = 0, flags = {.Selectable}})
 		ui.label(fmt.tprintf("%s###props_name", ui.text_shown(name)))
 		if ui.tags("weak") {
-			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = em * 0.6, flags = {.Selectable}})
+			ui.space(ui.SPACE_2)
+			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0, flags = {.Selectable}})
 			ui.label(fmt.tprintf("%s%s###props_pid", fmt.tprintf(i18n.tr("PID %d"), app.props.pid), p != nil ? fmt.tprintf("  ·  %s", state_text(p.state)) : ""))
 		}
 		ui.space(ui.SPACE_2)

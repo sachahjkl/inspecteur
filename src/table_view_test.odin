@@ -1,5 +1,6 @@
 package inspecteur
 
+import "core:math"
 import "core:testing"
 import "gt:testkit/session"
 import "gt:ui"
@@ -35,7 +36,9 @@ a_name_is_whole_when_its_column_has_room :: proc(t: ^testing.T) {
 	count := session.get(s, "k", within = cell)
 	win := session.get(s, "win", within = cell)
 	testing.expectf(t, name.size.x >= name.text_dim.x, "the name whole: %v of %v", name.size.x, name.text_dim.x)
-	testing.expectf(t, abs(count.rect.min.x - name.rect.max.x) <= 1, "the count right after the name: %v, %v", name.rect.max.x, count.rect.min.x)
+	// (one step of the scale between them, SPACE_1, on whole pixels as ui.space lays it)
+	gap := math.round(name.font_size * ui.SPACE_1)
+	testing.expectf(t, abs(count.rect.min.x - name.rect.max.x - gap) <= 1, "the count right after the name, %v apart: %v, %v", gap, name.rect.max.x, count.rect.min.x)
 	testing.expectf(t, win.rect.min.x >= count.rect.max.x && win.rect.max.x <= cell.rect.max.x + 1, "the button after the count, in the cell: %v", win.rect)
 
 	// (narrower than the name, its count and its button: the name is cut, not the count)

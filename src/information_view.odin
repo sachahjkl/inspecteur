@@ -4,6 +4,7 @@ package inspecteur
 // copies the same lines as plain text; F5 reads them again.
 
 import "core:fmt"
+import "core:math"
 import "core:strings"
 import lucide "gt:lucide"
 import "gt:platform"
@@ -13,6 +14,7 @@ import timefmt "gt:timefmt"
 
 INFO_KEY_EM :: 13   // the labels' column
 INFO_WIDTH_EM :: 60  // the text's width at most: long lines read badly
+INFO_ICON_EM :: 1.6  // a group's icon
 
 Info_Line :: struct { key, value: string }
 Info_Group :: struct { title, icon: string, lines: []Info_Line }
@@ -157,7 +159,7 @@ build_information :: proc(app: ^App, em: f32) {
 			ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 2.2))})
 			if ui.row(.Center, {}, fmt.tprintf("###head_%d", k)) {
 				ui.space(ui.SPACE_3)
-				ui.icon(g.icon, em * 1.6, ui.color("accent"))
+				ui.icon(g.icon, em * INFO_ICON_EM, ui.color("accent"))
 				ui.space(ui.ICON_GAP)
 				ui.next({width = ui.text_size(), height = ui.pct(1), font_size = em * 1.15, text_pad = 0})
 				ui.label(fmt.tprintf("%s###title", g.title))
@@ -173,7 +175,8 @@ build_information :: proc(app: ^App, em: f32) {
 info_line :: proc(l: Info_Line, i: int, em: f32) {
 	ui.next({width = ui.fill(), height = ui.children_sum()})
 	if ui.row(.Start, {}, fmt.tprintf("###line_%d", i)) {
-		ui.spacer(ui.px(em * 3))
+		// (not a gap: the labels line up with their group's title, past the head's lead, icon and gap)
+		ui.spacer(ui.px(math.round(em * ui.SPACE_3) + em * INFO_ICON_EM + math.round(em * ui.ICON_GAP)))
 		if ui.tags("weak") {
 			ui.next({width = ui.px(em * INFO_KEY_EM)})
 			if ui.style({text_pad = 0}) { ui.paragraph(fmt.tprintf("%s###k", ui.text_shown(l.key))) }

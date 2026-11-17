@@ -306,11 +306,11 @@ mission_health :: proc(app: ^App, em: f32) {
 					for f, k in findings {
 						ui.next({width = ui.fill()})
 						// (a tooltip's: it goes when the pointer moves, so nothing selects in it; the diagnosis has the words)
-						if ui.style({text_pad = em * 0.3}) { ui.paragraph(fmt.tprintf("%s %s###f%d", f.level == .Bad ? "●" : f.level == .Warn ? "▲" : "✓", ui.text_shown(f.text), k), selectable = false) }
+						if ui.style({text_pad = em * ui.SPACE_1}) { ui.paragraph(fmt.tprintf("%s %s###f%d", f.level == .Bad ? "●" : f.level == .Warn ? "▲" : "✓", ui.text_shown(f.text), k), selectable = false) }
 					}
 					if ui.tags("weak") {
 						ui.next({width = ui.fill()})
-						if ui.style({text_pad = em * 0.3}) { ui.paragraph(fmt.tprintf("%s###more", fmt.tprintf(i18n.tr("A click, or %s: why it is slow, in full."), ui.command_shortcut(COMMANDS[.Diagnose]))), selectable = false) }
+						if ui.style({text_pad = em * ui.SPACE_1}) { ui.paragraph(fmt.tprintf("%s###more", fmt.tprintf(i18n.tr("A click, or %s: why it is slow, in full."), ui.command_shortcut(COMMANDS[.Diagnose]))), selectable = false) }
 					}
 				}
 			}
@@ -627,7 +627,7 @@ mission_show_connections :: proc(app: ^App, pid: i32) {
 mission_note :: proc(text: string, em: f32) {
 	if ui.tags("weak") {
 		// (its height: its lines'; a paragraph has no children to sum)
-		ui.next({width = ui.fill(), text_pad = em * 0.8})
+		ui.next({width = ui.fill(), text_pad = em * ui.SPACE_3})   // (the rows' lead: the note's words line up with theirs)
 		ui.paragraph(fmt.tprintf("%s###mc_note_%s", ui.text_shown(text), ui.text_shown(text)))
 	}
 }

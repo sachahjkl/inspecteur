@@ -245,7 +245,8 @@ captioned_graph :: proc(app: ^App, id, what: string, series: []Series, top: f32,
 					ui.spacer(ui.px(em * ui.ITEM_GAP))
 					ui.next({width = ui.px(em * 0.75), height = ui.px(em * 0.75), bg = s.color})
 					ui.build_box({.Draw_Background}, fmt.tprintf("###swatch%d", i))
-					ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = em * 0.3})
+					ui.spacer(ui.px(em * ui.ICON_GAP))
+					ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
 					ui.label(fmt.tprintf("%s###name%d", s.name, i))
 				}
 				ui.spacer(ui.fill())
@@ -574,8 +575,9 @@ composition_bar :: proc(parts: []Bar_Part, total: u64, em: f32) {
 		for p, i in parts {
 			ui.next({width = ui.px(em * 0.8), height = ui.px(em * 0.8), bg = p.color})
 			ui.build_box({.Draw_Background}, fmt.tprintf("###swatch%d", i))
+			ui.space(ui.ICON_GAP)
 			if ui.tags("weak") {
-				ui.next({width = ui.text_size(), height = ui.pct(1), font_size = em * 0.86, text_pad = em * 0.35})
+				ui.next({width = ui.text_size(), height = ui.pct(1), font_size = em * 0.86, text_pad = 0})
 				ui.label(fmt.tprintf("%s %s###legend%d", p.label, timefmt.size(i64(p.bytes)), i))
 			}
 			ui.space(ui.ITEM_GAP)

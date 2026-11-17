@@ -71,7 +71,7 @@ journal_list :: proc(app: ^App, v: ^Journal_View, shown: []int, ids: []u64, em: 
 @(private = "file")
 journal_note :: proc(text: string, em: f32) {
 	if ui.tags("weak") {
-		ui.next({width = ui.fill(), height = ui.px(em * 2), text_pad = em * 0.8})
+		ui.next({width = ui.fill(), height = ui.px(em * 2), text_pad = em * ui.SPACE_3})   // (the entries' lead: the note's words line up with theirs)
 		ui.label(fmt.tprintf("%s###svc_journal_note", ui.text_shown(text)))
 	}
 }

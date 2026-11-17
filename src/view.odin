@@ -506,7 +506,8 @@ counter :: proc(app: ^App, id, icon, value: string, em: f32) {
 		vrule(em)
 		ui.spacer(ui.px(em * ui.SPACE_1))
 		if ui.tags("weak") { ui.icon(icon, em * 1.5) }
-		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = em * 0.3})
+		ui.spacer(ui.px(em * ui.ICON_GAP))
+		ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
 		ui.label(fmt.tprintf("%s###v", value))
 		ui.spacer(ui.px(em * ui.SPACE_2))
 	}

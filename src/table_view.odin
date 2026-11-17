@@ -352,8 +352,9 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 		ui.next({width = ui.text_size(0, 0), height = ui.pct(1), text_pad = 0})
 		if lit := ui.word_ranges(name, t.query); len(lit) > 0 { ui.matched_label("###n", name, lit) } else { ui.label(fmt.tprintf("%s###n", ui.text_shown(name))) }
 		if count > 0 {
+			ui.space(ui.SPACE_1)
 			if ui.tags("weak") {
-				ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = em * 0.35})
+				ui.next({width = ui.text_size(), height = ui.pct(1), text_pad = 0})
 				ui.label(fmt.tprintf("(%d)###k", count))
 			}
 		}
