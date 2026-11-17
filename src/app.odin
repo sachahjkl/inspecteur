@@ -83,7 +83,7 @@ App :: struct {
 	palette:     ui.Command_Palette,   // the command palette, and what the user chose in it (commands.odin)
 	palette_list: Palette_List,     // its commands source's table, made again only when it changes (commands.odin)
 	palette_settings: prefs_page.Palette_Settings,   // its settings source (`:`)
-	go_to:       Go_To,             // its Go to sources (`@`): the processes and the services (go_to.odin)
+	go_to:       Go_To,             // its Go to sources (`@`): the processes and the services (goto.odin)
 	rows_made:   int,               // counts rows_again: what the commands can act on may have changed
 	sheet:       ui.Shortcuts_Sheet,   // the sheet of the keys (commands.odin)
 	sheet_commands: [dynamic]ui.Command,   // its list, made at its first opening

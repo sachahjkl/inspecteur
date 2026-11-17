@@ -277,7 +277,7 @@ palette_choices_file :: proc(app: ^App) -> string {
 
 // The palette (gui_toolkit's, its docs/palette.md): its sources are the toolkit's commands source (inspecteur's
 // commands: those of the window, of the sections and of the section shown) with the views' moves beside it, the
-// toolkit's settings source, and inspecteur's Go to (`@`: the processes and the services, go_to.odin).
+// toolkit's settings source, and inspecteur's Go to (`@`: the processes and the services, goto.odin).
 //
 // The commands source gets a table made again only when the section shown changes, and a `disabled` read again only
 // when what cmd_can reads changes (Palette_Can: a few numbers of the state, compared at each build, never the commands

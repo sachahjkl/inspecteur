@@ -69,7 +69,7 @@ warning hue for the tint of busy cells. Corners are nearly square (`ui.set_round
 Every action is a command of one table (`COMMANDS`, the toolkit's `ui.Command`): its label, its group, its keys. The
 keys are read from it, the menus' lines and the buttons' tooltips say its key, the command palette (Ctrl+K, the
 toolkit's) lists the commands of the window and of the section shown beside the settings, the views' moves and Go to
-(`@`: the processes and the services, `go_to.odin`; [src/md/features/palette.md](../src/md/features/palette.md)), and
+(`@`: the processes and the services, `goto.odin`; [src/md/features/palette.md](../src/md/features/palette.md)), and
 the sheet of the keys (F1) lists them all. A test checks that no key does two things in one place.
 
 ## Install, updates, settings (setup.odin, updates.odin, settings_view.odin, src/identity, src/update)
