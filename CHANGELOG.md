@@ -3,6 +3,14 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.23.0] - 2026-11-18 21:12
+
+### Changed
+- **Old Head theme**: sliders have a raised rectangular knob on a sunken track, and switches are drawn as check boxes.
+
+### Fixed
+- **No crash when a window closes while a font loads**: closing waits for the font family being read.
+
 ## [0.22.0] - 2026-11-18 16:07
 
 ### Changed
@@ -345,6 +353,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.23.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.23.0
 [0.22.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.22.0
 [0.21.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.21.0
 [0.20.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.20.1
