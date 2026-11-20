@@ -3,6 +3,11 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.24.2] - 2026-11-20 07:05
+
+### Fixed
+- **The full frame rate on a second screen**: on Wayland a window on a 144 Hz screen beside a 60 Hz one moves at 144 frames a second, not 60.
+
 ## [0.24.1] - 2026-11-19 22:19
 
 ### Fixed
@@ -368,6 +373,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.24.2]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.24.2
 [0.24.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.24.1
 [0.24.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.24.0
 [0.23.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.23.1
