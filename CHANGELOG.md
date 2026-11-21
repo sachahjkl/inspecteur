@@ -3,6 +3,14 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.27.0] - 2026-11-21 18:50
+
+### Changed
+- **Scroll wheel on settings fields and choices**: numeric settings (including sizes like 4 MiB), closed dropdowns, segmented controls and font pickers now step with the mouse wheel; collapsed sidebar icons show tooltips with no delay and sidebar rows stay on one line.
+
+### Fixed
+- **Readable details on selected rows**: secondary and coloured text on selected rows now keep at least 4.5:1 contrast in every theme, and search matches on selected rows are underlined instead of tinted.
+
 ## [0.26.0] - 2026-11-21 10:06
 
 ### Added
@@ -396,6 +404,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.27.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.27.0
 [0.26.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.26.0
 [0.25.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.25.1
 [0.25.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.25.0
