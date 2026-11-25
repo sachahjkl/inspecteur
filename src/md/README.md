@@ -39,7 +39,16 @@ section, the views, the tests) is [docs/architecture.md](../../docs/architecture
   reads all check it.
 - Readers give counters, not rates: the neutral side computes the rates, so the arithmetic is the same on every system
   and is tested with no system.
-- At rest, one frame per sample. In a window the user is not in, the filter's caret does not blink.
+- At rest, one frame per sample. The time of a reading (samples, services, connections, journals) wakes the loop to
+  start its job and makes no frame: the frame comes when the reading posts. Only a wake by that time alone makes none;
+  input, a post, another thread's wake, a view's own timer keep theirs. In a window the user is not in, the filter's
+  caret does not blink.
+- A window hidden or covered makes the frames the toolkit's host makes of it. A path of its own that applied the
+  readings with no frame was refused: a compositor can keep its word for a window it shows (the host gives it up after
+  a time), and a frame owed and not made kept the loop awake. The toolkit must tell a suspended window first.
+- The user's themes file is looked at by each sample (one stat, on the sample's thread): the window asks the toolkit to
+  read it only when its time changed, or while paused. The toolkit's own poll posts its answer, changed or not: a
+  second frame per two samples.
 - A test sends a signal only to a process it started itself, and acts on a service, an autostart entry or an app's
   group only when it made it itself.
 

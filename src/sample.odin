@@ -16,6 +16,7 @@ import "core:sync"
 import "core:time"
 import "core:time/datetime"
 import "core:time/timezone"
+import fsx "gt:fsx"
 import tasks "gt:tasks"
 import "gt:ui"
 import i18n "gt:i18n"
@@ -37,6 +38,7 @@ Reading :: struct {
 	ask:       Sample_Ask,
 	failed:    bool,              // the processes cannot be read (/proc)
 	now_ns:    i64,               // when it was read (monotonic)
+	themes_stamp: i64,            // when the user's themes file changed (ns; 0: there is none)
 	took:      time.Duration,     // what reading it cost
 	machine:   Machine_Counters,
 	listed:    bool,              // the disks and the interfaces were listed again (disks, nets)
@@ -62,6 +64,7 @@ Reading :: struct {
 Sampling :: struct {
 	job:      tasks.Job,
 	demo:     ^Demo,              // not nil: every reading is the demo's
+	themes:   string,             // the user's themes file, whose time of change each reading takes (the window's path)
 	// the job's
 	opened:   bool,
 	ok:       bool,               // /proc could be opened
@@ -147,23 +150,40 @@ sample_take :: proc(app: ^App) {
 	reading_keep(app, r)
 	machine_apply(&app.machine, r)
 	sampler_apply(&app.sampler, r, app.machine.d_total_ns, &app.catalog)
-	gpu := gpu_procs(&app.machine)
-	for &p in app.sampler.procs {
-		use := gpu[p.pid]
-		p.gpu_mem, p.gpu = use.bytes, use.util
+	if gpu, has_gpu := gpu_procs(&app.machine); has_gpu {
+		app.had_gpu_procs = true
+		for &p in app.sampler.procs {
+			use := gpu[p.pid]
+			p.gpu_mem, p.gpu = use.bytes, use.util
+		}
+	} else if app.had_gpu_procs {
+		app.had_gpu_procs = false
+		for &p in app.sampler.procs { p.gpu_mem, p.gpu = 0, 0 }
 	}
 	// (the GPUs' numbers are read while they are shown: a GPU that may sleep is let go otherwise. The summary's tile does
 	// not ask for them: it would keep a laptop's GPU awake whenever Processes is shown; a GPU that is always on is read
 	// anyway)
-	gpu_want(&app.machine.gpu, app.tab == .Performance || app.table.layout.shown[int(Column.GPU_Memory)] || app.table.layout.shown[int(Column.GPU)])
+	gpus_want(app)
 	table_group(&app.table, app.sampler.procs[:])
 	app_windows_read(app)
-	rows_again(app)
+	// On a static sort (Name, PID, User...) with unchanged process membership, row order and identities cannot change.
+	if app.rows_made == 0 || app.sampler.changes != app.rows_changes || !table_sort_static(&app.table) {
+		rows_again(app)
+	}
 	ranking_make(app)
 	if props_shown(app) { props_tick(app, find_proc(&app.sampler, app.props.pid, app.props.start) != nil) }
 	app.refresh_time += r.took + time.tick_since(t0)
 	app.refreshes += 1
+	app.themes_changed = r.themes_stamp != app.themes_file.stamp
 	app.main.settle = max(app.main.settle, 1)
+}
+
+// Asks the GPUs' thread for what the window shows: the numbers of the GPUs, and those of each process (a column, the
+// Properties).
+gpus_want :: proc(app: ^App) {
+	shown := &app.table.layout.shown
+	columns := shown[int(Column.GPU_Memory)] || shown[int(Column.GPU)]
+	gpu_want(&app.machine.gpu, app.tab == .Performance || columns, columns || props_shown(app))
 }
 
 // What a reading brings once, the catalog and the session's facts, becomes the window's.
@@ -237,6 +257,7 @@ reading_make :: proc(s: ^Sampling, r: ^Reading, ask: Sample_Ask, now_ns: i64) {
 		if s.demo != nil { demo_devices(s.demo, &r.disks, &r.nets) } else { disks_list(&r.disks); nets_list(&r.nets) }
 	}
 	s.readings += 1
+	if s.themes != "" { _, r.themes_stamp, _ = fsx.stat(s.themes) }
 	if s.demo != nil { demo_machine_read(s.demo, now_ns, &r.machine) } else { machine_read(&s.machine, &r.machine) }
 	if ask.cpu_shown {
 		if !s.info_read {

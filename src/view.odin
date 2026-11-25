@@ -46,8 +46,11 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 	// Ctrl held: the rows stand still under the pointer (a key pressed before the window had the keyboard is not held:
 	// the compositor's Ctrl+Shift+Escape that opened it)
 	app.held = ui.key_held(.Ctrl)
-	// (the user's themes file: a task looks at it now and then and reads it when it changed; app_params shows it)
-	if prefs_page.themes_file_poll(&app.themes_file, &h.state) { host.host_settle(h) }
+	// (the user's themes file: a task reads it when it changed; app_params shows it. Each look posts its answer, a frame of
+	// its own: at rest the sample, which looks at the file's time, asks for it)
+	if app.themes_changed || app.paused || app.themes_file.due_ms == 0 || app.themes_file.busy || app.themes_file.serial != app.themes_file.seen {
+		if prefs_page.themes_file_poll(&app.themes_file, &h.state) { host.host_settle(h) }
+	}
 	// (--setup: the install's view, opened in the first build: its owner is this window)
 	if app.setup_due {
 		app.setup_due = false
@@ -106,7 +109,6 @@ view_build :: proc(h: ^host.Host, size: host.Vec2) {
 		row_menu_build(app, em)
 		if prefs_page.install_frame(&app.install) == .Launched { platform.request_close(app.main.win) }   // (the installed copy runs)
 	}
-	ui.wake_within(&app.main.state, min(until_sample(app), services_due_ms(app), connections_due_ms(app), journals_due_ms(app)))
 }
 
 @(private = "file")

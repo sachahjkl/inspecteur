@@ -121,4 +121,5 @@ tasks of the chores, shown under the settings' General page.
 - `inspecteurtool live`: the real program in a sway with no screen, driven over the DevTools protocol (see
   [development.md](development.md)). A key that changes something is pressed only once the selected row, as the
   accessibility tree says, is the test's own.
-- `inspecteurtool bench`: the cold start and the cost at rest, on the GPU.
+- `inspecteurtool bench`: the cold start and the cost at rest (with `--software` for pixman software rendering).
+- `inspecteurtool bench_reader`: opt-in benchmark of the Linux readers on real `/proc` and on a 5,000-process synthetic `/proc` tree, plus the neutral pipeline and churn memory.

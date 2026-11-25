@@ -3,16 +3,18 @@ package inspecteur
 // The GPUs on Linux:
 //
 // - NVIDIA: NVML (libnvidia-ml.so.1, the library nvidia-smi is made on), opened with dlopen: the utilization, the video
-//   memory, the temperature, the power, the clock, and each process's video memory and share of the GPU's time (its
-//   samples since the last reading: nvmlDeviceGetProcessUtilization). No process is started.
+//   memory, the temperature, the power, the clock, and (when it is asked) each process's video memory and
+//   share of the GPU's time (nvmlDeviceGetProcessUtilization). No process is started.
 // - AMD: amdgpu's files in /sys/class/drm/card*/device: gpu_busy_percent, mem_info_vram_used and _total.
 // - Intel: its name only (i915 and xe tell no utilization without root).
 //
-// A GPU the kernel may put to sleep (runtime power management: power/control is "auto", a laptop's second GPU) sleeps
+// A GPU the kernel puts to sleep (runtime power management: power/control is "auto", a laptop's second GPU) sleeps
 // while nothing uses it. NVML wakes it, and keeps it awake while it is open. So NVML is opened only while the GPUs'
 // numbers are wanted and no NVIDIA GPU sleeps (power/runtime_status "suspended"), and closed when they are no longer
-// wanted; a GPU that sleeps is listed asleep. A GPU that is always on (power/control "on", a desktop's) keeps NVML open.
-// The DRM files of an AMD GPU that sleeps are not read either.
+// wanted; a GPU that sleeps is listed asleep. A GPU that is always on (power/control "on", a desktop's) keeps NVML open,
+// but asks it of each process only when that is shown: those calls cost most of a reading's time.
+// NVML's handles and names are asked once per opening; the DRM cards are listed again every DRM_LIST_EVERY readings (a
+// card can be plugged in, or its driver loaded later).
 
 import "core:dynlib"
 import "core:fmt"
@@ -25,23 +27,44 @@ NIXOS_DRIVER_LIB :: "/run/opengl-driver/lib/libnvidia-ml.so.1"
 PCI_DEVICES :: "/sys/bus/pci/devices"
 PCI_VENDOR_NVIDIA :: "0x10de"
 
+@(private = "file")
+Drm_Card :: struct {
+	card:     int,
+	vendor:   string,    // "AMD" or "Intel"
+	name:     [96]u8,
+	name_len: int,
+}
+
 Gpu_Reader :: struct {
-	nv:        Nvml,
-	seen_us:   [GPU_MAX]u64,      // each GPU's newest process sample read (NVML's clock, microseconds)
-	tried:     bool,              // NVML's library was looked for (once: it is there or not)
-	nvidia:    [GPU_MAX][16]u8,   // the PCI slots of the NVIDIA display controllers (0000:01:00.0)
-	nvidia_n:  int,
-	listed:    bool,
-	names:     [GPU_MAX]Gpu_Read, // what NVML last said of each NVIDIA GPU: its name and driver, shown while it sleeps
+	nv:          Nvml,
+	seen_us:     [GPU_MAX]u64,       // each GPU's newest process sample read (NVML's clock, microseconds)
+	tried:       bool,               // NVML's library was looked for (once: it is there or not)
+	nvidia:      [GPU_MAX][16]u8,    // the PCI slots of the NVIDIA display controllers (0000:01:00.0)
+	nvidia_n:    int,
+	listed:      bool,
+	names:       [GPU_MAX]Gpu_Read,  // what NVML last said of each NVIDIA GPU: its name and driver, shown while it sleeps
+	// cached NVML handles and static strings (valid while nv.ok && nv_cached)
+	nv_cached:   bool,
+	nv_count:    int,
+	nv_handles:  [GPU_MAX]Nvml_Device,
+	nv_driver:   [32]u8,
+	nv_driver_n: int,
+	nv_names:    [GPU_MAX][96]u8,
+	nv_name_n:   [GPU_MAX]int,
+	// the AMD and Intel DRM cards, as last listed
+	drm_age:     int,                // readings since
+	drm_cards:   [GPU_MAX]Drm_Card,
+	drm_n:       int,
 }
 
 gpu_reader_close :: proc(r: ^Gpu_Reader) {
 	nvml_close(&r.nv)
+	r.nv_cached = false
 	if r.nv.lib != nil { dynlib.unload_library(r.nv.lib) }
 	r.nv = {}
 }
 
-// One reading of the GPUs. `wanted`: the window shows their numbers (NVML may be opened, see above).
+// One reading of the GPUs. `wanted`: the window shows their numbers (NVML can be opened, see above).
 gpu_read :: proc(r: ^Gpu_Reader, snap: ^Gpu_Snapshot, wanted: bool) {
 	if !r.listed { nvidia_list(r) }
 	asleep, always_on := false, true
@@ -57,11 +80,13 @@ gpu_read :: proc(r: ^Gpu_Reader, snap: ^Gpu_Snapshot, wanted: bool) {
 			nvml_load(&r.nv)
 		}
 		nvml_init(&r.nv)
+		r.nv_cached = false
 	} else if !open && r.nv.ok {
 		nvml_close(&r.nv)
+		r.nv_cached = false
 	}
 	if r.nv.ok {
-		nvml_read(&r.nv, snap, &r.seen_us)
+		nvml_read(r, snap)
 		for i in 0 ..< min(snap.count, GPU_MAX) { r.names[i] = snap.gpus[i]; r.names[i].has_util = false }
 	} else {
 		// (not read: each NVIDIA GPU as NVML last named it, asleep when it sleeps, else with no numbers)
@@ -75,7 +100,7 @@ gpu_read :: proc(r: ^Gpu_Reader, snap: ^Gpu_Snapshot, wanted: bool) {
 			snap.count += 1
 		}
 	}
-	drm_read(snap)
+	drm_read(r, snap)
 }
 
 // The PCI slots of the NVIDIA display controllers.
@@ -189,20 +214,41 @@ nvml_close :: proc(nv: ^Nvml) {
 }
 
 @(private = "file")
-nvml_read :: proc(nv: ^Nvml, snap: ^Gpu_Snapshot, seen_us: ^[GPU_MAX]u64) {
+nvml_cache_static :: proc(r: ^Gpu_Reader) {
+	nv := &r.nv
+	r.nv_count = 0
+	r.nv_driver_n = 0
 	n: u32
 	if nv.count(&n) != NVML_SUCCESS { return }
-	driver: [32]u8
-	driver_len := 0
-	if nv.driver != nil && nv.driver(&driver[0], len(driver)) == NVML_SUCCESS { driver_len = cstring_len(driver[:]) }
-	for i in 0 ..< min(int(n), GPU_MAX - snap.count) {
+	// (a GPU that gives no handle now is asked again at the next reading)
+	r.nv_cached = true
+	if nv.driver != nil && nv.driver(&r.nv_driver[0], len(r.nv_driver)) == NVML_SUCCESS {
+		r.nv_driver_n = cstring_len(r.nv_driver[:])
+	}
+	for i in 0 ..< min(int(n), GPU_MAX) {
 		dev: Nvml_Device
-		if nv.handle(u32(i), &dev) != NVML_SUCCESS { continue }
+		if nv.handle(u32(i), &dev) != NVML_SUCCESS { r.nv_cached = false; continue }
+		k := r.nv_count
+		r.nv_handles[k] = dev
+		r.nv_name_n[k] = 0
+		if nv.name != nil && nv.name(dev, &r.nv_names[k][0], len(r.nv_names[k])) == NVML_SUCCESS {
+			r.nv_name_n[k] = cstring_len(r.nv_names[k][:])
+		}
+		r.nv_count += 1
+	}
+}
+
+@(private = "file")
+nvml_read :: proc(r: ^Gpu_Reader, snap: ^Gpu_Snapshot) {
+	nv := &r.nv
+	if !r.nv_cached { nvml_cache_static(r) }
+	for i in 0 ..< min(r.nv_count, GPU_MAX - snap.count) {
+		dev := r.nv_handles[i]
 		g := &snap.gpus[snap.count]
 		snap.count += 1
 		g.vendor = "NVIDIA"
-		g.driver, g.driver_len = driver, driver_len
-		if nv.name != nil && nv.name(dev, &g.name[0], len(g.name)) == NVML_SUCCESS { g.name_len = cstring_len(g.name[:]) }
+		g.driver, g.driver_len = r.nv_driver, r.nv_driver_n
+		g.name, g.name_len = r.nv_names[i], r.nv_name_n[i]
 		u: Nvml_Utilization
 		if nv.utilization != nil && nv.utilization(dev, &u) == NVML_SUCCESS { g.util, g.has_util = f32(u.gpu), true }
 		mem: Nvml_Memory
@@ -211,6 +257,7 @@ nvml_read :: proc(nv: ^Nvml, snap: ^Gpu_Snapshot, seen_us: ^[GPU_MAX]u64) {
 		if nv.temperature != nil && nv.temperature(dev, 0, &v) == NVML_SUCCESS { g.temp_c, g.has_temp = f32(v), true }   // (0: the GPU's sensor)
 		if nv.power != nil && nv.power(dev, &v) == NVML_SUCCESS { g.power_w, g.has_power = f32(v) / 1000, true }
 		if nv.clock != nil && nv.clock(dev, 0, &v) == NVML_SUCCESS { g.clock_mhz, g.has_clock = f32(v), true }   // (0: the graphics clock)
+		if !snap.want_procs { continue }
 		// the processes: those that draw, then those that compute
 		first := snap.proc_count
 		infos: [GPU_PROCS_MAX]Nvml_Process
@@ -226,13 +273,13 @@ nvml_read :: proc(nv: ^Nvml, snap: ^Gpu_Snapshot, seen_us: ^[GPU_MAX]u64) {
 		if nv.samples != nil {
 			samples: [NVML_PROCESS_SAMPLES]Nvml_Process_Sample
 			count := u32(len(samples))
-			if nv.samples(dev, &samples[0], &count, seen_us[i]) == NVML_SUCCESS {
-				newest := seen_us[i]
+			if nv.samples(dev, &samples[0], &count, r.seen_us[i]) == NVML_SUCCESS {
+				newest := r.seen_us[i]
 				for q in samples[:min(int(count), len(samples))] {
 					gpu_proc_util(snap, first, i32(q.pid), f32(q.sm))
 					newest = max(newest, q.time_us)
 				}
-				seen_us[i] = newest
+				r.seen_us[i] = newest
 			}
 		}
 	}
@@ -247,32 +294,51 @@ cstring_len :: proc(b: []u8) -> int {
 ////////////////////////////////
 // AMD and Intel: the DRM files
 
+// Readings between two lists of the DRM cards (as the machine's other devices).
 @(private = "file")
-drm_read :: proc(snap: ^Gpu_Snapshot) {
+DRM_LIST_EVERY :: DEVICES_EVERY
+
+@(private = "file")
+drm_list :: proc(r: ^Gpu_Reader) {
+	r.drm_n = 0
 	for card in 0 ..< 8 {
-		if snap.count >= GPU_MAX { return }
+		if r.drm_n >= GPU_MAX { return }
 		dir := fmt.tprintf("/sys/class/drm/card%d/device", card)
 		vendor := read_text(fmt.tprintf("%s/vendor", dir))
 		if vendor == "" { continue }
-		g: Gpu_Read
-		asleep := read_text(fmt.tprintf("%s/power/runtime_status", dir)) == "suspended"
+		vname: string
 		switch vendor {
-		case "0x1002":
-			g.vendor = "AMD"
-			g.asleep = asleep
-			if asleep { break }
-			if v, ok := strconv.parse_f64(read_text(fmt.tprintf("%s/gpu_busy_percent", dir))); ok { g.util, g.has_util = f32(v), true }
-			used, uok := strconv.parse_u64(read_text(fmt.tprintf("%s/mem_info_vram_used", dir)), 10)
-			total, tok := strconv.parse_u64(read_text(fmt.tprintf("%s/mem_info_vram_total", dir)), 10)
-			if uok && tok { g.mem_used, g.mem_total, g.has_mem = used, total, true }
-		case "0x8086":
-			g.vendor = "Intel"
-		case:
-			continue   // (NVIDIA: NVML's; another: nothing to read)
+		case "0x1002": vname = "AMD"
+		case "0x8086": vname = "Intel"
+		case:          continue   // (NVIDIA: NVML's; another: nothing to read)
 		}
+		c := &r.drm_cards[r.drm_n]
+		c.card = card
+		c.vendor = vname
 		name := read_text(fmt.tprintf("%s/product_name", dir))
-		if name == "" { name = fmt.tprintf(i18n.tr("%s GPU (card%d)"), g.vendor, card) }
-		g.name_len = copy(g.name[:], name)
+		if name == "" { name = fmt.tprintf(i18n.tr("%s GPU (card%d)"), vname, card) }
+		c.name_len = copy(c.name[:], name)
+		r.drm_n += 1
+	}
+}
+
+@(private = "file")
+drm_read :: proc(r: ^Gpu_Reader, snap: ^Gpu_Snapshot) {
+	if r.drm_age == 0 { drm_list(r) }
+	r.drm_age = (r.drm_age + 1) % DRM_LIST_EVERY
+	for &c in r.drm_cards[:r.drm_n] {
+		if snap.count >= GPU_MAX { return }
+		dir := fmt.tprintf("/sys/class/drm/card%d/device", c.card)
+		g := Gpu_Read{vendor = c.vendor, name = c.name, name_len = c.name_len}
+		if c.vendor == "AMD" {
+			g.asleep = read_text(fmt.tprintf("%s/power/runtime_status", dir)) == "suspended"
+			if !g.asleep {
+				if v, ok := strconv.parse_f64(read_text(fmt.tprintf("%s/gpu_busy_percent", dir))); ok { g.util, g.has_util = f32(v), true }
+				used, uok := strconv.parse_u64(read_text(fmt.tprintf("%s/mem_info_vram_used", dir)), 10)
+				total, tok := strconv.parse_u64(read_text(fmt.tprintf("%s/mem_info_vram_total", dir)), 10)
+				if uok && tok { g.mem_used, g.mem_total, g.has_mem = used, total, true }
+			}
+		}
 		snap.gpus[snap.count] = g
 		snap.count += 1
 	}

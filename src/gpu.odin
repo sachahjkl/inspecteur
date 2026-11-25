@@ -44,6 +44,7 @@ Gpu_Snapshot :: struct {
 	procs:     [GPU_PROCS_MAX]Gpu_Proc,
 	proc_count: int,
 	readings:  int,   // how many readings have been made (0: none yet)
+	want_procs: bool,   // what the reader is asked: each process's share too (a reader can give it anyway)
 }
 
 Gpu_Watch :: struct {
@@ -52,6 +53,7 @@ Gpu_Watch :: struct {
 	cond:   sync.Cond,
 	stop:   bool,
 	wanted: bool,           // under the mutex: the window shows the GPUs' numbers
+	want_procs: bool,       // under the mutex: it shows what each process uses of them
 	demo:   ^Demo,          // not nil: the GPUs are the demo's
 	snap:   Gpu_Snapshot,   // the last reading, under the mutex
 }
@@ -83,12 +85,13 @@ gpu_stop :: proc(w: ^Gpu_Watch) {
 	w.thread = nil
 }
 
-// Says whether the GPUs' numbers are wanted; a change wakes the thread at once (a page opened reads now).
-gpu_want :: proc(w: ^Gpu_Watch, wanted: bool) {
+// Says whether the GPUs' numbers are wanted, and what each process uses of them; a change wakes the thread at once (a
+// page opened reads now).
+gpu_want :: proc(w: ^Gpu_Watch, wanted, procs: bool) {
 	sync.mutex_lock(&w.mutex)
 	defer sync.mutex_unlock(&w.mutex)
-	if w.wanted == wanted { return }
-	w.wanted = wanted
+	if w.wanted == wanted && w.want_procs == procs { return }
+	w.wanted, w.want_procs = wanted, procs
 	sync.cond_signal(&w.cond)
 }
 
@@ -115,18 +118,19 @@ gpus_sample :: proc(m: ^Machine, history: bool) {
 
 // The video memory each process holds and its use of the GPUs, by pid, over every GPU (temporary allocator; empty when
 // no GPU tells it).
-gpu_procs :: proc(m: ^Machine) -> map[i32]Gpu_Proc {
-	out := make(map[i32]Gpu_Proc, 16, context.temp_allocator)
+gpu_procs :: proc(m: ^Machine) -> (out: map[i32]Gpu_Proc, any: bool) {
 	w := &m.gpu
 	sync.mutex_lock(&w.mutex)
+	defer sync.mutex_unlock(&w.mutex)
+	if w.snap.proc_count == 0 { return nil, false }
+	out = make(map[i32]Gpu_Proc, w.snap.proc_count, context.temp_allocator)
 	for p in w.snap.procs[:w.snap.proc_count] {
 		q := out[p.pid]
 		q.bytes += p.bytes
 		q.util += p.util
 		out[p.pid] = q
 	}
-	sync.mutex_unlock(&w.mutex)
-	return out
+	return out, true
 }
 
 @(private = "file")
@@ -135,17 +139,17 @@ gpu_run :: proc(data: rawptr) {
 	r: Gpu_Reader
 	defer if w.demo == nil { gpu_reader_close(&r) }
 	sync.mutex_lock(&w.mutex)
-	wanted := w.wanted
+	wanted, want_procs := w.wanted, w.want_procs
 	sync.mutex_unlock(&w.mutex)
 	for {
-		snap: Gpu_Snapshot
+		snap := Gpu_Snapshot{want_procs = want_procs}
 		if w.demo != nil { demo_gpus_read(w.demo, &snap) } else { gpu_read(&r, &snap, wanted) }
 		sync.mutex_lock(&w.mutex)
 		snap.readings = w.snap.readings + 1
 		w.snap = snap
-		if !w.stop && w.wanted == wanted { _ = sync.cond_wait_with_timeout(&w.cond, &w.mutex, GPU_PERIOD) }
+		if !w.stop && w.wanted == wanted && w.want_procs == want_procs { _ = sync.cond_wait_with_timeout(&w.cond, &w.mutex, GPU_PERIOD) }
 		stop := w.stop
-		wanted = w.wanted
+		wanted, want_procs = w.wanted, w.want_procs
 		sync.mutex_unlock(&w.mutex)
 		free_all(context.temp_allocator)
 		if stop { return }

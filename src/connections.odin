@@ -49,8 +49,8 @@ Connections :: struct {
 	demo:    ^Demo,             // not nil: the sockets are the demo's
 	state:   ^ui.State,         // the window a reading is posted to
 	sockets: [dynamic]Socket,   // the window's
-	// what Mission Control says of them, counted when a reading comes (connections_posted)
-	listening, connected: int,
+	// what Mission Control and Connections bar say of them, counted when a reading comes (connections_posted)
+	listening, listening_or_open, connected: int,
 	holders: [dynamic]Socket_Holder,   // the processes that hold sockets, the most first
 	rows:    Section_Table,
 	read:    bool,              // a reading came at least once
@@ -113,11 +113,12 @@ Socket_Holder :: struct { pid: i32, start: u64, n: int }
 // The sockets that listen, those connected, and their holders, the most first.
 @(private = "file")
 connections_count :: proc(c: ^Connections) {
-	c.listening, c.connected = 0, 0
+	c.listening, c.listening_or_open, c.connected = 0, 0, 0
 	clear(&c.holders)
 	at := make(map[i32]int, 16, context.temp_allocator)
 	for so in c.sockets {
 		if so.state == .Listening { c.listening += 1 } else if so.state == .Established { c.connected += 1 }
+		if socket_listens(so) { c.listening_or_open += 1 }
 		if so.pid <= 0 { continue }
 		i, seen := at[so.pid]
 		if !seen {
@@ -226,6 +227,6 @@ connections_tick :: proc(app: ^App) {
 
 // The milliseconds until the next reading is due, while they are shown (the window wakes for it); max(int) otherwise.
 connections_due_ms :: proc(app: ^App) -> int {
-	if !connections_shown(app) || app.paused || app.held { return max(int) }
+	if !connections_shown(app) || app.paused || app.held || tasks.job_busy(ui.chores(), &app.connections.job) { return max(int) }
 	return max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), app.connections.next))) + 1, 1)
 }

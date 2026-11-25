@@ -118,19 +118,32 @@ busy_value :: proc(p: ^Proc, by: Busy_By) -> f64 {
 ranking_make :: proc(app: ^App) {
 	r := &app.ranking
 	r.threads = 0
-	for p in app.sampler.procs { r.threads += p.threads }
-	order := make([dynamic]int, 0, len(app.sampler.procs), context.temp_allocator)
+	top_idx: [Busy_By][BUSIEST_KEEP]int
+	top_val: [Busy_By][BUSIEST_KEEP]f64
+	top_len: [Busy_By]int
+	// One O(N) pass finds the BUSIEST_KEEP largest processes for each measure instead of three full sorts.
+	for &p, i in app.sampler.procs {
+		r.threads += p.threads
+		if p.ended { continue }
+		vals := [Busy_By]f64{.Cpu = f64(p.cpu), .Memory = f64(p.private), .Disk = p.read_rate + p.write_rate}
+		for by in Busy_By {
+			v := vals[by]
+			k := top_len[by]
+			if k == BUSIEST_KEEP && v <= top_val[by][BUSIEST_KEEP - 1] { continue }
+			pos := k
+			if pos == BUSIEST_KEEP { pos = BUSIEST_KEEP - 1 } else { top_len[by] = k + 1 }
+			for pos > 0 && v > top_val[by][pos - 1] {
+				top_val[by][pos] = top_val[by][pos - 1]
+				top_idx[by][pos] = top_idx[by][pos - 1]
+				pos -= 1
+			}
+			top_val[by][pos] = v
+			top_idx[by][pos] = i
+		}
+	}
 	for by in Busy_By {
-		clear(&order)
-		for &p, i in app.sampler.procs { if !p.ended { append(&order, i) } }
-		context.user_index = int(by)
-		// (the measure through the context: a procedure literal takes nothing from its scope)
-		slice.sort_by(order[:], proc(a, b: int) -> bool {
-			measure := Busy_By(context.user_index)
-			return busy_value(&the_app.sampler.procs[a], measure) > busy_value(&the_app.sampler.procs[b], measure)
-		})
 		clear(&r.busiest[by])
-		append(&r.busiest[by], ..order[:min(len(order), BUSIEST_KEEP)])
+		append(&r.busiest[by], ..top_idx[by][:top_len[by]])
 	}
 }
 

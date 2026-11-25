@@ -5,6 +5,9 @@ package inspecteur
 // from /proc/self/mountinfo, the interfaces from /sys/class/net and their addresses (getifaddrs) when they are listed;
 // the CPU's details from /proc/cpuinfo and /sys/devices/system/cpu; the processor's temperatures from its hwmon driver
 // (k10temp, zenpower, coretemp), what waits on the CPU, the memory and the disks from /proc/pressure.
+//
+// Fixed /proc and /sys files stay open across samples: small single-record files use pread at offset 0, while
+// potentially multi-page seq_files (/proc/stat, /proc/diskstats, /proc/net/dev) use lseek(0) + read loop.
 
 import "core:fmt"
 import "core:net"
@@ -26,17 +29,28 @@ CPU_HWMON := [?]string{"k10temp", "zenpower", "coretemp", "cpu_thermal", "soc_th
 PACKAGE_LABELS := [?]string{"Tdie", "Tctl", "Package id 0"}
 
 Machine_Reader :: struct {
-	buf: []u8,
+	buf:          []u8,
+	fds_init:     bool,
+	stat_fd:      linux.Fd,
+	meminfo_fd:   linux.Fd,
+	loadavg_fd:   linux.Fd,
+	uptime_fd:    linux.Fd,
+	filenr_fd:    linux.Fd,
+	diskstats_fd: linux.Fd,
+	netdev_fd:    linux.Fd,
+	pressure_fds: [Pressure_Kind]linux.Fd,
+	pm_fd:        linux.Fd,
+	throttle_fd:  linux.Fd,
 	temps_listed: bool,
-	temp_files: [TEMPS_MAX]Temp_File,   // the package's first
-	temp_n: int,
+	temp_files:   [TEMPS_MAX]Temp_File,      // the package's first
+	temp_n:       int,
 	// the cores' temperatures, by core_id: coretemp's "Core <id>" files (Intel), else ryzen_smu's power table (AMD)
-	core_files: [CORES_TOLD_MAX]Temp_File,   // path_len 0: none for that core
-	core_file_n: int,
-	pm: Pm_Table,                            // cores 0: no table read
-	pm_failures: int,                        // reads of the table that failed in a row
-	core_of: [dynamic]i32,                   // each logical processor's core_id (-1: not told)
-	no_throttle, no_pressure: bool,     // the files are not there: not looked for again
+	core_files:   [CORES_TOLD_MAX]Temp_File, // path_len 0: none for that core
+	core_file_n:  int,
+	pm:           Pm_Table,                  // cores 0: no table read
+	pm_failures:  int,                       // reads of the table that failed in a row
+	core_of:      [dynamic]i32,              // each logical processor's core_id (-1: not told)
+	no_throttle, no_pressure: bool,          // the files are not there: not looked for again
 }
 
 // The core_ids a temperature is kept for.
@@ -67,60 +81,167 @@ PM_TABLES := [?]Pm_Table{
 // After so many failed reads in a row, the table is not read again (the driver loaded, its SMU not answering).
 @(private = "file") PM_FAILURES_MAX :: 5
 
-// A temperature's file (temp<n>_input, millidegrees) and its label.
+// A temperature's file (temp<n>_input, millidegrees), its kept descriptor, and its label.
 @(private = "file")
-Temp_File :: struct { path: [64]u8, path_len: int, label: [24]u8, label_len: int }
+Temp_File :: struct { path: [64]u8, path_len: int, label: [24]u8, label_len: int, fd: linux.Fd }
 
-machine_reader_init :: proc(r: ^Machine_Reader) { r.buf = make([]u8, PROC_READ_MAX) }
+@(private = "file")
+machine_fds_reset :: proc(r: ^Machine_Reader) {
+	r.fds_init = true
+	r.stat_fd, r.meminfo_fd, r.loadavg_fd, r.uptime_fd, r.filenr_fd = -1, -1, -1, -1, -1
+	r.diskstats_fd, r.netdev_fd, r.pm_fd, r.throttle_fd = -1, -1, -1, -1
+	for k in Pressure_Kind { r.pressure_fds[k] = -1 }
+	for &f in r.temp_files { f.fd = -1 }
+	for &f in r.core_files { f.fd = -1 }
+}
+
+machine_reader_init :: proc(r: ^Machine_Reader) {
+	r.buf = make([]u8, PROC_READ_MAX)
+	machine_fds_reset(r)
+}
+
+@(private = "file")
+close_fd :: proc(fd: ^linux.Fd) {
+	if fd^ >= 0 { linux.close(fd^); fd^ = -1 }
+}
+
 machine_reader_destroy :: proc(r: ^Machine_Reader) {
+	if r.fds_init {
+		close_fd(&r.stat_fd)
+		close_fd(&r.meminfo_fd)
+		close_fd(&r.loadavg_fd)
+		close_fd(&r.uptime_fd)
+		close_fd(&r.filenr_fd)
+		close_fd(&r.diskstats_fd)
+		close_fd(&r.netdev_fd)
+		close_fd(&r.pm_fd)
+		close_fd(&r.throttle_fd)
+		for k in Pressure_Kind { close_fd(&r.pressure_fds[k]) }
+		for &f in r.temp_files[:r.temp_n] { close_fd(&f.fd) }
+		for &f in r.core_files { close_fd(&f.fd) }
+	}
 	delete(r.buf)
 	delete(r.core_of)
+	r^ = {}
+}
+
+// Reads a kept multi-page seq_file from offset 0 with lseek + read loop (opens lazily on first call).
+@(private = "file")
+read_kept_seq :: proc(fd: ^linux.Fd, path: cstring, buf: []u8) -> (data: []u8, ok: bool) {
+	for _ in 0 ..< 2 {
+		if fd^ < 0 {
+			f, err := linux.open(path, {.CLOEXEC})
+			if err != .NONE { return nil, false }
+			fd^ = f
+		}
+		if _, lerr := linux.lseek(fd^, 0, .SET); lerr == .NONE {
+			n := 0
+			good := true
+			for n < len(buf) {
+				k, re := linux.read(fd^, buf[n:])
+				if re != .NONE { good = false; break }
+				if k <= 0 { break }
+				n += k
+			}
+			if good { return buf[:n], true }
+		}
+		close_fd(fd)
+	}
+	return nil, false
+}
+
+// Reads a kept small single-record procfs/sysfs file with pread at offset 0 (falls back to loop if near one page).
+@(private = "file")
+read_kept_small :: proc(fd: ^linux.Fd, path: cstring, buf: []u8) -> (data: []u8, ok: bool) {
+	for _ in 0 ..< 2 {
+		if fd^ < 0 {
+			f, err := linux.open(path, {.CLOEXEC})
+			if err != .NONE { return nil, false }
+			fd^ = f
+		}
+		k, re := linux.pread(fd^, buf, 0)
+		if re == .NONE && k >= 0 {
+			n := k
+			if n >= PROC_ONE_READ_CAP {
+				good := true
+				for n < len(buf) {
+					m, e := linux.pread(fd^, buf[n:], i64(n))
+					if e != .NONE { good = false; break }
+					if m <= 0 { break }
+					n += m
+				}
+				if !good { close_fd(fd); continue }
+			}
+			return buf[:n], true
+		}
+		close_fd(fd)
+	}
+	return nil, false
+}
+
+@(private = "file")
+temp_file_read :: proc(f: ^Temp_File, buf: []u8) -> (celsius: f32, ok: bool) {
+	if f.path_len == 0 || f.path_len >= len(f.path) { return 0, false }
+	f.path[f.path_len] = 0
+	data, rok := read_kept_small(&f.fd, cstring(&f.path[0]), buf)
+	if !rok || len(data) == 0 { return 0, false }
+	pos := 0
+	w, has := next_token(string(data), &pos)
+	if !has { return 0, false }
+	if v, pok := parse_ascii_i64(w); pok { return f32(v) / 1000, true }
+	v, fok := strconv.parse_f64(w)
+	return f32(v / 1000), fok
 }
 
 machine_read :: proc(r: ^Machine_Reader, c: ^Machine_Counters) {
-	c.core_total_ns = make([dynamic]u64, context.temp_allocator)
-	c.core_idle_ns = make([dynamic]u64, context.temp_allocator)
-	c.disks = make([dynamic]Disk_Counters, context.temp_allocator)
-	c.nets = make([dynamic]Net_Counters, context.temp_allocator)
-	if text, _, ok := read_file(r.buf, linux.AT_FDCWD, "/proc/stat"); ok {
-		t := parse_cpu_times(string(text))
-		c.cpu_total_ns, c.cpu_idle_ns = t.total * TICK_NS, t.idle * TICK_NS
-		for v in t.core_total { append(&c.core_total_ns, v * TICK_NS) }
-		for v in t.core_idle { append(&c.core_idle_ns, v * TICK_NS) }
-		c.boot_time = t.boot_time
+	if !r.fds_init { machine_fds_reset(r) }
+	if r.buf == nil { r.buf = make([]u8, PROC_READ_MAX) }
+	c.core_total_ns = make([dynamic]u64, 0, 32, context.temp_allocator)
+	c.core_idle_ns = make([dynamic]u64, 0, 32, context.temp_allocator)
+	c.disks = make([dynamic]Disk_Counters, 0, 16, context.temp_allocator)
+	c.nets = make([dynamic]Net_Counters, 0, 8, context.temp_allocator)
+
+	if text, ok := read_kept_seq(&r.stat_fd, "/proc/stat", r.buf); ok {
+		parse_cpu_times_into(string(text), c)
 	}
-	if text, _, ok := read_file(r.buf, linux.AT_FDCWD, "/proc/meminfo"); ok { c.mem = parse_meminfo(string(text)) }
-	if text, _, ok := read_file(r.buf, linux.AT_FDCWD, "/proc/loadavg"); ok { c.load = parse_loadavg(string(text)) }
-	if text, _, ok := read_file(r.buf, linux.AT_FDCWD, "/proc/uptime"); ok { c.uptime = strconv.parse_f64(first_field(string(text))) or_else 0 }
-	if text, _, ok := read_file(r.buf, linux.AT_FDCWD, "/proc/sys/fs/file-nr"); ok { c.handles = u64(strconv.parse_uint(first_field(string(text)), 10) or_else 0) }
-	if text, _, ok := read_file(r.buf, linux.AT_FDCWD, "/proc/diskstats"); ok {
-		for s in parse_diskstats(string(text)) {
-			append(&c.disks, Disk_Counters{s.name, s.sectors_read * SECTOR_BYTES, s.sectors_written * SECTOR_BYTES, s.io_ms})
-		}
+	if text, ok := read_kept_small(&r.meminfo_fd, "/proc/meminfo", r.buf); ok {
+		c.mem = parse_meminfo(string(text))
 	}
-	if text, _, ok := read_file(r.buf, linux.AT_FDCWD, "/proc/net/dev"); ok {
-		for s in parse_net_dev(string(text)) { append(&c.nets, Net_Counters{s.name, s.rx, s.tx}) }
+	if text, ok := read_kept_small(&r.loadavg_fd, "/proc/loadavg", r.buf); ok { c.load = parse_loadavg(string(text)) }
+	if text, ok := read_kept_small(&r.filenr_fd, "/proc/sys/fs/file-nr", r.buf); ok {
+		pos := 0
+		if w, has := next_token(string(text), &pos); has { c.handles, _ = parse_ascii_u64(w) }
+	}
+	if text, ok := read_kept_small(&r.uptime_fd, "/proc/uptime", r.buf); ok {
+		pos := 0
+		if w, has := next_token(string(text), &pos); has { c.uptime = strconv.parse_f64(w) or_else 0 }
+	}
+	if text, ok := read_kept_seq(&r.diskstats_fd, "/proc/diskstats", r.buf); ok {
+		parse_diskstats_into(string(text), &c.disks)
+	}
+	if text, ok := read_kept_seq(&r.netdev_fd, "/proc/net/dev", r.buf); ok {
+		parse_net_dev_into(string(text), &c.nets)
 	}
 	sensors_read(r, c)
 }
 
-// The processor's temperatures, the pressure, the times it slowed for its heat: a few small files each.
+// The processor's temperatures, the pressure, the times it slowed for its heat: kept descriptors, zero-alloc parsing.
 @(private = "file")
 sensors_read :: proc(r: ^Machine_Reader, c: ^Machine_Counters) {
 	if !r.temps_listed { temps_list(r) }
 	for &f in r.temp_files[:r.temp_n] {
-		v, ok := strconv.parse_f64(read_text(string(f.path[:f.path_len])))
+		v, ok := temp_file_read(&f, r.buf[:256])
 		if !ok { continue }
 		t := &c.temps[c.temp_count]
 		t.label_len = copy(t.label[:], f.label[:f.label_len])
-		t.celsius = f32(v / 1000)
+		t.celsius = v
 		c.temp_count += 1
 	}
 	core_temps_read(r, c)
 	if !r.no_pressure {
-		names := [Pressure_Kind]string{.Cpu = "/proc/pressure/cpu", .Memory = "/proc/pressure/memory", .Io = "/proc/pressure/io"}
+		names := [Pressure_Kind]cstring{.Cpu = "/proc/pressure/cpu", .Memory = "/proc/pressure/memory", .Io = "/proc/pressure/io"}
 		for path, k in names {
-			text, _, ok := read_file(r.buf, linux.AT_FDCWD, path)
+			text, ok := read_kept_small(&r.pressure_fds[k], path, r.buf[:1024])
 			if !ok { r.no_pressure = true; break }
 			c.pressure[k] = parse_pressure(string(text))
 		}
@@ -128,8 +249,13 @@ sensors_read :: proc(r: ^Machine_Reader, c: ^Machine_Counters) {
 	}
 	// (Intel's count of the package's slowdowns; AMD's processors tell none)
 	if !r.no_throttle {
-		text := read_text("/sys/devices/system/cpu/cpu0/thermal_throttle/package_throttle_count")
-		if text == "" { r.no_throttle = true } else { c.throttled = u64(strconv.parse_uint(text, 10) or_else 0) }
+		data, ok := read_kept_small(&r.throttle_fd, "/sys/devices/system/cpu/cpu0/thermal_throttle/package_throttle_count", r.buf[:256])
+		if !ok || len(data) == 0 {
+			r.no_throttle = true
+		} else {
+			pos := 0
+			if w, has := next_token(string(data), &pos); has { c.throttled, _ = parse_ascii_u64(w) }
+		}
 	}
 }
 
@@ -152,14 +278,16 @@ temps_list :: proc(r: ^Machine_Reader) {
 			// (a core's: by its core_id, shown with its logical processors, not in the list)
 			if id, is_core := core_label_id(label); is_core {
 				if id < CORES_TOLD_MAX && r.core_files[id].path_len == 0 {
-					r.core_files[id].path_len = copy(r.core_files[id].path[:], input)
+					r.core_files[id].path_len = copy(r.core_files[id].path[:len(r.core_files[id].path) - 1], input)
+					r.core_files[id].fd = -1
 					r.core_file_n += 1
 				}
 				continue
 			}
 			f := &r.temp_files[r.temp_n]
-			f.path_len = copy(f.path[:], input)
+			f.path_len = copy(f.path[:len(f.path) - 1], input)
 			f.label_len = copy(f.label[:], label)
+			f.fd = -1
 			r.temp_n += 1
 		}
 	}
@@ -192,13 +320,13 @@ core_temps_read :: proc(r: ^Machine_Reader, c: ^Machine_Counters) {
 	if r.core_file_n > 0 {
 		for &f, id in r.core_files {
 			if f.path_len == 0 { continue }
-			if v, ok := strconv.parse_f64(read_text(string(f.path[:f.path_len]))); ok { celsius[id] = f32(v / 1000) }
+			if v, ok := temp_file_read(&f, r.buf[:256]); ok { celsius[id] = v }
 		}
 	} else {
-		data, _, ok := read_file(r.buf, linux.AT_FDCWD, RYZEN_SMU + "/pm_table")
+		data, ok := read_kept_small(&r.pm_fd, RYZEN_SMU + "/pm_table", r.buf)
 		if !ok || len(data) < (r.pm.first + r.pm.cores) * 4 {
 			r.pm_failures += 1
-			if r.pm_failures >= PM_FAILURES_MAX { r.pm = {} }
+			if r.pm_failures >= PM_FAILURES_MAX { r.pm = {}; close_fd(&r.pm_fd) }
 			return
 		}
 		r.pm_failures = 0
@@ -234,13 +362,6 @@ pm_table_find :: proc(r: ^Machine_Reader) {
 	if !ok || len(data) < 4 { return }
 	version := u32(data[0]) | u32(data[1]) << 8 | u32(data[2]) << 16 | u32(data[3]) << 24
 	for t in PM_TABLES { if t.version == version { r.pm = t; return } }
-}
-
-@(private = "file")
-first_field :: proc(text: string) -> string {
-	t := strings.trim_left_space(text)
-	if i := strings.index_any(t, " \t\n"); i >= 0 { return t[:i] }
-	return t
 }
 
 ////////////////////////////////
@@ -284,14 +405,25 @@ cpu_mhz_now :: proc(cores: []f32) -> f32 {
 
 // A file of /proc/pressure: "some avg10=0.23 avg60=1.59 avg300=1.89 total=..." and the same for "full".
 parse_pressure :: proc(text: string) -> (p: Pressure) {
-	rest := text
-	for line in strings.split_lines_iterator(&rest) {
-		fields := strings.fields(line, context.temp_allocator)
-		if len(fields) < 3 { continue }
-		avg :: proc(field, key: string) -> f32 { return strings.has_prefix(field, key) ? f32(strconv.parse_f64(field[len(key):]) or_else 0) : 0 }
-		switch fields[0] {
-		case "some": p.some10, p.some60 = avg(fields[1], "avg10="), avg(fields[2], "avg60=")
-		case "full": p.full10, p.full60 = avg(fields[1], "avg10="), avg(fields[2], "avg60=")
+	avg :: proc(field, key: string) -> f32 {
+		if !strings.has_prefix(field, key) { return 0 }
+		return f32(strconv.parse_f64(field[len(key):]) or_else 0)
+	}
+	i := 0
+	n := len(text)
+	for i < n {
+		start := i
+		for i < n && text[i] != '\n' { i += 1 }
+		line := text[start:i]
+		if i < n { i += 1 }
+		pos := 0
+		f0, ok0 := next_token(line, &pos)
+		f1, ok1 := next_token(line, &pos)
+		f2, ok2 := next_token(line, &pos)
+		if !ok0 || !ok1 || !ok2 { continue }
+		switch f0 {
+		case "some": p.some10, p.some60 = avg(f1, "avg10="), avg(f2, "avg60=")
+		case "full": p.full10, p.full60 = avg(f1, "avg10="), avg(f2, "avg60=")
 		}
 	}
 	return
@@ -438,27 +570,74 @@ Cpu_Times :: struct {
 	boot_time:   i64,
 }
 
+// Parses /proc/stat directly into Machine_Counters without intermediate core slices.
+@(private = "file")
+parse_cpu_times_into :: proc(text: string, c: ^Machine_Counters) {
+	i := 0
+	n := len(text)
+	for i < n {
+		start := i
+		for i < n && text[i] != '\n' { i += 1 }
+		line := text[start:i]
+		if i < n { i += 1 }
+		if len(line) < 4 { continue }
+		if line[0] == 'b' && strings.has_prefix(line, "btime ") {
+			pos := 6
+			if w, ok := next_token(line, &pos); ok { v, _ := parse_ascii_i64(w); c.boot_time = v }
+			continue
+		}
+		if line[0] != 'c' || line[1] != 'p' || line[2] != 'u' { continue }
+		pos := 3
+		whole := line[3] == ' '
+		if !whole { for pos < len(line) && !is_ascii_space(line[pos]) { pos += 1 } }
+		total, idle: u64
+		for field in 0 ..< 8 {
+			w, ok := next_token(line, &pos)
+			if !ok { break }
+			v, _ := parse_ascii_u64(w)
+			total += v
+			if field == 3 || field == 4 { idle += v }
+		}
+		if whole {
+			c.cpu_total_ns, c.cpu_idle_ns = total * TICK_NS, idle * TICK_NS
+		} else {
+			append(&c.core_total_ns, total * TICK_NS)
+			append(&c.core_idle_ns, idle * TICK_NS)
+		}
+	}
+}
+
 // /proc/stat: the ticks of all processors and of each (user, nice, system, idle, iowait, irq, softirq, steal; the guest
 // time is in the user time already), idle + iowait as idle; the boot time.
 parse_cpu_times :: proc(text: string) -> (t: Cpu_Times) {
-	t.core_total = make([dynamic]u64, context.temp_allocator)
-	t.core_idle = make([dynamic]u64, context.temp_allocator)
-	rest := text
-	for line in strings.split_lines_iterator(&rest) {
-		if strings.has_prefix(line, "btime ") { t.boot_time = i64(strconv.parse_i64(strings.trim_space(line[6:]), 10) or_else 0); continue }
-		if !strings.has_prefix(line, "cpu") { continue }
-		total, idle: u64
-		fields := line
-		_, _ = strings.fields_iterator(&fields)   // (the line's name)
-		i := 0
-		for word in strings.fields_iterator(&fields) {
-			if i >= 8 { break }
-			v := u64(strconv.parse_uint(word, 10) or_else 0)
-			total += v
-			if i == 3 || i == 4 { idle += v }
-			i += 1
+	t.core_total = make([dynamic]u64, 0, 32, context.temp_allocator)
+	t.core_idle = make([dynamic]u64, 0, 32, context.temp_allocator)
+	i := 0
+	n := len(text)
+	for i < n {
+		start := i
+		for i < n && text[i] != '\n' { i += 1 }
+		line := text[start:i]
+		if i < n { i += 1 }
+		if len(line) < 4 { continue }
+		if line[0] == 'b' && strings.has_prefix(line, "btime ") {
+			pos := 6
+			if w, ok := next_token(line, &pos); ok { v, _ := parse_ascii_i64(w); t.boot_time = v }
+			continue
 		}
-		if strings.has_prefix(line, "cpu ") {
+		if line[0] != 'c' || line[1] != 'p' || line[2] != 'u' { continue }
+		pos := 3
+		whole := line[3] == ' '
+		if !whole { for pos < len(line) && !is_ascii_space(line[pos]) { pos += 1 } }
+		total, idle: u64
+		for field in 0 ..< 8 {
+			w, ok := next_token(line, &pos)
+			if !ok { break }
+			v, _ := parse_ascii_u64(w)
+			total += v
+			if field == 3 || field == 4 { idle += v }
+		}
+		if whole {
 			t.total, t.idle = total, idle
 		} else {
 			append(&t.core_total, total)
@@ -468,39 +647,46 @@ parse_cpu_times :: proc(text: string) -> (t: Cpu_Times) {
 	return
 }
 
-// /proc/meminfo, in bytes.
+// /proc/meminfo, in bytes. Only keys Inspecteur displays are parsed into integers.
 parse_meminfo :: proc(text: string) -> (m: Mem_Fields) {
-	rest := text
-	for line in strings.split_lines_iterator(&rest) {
+	val :: proc(line: string, after_colon: int) -> u64 {
+		pos := after_colon
+		if w, ok := next_token(line, &pos); ok { v, _ := parse_ascii_u64(w); return v * 1024 }
+		return 0
+	}
+	i := 0
+	n := len(text)
+	for i < n {
+		start := i
+		for i < n && text[i] != '\n' { i += 1 }
+		line := text[start:i]
+		if i < n { i += 1 }
 		colon := strings.index_byte(line, ':')
 		if colon < 0 { continue }
-		v := strings.trim_suffix(strings.trim_space(line[colon + 1:]), " kB")
-		bytes := u64(strconv.parse_uint(v, 10) or_else 0) * 1024
 		switch line[:colon] {
-		case "MemTotal":     m.total = bytes
-		case "MemFree":      m.free = bytes
-		case "MemAvailable": m.available = bytes
-		case "Buffers":      m.buffers = bytes
-		case "Cached":       m.cached = bytes
-		case "SReclaimable": m.reclaimable = bytes
-		case "Shmem":        m.shared = bytes
-		case "Dirty":        m.dirty = bytes
-		case "SwapTotal":    m.swap_total = bytes
-		case "SwapFree":     m.swap_free = bytes
-		case "Committed_AS": m.committed = bytes
-		case "CommitLimit":  m.commit_limit = bytes
+		case "MemTotal":     m.total = val(line, colon + 1)
+		case "MemFree":      m.free = val(line, colon + 1)
+		case "MemAvailable": m.available = val(line, colon + 1)
+		case "Buffers":      m.buffers = val(line, colon + 1)
+		case "Cached":       m.cached = val(line, colon + 1)
+		case "SReclaimable": m.reclaimable = val(line, colon + 1)
+		case "Shmem":        m.shared = val(line, colon + 1)
+		case "Dirty":        m.dirty = val(line, colon + 1)
+		case "SwapTotal":    m.swap_total = val(line, colon + 1)
+		case "SwapFree":     m.swap_free = val(line, colon + 1)
+		case "Committed_AS": m.committed = val(line, colon + 1)
+		case "CommitLimit":  m.commit_limit = val(line, colon + 1)
 		}
 	}
 	return
 }
 
 parse_loadavg :: proc(text: string) -> (load: [3]f32) {
-	rest := text
-	i := 0
-	for word in strings.fields_iterator(&rest) {
-		if i >= 3 { break }
-		load[i] = f32(strconv.parse_f64(word) or_else 0)
-		i += 1
+	pos := 0
+	for i in 0 ..< 3 {
+		w, ok := next_token(text, &pos)
+		if !ok { break }
+		load[i] = f32(strconv.parse_f64(w) or_else 0)
 	}
 	return
 }
@@ -537,32 +723,116 @@ parse_size_k :: proc(s: string) -> u64 {
 
 Disk_Stat :: struct { name: string, sectors_read, sectors_written, io_ms: u64 }
 
+@(private = "file")
+parse_diskstats_into :: proc(text: string, out: ^[dynamic]Disk_Counters) {
+	i := 0
+	n := len(text)
+	for i < n {
+		start := i
+		for i < n && text[i] != '\n' { i += 1 }
+		line := text[start:i]
+		if i < n { i += 1 }
+		pos := 0
+		name: string
+		s_read, s_write, io_ms: u64
+		count := 0
+		for count < 13 {
+			w, ok := next_token(line, &pos)
+			if !ok { break }
+			switch count {
+			case 2:  name = w
+			case 5:  s_read, _ = parse_ascii_u64(w)
+			case 9:  s_write, _ = parse_ascii_u64(w)
+			case 12: io_ms, _ = parse_ascii_u64(w)
+			}
+			count += 1
+		}
+		if count < 13 { continue }
+		append(out, Disk_Counters{name = strings.clone(name, context.temp_allocator), read_bytes = s_read * SECTOR_BYTES, written_bytes = s_write * SECTOR_BYTES, busy_ms = io_ms})
+	}
+}
+
 // /proc/diskstats: per device, the sectors read and written and the milliseconds spent doing I/O (in the temporary
 // allocator).
 parse_diskstats :: proc(text: string) -> []Disk_Stat {
-	out := make([dynamic]Disk_Stat, context.temp_allocator)
-	rest := text
-	for line in strings.split_lines_iterator(&rest) {
-		f := strings.fields(line, context.temp_allocator)
-		if len(f) < 13 { continue }
-		num :: proc(s: string) -> u64 { return u64(strconv.parse_uint(s, 10) or_else 0) }
-		append(&out, Disk_Stat{name = f[2], sectors_read = num(f[5]), sectors_written = num(f[9]), io_ms = num(f[12])})
+	out := make([dynamic]Disk_Stat, 0, 16, context.temp_allocator)
+	i := 0
+	n := len(text)
+	for i < n {
+		start := i
+		for i < n && text[i] != '\n' { i += 1 }
+		line := text[start:i]
+		if i < n { i += 1 }
+		pos := 0
+		d: Disk_Stat
+		count := 0
+		for count < 13 {
+			w, ok := next_token(line, &pos)
+			if !ok { break }
+			switch count {
+			case 2:  d.name = w
+			case 5:  d.sectors_read, _ = parse_ascii_u64(w)
+			case 9:  d.sectors_written, _ = parse_ascii_u64(w)
+			case 12: d.io_ms, _ = parse_ascii_u64(w)
+			}
+			count += 1
+		}
+		if count < 13 { continue }
+		append(&out, d)
 	}
 	return out[:]
 }
 
 Net_Stat :: struct { name: string, rx, tx: u64 }
 
-// /proc/net/dev: per interface, the bytes received and sent.
-parse_net_dev :: proc(text: string) -> []Net_Stat {
-	out := make([dynamic]Net_Stat, context.temp_allocator)
-	rest := text
-	for line in strings.split_lines_iterator(&rest) {
+@(private = "file")
+parse_net_dev_into :: proc(text: string, out: ^[dynamic]Net_Counters) {
+	i := 0
+	n := len(text)
+	for i < n {
+		start := i
+		for i < n && text[i] != '\n' { i += 1 }
+		line := text[start:i]
+		if i < n { i += 1 }
 		colon := strings.index_byte(line, ':')
 		if colon < 0 { continue }
-		f := strings.fields(line[colon + 1:], context.temp_allocator)
-		if len(f) < 9 { continue }
-		append(&out, Net_Stat{name = strings.trim_space(line[:colon]), rx = u64(strconv.parse_uint(f[0], 10) or_else 0), tx = u64(strconv.parse_uint(f[8], 10) or_else 0)})
+		pos := colon + 1
+		rx, tx: u64
+		count := 0
+		for count < 9 {
+			w, ok := next_token(line, &pos)
+			if !ok { break }
+			if count == 0 { rx, _ = parse_ascii_u64(w) } else if count == 8 { tx, _ = parse_ascii_u64(w) }
+			count += 1
+		}
+		if count < 9 { continue }
+		append(out, Net_Counters{name = strings.clone(strings.trim_space(line[:colon]), context.temp_allocator), rx = rx, tx = tx})
+	}
+}
+
+// /proc/net/dev: per interface, the bytes received and sent.
+parse_net_dev :: proc(text: string) -> []Net_Stat {
+	out := make([dynamic]Net_Stat, 0, 8, context.temp_allocator)
+	i := 0
+	n := len(text)
+	for i < n {
+		start := i
+		for i < n && text[i] != '\n' { i += 1 }
+		line := text[start:i]
+		if i < n { i += 1 }
+		colon := strings.index_byte(line, ':')
+		if colon < 0 { continue }
+		pos := colon + 1
+		rx, tx: u64
+		count := 0
+		for count < 9 {
+			w, ok := next_token(line, &pos)
+			if !ok { break }
+			if count == 0 { rx, _ = parse_ascii_u64(w) } else if count == 8 { tx, _ = parse_ascii_u64(w) }
+			count += 1
+		}
+		if count < 9 { continue }
+		append(&out, Net_Stat{name = strings.trim_space(line[:colon]), rx = rx, tx = tx})
 	}
 	return out[:]
 }

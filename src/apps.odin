@@ -17,9 +17,10 @@ import "gt:ui"
 import identity "identity"
 
 App_Entry :: struct {
-	id:   string,   // the desktop file's name without .desktop (org.chromium.Chromium)
-	name: string,   // Name=
-	icon: string,   // Icon=
+	id:         string,   // the desktop file's name without .desktop (org.chromium.Chromium)
+	name:       string,   // Name=
+	name_lower: string,   // lower-case name cached once for filtering
+	icon:       string,   // Icon=
 }
 
 Catalog :: struct {
@@ -33,7 +34,7 @@ catalog_add_entry :: proc(c: ^Catalog, id, name, icon, program, window_class: st
 	// a desktop file id names one entry: the first folder's (the user's) wins
 	if key_of(id) in c.keys { return }
 	at := len(c.entries)
-	append(&c.entries, App_Entry{id = strings.clone(id), name = strings.clone(name), icon = strings.clone(icon)})
+	append(&c.entries, App_Entry{id = strings.clone(id), name = strings.clone(name), name_lower = strings.to_lower(name), icon = strings.clone(icon)})
 	add :: proc(c: ^Catalog, key: string, at: int) {
 		k := unwrapped(key_of(key))
 		if k == "" || k in c.keys { return }
@@ -133,7 +134,7 @@ unwrapped :: proc(name: string) -> string {
 }
 
 catalog_destroy :: proc(c: ^Catalog) {
-	for e in c.entries { delete(e.id); delete(e.name); delete(e.icon) }
+	for e in c.entries { delete(e.id); delete(e.name); delete(e.name_lower); delete(e.icon) }
 	delete(c.entries)
 	for k in c.keys { delete(k) }
 	delete(c.keys)

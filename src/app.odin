@@ -81,6 +81,9 @@ App :: struct {
 	palette_settings: prefs_page.Palette_Settings,   // its settings source (`:`)
 	go_to:       Go_To,             // its Go to sources (`@`): the processes and the services (goto.odin)
 	rows_made:   int,               // counts rows_again: what the commands can act on may have changed
+	rows_changes: u64,              // sampler.changes at the last rows_again: a sort on what does not change keeps its rows
+	had_gpu_procs: bool,            // the last sample gave some process GPU numbers
+	themes_changed: bool,           // the last sample saw another themes file than the one read
 	sheet:       ui.Shortcuts_Sheet,   // the sheet of the keys (commands.odin)
 	sheet_commands: [dynamic]ui.Command,   // its list, made at its first opening
 	keymap:      ui.Keymap,         // the person's keys and aliases of the commands (keys.custom, keys.aliases), set from the palette
@@ -158,6 +161,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 	machine_init(&app.machine, app.demo)
 	sampling_init(&app.sampling, app.demo)
 	if app.demo != nil { demo_preroll(app.demo, app, time.tick_now()._nsec) }
+	app.sampling.themes = app.themes_file.path   // (not the preroll's, which runs on this thread)
 	table_layout_load(&app.table, app.settings)
 	app.table.tree = app.settings.tree
 	pins_load(&app.table, app.settings.pinned)
@@ -243,7 +247,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 	// what that frame took; hosts_wait counts them)
 	hosts := [1]^host.Host{h}
 	for !platform.is_closed(win) {
-		host.hosts_wait(hosts[:])
+		timer := readings_wait(app, hosts[:])
 		if !app.paused && !app.held && time.tick_diff(app.next_sample, time.tick_now()) >= 0 { sample_ask(app) }
 		if !app.paused && !app.held {
 			services_tick(app)
@@ -251,6 +255,12 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 		}
 		journals_tick(app)
 		updates_follow(app)
+		// (a reading asked shows nothing yet: its frame comes with it)
+		if timer && !frame_due(app, hosts[:]) {
+			free_all(context.temp_allocator)
+			continue
+		}
+
 		t_frame := time.tick_now()
 		host.host_frame(h)
 		zoom_follow(app)
@@ -336,7 +346,9 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 rows_again :: proc(app: ^App) {
 	keep := selected_id(app)
 	app.rows_made += 1
-	ui.vlist_invalidate(&app.vl)
+	app.rows_changes = app.sampler.changes
+	// (no vlist_invalidate: the list keeps each row's height by its id, and drops them itself when the width, the scale or
+	// the text size changes)
 	table_rows(&app.table, &app.sampler, &app.catalog)
 	app.vl.sel = -1
 	if keep != 0 { for id, i in app.table.ids { if id == keep { app.vl.sel = i; break } } }
@@ -353,7 +365,7 @@ tab_show :: proc(app: ^App, tab: Tab) {
 	app.tab = tab
 	pref_set(&app.prefs, "view.section", strings.to_lower(TAB_LABELS[tab], context.temp_allocator))
 	section_first_show(app)
-	if tab == .Performance { gpu_want(&app.machine.gpu, true) }
+	if tab == .Performance { gpus_want(app) }
 }
 
 // What the section shown reads when it is shown.
@@ -405,6 +417,37 @@ row_process :: proc(app: ^App, r: Row) -> (p: ^Proc, ok: bool) {
 until_sample :: proc(app: ^App) -> int {
 	if app.paused || app.held || app.sampling.asked { return max(int) }   // (Ctrl's release wakes the window)
 	return max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), app.next_sample))) + 1, 1)
+}
+
+// The soonest background polling timer across samples, services, connections and journals (max(int) when none is due).
+@(private = "file")
+poll_due_ms :: proc(app: ^App) -> int {
+	return min(until_sample(app), services_due_ms(app), connections_due_ms(app), journals_due_ms(app))
+}
+
+// The loop's wait: host.hosts_wait, which a reading's time ends too. True: that time alone ended it; whatever else did
+// (input, a post, another thread's wake) is owed a frame, as hosts_wait's callers give it.
+@(private = "file")
+readings_wait :: proc(app: ^App, hosts: []^host.Host) -> (timer: bool) {
+	now, wake := host.hosts_due(hosts)
+	if now || ui.posts_pending(&app.main.state) { return false }
+	due := poll_due_ms(app)
+	timer = due < max(int) && (wake == 0 || due < wake)
+	ms := timer ? due : wake
+	began := time.tick_now()
+	platform.wait_event(app.main.win, ms)
+	for h in hosts { h.slept = !h.word_due }
+	return timer && time.tick_since(began) >= time.Duration(ms) * time.Millisecond
+}
+
+// Whether the window or a view's window has a frame to make: input, what moves or settles, a posted reading, a wake of
+// the interface that is due (a view's own too: the soonest wake counts them all).
+@(private = "file")
+frame_due :: proc(app: ^App, hosts: []^host.Host) -> bool {
+	if platform.is_closed(app.main.win) || ui.view_window_due(&app.main.state) { return true }
+	for v in app.shared.views { if ui.view_window_due(&v.host.state) { return true } }
+	now, _ := host.hosts_due(hosts)
+	return now
 }
 
 // What each build of the window is given: the theme, the base style of the preferences. (The views' windows follow the

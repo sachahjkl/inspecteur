@@ -27,9 +27,7 @@ build_services :: proc(app: ^App, em: f32) {
 	if s.pending != .None {
 		note = i18n.tr("Waiting for the service manager…")
 	} else if s.list != nil && s.list.manager == s.manager {
-		running := 0
-		for u in s.list.units { if u.active == "active" && u.sub == "running" { running += 1 } }
-		note = fmt.tprintf(i18n.tr(len(s.list.units), "%d service, %d running", "%d services, %d running"), len(s.list.units), running)
+		note = fmt.tprintf(i18n.tr(len(s.list.units), "%d service, %d running", "%d services, %d running"), len(s.list.units), s.list.running)
 	}
 	section_bar(app, i18n.tr("Services"), note, em, services_actions, services_manager_choice)
 	// (the table is the space's centre; the details and the journals dock around it)
@@ -150,9 +148,11 @@ services_tick :: proc(app: ^App) {
 // The milliseconds until the next reading of the services is due, while they are shown, or of the details' journal
 // while it is followed (the window wakes for it).
 services_due_ms :: proc(app: ^App) -> int {
-	if app.paused { return max(int) }
+	if app.paused || app.held { return max(int) }
 	due := journal_due_ms(app)
-	if app.tab == .Services { due = min(due, max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), app.services.next))) + 1, 1)) }
+	if app.tab == .Services && !services_busy(app) {
+		due = min(due, max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), app.services.next))) + 1, 1))
+	}
 	return due
 }
 

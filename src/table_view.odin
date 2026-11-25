@@ -217,7 +217,7 @@ build_rows :: proc(app: ^App, em: f32) {
 	// (narrower than the columns, the rows scroll sideways: Shift+wheel, a touchpad)
 	least := ui.table_min_width(&t.layout)
 	ui.next({width = ui.fill(), height = ui.fill(), flags = {.View_Scroll_X, .Allow_Overflow_X}})
-	rows, ok := ui.vlist("###rows", &app.vl, t.ids[:], nil, t.selectable[:])
+	rows, ok := ui.vlist("###rows", &app.vl, t.ids[:], nil, t.selectable[:], ids_version = t.ids_version)
 	if !ok { return }
 	// (the search has the keyboard, yet the selection is the window's: it shows as strong as a focused list's)
 	app.vl.focused = true

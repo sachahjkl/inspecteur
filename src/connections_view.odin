@@ -14,9 +14,7 @@ import i18n "gt:i18n"
 build_connections :: proc(app: ^App, em: f32) {
 	c := &app.connections
 	if c.rows.table.query != app.query { ui.table_apply(&c.rows.table, &c.rows.data, app.query) }
-	listening := 0
-	for s in c.sockets { if socket_listens(s) { listening += 1 } }
-	note := c.read ? fmt.tprintf(i18n.tr(len(c.sockets), "%d socket, %d listening or open", "%d sockets, %d listening or open"), len(c.sockets), listening) : i18n.tr("Reading…")
+	note := c.read ? fmt.tprintf(i18n.tr(len(c.sockets), "%d socket, %d listening or open", "%d sockets, %d listening or open"), len(c.sockets), c.listening_or_open) : i18n.tr("Reading…")
 	section_bar(app, i18n.tr("Connections"), note, em, connections_actions)
 	ev := section_table_build(&c.rows, c.read ? i18n.tr("No socket.") : "")
 	if ev.sorted { ui.table_apply(&c.rows.table, &c.rows.data, app.query) }

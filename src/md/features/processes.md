@@ -1,17 +1,43 @@
 # The processes
 
-On Linux everything comes from `/proc`, read with system calls (`openat`, `read`, `getdents`) into one buffer. Kernel
-threads (`PF_KTHREAD`) are not shown.
+On Linux everything comes from `/proc`, read with system calls (`openat`, `pread`, `read`, `getdents`) into reusable
+buffers without per-process path allocations. Kernel threads (`PF_KTHREAD`) are not shown.
 
 ## What is read, and when
 
-- **Each sample**: `/proc/stat` (the machine's CPU time), `/proc/meminfo`, the list of pids, then for each process
-  `stat` (parent, CPU time, threads, state, nice, start time), `statm` (resident and shared pages) and `io` (bytes read
-  from and written to the storage).
-- **Once per process**: its command line, its executable, its owner, its systemd unit (`cgroup`), its app.
+- **Each sample**: `/proc/stat` (the machine's CPU time), `/proc/meminfo`, `/proc/diskstats`, `/proc/net/dev`, the
+  package temperature and pressure, the list of pids, then for each user process `stat` (parent, CPU time, threads,
+  state, nice, start time), `statm` (resident and shared pages) and `io` (bytes read from and written to the storage).
+  All of it is read whatever section is shown: a number left out while hidden was stale, or 0, when its section opened,
+  for as long as the refresh was paused. It saved about 0.1 ms per sample.
+- **Kept descriptors**: closing a `/proc/<pid>` file frees its kernel dentry and inode (`always_delete_dentry`), making
+  re-opening ~4x slower than `pread` at offset 0 on a kept descriptor. `Proc_Reader` keeps open `stat`, `statm` and
+  `io` descriptors for live user processes up to a budget derived from `RLIMIT_NOFILE` (reserving headroom for the UI,
+  Wayland, Vulkan and Properties) and at most 4096: each keeps a page of the kernel's memory, which no figure of the
+  process shows. Beyond the budget, it falls back to `openat` + single-read + `close`. When a process
+  exits, `pread` on its kept descriptor returns `ESRCH` even if the pid was reused; the reader closes the old
+  descriptors and re-opens if the pid is still listed. Fixed `/proc` and `/sys` files in `Machine_Reader` also stay
+  open (`pread(0)` for small single-record files; `lseek(0)` + read loop for multi-page `seq_file`s such as
+  `/proc/stat`, `/proc/diskstats` and `/proc/net/dev`).
+- **Kernel threads**: on real `/proc`, once a pid is identified as a kernel thread, the reader opens a `pidfd`
+  (re-verifying `stat` start time before closing `stat`) and watches it in one `epoll` instance within the descriptor
+  budget. Each sample runs one non-blocking `epoll_wait` to evict exited kernel threads; live kernel threads cost zero
+  syscalls per sample and cannot suffer from pid reuse. (None of their numbers is shown, so none is read.)
+- **Refused alternative (`io_uring`)**: batched `io_uring` `read` on kept `/proc` descriptors was measured against
+  synchronous `pread`. Because procfs `seq_file` reads do not complete with `IOCB_NOWAIT`, the kernel punts them to
+  `io-wq` worker threads, making `io_uring` ~58% slower in wall time while shifting CPU work into kernel worker threads.
+  Synchronous `pread` is kept.
+- **Once per process**: `proc_facts` opens the process's `/proc/<pid>` directory descriptor once and reads `cmdline`,
+  `exe`, `fstat` (owner) and `cgroup` relative to it, avoiding repeated path walks and pinning the same process.
 - **Identity**: a process is the pair (pid, start time). A pid used again is a new process. The table's selection (the
   toolkit's `Item_Selection`: the rows selected and the cursor) is kept by this identity across samples, sorts and
   filters.
+- **Memory and neutral pipeline**: `Proc_History` (3,648 bytes) is allocated lazily on a process's second sample so
+  short-lived processes allocate none. `Sampler` double-buffers its process slice. `ranking_make` finds the top
+  `BUSIEST_KEEP` processes in one O(N) pass instead of three full sorts. `Table` prunes dead keys from `collapsed`,
+  reuses its pid-index map, sorts tree siblings in a flat CSR array, skips full re-sorts when membership and static
+  sort inputs did not change, and drives `ui.vlist` with `ids_version` without per-sample `vlist_invalidate` (all rows
+  have uniform height).
 
 ## Decisions on the numbers
 

@@ -92,6 +92,7 @@ Proc :: struct {
 // The window's processes. The system's are read off its thread (sample.odin); a reading becomes these (sampler_apply).
 Sampler :: struct {
 	procs:   [dynamic]Proc,   // sorted by pid
+	scratch: [dynamic]Proc,   // double-buffered backing slice reused by procs_merge
 	last_ns: i64,             // when the last sample was taken (monotonic)
 	samples: int,
 	changes: u64,             // counts the samples that brought a process or took one away (the palette's Go to reads again)
@@ -100,6 +101,7 @@ Sampler :: struct {
 sampler_destroy :: proc(s: ^Sampler) {
 	for &p in s.procs { proc_free(&p) }
 	delete(s.procs)
+	delete(s.scratch)
 	s^ = {}
 }
 
@@ -141,19 +143,21 @@ proc_ended :: proc(p: ^Proc, now_ns: i64) -> bool {
 // a new one (a new pid, or a pid with another start) is learnt from its facts (`facts`, beside `counters`: those the
 // reader read; none, or not read: its command name alone).
 procs_merge :: proc(s: ^Sampler, counters: []Proc_Counters, facts: []Proc_Facts, dt: f64, d_total_ns: u64, catalog: ^Catalog, history := true, now_ns: i64 = 0) {
-	next := make([dynamic]Proc, 0, len(counters))
+	clear(&s.scratch)
+	if cap(s.scratch) < len(counters) { reserve(&s.scratch, len(counters)) }
 	old := 0
 	changed := false
 	for c, i in counters {
 		for old < len(s.procs) && s.procs[old].pid < c.pid {
 			changed = changed || !s.procs[old].ended
-			if proc_ended(&s.procs[old], now_ns) { append(&next, s.procs[old]) }
+			if proc_ended(&s.procs[old], now_ns) { append(&s.scratch, s.procs[old]) } else { changed = true }
 			old += 1
 		}
 		p: Proc
 		known := old < len(s.procs) && s.procs[old].pid == c.pid && s.procs[old].start == c.start && !s.procs[old].ended
 		if known {
 			p = s.procs[old]
+			if p.ppid != c.ppid { changed = true }
 			old += 1
 		} else {
 			if old < len(s.procs) && s.procs[old].pid == c.pid {   // (the pid of a process that ended, used again)
@@ -167,27 +171,27 @@ procs_merge :: proc(s: ^Sampler, counters: []Proc_Counters, facts: []Proc_Facts,
 			if s.samples > 1 { p.born_ns = now_ns }
 		}
 		proc_update(&p, c, known, dt, d_total_ns)
-		// (a process seen for the first time has no rates yet: its first point is its second sample's)
+		// (a process seen for the first time has no rates yet: its first point is its second sample's; lazy allocation
+		// avoids allocating 3.6 KiB per short-lived process that disappears before its second sample)
 		if history && known {
+			if p.hist == nil { p.hist = new(Proc_History) }
 			ui.value_history_push(&p.hist.cpu, p.cpu)
 			ui.value_history_push(&p.hist.memory, f32(p.private))
 			ui.value_history_push(&p.hist.disk, f32(p.read_rate + p.write_rate))
 		}
-		append(&next, p)
+		append(&s.scratch, p)
 	}
 	for ; old < len(s.procs); old += 1 {
 		changed = changed || !s.procs[old].ended
-		if proc_ended(&s.procs[old], now_ns) { append(&next, s.procs[old]) }
+		if proc_ended(&s.procs[old], now_ns) { append(&s.scratch, s.procs[old]) } else { changed = true }
 	}
-	delete(s.procs)
-	s.procs = next
+	s.procs, s.scratch = s.scratch, s.procs
 	if changed { s.changes += 1 }
 }
 
 @(private = "file")
 proc_learn :: proc(p: ^Proc, c: Proc_Counters, f: Proc_Facts, catalog: ^Catalog) {
 	p.pid, p.start, p.started, p.user = c.pid, c.start, f.started, f.user
-	p.hist = new(Proc_History)
 	p.name = strings.clone(f.name != "" ? f.name : c.comm)
 	p.cmdline = strings.clone(f.cmdline)
 	p.exe = strings.clone(f.exe)

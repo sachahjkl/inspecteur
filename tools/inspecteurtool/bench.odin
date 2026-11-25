@@ -31,12 +31,21 @@ CLOCK_TICKS  :: 100               // USER_HZ: the unit of /proc/<pid>/stat's tim
 
 run_bench :: proc(args: []string) -> cli.Exit {
 	seconds := 10
-	if len(args) > 0 { seconds = strconv.parse_int(args[0], 10) or_else seconds }
-	if !toolbox.program_build(build_options(), release = true) { return .Failed }
+	software := false
+	no_build := false
+	for a in args {
+		switch a {
+		case "--software": software = true
+		case "--no-build": no_build = true
+		case:              seconds = strconv.parse_int(a, 10) or_else seconds
+		}
+	}
+	if !no_build && !toolbox.program_build(build_options(), release = true) { return .Failed }
+	renderer := software ? "pixman" : "vulkan"
 	starts: [BENCH_STARTS]f64
 	for k in 0 ..< BENCH_STARTS {
 		s: toolbox.Program_Session
-		if why := session_start(&s, BENCH_DIR, {"--first-frame"}, renderer = "vulkan"); why != "" {
+		if why := session_start(&s, BENCH_DIR, {"--first-frame"}, renderer = renderer); why != "" {
 			fmt.eprintfln("inspecteurtool bench: %s", why)
 			toolbox.program_session_stop(&s)
 			return .Failed
@@ -55,6 +64,12 @@ run_bench :: proc(args: []string) -> cli.Exit {
 			// (the sections that read on threads of their own, shown: what they cost while they are on the screen)
 			for section in ([]struct { key, name: string }{{"ctrl+4", "Services"}, {"ctrl+6", "Connections"}}) {
 				if show(&s, section.key) { rest(&s, seconds, fmt.tprintf("%s shown", section.name)) }
+			}
+			// (on a workspace nobody sees: the compositor shows none of its pictures)
+			if show(&s, "ctrl+1") && toolbox.run({"swaymsg", "-q", "-s", s.sway.ipc, "workspace", "away"}) {
+				rest(&s, seconds, "on a hidden workspace")
+				_ = toolbox.run({"swaymsg", "-q", "-s", s.sway.ipc, "workspace", "1"})
+				rest(&s, seconds, "shown again")
 			}
 		}
 		toolbox.program_session_stop(&s)
@@ -107,20 +122,69 @@ show :: proc(s: ^toolbox.Program_Session, key: string) -> bool {
 rest :: proc(s: ^toolbox.Program_Session, seconds: int, what: string) {
 	time.sleep(BENCH_SETTLE)
 	pid := s.program.pid
-	b0 := builds(s)
+	b0 := metrics_reset(s)
 	t0, _ := ticks_of(pid)
 	threads0 := thread_ticks(pid)
 	time.sleep(time.Duration(seconds) * time.Second)
 	t1, rss := ticks_of(pid)
 	threads1 := thread_ticks(pid)
-	b1 := builds(s)
+	b1, mline := metrics_read(s)
 	share := 100 * f64(t1 - t0) / CLOCK_TICKS / f64(seconds)
-	fmt.printfln("%s: %.2f%% of one core over %d s (%d ticks), %d builds, %.1f MB resident", what, share, seconds, t1 - t0, b1 - b0 - 1, f64(rss) / (1024 * 1024))
+	fmt.printfln("%s: %.2f%% of one core over %d s (%d ticks), %d builds, %.1f MB resident%s", what, share, seconds, t1 - t0, b1 - b0 - 1, f64(rss) / (1024 * 1024), mline)
 	// where it went: each thread that used some
 	for tid, after in threads1 {
 		d := after.ticks - (threads0[tid].ticks if tid in threads0 else 0)
 		if d > 0 { fmt.printfln("  thread %d %s: %d ticks", tid, after.name, d) }
 	}
+}
+
+@(private = "file")
+metrics_reset :: proc(s: ^toolbox.Program_Session) -> int {
+	c, why := toolbox.program_session_connect(s)
+	if why != "" { return 0 }
+	defer cdp.close(&c)
+	r, rok := cdp.call(&c, "Toolkit.metrics", `{"reset":true}`)
+	if !rok { return 0 }
+	n, _ := cdp.integer((r.(json.Object) or_else nil)["build"])
+	return n
+}
+
+@(private = "file")
+metrics_read :: proc(s: ^toolbox.Program_Session) -> (build: int, summary: string) {
+	c, why := toolbox.program_session_connect(s)
+	if why != "" { return 0, "" }
+	defer cdp.close(&c)
+	r, rok := cdp.call(&c, "Toolkit.metrics")
+	if !rok { return 0, "" }
+	obj := r.(json.Object) or_else nil
+	build, _ = cdp.integer(obj["build"])
+	bm := (obj["buildMs"].(json.Object) or_else nil)
+	lm := (obj["layoutMs"].(json.Object) or_else nil)
+	b50 := cdp.number(bm["p50"])
+	l50 := cdp.number(lm["p50"])
+	if dmg, ok := obj["damage"].(json.Object); ok {
+		share := cdp.number(dmg["drawnShare"])
+		part, _ := cdp.integer(dmg["partial"])
+		summary = fmt.tprintf(" (build %.2f ms, layout %.2f ms, damage %.1f%% partial=%d)", b50, l50, share * 100, part)
+	} else {
+		summary = fmt.tprintf(" (build %.2f ms, layout %.2f ms)", b50, l50)
+	}
+	if fr, fok := cdp.call(&c, "Toolkit.frames"); fok {
+		if fobj, ok := fr.(json.Object); ok {
+			if arr, aok := fobj["frames"].(json.Array); aok && len(arr) > 0 {
+				sb: strings.Builder
+				strings.builder_init(&sb, context.temp_allocator)
+				start := max(0, len(arr) - 16)
+				for item, idx in arr[start:] {
+					fo := item.(json.Object) or_else nil
+					fms := cdp.number(fo["frameMs"])
+					fmt.sbprintf(&sb, "%s%.0f", idx == 0 ? "" : ",", fms)
+				}
+				summary = fmt.tprintf("%s frameMs=[%s]", summary, strings.to_string(sb))
+			}
+		}
+	}
+	return
 }
 
 @(private = "file")
@@ -139,18 +203,6 @@ thread_ticks :: proc(pid: int) -> map[int]Thread_Ticks {
 		out[tid] = {strings.trim_space(string(name)), ticks}
 	}
 	return out
-}
-
-// The window's count of builds (Toolkit.state; the question itself makes one).
-@(private = "file")
-builds :: proc(s: ^toolbox.Program_Session) -> int {
-	c, why := toolbox.program_session_connect(s)
-	if why != "" { return 0 }
-	defer cdp.close(&c)
-	r, rok := cdp.call(&c, "Toolkit.state")
-	if !rok { return 0 }
-	n, _ := cdp.integer((r.(json.Object) or_else nil)["build"])
-	return n
 }
 
 // user + system CPU ticks and resident bytes of a process (of one of its threads: tid).

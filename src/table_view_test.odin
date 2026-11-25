@@ -50,3 +50,52 @@ a_name_is_whole_when_its_column_has_room :: proc(t: ^testing.T) {
 	testing.expectf(t, name.size.x < name.text_dim.x && name.size.x > 0, "the name cut, some of it shown: %v of %v", name.size.x, name.text_dim.x)
 	testing.expectf(t, count.size.x >= count.text_dim.x, "the count whole: %v of %v", count.size.x, count.text_dim.x)
 }
+
+// At rest, a sample on Processes builds one frame and asks for no follow-up frame, animation or caret blink wake.
+@(test)
+processes_view_is_still_at_rest :: proc(t: ^testing.T) {
+	app := new(App)
+	defer free(app)
+	defer catalog_destroy(&app.catalog)
+	defer table_destroy(&app.table)
+	defer sampler_destroy(&app.sampler)
+	defer ranking_destroy(&app.ranking)
+	defer ui.vlist_destroy(&app.vl)
+	defer ui.line_edit_destroy(&app.search)
+
+	app.settings.summary = true
+	app.settings.refresh_ms = 1000
+	table_columns_init(&app.table)
+	catalog_add_entry(&app.catalog, "org.app.app0", "App 0", "", "app0", "")
+	batch := [4]Proc_Counters{
+		{pid = 10, ppid = 1, start = 100, comm = "app0", cpu_ns = 1000, threads = 1, private = 1024 * 1024},
+		{pid = 11, ppid = 1, start = 101, comm = "bg1", cpu_ns = 2000, threads = 1, private = 2048 * 1024},
+		{pid = 12, ppid = 1, start = 102, comm = "bg2", cpu_ns = 3000, threads = 1, private = 512 * 1024},
+		{pid = 13, ppid = 1, start = 103, comm = "bg3", cpu_ns = 4000, threads = 1, private = 256 * 1024},
+	}
+	procs_merge(&app.sampler, batch[:], nil, 1.0, 10_000_000, &app.catalog, true, 1_000_000_000)
+	table_group(&app.table, app.sampler.procs[:])
+	rows_again(app)
+
+	s := session.start(t, {size = {1100, 720}, user = app, no_renderer = true, build = proc(s: ^session.Session) {
+		app := (^App)(s.user)
+		app.shared.font = s.state.base_style.font
+		build_processes(app, ui.font_size())
+	}})
+	session.frames(s, 3)
+	testing.expect(t, !s.state.anim_busy, "no running animation at rest")
+	testing.expect(t, !ui.needs_frame(s.state), "no extra frame needed at rest")
+	testing.expectf(t, ui.wake_in_ms(s.state) <= 0, "no caret or timer wake at rest (got %d ms)", ui.wake_in_ms(s.state))
+
+	// Steady sample with unchanged row identities must settle in a single frame without rebuilding vlist offsets.
+	offsets_before := app.vl.offsets_made
+	for &c in batch { c.cpu_ns += 500_000 }
+	procs_merge(&app.sampler, batch[:], nil, 1.0, 10_000_000, &app.catalog, true, 2_000_000_000)
+	table_group(&app.table, app.sampler.procs[:])
+	rows_again(app)
+	session.frames(s, 1)
+	testing.expect(t, !s.state.anim_busy, "no animation started by steady sample")
+	testing.expect(t, !ui.needs_frame(s.state), "single frame settles after steady sample")
+	testing.expectf(t, ui.wake_in_ms(s.state) <= 0, "no extra wake after steady sample (got %d ms)", ui.wake_in_ms(s.state))
+	testing.expect_value(t, app.vl.offsets_made, offsets_before)
+}

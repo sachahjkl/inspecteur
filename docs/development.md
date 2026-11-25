@@ -27,7 +27,8 @@ odin run tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/insp
 | `check` | the changelog's fragments and the roadmap, the ui scopes (`toolbox.check_scopes`), the French catalogue, THIRD-PARTY-NOTICES up to date, `odin check -vet` of the program for Linux, Windows and macOS and of the tool, the tests, a release build |
 | `live [--keep]` | the real program in a headless sway, driven over the DevTools protocol (310 checks); its pictures stay in `build/live` |
 | `shots [--out folder]` | the pictures of the documentation, the program's own frames, of the demo's made-up machine |
-| `bench [seconds]` | a release build in a headless sway that draws on the GPU: the time to the first frame, the CPU use at rest, then with Services and with Connections shown |
+| `bench [--software] [--no-build] [seconds]` | a release build in a headless sway (`--software` selects pixman software rendering; `--no-build` skips rebuilding): cold start time, CPU use at rest, build counts, damage, then Services and Connections shown |
+| `bench_reader [--fast]` | opt-in Linux reader and neutral pipeline benchmark (`-o:speed`; `--fast` uses `-o:none`): measures real `/proc`, machine, sockets, GPU, neutral 5,000-process pipeline, churn memory, and a 5,000-process synthetic `/proc` tree verified against a plain reference reader |
 | `logo` | `assets/logo*.png` and `.project/image.png`, drawn by the toolkit's paint package |
 | `desktop_files <prefix>` | the desktop entry and the icons under `<prefix>/share`: what the Nix package installs |
 | `notices [--check]` | THIRD-PARTY-NOTICES (the toolkit's `notices_command`): the licences of what the program embeds and links (gui_toolkit and its attributions, Roboto, Inconsolata, Lucide, Odin's core library, wgpu-native, the text library's crates from `cargo metadata`); `--check` fails when it is not up to date |
