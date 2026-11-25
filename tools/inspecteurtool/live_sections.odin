@@ -1,3 +1,4 @@
+#+build linux
 package inspecteurtool
 
 // live's checks of the Services, Startup, Connections and Information sections (live.odin runs them). Each acts only on

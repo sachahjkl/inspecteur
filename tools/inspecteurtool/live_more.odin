@@ -1,3 +1,4 @@
+#+build linux
 package inspecteurtool
 
 // live's checks of the Performance section, the table's columns, the theme's menu and the Properties dialog (live.odin

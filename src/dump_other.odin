@@ -1,4 +1,5 @@
 #+build !linux
+#+build !windows
 package inspecteur
 
 import i18n "gt:i18n"

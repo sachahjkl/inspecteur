@@ -403,7 +403,9 @@ cpu_page :: proc(app: ^App, em: f32) {
 	if m.info.max_mhz > 0 { append(&details, Stat{i18n.tr("Maximum speed"), mhz_text(m.info.max_mhz)}) }
 	append(&details, Stat{i18n.tr("Sockets"), fmt.tprintf("%d", m.info.sockets)}, Stat{i18n.tr("Cores"), fmt.tprintf("%d", m.info.cores)}, Stat{i18n.tr("Logical processors"), fmt.tprintf("%d", len(m.core_total))})
 	append(&details, ..caches[:])
-	append(&details, Stat{i18n.tr("Load average"), fmt.tprintf("%s  %s  %s", i18n.decimal(f64(m.load[0]), 2), i18n.decimal(f64(m.load[1]), 2), i18n.decimal(f64(m.load[2]), 2))})
+	if m.has_load {
+		append(&details, Stat{i18n.tr("Load average"), fmt.tprintf("%s  %s  %s", i18n.decimal(f64(m.load[0]), 2), i18n.decimal(f64(m.load[1]), 2), i18n.decimal(f64(m.load[2]), 2))})
+	}
 	// (the first sensor is the big Temperature; a machine with none, a CI runner's, has no others)
 	if m.temp_count > 1 { for &t in m.temps[1:m.temp_count] { append(&details, Stat{temp_label(&t), fmt.tprintf("%.0f °C", t.celsius)}) } }
 	// (each core's is in the logical processors' view)
@@ -412,7 +414,7 @@ cpu_page :: proc(app: ^App, em: f32) {
 	big := make([dynamic]Stat, context.temp_allocator)
 	append(&big, Stat{i18n.tr("Utilization"), percent_text(f64(m.cpu))}, Stat{i18n.tr("Speed"), mhz_text(m.mhz)})
 	if m.temp_count > 0 { append(&big, Stat{i18n.tr("Temperature"), fmt.tprintf("%.0f °C", m.temps[0].celsius)}) }
-	append(&big, Stat{i18n.tr("Up time"), timefmt.stopwatch(m.uptime * 1000, {days = true})}, Stat{i18n.tr("Processes"), fmt.tprintf("%d", len(app.sampler.procs))}, Stat{i18n.tr("Threads"), fmt.tprintf("%d", threads)}, Stat{i18n.tr("Open files"), fmt.tprintf("%d", m.handles)})
+	append(&big, Stat{i18n.tr("Up time"), timefmt.stopwatch(m.uptime * 1000, {days = true})}, Stat{i18n.tr("Processes"), fmt.tprintf("%d", len(app.sampler.procs))}, Stat{i18n.tr("Threads"), fmt.tprintf("%d", threads)}, Stat{i18n.tr(HANDLES_LABEL), fmt.tprintf("%d", m.handles)})
 	stats_block(big[:], details[:], em)
 }
 
@@ -431,16 +433,8 @@ memory_page :: proc(app: ^App, em: f32) {
 	caption(i18n.tr("Memory composition"), "", em)
 	parts := []Bar_Part{{in_use, c, i18n.tr("In use")}, {reclaimable, faded(c, 0.45), i18n.tr("Cache, given back when needed")}, {min(mem.free, mem.available), ui.color("border"), i18n.tr("Free")}}
 	composition_bar(parts, mem.total, em)
-	swap_used := mem.swap_total - min(mem.swap_total, mem.swap_free)
-	// (the numbers of the composition, and what the kernel keeps besides: the files it caches, the buffers of the disks,
-	// what processes share, what is still to be written)
-	stats_block({
-		{i18n.tr("In use"), timefmt.size(i64(in_use))}, {i18n.tr("Available"), timefmt.size(i64(mem.available))}, {i18n.tr("Free"), timefmt.size(i64(mem.free))},
-		{i18n.tr("Committed"), fmt.tprintf("%s / %s", timefmt.size(i64(mem.committed)), timefmt.size(i64(mem.commit_limit)))}, {i18n.tr("Swap"), fmt.tprintf("%s / %s", timefmt.size(i64(swap_used)), timefmt.size(i64(mem.swap_total)))},
-	}, {
-		{i18n.tr("Total"), timefmt.size(i64(mem.total))}, {i18n.tr("Files cached"), timefmt.size(i64(mem.cached))}, {i18n.tr("Disk buffers"), timefmt.size(i64(mem.buffers))},
-		{i18n.tr("Kernel, reclaimable"), timefmt.size(i64(mem.reclaimable))}, {i18n.tr("Shared memory"), timefmt.size(i64(mem.shared))}, {i18n.tr("To be written"), timefmt.size(i64(mem.dirty))},
-	}, em)
+	big, details := memory_page_stats(m, in_use)
+	stats_block(big, details, em)
 }
 
 @(private = "file")
@@ -501,7 +495,7 @@ gpu_page :: proc(app: ^App, g: ^Gpu, em: f32) {
 			ui.next({width = ui.fill(), height = ui.px(em * 3)})
 			switch {
 			case r.asleep:          ui.label(fmt.tprintf("%s###none", i18n.tr("This GPU is asleep: the system turned it off while nothing uses it. Reading it would wake it.")))
-			case r.vendor == "NVIDIA": ui.label(fmt.tprintf("%s###none", i18n.tr("This GPU's numbers come with NVIDIA's driver library (libnvidia-ml), not found or not answering.")))
+			case r.vendor == "NVIDIA": ui.label(fmt.tprintf("%s###none", i18n.tr(GPU_NVIDIA_MISSING)))
 			case:                   ui.label(fmt.tprintf("%s###none", fmt.tprintf(i18n.tr("This GPU's driver tells no utilization without %s."), ADMIN)))
 			}
 		}

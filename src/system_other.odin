@@ -1,4 +1,5 @@
 #+build !linux
+#+build !windows
 package inspecteur
 
 // What the window says of a system not supported yet: Linux's words, so that the views read the same until a port
@@ -6,6 +7,7 @@ package inspecteur
 
 import "core:fmt"
 import i18n "gt:i18n"
+import timefmt "gt:timefmt"
 
 PRIORITIES := [?]Priority{
 	{i18n.later("High (-10)"), -10}, {i18n.later("Above normal (-5)"), -5}, {i18n.later("Normal (0)"), 0}, {i18n.later("Below normal (5)"), 5}, {i18n.later("Low (10)"), 10}, {i18n.later("Idle (19)"), 19},
@@ -17,4 +19,27 @@ ADMIN :: "root"
 
 PRIORITY_DENIED := i18n.later("only root may raise a priority, or change another user's process")
 
+PROCS_READ_FAILED  := i18n.later("The processes cannot be read (/proc)")
+HANDLES_LABEL      := i18n.later("Open files")
+GPU_NVIDIA_MISSING := i18n.later("This GPU's numbers come with NVIDIA's driver library (libnvidia-ml), not found or not answering.")
+
 priority_text :: proc(nice: i8) -> string { return fmt.tprintf(i18n.tr("nice %d"), nice) }
+
+memory_page_stats :: proc(m: ^Machine, in_use: u64) -> (big, details: []Stat) {
+	mem := m.mem
+	swap_used := mem.swap_total - min(mem.swap_total, mem.swap_free)
+	b := make([]Stat, 5, context.temp_allocator)
+	b[0] = {i18n.tr("In use"), timefmt.size(i64(in_use))}
+	b[1] = {i18n.tr("Available"), timefmt.size(i64(mem.available))}
+	b[2] = {i18n.tr("Free"), timefmt.size(i64(mem.free))}
+	b[3] = {i18n.tr("Committed"), fmt.tprintf("%s / %s", timefmt.size(i64(mem.committed)), timefmt.size(i64(mem.commit_limit)))}
+	b[4] = {i18n.tr("Swap"), fmt.tprintf("%s / %s", timefmt.size(i64(swap_used)), timefmt.size(i64(mem.swap_total)))}
+	d := make([]Stat, 6, context.temp_allocator)
+	d[0] = {i18n.tr("Total"), timefmt.size(i64(mem.total))}
+	d[1] = {i18n.tr("Files cached"), timefmt.size(i64(mem.cached))}
+	d[2] = {i18n.tr("Disk buffers"), timefmt.size(i64(mem.buffers))}
+	d[3] = {i18n.tr("Kernel, reclaimable"), timefmt.size(i64(mem.reclaimable))}
+	d[4] = {i18n.tr("Shared memory"), timefmt.size(i64(mem.shared))}
+	d[5] = {i18n.tr("To be written"), timefmt.size(i64(mem.dirty))}
+	return b, d
+}

@@ -1,9 +1,10 @@
 name: Release
 
-# A version tag vX.Y.Z (inspecteurtool ship makes it) builds inspecteur and publishes it: the Linux archive with its SHA-256,
-# the program alone and its update manifest signed by the secret UPDATE_SIGNING_KEY (what installed copies update
-# themselves from), on a GitHub release whose notes are the changelog's section of that version. The tag must be APP_VERSION's
-# (inspecteurtool package checks).
+# A version tag vX.Y.Z (inspecteurtool ship makes it) builds inspecteur and publishes it: the Linux and Windows
+# archives, each with its SHA-256, the programs alone and their update manifests signed by the secret UPDATE_SIGNING_KEY
+# (what installed copies update themselves from), on a GitHub release whose notes are the changelog's section of that
+# version. The Linux job creates the release as a draft; the Windows job adds its files and publishes it. The tag must
+# match APP_VERSION (inspecteurtool package checks).
 on:
   push:
     tags: ['v*']
@@ -26,10 +27,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: The checkout trusted
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - uses: ./.github/actions/setup-odin-linux
 
       - name: Build and test
         run: |
+          mkdir -p build
           odin build tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/inspecteurtool -vet
           build/inspecteurtool check
 
@@ -38,18 +43,49 @@ jobs:
           UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
         run: build/inspecteurtool package ${{ github.ref_name }}
 
-      # (gh asks git for the repository: in the container the checkout is another user's, which git refuses unless it is
-      # said safe; GH_REPO names the repository besides)
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           build/inspecteurtool notes ${{ github.ref_name }} > build/notes.md
           if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
             gh release upload "${{ github.ref_name }}" build/dist/* --clobber
           else
-            gh release create "${{ github.ref_name }}" build/dist/* --title "inspecteur ${GITHUB_REF_NAME#v}" --notes-file build/notes.md
+            gh release create "${{ github.ref_name }}" build/dist/* --draft --title "inspecteur ${GITHUB_REF_NAME#v}" --notes-file build/notes.md
           fi
 
+  windows:
+    needs: release
+    runs-on: windows-2025
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: ./ext/gui_toolkit/.github/actions/setup-odin
+
+      - name: Build, test, package
+        shell: pwsh
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          New-Item -ItemType Directory -Force build | Out-Null
+          odin build tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/inspecteurtool.exe -vet
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          build/inspecteurtool.exe check
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          build/inspecteurtool.exe package ${{ github.ref_name }}
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - name: Publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.ref_name }}" (Get-ChildItem build/dist/*).FullName --clobber
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          # (public once both systems' files are there: an installed copy that checks finds its manifest)
+          gh release edit "${{ github.ref_name }}" --draft=false --latest
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }

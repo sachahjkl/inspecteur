@@ -67,6 +67,39 @@ fr %s repris
 en Asked %s to end
 fr Fin demandée à %s
 
+en Refused: %s is a critical Windows process (ending it crashes the system)
+fr Refusé : %s est un processus critique de Windows (le terminer plante le système)
+
+en Refused: %s is a protected process (%s)
+fr Refusé : %s est un processus protégé (%s)
+
+en Efficiency mode enabled for %s
+fr Mode efficacité activé pour %s
+
+en Efficiency mode disabled for %s
+fr Mode efficacité désactivé pour %s
+
+en Access denied: run Inspecteur as an administrator to change Efficiency mode for %s
+fr Accès refusé : lancez Inspecteur en tant qu'administrateur pour changer le mode efficacité de %s
+
+en Efficiency mode cannot be changed for %s
+fr Le mode efficacité ne peut pas être changé pour %s
+
+en Access denied: run Inspecteur as an administrator to read the affinity of %s
+fr Accès refusé : lancez Inspecteur en tant qu'administrateur pour lire l'affinité de %s
+
+en Access denied for %s: run Inspecteur as an administrator (protected system processes remain blocked)
+fr Accès refusé pour %s : lancez Inspecteur en tant qu'administrateur (les processus système protégés restent bloqués)
+
+en %s cannot be changed (error %d)
+fr %s ne peut pas être modifié (erreur %d)
+
+en Asked %s to close its window
+fr Fermeture de fenêtre demandée à %s
+
+en Ended %s
+fr %s terminé
+
 en Affinity
 fr Affinité
 
@@ -126,6 +159,99 @@ fr Les réglages ne peuvent pas être écrits
 
 en Read again
 fr Actualiser
+
+en Name
+fr Nom
+
+en PID
+fr PID
+
+en Parent PID
+fr PID parent
+
+en User
+fr Utilisateur
+
+en State
+fr État
+
+en CPU
+fr CPU
+
+en CPU, 30 s
+fr CPU, 30 s
+
+en Private memory
+fr Mémoire privée
+
+en Resident
+fr Résidente
+
+en GPU
+fr GPU
+
+en GPU memory
+fr Mémoire GPU
+
+en Disk read
+fr Lecture disque
+
+en Disk write
+fr Écriture disque
+
+en Threads
+fr Fils
+
+en Started
+fr Lancé
+
+en Command line
+fr Ligne de commande
+
+en Executable
+fr Exécutable
+
+en Working set
+fr Plage de travail
+
+en Commit
+fr Mémoire allouée
+
+en Handles
+fr Handles
+
+en Session
+fr Session
+
+en Integrity
+fr Intégrité
+
+en Efficiency
+fr Efficacité
+
+en Package
+fr Paquet
+
+en Admin
+fr Admin
+
+en EcoQoS
+fr EcoQoS
+
+en Light colours: %s has no light version, %s has
+fr Couleurs claires : %s n'a pas de version claire, %s en a une
+
+en Dark colours: %s has no dark version, %s has
+fr Couleurs sombres : %s n'a pas de version sombre, %s en a une
+
+en Light colours
+fr Couleurs claires
+
+en Dark colours
+fr Couleurs sombres
+
+en Colours as the system's
+fr Couleurs comme celles du système
 
 en Keyboard shortcuts
 fr Raccourcis clavier
@@ -349,20 +475,50 @@ fr Intervalle d'actualisation
 en Checking for updates…
 fr Recherche de mises à jour…
 
-en Light colours: %s has no light version, %s has
-fr Couleurs claires : %s n'a pas de version claire, %s en a une
+en Efficiency mode (EcoQoS)
+fr Mode efficacité (EcoQoS)
 
-en Dark colours: %s has no dark version, %s has
-fr Couleurs sombres : %s n'a pas de version sombre, %s en a une
+en Analyze wait chain
+fr Analyser la chaîne d'attente
 
-en Light colours
-fr Couleurs claires
+en Pause
+fr Pause
 
-en Dark colours
-fr Couleurs sombres
+en Continue
+fr Continuer
 
-en Colours as the system's
-fr Couleurs comme celles du système
+en Startup type…
+fr Type de démarrage…
+
+en Services, shared (svchost), or drivers
+fr Services, partagés (svchost) ou pilotes
+
+en Open binary location
+fr Ouvrir l'emplacement du binaire
+
+en Details and Event Log
+fr Détails et journal des événements
+
+en Search Event Log
+fr Rechercher dans le journal des événements
+
+en Event Log: all, warnings, errors
+fr Journal des événements : tout, avertissements, erreurs
+
+en Follow Event Log
+fr Suivre le journal des événements
+
+en Copy Event Log entries shown
+fr Copier les entrées affichées du journal des événements
+
+en Event Log in its own window
+fr Le journal des événements dans sa propre fenêtre
+
+en Copy location
+fr Copier l'emplacement
+
+en Startup type
+fr Type de démarrage
 
 en Established
 fr Établie
@@ -406,9 +562,6 @@ fr Connectée
 en Process
 fr Processus
 
-en PID
-fr PID
-
 en Protocol
 fr Protocole
 
@@ -417,9 +570,6 @@ fr Adresse locale
 
 en Remote address
 fr Adresse distante
-
-en State
-fr État
 
 en %d socket, %d listening or open
 en+ %d sockets, %d listening or open
@@ -462,6 +612,15 @@ fr Statique
 
 en No line in the journal.
 fr Aucune ligne dans le journal.
+
+en No recent entries for this service in the System Event Log.
+fr Aucune entrée récente pour ce service dans le journal des événements Système.
+
+en Enabled (default)
+fr Activé (par défaut)
+
+en Waiting
+fr En attente
 
 en The processors are %.0f%% busy. The busiest: %s.
 fr Les processeurs sont occupés à %.0f %%. Les plus actifs : %s.
@@ -537,6 +696,33 @@ fr gcore n'a pas pu le lire
 en No dump can be written on this system.
 fr Aucun vidage ne peut être écrit sur ce système.
 
+en Windows writes a minidump (.dmp) into %LOCALAPPDATA%\\FromentSoftware\\Inspecteur\\dumps.
+fr Windows écrit une image mémoire (.dmp) dans %LOCALAPPDATA%\\FromentSoftware\\Inspecteur\\dumps.
+
+en dbghelp.dll is not available on this system
+fr dbghelp.dll n'est pas disponible sur ce système
+
+en MiniDumpWriteDump is not available in dbghelp.dll
+fr MiniDumpWriteDump n'est pas disponible dans dbghelp.dll
+
+en refused: critical Windows processes are not dumped
+fr refusé : aucune image mémoire n'est créée pour les processus critiques de Windows
+
+en refused: protected process (%s) cannot be read
+fr refusé : le processus protégé (%s) ne peut pas être lu
+
+en access denied: run Inspecteur as an administrator to dump this process
+fr accès refusé : lancez Inspecteur en tant qu'administrateur pour créer une image mémoire de ce processus
+
+en the process memory cannot be opened
+fr la mémoire du processus ne peut pas être ouverte
+
+en cannot create dump file (error %d)
+fr impossible de créer le fichier d'image mémoire (erreur %d)
+
+en MiniDumpWriteDump failed (error %d)
+fr MiniDumpWriteDump a échoué (erreur %d)
+
 en %d day, %d h %d min
 en+ %d days, %d h %d min
 fr %d jour, %d h %d min
@@ -584,9 +770,6 @@ fr Allumé depuis
 
 en Desktop
 fr Bureau
-
-en Session
-fr Session
 
 en Computer
 fr Ordinateur
@@ -699,6 +882,60 @@ en+ Copied the system's information (%d lines)
 fr Informations du système copiées (%d ligne)
 fr+ Informations du système copiées (%d lignes)
 
+en %s, kernel %s
+fr %s, noyau %s
+
+en GPU %d
+fr GPU %d
+
+en OS build
+fr Build du système
+
+en Privilege level
+fr Niveau de privilège
+
+en Administrator (elevated)
+fr Administrateur (élevé)
+
+en Standard user
+fr Utilisateur standard
+
+en Committed
+fr Allouée
+
+en Pagefile
+fr Fichier d'échange
+
+en Kernel pools
+fr Pools du noyau
+
+en Paged %s, non-paged %s
+fr Paginé %s, non paginé %s
+
+en %s, PCI %s, %s dedicated VRAM
+fr %s, PCI %s, %s de VRAM dédiée
+
+en %s free of %s (%s)
+fr %s libres sur %s (%s)
+
+en Windows
+fr Windows
+
+en Privilege
+fr Privilège
+
+en Administrator
+fr Administrateur
+
+en Standard
+fr Standard
+
+en plugged in
+fr sur secteur
+
+en System battery
+fr Batterie du système
+
 en Select a service: its journal shows here.
 fr Sélectionnez un service : son journal s'affiche ici.
 
@@ -799,9 +1036,6 @@ fr un service de l'utilisateur
 en in its state since %s
 fr dans cet état depuis %s
 
-en CPU
-fr CPU
-
 en I/O
 fr E/S
 
@@ -859,36 +1093,6 @@ fr Dossier de %s ouvert
 en Copied the command line of %s
 fr Ligne de commande de %s copiée
 
-en Hang up (SIGHUP)
-fr Raccrocher (SIGHUP)
-
-en Interrupt (SIGINT)
-fr Interrompre (SIGINT)
-
-en Quit (SIGQUIT)
-fr Quitter (SIGQUIT)
-
-en Terminate (SIGTERM)
-fr Terminer (SIGTERM)
-
-en Kill (SIGKILL)…
-fr Forcer l'arrêt (SIGKILL)…
-
-en Stop (SIGSTOP)
-fr Suspendre (SIGSTOP)
-
-en Continue (SIGCONT)
-fr Continuer (SIGCONT)
-
-en User 1 (SIGUSR1)
-fr Utilisateur 1 (SIGUSR1)
-
-en User 2 (SIGUSR2)
-fr Utilisateur 2 (SIGUSR2)
-
-en Not stopped: it is Inspecteur, runs it or draws the desktop, and nothing could resume it
-fr Pas suspendu : c'est Inspecteur, il l'exécute ou dessine le bureau, et rien ne pourrait le reprendre
-
 en The demo's processes are not the system's: nothing was sent
 fr Les processus de la démo ne sont pas ceux du système : rien n'a été envoyé
 
@@ -928,6 +1132,48 @@ fr Forcer l'arrêt
 en End
 fr Terminer
 
+en The demo's processes are not the system's: %s was not sent to %s
+fr Les processus de la démo ne sont pas ceux du système : %s n'a pas été envoyé à %s
+
+en The demo's processes are not the system's: %s does not run at %s
+fr Les processus de la démo ne sont pas ceux du système : %s ne tourne pas à %s
+
+en %s runs at the highest priority offered already
+fr %s tourne déjà à la plus haute priorité proposée
+
+en %s runs at the lowest priority offered already
+fr %s tourne déjà à la plus basse priorité proposée
+
+en Hang up (SIGHUP)
+fr Raccrocher (SIGHUP)
+
+en Interrupt (SIGINT)
+fr Interrompre (SIGINT)
+
+en Quit (SIGQUIT)
+fr Quitter (SIGQUIT)
+
+en Terminate (SIGTERM)
+fr Terminer (SIGTERM)
+
+en Kill (SIGKILL)…
+fr Forcer l'arrêt (SIGKILL)…
+
+en Stop (SIGSTOP)
+fr Suspendre (SIGSTOP)
+
+en Continue (SIGCONT)
+fr Continuer (SIGCONT)
+
+en User 1 (SIGUSR1)
+fr Utilisateur 1 (SIGUSR1)
+
+en User 2 (SIGUSR2)
+fr Utilisateur 2 (SIGUSR2)
+
+en Not stopped: it is Inspecteur, runs it or draws the desktop, and nothing could resume it
+fr Pas suspendu : c'est Inspecteur, il l'exécute ou dessine le bureau, et rien ne pourrait le reprendre
+
 en They stop, and their processes end; what needs them may stop too.
 fr Ils s'arrêtent, et leurs processus se terminent ; ce qui en dépend peut s'arrêter aussi.
 
@@ -956,17 +1202,26 @@ fr+ Redémarrer %d services ?
 en Restart %s?
 fr Redémarrer %s ?
 
-en The demo's processes are not the system's: %s was not sent to %s
-fr Les processus de la démo ne sont pas ceux du système : %s n'a pas été envoyé à %s
+en Disable efficiency mode
+fr Désactiver le mode efficacité
 
-en The demo's processes are not the system's: %s does not run at %s
-fr Les processus de la démo ne sont pas ceux du système : %s ne tourne pas à %s
+en Enable efficiency mode
+fr Activer le mode efficacité
 
-en %s runs at the highest priority offered already
-fr %s tourne déjà à la plus haute priorité proposée
+en The demo's processes are not the system's: Efficiency mode was not changed for %s
+fr Les processus de la démo ne sont pas ceux du système : le mode efficacité n'a pas été changé pour %s
 
-en %s runs at the lowest priority offered already
-fr %s tourne déjà à la plus basse priorité proposée
+en They stop. One that running services need is not stopped: the footer names them.
+fr Ils s'arrêtent. Un service dont des services en cours ont besoin n'est pas arrêté : le pied de la fenêtre les nomme.
+
+en It stops. If running services need it, it is not stopped: the footer names them.
+fr Il s'arrête. Si des services en cours en ont besoin, il n'est pas arrêté : le pied de la fenêtre les nomme.
+
+en They stop and start again.
+fr Ils s'arrêtent et redémarrent.
+
+en It stops and starts again.
+fr Il s'arrête et redémarre.
 
 en Machine
 fr Machine
@@ -1004,19 +1259,6 @@ fr CPU %s
 en A click, or %s: why it is slow, in full.
 fr Un clic, ou %s : pourquoi c'est lent, en détail.
 
-en %d service of the system: %d running, %d failed
-en+ %d services of the system: %d running, %d failed
-fr %d service du système : %d en cours, %d en échec
-fr+ %d services du système : %d en cours, %d en échec
-
-en %d service of the user: %d running, %d failed
-en+ %d services of the user: %d running, %d failed
-fr %d service de l'utilisateur : %d en cours, %d en échec
-fr+ %d services de l'utilisateur : %d en cours, %d en échec
-
-en No service failed.
-fr Aucun service en échec.
-
 en %s now; %d listening, %d connected
 fr %s maintenant ; %d à l'écoute, %d connectés
 
@@ -1025,28 +1267,11 @@ en+ %d sockets
 fr %d socket
 fr+ %d sockets
 
-en %d item, %d on
-en+ %d items, %d on
-fr %d élément, %d actifs
-fr+ %d éléments, %d actifs
-
-en %s, kernel %s
-fr %s, noyau %s
-
-en GPU %d
-fr GPU %d
-
 en Show in Processes
 fr Afficher dans Processus
 
 en Show its connections
 fr Afficher ses connexions
-
-en Show in Services
-fr Afficher dans Services
-
-en Show its process
-fr Afficher son processus
 
 en Show in Startup
 fr Afficher dans Démarrage
@@ -1128,12 +1353,6 @@ fr Température
 en Up time
 fr Temps d'activité
 
-en Threads
-fr Fils
-
-en Open files
-fr Fichiers ouverts
-
 en Memory usage
 fr Utilisation de la mémoire
 
@@ -1148,30 +1367,6 @@ fr Cache, rendu au besoin
 
 en Free
 fr Libre
-
-en Available
-fr Disponible
-
-en Committed
-fr Allouée
-
-en Total
-fr Total
-
-en Files cached
-fr Fichiers en cache
-
-en Disk buffers
-fr Tampons des disques
-
-en Kernel, reclaimable
-fr Noyau, récupérable
-
-en Shared memory
-fr Mémoire partagée
-
-en To be written
-fr À écrire
 
 en Active time
 fr Temps d'activité du disque
@@ -1239,9 +1434,6 @@ fr Utilisation de la mémoire dédiée
 en This GPU is asleep: the system turned it off while nothing uses it. Reading it would wake it.
 fr Ce GPU est en veille : le système l'a éteint tant que rien ne l'utilise. Le lire le réveillerait.
 
-en This GPU's numbers come with NVIDIA's driver library (libnvidia-ml), not found or not answering.
-fr Les chiffres de ce GPU viennent de la bibliothèque du pilote NVIDIA (libnvidia-ml), introuvable ou muette.
-
 en This GPU's driver tells no utilization without %s.
 fr Le pilote de ce GPU ne donne aucune utilisation sans %s.
 
@@ -1290,50 +1482,14 @@ fr %s est épinglé au-dessus des autres
 en %s is unpinned
 fr %s est détaché
 
-en Name
-fr Nom
-
-en Parent PID
-fr PID parent
-
-en User
-fr Utilisateur
-
-en CPU, 30 s
-fr CPU, 30 s
-
-en Private memory
-fr Mémoire privée
-
-en Resident
-fr Résidente
-
-en GPU
-fr GPU
-
-en GPU memory
-fr Mémoire GPU
-
-en Disk read
-fr Lecture disque
-
-en Disk write
-fr Écriture disque
-
-en Started
-fr Lancé
-
-en Command line
-fr Ligne de commande
-
-en Executable
-fr Exécutable
-
 en General
 fr Général
 
 en History
 fr Historique
+
+en Open files
+fr Fichiers ouverts
 
 en Modules
 fr Modules
@@ -1407,11 +1563,146 @@ fr Affinité…
 en Filter the list…
 fr Filtrer la liste…
 
-en The processes cannot be read (/proc)
-fr Les processus ne peuvent pas être lus (/proc)
+en Elevated
+fr Élevé
+
+en Efficiency mode
+fr Mode efficacité
+
+en Access denied (requires administrator or unprotected process)
+fr Accès refusé (nécessite un administrateur ou un processus non protégé)
+
+en 32-bit (WOW64)
+fr 32 bits (WOW64)
+
+en 64-bit
+fr 64 bits
+
+en On (EcoQoS)
+fr Activé (EcoQoS)
+
+en Off
+fr Désactivé
+
+en UWP package
+fr Paquet UWP
+
+en svchost group
+fr Groupe svchost
+
+en Hosted services
+fr Services hébergés
+
+en Access denied
+fr Accès refusé
+
+en %s private, %s working set (peak %s), %s commit
+fr %s privée, %s de plage de travail (pic %s), %s allouée
+
+en Page faults
+fr Défauts de page
+
+en Threads & Handles
+fr Fils et handles
+
+en %d threads, %d handles
+fr %d fils, %d handles
+
+en Integrity level
+fr Niveau d'intégrité
+
+en Unknown
+fr Inconnu
+
+en Elevation
+fr Élévation
+
+en Elevated (Administrator)
+fr Élevé (Administrateur)
+
+en Protection
+fr Protection
+
+en Critical process
+fr Processus critique
+
+en Yes (terminating it crashes Windows)
+fr Oui (le terminer plante Windows)
+
+en No
+fr Non
+
+en GDI / USER objects
+fr Objets GDI / USER
+
+en GDI: %d (peak %d)  ·  USER: %d (peak %d)
+fr GDI : %d (pic %d)  ·  USER : %d (pic %d)
+
+en Paged %s  ·  Non-paged %s
+fr Paginé %s  ·  Non paginé %s
+
+en Token privilege
+fr Privilège du jeton
+
+en Deadlock detected by Windows Wait Chain Traversal
+fr Interblocage détecté par la traversée de chaîne d'attente Windows
+
+en Wait reason
+fr Raison d'attente
+
+en Wait chain
+fr Chaîne d'attente
+
+en Showing first %d of %d handles
+fr Affichage des %d premiers handles sur %d
+
+en Handle
+fr Handle
+
+en Access
+fr Accès
+
+en Object name
+fr Nom d'objet
+
+en Module path
+fr Chemin du module
+
+en Base address
+fr Adresse de base
+
+en Access denied: run Inspecteur as an administrator (protected processes remain blocked).
+fr Accès refusé : lancez Inspecteur en tant qu'administrateur (les processus protégés restent bloqués).
+
+en EcoQoS: On
+fr EcoQoS : activé
+
+en Security & Resources
+fr Sécurité et ressources
+
+en DEADLOCK: 
+fr INTERBLOCAGE : 
+
+en Initialized
+fr Initialisé
+
+en Ready
+fr Prêt
 
 en Running
 fr En cours
+
+en Standby
+fr En veille
+
+en Terminated
+fr Terminé
+
+en Transition
+fr En transition
+
+en Deferred ready
+fr Prêt différé
 
 en Sleeping
 fr En sommeil
@@ -1733,6 +2024,219 @@ en+ %d names
 fr %d nom
 fr+ %d noms
 
+en %d service of the system: %d running, %d failed
+en+ %d services of the system: %d running, %d failed
+fr %d service du système : %d en cours, %d en échec
+fr+ %d services du système : %d en cours, %d en échec
+
+en %d service of the user: %d running, %d failed
+en+ %d services of the user: %d running, %d failed
+fr %d service de l'utilisateur : %d en cours, %d en échec
+fr+ %d services de l'utilisateur : %d en cours, %d en échec
+
+en No service failed.
+fr Aucun service en échec.
+
+en Show in Services
+fr Afficher dans Services
+
+en Show its process
+fr Afficher son processus
+
+en Waiting for Service Control Manager…
+fr En attente du gestionnaire de contrôle des services…
+
+en Event Log
+fr Journal des événements
+
+en The selected service's details and Event Log
+fr Les détails et le journal des événements du service sélectionné
+
+en Depends on: %s
+fr Dépend de : %s
+
+en Active dependents: %s
+fr Dépendants actifs : %s
+
+en Search Event Log…
+fr Rechercher dans le journal des événements…
+
+en Follow Event Log (Alt+F)
+fr Suivre le journal des événements (Alt+F)
+
+en Reading Event Log…
+fr Lecture du journal des événements…
+
+en No Event Log entries.
+fr Aucune entrée dans le journal des événements.
+
+en Copied Event Log
+fr Journal des événements copié
+
+en It hosts the desktop compositor.
+fr Il héberge le compositeur de bureau.
+
+en Inspecteur runs under this service.
+fr Inspecteur tourne sous ce service.
+
+en Active dependent services: %s.
+fr Services dépendants actifs : %s.
+
+en Event Log: %s
+fr Journal des événements : %s
+
+en Following the Event Log
+fr Suivi du journal des événements
+
+en Event Log paused
+fr Journal des événements en pause
+
+en %d Windows service: %d running, %d automatic stopped
+en+ %d Windows services: %d running, %d automatic stopped
+fr %d service Windows : %d en cours, %d automatique arrêté
+fr+ %d services Windows : %d en cours, %d automatiques arrêtés
+
+en Stopped
+fr Arrêté
+
+en All automatic services are running.
+fr Tous les services automatiques sont en cours d'exécution.
+
+en Shared (svchost)
+fr Partagés (svchost)
+
+en Drivers
+fr Pilotes
+
+en Pausing %s…
+fr Mise en pause de %s…
+
+en Resuming %s…
+fr Reprise de %s…
+
+en Changing startup type of %s…
+fr Modification du type de démarrage de %s…
+
+en Paused %s
+fr %s mis en pause
+
+en Changed startup type of %s
+fr Type de démarrage de %s modifié
+
+en Boot
+fr Amorçage
+
+en Automatic
+fr Automatique
+
+en Automatic (Delayed)
+fr Automatique (différé)
+
+en Manual
+fr Manuel
+
+en Starting
+fr Démarrage
+
+en Stopping
+fr Arrêt
+
+en Resuming
+fr Reprise
+
+en Pausing
+fr Mise en pause
+
+en Paused
+fr En pause
+
+en Display name
+fr Nom complet
+
+en Status
+fr État
+
+en Group
+fr Groupe
+
+en Account
+fr Compte
+
+en %s is not among the services listed
+fr %s n'est pas parmi les services listés
+
+en Protected (Windows)
+fr Protégé (Windows)
+
+en Protected (Windows Light)
+fr Protégé (Windows Light)
+
+en Protected (Antimalware)
+fr Protégé (antivirus)
+
+en Service Control Manager is not available.
+fr Le gestionnaire de contrôle des services n'est pas disponible.
+
+en Cannot open Service Control Manager (error %d).
+fr Impossible d'ouvrir le gestionnaire de contrôle des services (erreur %d).
+
+en Cannot list Windows services (error %d).
+fr Impossible de lister les services Windows (erreur %d).
+
+en error %d
+fr erreur %d
+
+en it stopped again (error %d)
+fr il s'est arrêté de nouveau (erreur %d)
+
+en it is still in this state: %s
+fr il est encore dans cet état : %s
+
+en administrator privileges required
+fr privilèges d'administrateur requis
+
+en these services need it and run: %s
+fr ces services en ont besoin et sont en cours : %s
+
+en dependent services are still running
+fr des services dépendants sont encore en cours d'exécution
+
+en Service Control Manager is unavailable
+fr Le gestionnaire de contrôle des services est indisponible
+
+en access denied: run Inspecteur as an administrator (protected services remain blocked)
+fr accès refusé : lancez Inspecteur en tant qu'administrateur (les services protégés restent bloqués)
+
+en cannot open service (error %d)
+fr impossible d'ouvrir le service (erreur %d)
+
+en protected service (%s) cannot be modified
+fr le service protégé (%s) ne peut pas être modifié
+
+en start failed (error %d)
+fr échec du démarrage (erreur %d)
+
+en stop failed (error %d)
+fr échec de l'arrêt (erreur %d)
+
+en pause failed (error %d)
+fr échec de la mise en pause (erreur %d)
+
+en resume failed (error %d)
+fr échec de la reprise (erreur %d)
+
+en cannot change startup type (error %d)
+fr impossible de changer le type de démarrage (erreur %d)
+
+en Windows Event Log API (wevtapi.dll) is unavailable.
+fr L'API du journal des événements Windows (wevtapi.dll) est indisponible.
+
+en Access denied reading the System Event Log.
+fr Accès refusé lors de la lecture du journal des événements Système.
+
+en No entries in the System Event Log.
+fr Aucune entrée dans le journal des événements Système.
+
 en Refresh
 fr Actualisation
 
@@ -1756,6 +2260,12 @@ fr Résumé
 
 en Show the summary of the machine over the Processes table: CPU, memory, disks, network, GPU, temperature and pressure, each with its last minute. Ctrl+B shows or hides it.
 fr Afficher le résumé de la machine au-dessus du tableau des processus : CPU, mémoire, disques, réseau, GPU, température et pression, chacun avec sa dernière minute. Ctrl+B l'affiche ou le masque.
+
+en How often the sockets are read again while Connections or Mission Control is shown, in milliseconds. A reading goes through every process's open files: a longer period costs less.
+fr L'intervalle de lecture des sockets tant que Connexions ou Mission Control est affiché, en millisecondes. Une lecture parcourt les fichiers ouverts de chaque processus : un intervalle plus long coûte moins.
+
+en How often the services are read again while their section is shown, in milliseconds.
+fr L'intervalle de lecture des services tant que leur section est affichée, en millisecondes.
 
 en Manager
 fr Gestionnaire
@@ -1787,12 +2297,6 @@ fr Suivi du journal
 en Read the details' journal again every 2 seconds while it is shown: new entries come in at the end. Alt+F switches it.
 fr Actualiser le journal des détails toutes les 2 secondes tant qu'il est affiché : les nouvelles entrées arrivent à la fin. Alt+F le bascule.
 
-en How often the sockets are read again while Connections or Mission Control is shown, in milliseconds. A reading goes through every process's open files: a longer period costs less.
-fr L'intervalle de lecture des sockets tant que Connexions ou Mission Control est affiché, en millisecondes. Une lecture parcourt les fichiers ouverts de chaque processus : un intervalle plus long coûte moins.
-
-en How often the services are read again while their section is shown, in milliseconds.
-fr L'intervalle de lecture des services tant que leur section est affichée, en millisecondes.
-
 en Appearance
 fr Apparence
 
@@ -1817,6 +2321,24 @@ fr Touches
 en This desktop draws no title bar for Inspecteur's window (GNOME): Inspecteur keeps its own.
 fr Ce bureau ne dessine pas de barre de titre pour la fenêtre d'Inspecteur (GNOME) : Inspecteur garde la sienne.
 
+en Service filter
+fr Filtre des services
+
+en Which Windows services the Services section lists: all Win32 services (services), shared svchost services (shared), or drivers (drivers).
+fr Quels services Windows la section Services liste : tous les services Win32 (services), les services partagés svchost (shared) ou les pilotes (drivers).
+
+en Event Log level
+fr Niveau du journal des événements
+
+en The Windows Event Log entries shown in the service details pane: all, warnings (and errors), or errors only. Alt+L cycles them.
+fr Les entrées du journal des événements Windows affichées dans les détails du service : toutes, les avertissements (et erreurs) ou les erreurs seules. Alt+L passe de l'un à l'autre.
+
+en Event Log follow
+fr Suivi du journal des événements
+
+en Read the Windows Event Log again every 3 seconds while the details pane is shown. Alt+F switches it.
+fr Actualiser le journal des événements Windows toutes les 3 secondes tant que le panneau des détails est affiché. Alt+F le bascule.
+
 en Autostart entry
 fr Démarrage auto
 
@@ -1825,9 +2347,6 @@ fr Service utilisateur
 
 en Command
 fr Commande
-
-en Status
-fr État
 
 en File
 fr Fichier
@@ -1878,6 +2397,11 @@ fr impossible d'écrire %s
 en Changing…
 fr Modification…
 
+en %d item, %d on
+en+ %d items, %d on
+fr %d élément, %d actifs
+fr+ %d éléments, %d actifs
+
 en Nothing starts with the session.
 fr Rien ne démarre avec la session.
 
@@ -1893,6 +2417,67 @@ en Copied the command of %d item
 en+ Copied the commands of %d items
 fr Commande de %d élément copiée
 fr+ Commandes de %d éléments copiées
+
+en Nothing starts with Windows.
+fr Rien ne démarre avec Windows.
+
+en Copied location
+fr Emplacement copié
+
+en Registry (HKCU Run)
+fr Registre (HKCU Run)
+
+en Registry (HKLM Run)
+fr Registre (HKLM Run)
+
+en Registry (HKLM Run 32-bit)
+fr Registre (HKLM Run 32 bits)
+
+en User Startup folder
+fr Dossier Démarrage utilisateur
+
+en Common Startup folder
+fr Dossier Démarrage commun
+
+en Task Scheduler
+fr Planificateur de tâches
+
+en Source
+fr Source
+
+en Location
+fr Emplacement
+
+en Enabled %s in StartupApproved
+fr %s activé dans StartupApproved
+
+en Disabled %s in StartupApproved
+fr %s désactivé dans StartupApproved
+
+en Enabled %d startup item
+en+ Enabled %d startup items
+fr %d élément de démarrage activé
+fr+ %d éléments de démarrage activés
+
+en Disabled %d startup item
+en+ Disabled %d startup items
+fr %d élément de démarrage désactivé
+fr+ %d éléments de démarrage désactivés
+
+en The tasks that start at logon are listed to an administrator alone.
+fr Seul un administrateur voit les tâches lancées à l'ouverture de session.
+
+en Task Scheduler items are changed in Task Scheduler
+fr Les éléments du Planificateur de tâches se modifient dans le Planificateur de tâches
+
+en administrator privileges required for system-wide startup entries
+fr privilèges d'administrateur requis pour les entrées de démarrage système
+
+en cannot open StartupApproved key (error %d)
+fr impossible d'ouvrir la clé StartupApproved (erreur %d)
+
+en cannot write StartupApproved value (error %d)
+fr impossible d'écrire la valeur StartupApproved (erreur %d)
 
 en Pressure, %s
 fr Pression, %s
@@ -1930,8 +2515,83 @@ fr Nice
 en only root may raise a priority, or change another user's process
 fr seul root peut augmenter une priorité, ou changer le processus d'un autre utilisateur
 
+en The processes cannot be read (/proc)
+fr Les processus ne peuvent pas être lus (/proc)
+
+en This GPU's numbers come with NVIDIA's driver library (libnvidia-ml), not found or not answering.
+fr Les chiffres de ce GPU viennent de la bibliothèque du pilote NVIDIA (libnvidia-ml), introuvable ou muette.
+
 en nice %d
 fr nice %d
+
+en Available
+fr Disponible
+
+en Total
+fr Total
+
+en Files cached
+fr Fichiers en cache
+
+en Disk buffers
+fr Tampons des disques
+
+en Kernel, reclaimable
+fr Noyau, récupérable
+
+en Shared memory
+fr Mémoire partagée
+
+en To be written
+fr À écrire
+
+en High
+fr Haute
+
+en Above normal
+fr Supérieure à la normale
+
+en Normal
+fr Normale
+
+en Below normal
+fr Inférieure à la normale
+
+en administrator privileges are required to change this process's priority
+fr les privilèges d'administrateur sont requis pour changer la priorité de ce processus
+
+en The processes cannot be read
+fr Les processus ne peuvent pas être lus
+
+en NVIDIA's driver library (nvml.dll) was not found or did not answer.
+fr La bibliothèque du pilote NVIDIA (nvml.dll) est introuvable ou ne répond pas.
+
+en Realtime
+fr Temps réel
+
+en System cache
+fr Cache système
+
+en Paged pool
+fr Pool paginé
+
+en Non-paged pool
+fr Pool non paginé
+
+en Untrusted
+fr Non fiable
+
+en Low
+fr Basse
+
+en Medium
+fr Moyenne
+
+en Medium high
+fr Moyenne-haute
+
+en Protected
+fr Protégée
 
 en %d app
 en+ %d apps
@@ -2047,9 +2707,6 @@ fr Lente : 2 s
 en Very low: 5 s
 fr Très lente : 5 s
 
-en Paused
-fr En pause
-
 en Paused while Ctrl is held
 fr En pause tant que Ctrl est enfoncée
 
@@ -2068,9 +2725,6 @@ fr Actualisation : en pause. %s (%s), Reprendre (%s)
 en Refresh: every %s. %s (%s), Pause (%s)
 fr Actualisation : intervalle de %s. %s (%s), Pause (%s)
 
-en Pause
-fr Pause
-
 en Read again now
 fr Actualiser maintenant
 
@@ -2080,12 +2734,6 @@ fr Zoom %s
 en Zoom %s (Ctrl+0: %s)
 fr Zoom %s (Ctrl+0 : %s)
 
-en The window of %s comes to the front
-fr La fenêtre de %s passe au premier plan
-
-en That window has closed
-fr Cette fenêtre s'est fermée
-
 en Show its window: %s
 fr Afficher sa fenêtre : %s
 
@@ -2093,3 +2741,9 @@ en Show its windows (%d), one after the other
 en+ Show its windows (%d), one after the other
 fr Afficher ses fenêtres (%d), l'une après l'autre
 fr+ Afficher ses fenêtres (%d), l'une après l'autre
+
+en The window of %s comes to the front
+fr La fenêtre de %s passe au premier plan
+
+en That window has closed
+fr Cette fenêtre s'est fermée

@@ -32,32 +32,36 @@ input, nothing runs. In a window the user is not in, the filter's caret neither 
 
 ## The system and the views
 
-Every reading of the system is in a `*_linux.odin` file, behind plain structs and procs; the models, the views and the
-commands hold no path of `/proc` or `/sys`, no system call. Why, and what a Windows port writes:
+Every reading of the system is in a `*_linux.odin` or `*_windows.odin` file (with `*_other.odin` stubs for macOS).
+Sections whose meaning is the same across operating systems share their model and view; sections whose model differs by
+system (Services, Startup, Properties, Information, process columns, commands, and acts) have whole per-system files
+selected by Odin build suffixes, with no `when ODIN_OS` in `src/`. Pure Windows binary layouts and bounds-checked
+decoders live in `src/winapi` so they compile and run unit tests on any host OS. Why:
 [src/md/infrastructure/porting.md](../src/md/infrastructure/porting.md).
 
-| Section | Model (neutral) | Reader (Linux) | View | Its reasons |
+| Section | Shared | Linux | Windows | Its reasons |
 |---|---|---|---|---|
-| Processes | `sampler.odin`, `processes.odin`, `apps.odin` | `processes_linux.odin`, `apps_linux.odin` | `table_view.odin`, `menu.odin` | [processes.md](../src/md/features/processes.md), [apps.md](../src/md/features/apps.md) |
-| Properties | `props.odin` | `props_linux.odin` | `props_view.odin` | [processes.md](../src/md/features/processes.md) |
-| Performance | `machine.odin`, `gpu.odin` | `machine_linux.odin`, `gpu_linux.odin` | `perf_view.odin` | [gpus.md](../src/md/features/gpus.md) |
-| Services | `services.odin` | `services_linux.odin` | `services_view.odin` | [services.md](../src/md/features/services.md) |
-| Startup | `startup.odin` | `startup_linux.odin` | `startup_view.odin` | [services.md](../src/md/features/services.md) |
-| Connections | `connections.odin` | `connections_linux.odin` | `connections_view.odin` | [connections.md](../src/md/features/connections.md) |
-| Information | `information.odin` | `information_linux.odin` | `information_view.odin` | |
-| the session | `menu.odin` (the guards) | `session_linux.odin`, `desktop_linux.odin` | `setup_view.odin` | |
-| a dump file | `dump.odin` | `dump_linux.odin` | | [processes.md](../src/md/features/processes.md) |
-| the system's words | `props.odin` (`Priority`) | `system_linux.odin` | | |
+| Processes | `sampler.odin`, `processes.odin`, `apps.odin`, `table_view.odin`, `menu.odin` | `processes_linux.odin`, `apps_linux.odin`, `columns_other.odin`, `acts.odin`, `menu_other.odin` | `processes_windows.odin`, `apps_windows.odin`, `columns_windows.odin`, `acts_windows.odin`, `menu_windows.odin` | [processes.md](../src/md/features/processes.md), [apps.md](../src/md/features/apps.md) |
+| Properties | — | `props.odin`, `props_linux.odin`, `props_view.odin` | `props_windows.odin`, `props_view_windows.odin` | [processes.md](../src/md/features/processes.md) |
+| Performance | `machine.odin`, `gpu.odin`, `perf_view.odin` | `machine_linux.odin`, `gpu_linux.odin` | `machine_windows.odin`, `gpu_windows.odin` | [gpus.md](../src/md/features/gpus.md) |
+| Services | — | `services.odin`, `services_linux.odin`, `services_view.odin`, `journal*.odin` | `services_windows.odin`, `services_view_windows.odin` | [services.md](../src/md/features/services.md) |
+| Startup | — | `startup.odin`, `startup_linux.odin`, `startup_view.odin` | `startup_windows.odin`, `startup_view_windows.odin` | [services.md](../src/md/features/services.md) |
+| Connections | `connections.odin`, `connections_view.odin` | `connections_linux.odin` | `connections_windows.odin` | [connections.md](../src/md/features/connections.md) |
+| Information | — | `information.odin`, `information_linux.odin`, `information_view.odin` | `information_windows.odin`, `information_view_windows.odin` | |
+| Session & windows | `window_list.odin` | `session_linux.odin`, `window_list_other.odin` | `session_windows.odin`, `window_list_windows.odin` | |
+| Process dump | `dump.odin` | `dump_linux.odin` | `dump_windows.odin` | [processes.md](../src/md/features/processes.md) |
+| Commands & settings | `commands.odin`, `settings.odin`, `goto.odin` | `commands_other.odin`, `settings_other.odin`, `goto_other.odin`, `system_linux.odin` | `commands_windows.odin`, `settings_windows.odin`, `goto_windows.odin`, `system_windows.odin` | |
 
-The demo (`demo.odin`, `inspecteur --demo`) is a third source behind the same procs. The pictures of the documentation
-are made with it (see [development.md](development.md)).
+The demo (`demo.odin`, plus `demo_other.odin` and `demo_windows.odin`, `inspecteur --demo`) provides deterministic sample
+data for documentation screenshots and UI tests.
 
 ## Information
 
-What does not change while the program runs (`/etc/os-release`, `uname`, `/sys/class/dmi/id`, `/proc/cpuinfo`, the PCI
-display controllers with their names from `pci.ids` when the system has it, the file systems and `statfs`, the screens'
-EDID, the batteries) is read on its thread; what changes (the uptime, the memory, the network interfaces) comes from the
-last sample of Performance.
+What does not change while the program runs is read on a worker thread: on Linux from `/etc/os-release`, `uname`,
+`/sys/class/dmi/id`, `/proc/cpuinfo`, PCI display controllers (`pci.ids`), file systems, DRM EDID, and batteries; on
+Windows from the CurrentVersion registry, SMBIOS (`GetSystemFirmwareTable`), `GetLogicalProcessorInformationEx`, DXGI,
+NTFS/ReFS volumes, `EnumDisplayDevicesW`/EDID, and `IOCTL_BATTERY_QUERY_*`. Live figures (uptime, memory, network
+interfaces) come from the last sample of Performance.
 
 ## The window (view.odin, table_view.odin, commands.odin)
 
@@ -114,10 +118,13 @@ tasks of the chores, shown under the settings' General page.
 
 ## Tests
 
-- Unit tests (`src`; those of the Linux readers' formats in `*_linux_test.odin`): the formats of `/proc`, `/proc/net`, unit files, desktop entries, `os-release`, `pci.ids`, EDID and
-  `mountinfo`; the rates, a pid used again, the devices that come and go, the rows' filter and sort, the columns kept,
-  the priorities' steps, the apps of a scope, launchers and interpreters; names, durations, an empty cell for a still rate; no key doing two things; the preferences'
-  documentation.
+- Unit tests (`src` and `src/winapi`; Linux format tests in `*_linux_test.odin`; Windows live process/reader tests in
+  `*_windows_test.odin`; pure Windows binary ABI layouts and hostile/truncated buffer decoders in `src/winapi/winapi_test.odin`
+  verified across `amd64` and `arm64`): `/proc`, `/proc/net`, unit files, desktop entries, `os-release`, `pci.ids`, EDID,
+  `mountinfo`, `SystemProcessInformation`, `SystemProcessorPerformanceInformation`, `SystemExtendedHandleInformation`,
+  PEB64/PEB32 (WOW64), TCP/UDP v4/v6 extended tables, `StartupApproved`, SMBIOS, `MIB_IF_TABLE2`, `.lnk`, Task XML; rates,
+  PID reuse rejection, devices, filter and sort, columns, priorities, no conflicting shortcuts, preference documentation,
+  and zero `ODIN_OS` in `src/`.
 - `inspecteurtool live`: the real program in a sway with no screen, driven over the DevTools protocol (see
   [development.md](development.md)). A key that changes something is pressed only once the selected row, as the
   accessibility tree says, is the test's own.

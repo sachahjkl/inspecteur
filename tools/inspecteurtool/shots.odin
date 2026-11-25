@@ -1,3 +1,4 @@
+#+build linux
 package inspecteurtool
 
 // shots: the pictures of the README and the documentation, the program's own frames (over the DevTools protocol,

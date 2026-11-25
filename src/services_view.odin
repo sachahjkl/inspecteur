@@ -1,3 +1,4 @@
+#+build !windows
 package inspecteur
 
 // The Services section (services.odin): a table of the services of the system's manager or of the user's (System and
@@ -206,7 +207,7 @@ services_switch :: proc(app: ^App, m: Manager) {
 	s := &app.services
 	if s.manager == m { return }
 	s.manager = m
-	app.settings.manager = m
+	app.settings.extra.manager = m
 	pref_set(&app.prefs, "services.manager", MANAGER_KEYS[m])
 	s.rows.table.vl.sel = -1
 	services_rows(app)
@@ -336,4 +337,54 @@ service_copy :: proc(app: ^App) {
 	text := strings.join(names[:], "\n", context.temp_allocator)
 	platform.set_clipboard(app.main.win, text)
 	announce(app, i18n.tr("Copied"), len(names) == 1 ? text : fmt.tprintf(i18n.tr(len(names), "%d name", "%d names"), len(names)))
+}
+
+services_search_focused :: proc(app: ^App) -> bool {
+	jk := app.services.pane.search_key
+	return jk != 0 && ui.focus_key() == jk
+}
+
+services_search_escape :: proc(app: ^App) -> bool {
+	return journal_search_escape(&app.services.pane)
+}
+
+// Mission Control's services: how many run, how many failed; the failed ones by name (a click selects it in Services).
+mission_services :: proc(app: ^App, em: f32) {
+	s := &app.services
+	if s.list == nil || s.list.manager != s.manager { mission_note(i18n.tr("Reading…"), em); return }
+	if s.list.problem != "" { mission_note(s.list.problem, em); return }
+	// (counted when the list was read: services_take)
+	failed := s.list.failed
+	n := len(s.list.units)
+	mission_note(fmt.tprintf(s.manager == .System ? i18n.tr(n, "%d service of the system: %d running, %d failed", "%d services of the system: %d running, %d failed") : i18n.tr(n, "%d service of the user: %d running, %d failed", "%d services of the user: %d running, %d failed"), n, s.list.running, failed), em)
+	k := 0
+	for u in s.list.units {
+		if k >= failed { break }
+		if u.active != "failed" { continue }
+		if mission_line(app, fmt.tprintf("mc_svc_%d", k), u.name, u.description, unit_word("failed"), -1, "bad", em, {kind = .Service, name = u.name}) {
+			tab_show(app, .Services)
+			service_select(app, u.name)
+		}
+		k += 1
+		if k >= MISSION_TOP { break }
+	}
+	if failed == 0 { mission_note(i18n.tr("No service failed."), em) }
+}
+
+mission_service_menu_items :: proc(app: ^App, name: string) {
+	s := &app.services
+	u: Service
+	found := false
+	if s.list != nil {
+		for item in s.list.units { if item.name == name { u, found = item, true; break } }
+	}
+	if !found { ui.menu_close(); return }
+	if ui.menu_item(i18n.tr("Show in Services"), icon = lucide.SETTINGS, icon_font = app.icons).clicked { tab_show(app, .Services); service_select(app, name) }
+	q := u.pid > 0 ? find_pid(&app.sampler, u.pid) : nil
+	if ui.menu_item(i18n.tr("Show its process"), icon = lucide.LAYOUT_LIST, disabled = q == nil, icon_font = app.icons).clicked { processes_reveal(app, q.pid, q.start) }
+	if ui.menu_item(cmd_label(.Service_Details), icon = COMMANDS[.Service_Details].icon, icon_font = app.icons).clicked {
+		tab_show(app, .Services)
+		service_select(app, name)
+		if !service_details_shown(app) { service_details_switch(app) }
+	}
 }

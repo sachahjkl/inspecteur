@@ -1,4 +1,5 @@
 #+build !linux
+#+build !windows
 package inspecteur
 
 // The sockets on a system not supported yet: none.

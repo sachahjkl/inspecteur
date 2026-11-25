@@ -369,17 +369,18 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 	}
 
 	weak := r.kind == .App   // (an app's pid, user and the like are its first process's)
+	g_ptr := r.kind == .App ? &t.groups[r.index] : nil
 	io_dash := r.kind == .Process && !p.io_known
 	for k in t.layout.order {
 		c := Column(k)
 		if c == .Name || !t.layout.shown[k] { continue }
-		switch c {
+		#partial switch c {
 		case .Name:
 		case .PID:        cell(t, c, fmt.tprintf("%d", p.pid), &tip, weak = true)
 		case .PPID:       cell(t, c, fmt.tprintf("%d", p.ppid), &tip, weak = true)
 		case .User:       cell(t, c, p.user, &tip, weak = true)
 		case .State:      cell(t, c, state_text(p.state), &tip, weak = p.state != .Stopped && p.state != .Zombie)
-		case .Nice:       cell(t, c, fmt.tprintf("%d", p.nice), &tip, weak = p.nice == 0)
+		case .Nice:       cell(t, c, nice_cell_text(p.nice), &tip, weak = p.nice == 0)
 		case .CPU:        cell(t, c, percent_text(f64(cpu), 1), &tip, heat = cpu / HEAT_CPU_FULL, page = page)
 		case .CPU_Graph:
 			if text := cpu_graph_cell(app, r, page, em); text != "" { tip = text }
@@ -393,6 +394,7 @@ build_cells :: proc(app: ^App, r: Row, em: f32, page: ui.Color) -> (tip: string)
 		case .Started:    cell(t, c, started_text(app, p.started), &tip, weak = true)
 		case .Command:    cell(t, c, p.cmdline, &tip, weak = true)
 		case .Executable: cell(t, c, p.exe, &tip, weak = true)
+		case:             build_cell_extra(app, t, c, r, p, g_ptr, weak, &tip)
 		}
 	}
 	ui.table_row_end()

@@ -51,13 +51,11 @@ PREF_DEFS := [?]config.Def{
 	{name = "processes.view", title = i18n.later("View"), description = i18n.later("How the processes are listed: apps, the apps' groups and the background processes; tree, every process under its parent. Ctrl+T switches them."), kind = .String, default = {s = "apps"}, choices = {"apps", "tree"}, choice_labels = {i18n.later("Apps"), i18n.later("Tree")}, tags = {"tree", "apps", "group"}},
 	{name = "processes.pinned", description = "The apps and processes pinned over the others, by name, apart by commas. Alt+P pins or unpins the selected row.", kind = .String, default = {s = ""}, hidden = true},
 	{name = "processes.summary", title = i18n.later("Summary"), description = i18n.later("Show the summary of the machine over the Processes table: CPU, memory, disks, network, GPU, temperature and pressure, each with its last minute. Ctrl+B shows or hides it."), kind = .Bool, default = {b = true}, tags = {"header", "overview"}},
-	{name = "services.manager", title = i18n.later("Manager"), description = i18n.later("The services the Services section lists: the system's (system) or the user's (user). Its System and User buttons change it."), kind = .String, default = {s = "system"}, choices = {"system", "user"}, choice_labels = {i18n.later("System"), i18n.later("User")}, tags = {"system", "user", "systemd"}},
-	{name = "services.widths", description = "The widths of the Services table's columns that were resized, in ems (description=30). Dragging the line before a column's title changes them.", kind = .String, default = {s = ""}, hidden = true},
-	{name = "services.order", description = "The order of the Services table's columns, apart by commas (name,state,description). Dragging a column's title sideways changes it.", kind = .String, default = {s = ""}, hidden = true},
-	{name = "services.sort", description = "The column the services are sorted by (name, description, state, startup, load, pid, memory), a - before it for the largest (or Z) first. A click on a title changes it.", kind = .String, default = {s = "name"}, hidden = true},
-	{name = "services.journal_boot", title = i18n.later("Journal boot"), description = i18n.later("The details' journal shows this boot's entries alone; off: its last entries, from any boot. Alt+B switches it."), kind = .Bool, default = {b = true}},
-	{name = "services.journal_level", title = i18n.later("Journal level"), description = i18n.later("The entries of the details' journal shown: all, warnings (and worse), errors (and worse). Alt+L goes through them."), kind = .String, default = {s = "all"}, choices = {"all", "warnings", "errors"}, choice_labels = {i18n.later("All entries"), i18n.later("Warnings and errors"), i18n.later("Errors")}},
-	{name = "services.journal_follow", title = i18n.later("Journal follow"), description = i18n.later("Read the details' journal again every 2 seconds while it is shown: new entries come in at the end. Alt+F switches it."), kind = .Bool, default = {b = true}},
+}
+
+// (after the services' preferences, which each system has of its own: OS_PREF_DEFS, settings_other.odin and
+// settings_windows.odin. The order is the order they are listed in.)
+PREF_DEFS_AFTER := [?]config.Def{
 	{name = "startup.widths", description = "The widths of the Startup table's columns that were resized, in ems (command=24).", kind = .String, default = {s = ""}, hidden = true},
 	{name = "startup.order", description = "The order of the Startup table's columns, apart by commas (name,status,command).", kind = .String, default = {s = ""}, hidden = true},
 	{name = "startup.sort", description = "The column the startup items are sorted by (name, command, type, status, file), a - before it for Z first.", kind = .String, default = {s = "name"}, hidden = true},
@@ -84,10 +82,7 @@ Settings :: struct {
 	tree:       bool,       // processes.view = tree
 	summary:    bool,       // processes.summary
 	pinned:     string,     // owned: processes.pinned as written
-	manager:    Manager,    // services.manager
-	journal_boot: bool,     // services.journal_boot
-	journal_level: Journal_Level,   // services.journal_level
-	journal_follow: bool,   // services.journal_follow
+	extra:      Settings_Extra,
 	services_ms: int,       // services.refresh_ms
 	connections_ms: int,    // connections.refresh_ms
 	columns:    string,   // owned: processes.columns, .widths, .order, .sort as written
@@ -116,6 +111,8 @@ prefs_open :: proc(p: ^config.Prefs, args: []string) -> (rest: [dynamic]string, 
 	// (the descriptions that name the program live as long as the registry: the process's)
 	prefs_page.standard_register(p, prefs_page.STANDARD_ALL + {.Rows}, standard_defaults())
 	config.register(p, PREF_DEFS[:])
+	config.register(p, OS_PREF_DEFS[:])
+	config.register(p, PREF_DEFS_AFTER[:])
 	prefs_page.changelog_register(p)   // (the version last started: What's new after an update)
 	_, file_problems := config.load_file(p, prefs_file(), .User)
 	rest, problems = config.apply_args(p, args, context.temp_allocator)
@@ -128,10 +125,7 @@ prefs_read :: proc(p: ^config.Prefs, allocator := context.allocator) -> (s: Sett
 	s.tree = config.string_of(p, "processes.view") == "tree"
 	s.summary = config.bool_of(p, "processes.summary")
 	s.pinned = strings.clone(config.string_of(p, "processes.pinned"), allocator)
-	s.journal_boot = config.bool_of(p, "services.journal_boot")
-	for l in Journal_Level { if JOURNAL_LEVEL_KEYS[l] == config.string_of(p, "services.journal_level") { s.journal_level = l } }
-	s.journal_follow = config.bool_of(p, "services.journal_follow")
-	s.manager = config.string_of(p, "services.manager") == "user" ? .User : .System
+	settings_read_os(p, &s)
 	s.services_ms = int(config.int_of(p, "services.refresh_ms"))
 	s.connections_ms = int(config.int_of(p, "connections.refresh_ms"))
 	s.columns = strings.clone(config.string_of(p, "processes.columns"), allocator)

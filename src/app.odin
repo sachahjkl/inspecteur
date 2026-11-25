@@ -98,8 +98,6 @@ App :: struct {
 	updates:     prefs_page.Updates,   // the updates (updates.odin); its updater nil in the demo
 	restart:     bool,              // at the end, the new program starts (an update in place)
 	closing:     bool,              // the window closed: what the chores posted is freed, not shown
-	journals:    [dynamic]^Journal_Window,   // the services' journals on their own, a view each (journal_window.odin)
-	journals_closed: [dynamic]^Journal_Window,   // closed, freed once their reading is done
 	windows:     [dynamic]App_Window,   // the apps' windows, read at each sample (window_list.odin)
 	one_copy:    ^instance.Server,  // the name of the one Inspecteur that runs, served (one_copy.odin)
 	tz:          ^datetime.TZ_Region,   // local time, for the processes' start (the first reading's; nil: UTC)

@@ -1,3 +1,4 @@
+#+build !windows
 package inspecteur
 
 // The Information section's model: what the system is. What does not change while the program runs (the system, the

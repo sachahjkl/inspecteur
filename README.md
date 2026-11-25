@@ -1,11 +1,11 @@
 <h1 align="center">inspecteur</h1>
 
-<p align="center"><b>The processes of your Linux machine, at a glance.</b></p>
+<p align="center"><b>What runs on your computer, at a glance.</b></p>
 
-Inspecteur is a system monitor and task manager: what runs, what it uses, which services and sockets it has, what starts
-with the session, and a way to end it. It is one small native program, written in [Odin](https://odin-lang.org) on
-[gui_toolkit](https://github.com/sachahjkl/gui_toolkit). Its window comes up in about 270 ms, and it uses about 1 % of one
-core while it refreshes its table each second.
+Inspecteur is a system monitor and task manager for Linux (Wayland first) and Windows (10 / 11): what runs, what it uses,
+which services and sockets it has, what starts with the session, and a way to end it. It is one small native program,
+written in [Odin](https://odin-lang.org) on [gui_toolkit](https://github.com/sachahjkl/gui_toolkit). Its window comes up
+in about 270 ms on Linux, and it uses about 1 % of one core while it refreshes its table each second.
 
 Inspecteur is not a port, but it is strongly inspired by [TaskSlinger](http://taskslinger.net): a task manager of that
 quality is what Linux lacked. Its sections are the same six: Processes, Performance, Services, Startup, Connections and
@@ -24,36 +24,43 @@ Information.
 
   ![Mission Control](docs/screenshots/mission_control.png)
 - **Processes**: name with the app's icon, PID, user, CPU %, private memory, disk read and write rates, threads, and more
-  columns on a right click of the header (Ctrl+Shift+C): parent, state, priority, resident memory, GPU memory, start time,
-  command line, executable. Read again each second; the refresh pauses (Ctrl+Space) and goes faster or slower from the
+  columns on a right click of the header (Ctrl+Shift+C): parent, state, priority, resident memory (Working set on Windows),
+  GPU %, GPU memory, start time, command line, executable; on Windows also commit charge, handles, session ID, integrity
+  level, Efficiency mode (EcoQoS), and UWP package. Read again each second; on Windows all processes are read in one
+  `NtQuerySystemInformation` call into a reused buffer. The refresh pauses (Ctrl+Space) and goes faster or slower from the
   title bar (Ctrl+Shift+R).
-- **Apps and background processes**: a process that the desktop's menu knows (its desktop entry) is an app; the
-  processes under it are in its group. A launcher (env, sudo, flatpak, systemd-run...) or an interpreter (Python, Node,
-  a shell...) is never taken for an app. Or **every process under its parent**: Ctrl+T.
-- **End task** (Delete) asks a process to end; **Kill** (Shift+Delete) ends it at once; **End process tree**
-  (Ctrl+Delete) ends it and every process under it. A kill and a tree are asked first: the confirmation lists each
-  process by its name and PID, and says when Inspecteur or the session would end with them. **Select many rows** in
-  every table with Ctrl and Shift clicks, Shift and the arrows, or Ctrl+A: what changes something acts on all of them,
-  after one question that counts them; Properties and the other views of one thing stay on the row of the cursor.
-- **Suspend or resume** (Ctrl+P), **the priority** (Ctrl+Up, Ctrl+Down), **the affinity** (Ctrl+Shift+A), **Go to
-  service** (Ctrl+Shift+S), **Search online** (Ctrl+Shift+F), **Create dump file** (Ctrl+Shift+D, with gdb's gcore).
-  **Properties** (Alt+Enter, Enter): its threads, open files, modules and environment, each with a filter (Ctrl+F).
-  Inspecteur does not suspend itself, what it runs under, or the desktop's compositor.
-- **Performance**: CPU (overall or per logical processor, each with its core's temperature where the machine tells
-  it), memory, disks, network interfaces and GPUs, sixty readings of history each. A laptop's GPU that sleeps is not
-  woken to be read.
-- **Services**: systemd's services, the system's or the user's: their state, whether they start by themselves, their
-  main process and memory; under the table, the selected one's unit file, tasks, CPU time and its journal: each entry's time, level in
-  its colour, program and message; all, warnings or errors with their counts, this boot or every boot, followed live, its
-  own search, the selected entry whole, Copy (Ctrl+I); a service's journal in a window of its own for a second screen
-  (Ctrl+Shift+J), back under the table when that window closes. Start, Stop, Restart (both asked first), Enable,
-  Disable, over D-Bus; for a system service the manager asks
-  polkit, which can ask for a password, and the footer says what it answered.
-- **Startup**: the XDG autostart entries and the user's systemd services that start with the session; turn one on or off,
-  open its file's folder.
+- **Apps and background processes**: a process that the desktop knows (desktop entry on Linux, visible window or Start Menu
+  shortcut on Windows) is an app; the processes under it are in its group. A launcher (env, sudo, flatpak, systemd-run...)
+  or an interpreter (Python, Node, a shell...) is never taken for an app. Or **every process under its parent**: Ctrl+T.
+- **End task** (Delete) asks a process to end (`SIGTERM` on Linux, `WM_CLOSE` then `TerminateProcess` on Windows); **Kill**
+  (Shift+Delete) ends it at once; **End process tree** (Ctrl+Delete) ends it and every process under it. Every action verifies
+  `(PID, creation time)` on the open handle so a reused PID is never hit, and refuses critical or protected (PPL) Windows
+  processes with an explicit reason. **Select many rows** in every table with Ctrl and Shift clicks, Shift and the arrows,
+  or Ctrl+A: what changes something acts on all of them, after one question that counts them; Properties and the other views
+  of one thing stay on the row of the cursor.
+- **Suspend or resume** (Ctrl+P), **the priority** (Ctrl+Up, Ctrl+Down), **the affinity** (Ctrl+Shift+A, processor-group
+  aware beyond 64 CPUs on Windows), **Efficiency mode (EcoQoS)** (Alt+E on Windows), **Analyze wait chain** (Alt+W on
+  Windows), **Go to service** (Ctrl+Shift+S), **Search online** (Ctrl+Shift+F), **Create dump file** (Ctrl+Shift+D: `gcore`
+  on Linux, `MiniDumpWriteDump` on Windows). **Properties** (Alt+Enter, Enter): on Linux threads, open files, modules, and
+  environment; on Windows seven native tabs adding Security & Resources (integrity, elevation, PPL, GDI/USER objects,
+  kernel pools, token privileges), Wait Chain Traversal deadlock detection, Handles, and WOW64/64-bit PEB Environment.
+  Inspecteur does not suspend itself, what it runs under, or the desktop compositor (`dwm.exe` on Windows).
+- **Performance**: CPU (overall or per logical processor across processor groups, with core temperatures where reported),
+  memory (RAM, swap/pagefile, system cache, paged and non-paged pools), disks, network interfaces, and GPUs (NVML and DRM
+  on Linux; DXGI, all-vendor PDH GPU engine/memory counters, and optional NVML on Windows), sixty readings of history each.
+- **Services**:
+  - **Linux**: systemd's system and user services over D-Bus, unit file details, and live journald viewer with detachable
+    journal windows (Ctrl+Shift+J).
+  - **Windows**: Service Control Manager services, shared `svchost` groups, and drivers; Start, Stop (with active dependent
+    warnings), Restart, Pause, Continue, and 4 startup types (including Automatic Delayed); PPL protection status; and a
+    filterable Windows Event Log viewer (`wevtapi.dll`) with detachable Event Log windows.
+- **Startup**: on Linux XDG autostart entries and user systemd services; on Windows the HKCU and HKLM `Run` keys (HKLM's 64-bit and 32-bit
+  views), User and Common Startup folders (`.lnk`), Task Scheduler logon tasks, and synchronized `StartupApproved`
+  enable/disable state matching Windows Task Manager.
 - **Connections**: every TCP and UDP socket, IPv4 and IPv6, with its process; End task, Kill, Open in Processes.
-- **Information**: the system, the processor, the memory, the GPUs, the disks and file systems, the network interfaces,
-  the screens and the batteries. **Copy all** copies it as text.
+- **Information**: the system, processor, memory, GPUs, disks and volumes, network interfaces, displays, and batteries (with
+  Windows edition/build, elevation status, SMBIOS, DXGI, NTFS/ReFS volumes, EDID, and battery health). **Copy all** copies
+  it as text.
 - **Every action has its key**, said in its menu line and its button's tooltip. The **command palette** (Ctrl+K,
   Ctrl+Shift+P) finds any action or section by its words, and a setting; `@` in it goes to a process or a service.
   Send a signal, Set the priority and Refresh speed ask their value in it. Shift+Enter on an action shows its button.
@@ -123,10 +130,13 @@ CPU % is a share of the whole machine: 100 % is every core busy. Preferences: [d
 
 ## Install
 
-- **The archive** of a release: `inspecteur-<version>-linux-x64.tar.gz`, one program. At its first start it offers to
-  install itself for the user (or `./inspecteur --install`): the program in `~/.local/share/inspecteur`, its menu entry and
-  its icons. The installed copy updates itself from the signed releases (`update.auto`). It needs a Wayland desktop,
-  Vulkan and fontconfig. On NixOS the install builds the libraries it needs with `nix-build` and points the copy at them.
+- **Linux archive**: `inspecteur-<version>-linux-x64.tar.gz`, one program. At its first start it offers to install itself
+  for the user (or `./inspecteur --install`): the program in `~/.local/share/inspecteur`, its menu entry and its icons. The
+  installed copy updates itself from the signed releases (`update.auto`). It needs a Wayland desktop, Vulkan and fontconfig.
+  On NixOS the install builds the libraries it needs with `nix-build` and points the copy at them.
+- **Windows archive**: `inspecteur-<version>-windows-x64.zip` (`inspecteur.exe` and console launcher `inspecteur.com`).
+  At first start it offers to install itself for the user (`inspecteur --install`) with Start Menu shortcuts and signed
+  self-updates. No silent elevation is performed; actions that require Administrator privileges report it plainly.
 - **Nix**: `nix run git+https://github.com/sachahjkl/inspecteur` (Nix 2.27 or later: the flake asks for its submodule,
   `inputs.self.submodules`; with an older Nix, add `?submodules=1`). A `github:` URL does not bring the submodule: use
   the `git+https` one. The package brings its desktop entry and icons. On a Linux other than NixOS, a program from Nix

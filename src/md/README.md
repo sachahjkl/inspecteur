@@ -12,8 +12,7 @@ section, the views, the tests) is [docs/architecture.md](../../docs/architecture
   reading posted to it.
 - Every reader is a `tasks.Job` on the toolkit's chores; its reading is new memory of its own, posted with `ui.post` and
   taken at the next build. The GPUs have a thread of their own (every 2 s).
-- Each section has a neutral model, a Linux reader (`*_linux.odin`) and a view. The demo (`--demo`) is a third source
-  behind the same procs.
+- Each section has a model, an OS reader (`*_linux.odin` or `*_windows.odin`), and a view. Platform-divergent sections (Services, Startup, Properties, Information, process commands and columns) use dedicated per-OS model and view files rather than forcing one system into the shape of another ([infrastructure/porting.md](infrastructure/porting.md)). The demo (`--demo`) is a third source behind the same procedures.
 - Every action is a command of `COMMANDS` (`src/commands.odin`); every dialog and panel is a toolkit view
   (`src/views.odin`). A command that asks one value takes it in the palette's form; a button names the command it runs
   ([features/palette.md](features/palette.md)).

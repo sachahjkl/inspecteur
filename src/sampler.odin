@@ -45,6 +45,7 @@ Proc_Counters :: struct {
 	private:   u64,      // bytes in memory that are its own (not a file's, not shared)
 	io_read, io_write: u64,   // bytes read from and written to the storage since it started
 	io_known:  bool,     // false: the system does not tell them to this user
+	extra:     Proc_Counters_Extra,
 }
 
 // What does not change in a process's life, read once (texts in the temporary allocator; `user` is the reader's).
@@ -57,6 +58,7 @@ Proc_Facts :: struct {
 	user_unit: bool,   // that unit is the user's service manager's, not the system's
 	started: i64,      // when it started, unix seconds (0: unknown)
 	read:    bool,     // the reader read them (a process it had not seen); false: none were read
+	extra:   Proc_Facts_Extra,
 }
 
 Proc :: struct {
@@ -87,6 +89,7 @@ Proc :: struct {
 	born_ns:    i64,      // when it was first seen, after the first sample (0: it was there when Inspecteur started)
 	ended:      bool,     // missing from the last reading: it ended; kept ENDED_KEEP_NS so its row fades out
 	ended_ns:   i64,      // when it was first missing
+	extra:      Proc_Extra,
 }
 
 // The window's processes. The system's are read off its thread (sample.odin); a reading becomes these (sampler_apply).
@@ -112,6 +115,7 @@ proc_free :: proc(p: ^Proc) {
 	delete(p.unit)
 	delete(p.search)
 	free(p.hist)
+	proc_free_extra(p)
 }
 
 // The processes of a reading (sample.odin). `d_total_ns`: the time of all the machine's processors since the last
@@ -198,6 +202,7 @@ proc_learn :: proc(p: ^Proc, c: Proc_Counters, f: Proc_Facts, catalog: ^Catalog)
 	if strings.has_suffix(f.scope, ".service") { p.unit, p.unit_user = strings.clone(f.scope), f.user_unit }
 	p.search = strings.to_lower(strings.concatenate({p.name, " ", p.cmdline}, context.temp_allocator))
 	p.entry = catalog != nil ? catalog_match(catalog, p.name, p.exe, f.scope, p.cmdline) : -1
+	proc_learn_extra(p, c, f)
 }
 
 // What moves: the counters of this sample, and the rates since the last one (none for a process seen for the first time).
@@ -216,6 +221,7 @@ proc_update :: proc(p: ^Proc, c: Proc_Counters, known: bool, dt: f64, d_total_ns
 		}
 		p.io_read, p.io_write = c.io_read, c.io_write
 	}
+	proc_update_extra(p, c)
 }
 
 // The last `n` points of a history (fewer while it is young), oldest first, into `out`; returns how many.

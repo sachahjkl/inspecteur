@@ -84,7 +84,7 @@ MISSION_ORDER := [?]Mission_Panel{.Machine, .Health, .Cpu, .Memory, .Services, .
 // The panels' menu's width, in ems: its last line ("Mission Control: the layout as at first") whole.
 @(private = "file") MISSION_MENU_EM :: 22
 // The lines a list panel shows at most.
-@(private = "file") MISSION_TOP :: 8
+MISSION_TOP :: 8
 
 // The panels' menu, and a line's menu (a right click).
 MISSION_MENU :: "inspecteur_mission_panels"
@@ -397,29 +397,6 @@ mission_busiest :: proc(app: ^App, em: f32, memory: bool) {
 	}
 }
 
-// The services: how many run, how many failed; the failed ones by name (a click selects it in Services).
-@(private = "file")
-mission_services :: proc(app: ^App, em: f32) {
-	s := &app.services
-	if s.list == nil || s.list.manager != s.manager { mission_note(i18n.tr("Reading…"), em); return }
-	if s.list.problem != "" { mission_note(s.list.problem, em); return }
-	// (counted when the list was read: services_take)
-	failed := s.list.failed
-	n := len(s.list.units)
-	mission_note(fmt.tprintf(s.manager == .System ? i18n.tr(n, "%d service of the system: %d running, %d failed", "%d services of the system: %d running, %d failed") : i18n.tr(n, "%d service of the user: %d running, %d failed", "%d services of the user: %d running, %d failed"), n, s.list.running, failed), em)
-	k := 0
-	for u in s.list.units {
-		if k >= failed { break }
-		if u.active != "failed" { continue }
-		if mission_line(app, fmt.tprintf("mc_svc_%d", k), u.name, u.description, unit_word("failed"), -1, "bad", em, {kind = .Service, name = u.name}) {
-			mission_show_service(app, u.name)
-		}
-		k += 1
-		if k >= MISSION_TOP { break }
-	}
-	if failed == 0 { mission_note(i18n.tr("No service failed."), em) }
-}
-
 // The network: its rate, the sockets that listen and those connected; the processes with the most sockets.
 @(private = "file")
 mission_network :: proc(app: ^App, em: f32) {
@@ -440,66 +417,6 @@ mission_network :: proc(app: ^App, em: f32) {
 	}
 }
 
-// What starts with the session: how many items, how many on; those on by name.
-@(private = "file")
-mission_startup :: proc(app: ^App, em: f32) {
-	s := &app.startup
-	if s.list == nil { mission_note(i18n.tr("Reading…"), em); return }
-	// (counted when the list was read: startup_posted)
-	on := s.list.on_count
-	mission_note(fmt.tprintf(i18n.tr(len(s.list.items), "%d item, %d on", "%d items, %d on"), len(s.list.items), on), em)
-	k := 0
-	for it in s.list.items {
-		if k >= on { break }
-		if !it.enabled { continue }
-		if mission_line(app, fmt.tprintf("mc_start_%d", k), it.name, it.command, it.status, -1, "", em, {kind = .Startup, name = it.name}) { tab_show(app, .Startup) }
-		k += 1
-		if k >= MISSION_TOP { break }
-	}
-}
-
-// The system: its name, its operating system and kernel, its processor, its memory, its GPUs, how long it has run.
-@(private = "file")
-mission_system :: proc(app: ^App, em: f32) {
-	m := &app.machine
-	info := app.information.data
-	if info == nil { mission_note(i18n.tr("Reading…"), em); return }
-	facts := [][2]string{
-		{i18n.tr("Computer"), info.hostname},
-		{i18n.tr("System"), fmt.tprintf(i18n.tr("%s, kernel %s"), info.os_name, info.kernel)},
-		{i18n.tr("Processor"), info.cpu.model},
-		{i18n.tr("Memory"), timefmt.size(i64(m.mem.total))},
-		{i18n.tr("Up for"), timefmt.stopwatch(m.uptime * 1000, {days = true})},
-		{i18n.tr("Desktop"), info.desktop},
-	}
-	for f, i in facts {
-		if f[1] == "" { continue }
-		ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 1.7)), axis = .X, cross = .Center})
-		if ui.row(.Center, {}, fmt.tprintf("###mc_sys_%d", i)) {
-			ui.space(ui.SPACE_3)
-			if ui.tags("weak") {
-				ui.next({width = ui.px(em * 7), height = ui.pct(1), text_pad = 0})
-				ui.label(fmt.tprintf("%s###k", f[0]))
-			}
-			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0, flags = {.Selectable}})   // (content: a fact to copy)
-			ui.label_tip(fmt.tprintf("%s###v", ui.text_shown(f[1])))
-		}
-	}
-	for g, i in info.gpus {
-		ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 1.7)), axis = .X, cross = .Center})
-		if ui.row(.Center, {}, fmt.tprintf("###mc_gpu_%d", i)) {
-			ui.space(ui.SPACE_3)
-			if ui.tags("weak") {
-				ui.next({width = ui.px(em * 7), height = ui.pct(1), text_pad = 0})
-				ui.label(fmt.tprintf("%s###k", fmt.tprintf(i18n.tr("GPU %d"), i)))
-			}
-			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0, flags = {.Selectable}})
-			ui.label_tip(fmt.tprintf("%s###v", ui.text_shown(g.name)))
-		}
-	}
-	if mission_more(app, "mc_system_more", i18n.tr("Information"), em) { tab_show(app, .Information) }
-}
-
 // A line of a list panel: its name, a faint detail, its value at the right, a bar of its share (-1: none), in the
 // colour of `tag`. True when clicked anywhere on it; a right click opens the menu of what it shows (`line`, its name
 // not kept: it is cloned when the menu opens). Its texts are plain labels: a clickable label would take the click.
@@ -508,7 +425,6 @@ mission_system :: proc(app: ^App, em: f32) {
 @(private = "file") MISSION_FULL_EM :: 26
 @(private = "file") MISSION_BAR_EM :: 17
 
-@(private = "file")
 mission_line :: proc(app: ^App, id, name, detail, value: string, share: f32, tag: string, em: f32, line: Mission_Line) -> bool {
 	ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 1.9)), axis = .X, cross = .Center})
 	ui.push_tags("list_row")
@@ -579,51 +495,25 @@ mission_line_menu :: proc(app: ^App, em: f32) {
 				props_open(app, p.pid, p.start)
 			}
 			ui.menu_separator()
-			if ui.menu_item(cmd_label(.Go_To_Service), icon = COMMANDS[.Go_To_Service].icon, disabled = p.unit == "", icon_font = app.icons).clicked { go_to_service(app, p) }
+			if ui.menu_item(cmd_label(.Go_To_Service), icon = COMMANDS[.Go_To_Service].icon, disabled = !proc_has_service(p), icon_font = app.icons).clicked { go_to_service(app, p) }
 			if ui.menu_item(i18n.tr("Show its connections"), icon = lucide.GLOBE, icon_font = app.icons).clicked { mission_show_connections(app, p.pid) }
 			ui.menu_separator()
 			if ui.menu_item(cmd_label(.Open_Location), icon = COMMANDS[.Open_Location].icon, disabled = p.exe == "", icon_font = app.icons).clicked { open_location(app, p) }
 			if ui.menu_item(cmd_label(.Copy_Command), icon = COMMANDS[.Copy_Command].icon, disabled = p.cmdline == "", icon_font = app.icons).clicked { copy_command(app, p) }
 		case .Service:
-			u, found := mission_service(app, line.name)
-			if !found { ui.menu_close(); return }
-			if ui.menu_item(i18n.tr("Show in Services"), icon = lucide.SETTINGS, icon_font = app.icons).clicked { mission_show_service(app, line.name) }
-			q := u.pid > 0 ? find_pid(&app.sampler, u.pid) : nil
-			if ui.menu_item(i18n.tr("Show its process"), icon = lucide.LAYOUT_LIST, disabled = q == nil, icon_font = app.icons).clicked { processes_reveal(app, q.pid, q.start) }
-			if ui.menu_item(cmd_label(.Service_Details), icon = COMMANDS[.Service_Details].icon, icon_font = app.icons).clicked {
-				mission_show_service(app, line.name)
-				if !service_details_shown(app) { service_details_switch(app) }
-			}
+			mission_service_menu_items(app, line.name)
 		case .Startup:
 			if ui.menu_item(i18n.tr("Show in Startup"), icon = lucide.POWER, icon_font = app.icons).clicked { tab_show(app, .Startup) }
 		}
 	}
 }
 
-// A service of the list shown, by its name.
-@(private = "file")
-mission_service :: proc(app: ^App, name: string) -> (Service, bool) {
-	s := &app.services
-	if s.list == nil { return {}, false }
-	for u in s.list.units { if u.name == name { return u, true } }
-	return {}, false
-}
-
-// Services, the service selected (once a reading lists it).
-@(private = "file")
-mission_show_service :: proc(app: ^App, name: string) {
-	tab_show(app, .Services)
-	service_select(app, name)
-}
-
 // Connections, filtered on the process's pid.
-@(private = "file")
 mission_show_connections :: proc(app: ^App, pid: i32) {
 	tab_show(app, .Connections)
 	ui.line_edit_set(&app.search, fmt.tprintf("%d", pid))
 }
 
-@(private = "file")
 mission_note :: proc(text: string, em: f32) {
 	if ui.tags("weak") {
 		// (its height: its lines'; a paragraph has no children to sum)
@@ -633,7 +523,6 @@ mission_note :: proc(text: string, em: f32) {
 }
 
 // A link at a panel's end to its section ("Why is it slow? (F2)").
-@(private = "file")
 mission_more :: proc(app: ^App, id, text: string, em: f32) -> (clicked: bool) {
 	ui.space(ui.SPACE_1)
 	ui.next({width = ui.fill(), height = ui.px(em * 1.8), axis = .X, cross = .Center})

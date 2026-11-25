@@ -76,13 +76,6 @@ is_interpreter :: proc(name: string) -> bool {
 	return false
 }
 
-// "/usr/bin/firefox" is "firefox"; a Nix wrapper's ".firefox-wrapped" too.
-base_name :: proc(path: string) -> string {
-	b := path
-	if i := strings.last_index_byte(b, '/'); i >= 0 { b = b[i + 1:] }
-	return unwrapped(b)
-}
-
 // The program a command line runs (its words), by its name: past the launchers (`env FOO=1 sudo -u x prog`), and for an
 // interpreter its script or program (`python3 -u /opt/app/main.py` is main.py, `sh -c "prog --x"` is prog, `python -m
 // app` is app). "" when there is none: an interpreter alone, a launcher of nothing.
@@ -218,7 +211,7 @@ Icon_Reading :: struct {
 @(private = "file")
 icon_work :: proc(data: rawptr) {
 	r := (^Icon_Reading)(data)
-	r.pic, r.ok = desktop.theme_icon(r.name, ICON_PX)
+	r.pic, r.ok = icon_load_native(r.name, ICON_PX)
 }
 
 @(private = "file")

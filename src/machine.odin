@@ -40,7 +40,8 @@ Machine_Counters :: struct {
 	cpu_total_ns, cpu_idle_ns:   u64,            // all processors' time, and the part they were idle (or waiting on I/O)
 	core_total_ns, core_idle_ns: [dynamic]u64,   // each logical processor's
 	boot_time: i64,                              // unix seconds
-	load:      [3]f32,                           // the load average over 1, 5 and 15 minutes (0: the system has none)
+	load:      [3]f32,                           // the load average over 1, 5 and 15 minutes
+	has_load:  bool,                             // false on systems with no load average (Windows)
 	uptime:    f64,                              // seconds
 	handles:   u64,                              // the open file handles of the whole system
 	mem:       Mem_Fields,
@@ -136,6 +137,7 @@ Machine :: struct {
 	core_hist:  [dynamic]History,
 	boot_time:  i64,
 	load:       [3]f32,
+	has_load:   bool,
 	uptime:     f64,
 	handles:    u64,
 	mhz:        f32,               // the processors' mean frequency now (read while the CPU is shown)
@@ -246,7 +248,7 @@ machine_take :: proc(m: ^Machine, c: Machine_Counters, dt: f64, history: bool) {
 		if !first && history { ui.value_history_push(&m.core_hist[i], m.core_cpu[i]) }
 	}
 	if !first && history { ui.value_history_push(&m.cpu_hist, m.cpu) }
-	m.boot_time, m.load, m.uptime, m.handles, m.mem = c.boot_time, c.load, c.uptime, c.handles, c.mem
+	m.boot_time, m.load, m.has_load, m.uptime, m.handles, m.mem = c.boot_time, c.load, c.has_load, c.uptime, c.handles, c.mem
 	if history { ui.value_history_push(&m.mem_hist, m.mem.total > 0 ? 100 * f32(f64(mem_used(m)) / f64(m.mem.total)) : 0) }
 	m.temps, m.temp_count = c.temps, c.temp_count
 	resize(&m.core_celsius, len(c.core_celsius))

@@ -1,3 +1,4 @@
+#+build linux
 package inspecteurtool
 
 // bench: how fast a release build starts and how little it costs at rest, in a sway nobody sees (session.odin) that

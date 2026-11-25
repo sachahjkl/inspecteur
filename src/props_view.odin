@@ -1,3 +1,4 @@
+#+build !windows
 package inspecteur
 
 // The Properties of a process (props.odin): a view ("props": views.odin), a resizable dialog at home, which the user can

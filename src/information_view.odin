@@ -1,3 +1,4 @@
+#+build !windows
 package inspecteur
 
 // The Information section: what the system is, in groups of lines (information.odin reads it). "Copy all" (Ctrl+C)
@@ -200,4 +201,46 @@ info_copy :: proc(app: ^App) {
 	platform.set_clipboard(app.main.win, text)
 	n := strings.count(text, "\n")
 	announce(app, fmt.tprintf(i18n.tr(n, "Copied the system's information (%d lines)", "Copied the system's information (%d lines)"), n))
+}
+
+// Mission Control's system: its name, its operating system and kernel, its processor, its memory, its GPUs, how long it
+// has run.
+mission_system :: proc(app: ^App, em: f32) {
+	m := &app.machine
+	info := app.information.data
+	if info == nil { mission_note(i18n.tr("Reading…"), em); return }
+	facts := [][2]string{
+		{i18n.tr("Computer"), info.hostname},
+		{i18n.tr("System"), fmt.tprintf(i18n.tr("%s, kernel %s"), info.os_name, info.kernel)},
+		{i18n.tr("Processor"), info.cpu.model},
+		{i18n.tr("Memory"), timefmt.size(i64(m.mem.total))},
+		{i18n.tr("Up for"), timefmt.stopwatch(m.uptime * 1000, {days = true})},
+		{i18n.tr("Desktop"), info.desktop},
+	}
+	for f, i in facts {
+		if f[1] == "" { continue }
+		ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 1.7)), axis = .X, cross = .Center})
+		if ui.row(.Center, {}, fmt.tprintf("###mc_sys_%d", i)) {
+			ui.space(ui.SPACE_3)
+			if ui.tags("weak") {
+				ui.next({width = ui.px(em * 7), height = ui.pct(1), text_pad = 0})
+				ui.label(fmt.tprintf("%s###k", f[0]))
+			}
+			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0, flags = {.Selectable}})   // (content: a fact to copy)
+			ui.label_tip(fmt.tprintf("%s###v", ui.text_shown(f[1])))
+		}
+	}
+	for g, i in info.gpus {
+		ui.next({width = ui.fill(), height = ui.px(ui.dense(em * 1.7)), axis = .X, cross = .Center})
+		if ui.row(.Center, {}, fmt.tprintf("###mc_gpu_%d", i)) {
+			ui.space(ui.SPACE_3)
+			if ui.tags("weak") {
+				ui.next({width = ui.px(em * 7), height = ui.pct(1), text_pad = 0})
+				ui.label(fmt.tprintf("%s###k", fmt.tprintf(i18n.tr("GPU %d"), i)))
+			}
+			ui.next({width = ui.fill(), height = ui.pct(1), text_pad = 0, flags = {.Selectable}})   // (content: a fact to copy)
+			ui.label_tip(fmt.tprintf("%s###v", ui.text_shown(g.name)))
+		}
+	}
+	if mission_more(app, "mc_system_more", i18n.tr("Information"), em) { tab_show(app, .Information) }
 }

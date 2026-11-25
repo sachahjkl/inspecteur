@@ -119,10 +119,9 @@ view_keys :: proc(app: ^App, in_view: bool) {
 		return
 	}
 	// (a filter with text and the keyboard keeps its editing keys: Delete erases a character there, not a process)
-	// (the journal's search keeps them all, empty or not: Delete there is no Stop)
-	jk := app.services.pane.search_key
-	field_keeps := ui.focus_key() == app.search_key && app.search_key != 0 && len(app.search.buf) > 0 || jk != 0 && ui.focus_key() == jk
-	if journal_search_escape(&app.services.pane) { return }
+	// (the search of the services' log keeps them all, empty or not: Delete there is no Stop)
+	field_keeps := ui.focus_key() == app.search_key && app.search_key != 0 && len(app.search.buf) > 0 || services_search_focused(app)
+	if services_search_escape(app) { return }
 	// (Escape on several rows selected: the toolkit's, the cursor's row alone; else the filter's. The filter has the
 	// keyboard: the table's list does not see it)
 	if ui.key_pressed_peek(.Escape) {

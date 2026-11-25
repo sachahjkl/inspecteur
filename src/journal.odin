@@ -1,3 +1,4 @@
+#+build !windows
 package inspecteur
 
 // A journal shown: the details and journal entries of one service, read in a tasks.Job on the toolkit's chores

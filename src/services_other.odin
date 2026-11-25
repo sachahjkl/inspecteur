@@ -1,4 +1,5 @@
 #+build !linux
+#+build !windows
 package inspecteur
 
 import "base:runtime"

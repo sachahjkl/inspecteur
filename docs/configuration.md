@@ -1,6 +1,6 @@
 # Configuration
 
-Inspecteur reads its preferences from `$XDG_CONFIG_HOME/FromentSoftware/Inspecteur/prefs` (a line `name<TAB>value` each, after the
+Inspecteur reads its preferences from `$XDG_CONFIG_HOME/FromentSoftware/Inspecteur/prefs` on Linux and `%APPDATA%\FromentSoftware\Inspecteur\prefs` on Windows (a line `name<TAB>value` each, after the
 first line). The settings (Ctrl+, or the title bar's button) show them on a page, searched as you type, each change
 applied at once; the layouts of the tables are not there (the tables set them). `inspecteur prefs` lists them all with their
 values. `--pref name=value` sets one for a single run:
@@ -53,7 +53,7 @@ puts every one of them back as at the first start.
 
 | Name | Default | What it does |
 |---|---|---|
-| `processes.columns` | pid,user,cpu,cpu_graph,memory,read,write,threads | The columns of the Processes table besides the name, apart by commas: `pid`, `ppid`, `user`, `state`, `nice`, `cpu`, `cpu_graph` (the CPU of the last 30 seconds, a bar per sample in the colours of the load), `memory` (private memory), `resident`, `gpu` (the share of a GPU's time it keeps busy: NVIDIA's GPUs tell it), `gpu_memory`, `read`, `write`, `threads`, `started`, `command`, `executable`. A right click on the table's header (or Ctrl+Shift+C) changes them. |
+| `processes.columns` | pid,user,cpu,cpu_graph,memory,read,write,threads | The columns of the Processes table besides the name, apart by commas: `pid`, `ppid`, `user`, `state`, `nice`, `cpu`, `cpu_graph` (the CPU of the last 30 seconds, a bar per sample in the colours of the load), `memory` (private memory), `resident` (Working set on Windows), `gpu`, `gpu_memory`, `read`, `write`, `threads`, `started`, `command`, `executable`; plus on Windows `commit`, `handles`, `session`, `integrity`, `efficiency` (EcoQoS) and `package` (UWP). A right click on the table's header (or Ctrl+Shift+C) changes them. |
 | `processes.widths` | (empty) | The widths of the columns that were resized, in ems, apart by commas (`pid=6,command=30`). Dragging the line before a column's title changes them. |
 | `processes.order` | (empty) | The order of the Processes table's columns after the name, apart by commas (`cpu,pid,user`). Dragging a column's title sideways changes it. |
 | `processes.sort` | name | The column the processes are sorted by (one of `processes.columns`, or `name`; `none`: by PID, as they are read). A click on a title sorts by it, a second the other way, a third gives `none`. |
@@ -62,13 +62,16 @@ puts every one of them back as at the first start.
 | `processes.view` | apps | How the processes are listed: `apps` (the apps' groups, then the background processes) or `tree` (every process under its parent). Ctrl+T switches them. |
 | `processes.pinned` | (empty) | The apps and processes pinned over the others, by name, apart by commas. Alt+P pins or unpins the selected row. |
 | `processes.summary` | true | Show the summary of the machine over the Processes table: CPU, memory, disks, network, the first GPU, the processor's temperature and the pressure (the share of the time tasks waited), each with its last minute; a click shows the device in Performance. Ctrl+B shows or hides it. |
-| `services.manager` | system | The services the Services section lists: the system's (`system`) or the user's (`user`). Its System and User buttons change it. |
+| `services.manager` | system | Linux: the services the Services section lists: the system's (`system`) or the user's (`user`). Its System and User buttons change it. |
+| `services.filter` | services | Windows: which entries the Services section lists: all Win32 services (`services`), shared `svchost` services (`shared`), or kernel and file-system drivers (`drivers`). |
 | `services.widths` | (empty) | The widths of the Services table's columns that were resized, in ems (`description=30`). Dragging the line before a column's title changes them. |
 | `services.order` | (empty) | The order of the Services table's columns, apart by commas (`name,state,description`). Dragging a column's title sideways changes it. |
-| `services.sort` | name | The column the services are sorted by: `name`, `description`, `state`, `startup`, `load`, `pid` or `memory`; a `-` before it for the largest (or Z) first. A click on a title changes it. |
-| `services.journal_boot` | true | The details' journal shows this boot's entries alone; `false`: its last entries, from any boot. Alt+B switches it. |
-| `services.journal_level` | all | The entries of the details' journal shown: `all`, `warnings` (and worse) or `errors` (and worse). Alt+L goes through them. |
-| `services.journal_follow` | true | Read the details' journal again every 2 seconds while it is shown: new entries come in at the end. Alt+F switches it. |
+| `services.sort` | name | The column the services are sorted by; a `-` before it for the largest (or Z) first. A click on a title changes it. |
+| `services.journal_boot` | true | Linux: the details' journal shows this boot's entries alone; `false`: its last entries, from any boot. Alt+B switches it. |
+| `services.journal_level` | all | Linux: the entries of the details' journal shown: `all`, `warnings` (and worse) or `errors` (and worse). Alt+L goes through them. |
+| `services.journal_follow` | true | Linux: read the details' journal again every 2 seconds while it is shown: new entries come in at the end. Alt+F switches it. |
+| `services.eventlog_level` | all | Windows: the Event Log entries shown in the service details pane: `all`, `warnings` (and errors), or `errors` only. Alt+L cycles them. |
+| `services.eventlog_follow` | true | Windows: read the Windows Event Log again every 3 seconds while the details pane is shown. Alt+F switches it. |
 | `startup.widths` | (empty) | The widths of the Startup table's columns that were resized, in ems (`command=24`). |
 | `startup.order` | (empty) | The order of the Startup table's columns, apart by commas (`name,status,command`). |
 | `startup.sort` | name | The column the startup items are sorted by: `name`, `command`, `type`, `status` or `file`; a `-` before it for Z first. |

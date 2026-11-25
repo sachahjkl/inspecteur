@@ -1,4 +1,5 @@
 #+build !linux
+#+build !windows
 package inspecteur
 
 // A process's details on a system not supported yet: the process is told gone, as no reader can name it.

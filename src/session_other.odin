@@ -1,4 +1,5 @@
 #+build !linux
+#+build !windows
 package inspecteur
 
 // The session on a system not supported yet: no display server known, no unit.

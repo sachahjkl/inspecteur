@@ -1,3 +1,4 @@
+#+build !windows
 package inspecteur
 
 // The Startup section's model: what starts with the user's session, whether it is on, and turning it on or off. The

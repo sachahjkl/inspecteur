@@ -207,7 +207,7 @@ machine_read :: proc(r: ^Machine_Reader, c: ^Machine_Counters) {
 	if text, ok := read_kept_small(&r.meminfo_fd, "/proc/meminfo", r.buf); ok {
 		c.mem = parse_meminfo(string(text))
 	}
-	if text, ok := read_kept_small(&r.loadavg_fd, "/proc/loadavg", r.buf); ok { c.load = parse_loadavg(string(text)) }
+	if text, ok := read_kept_small(&r.loadavg_fd, "/proc/loadavg", r.buf); ok { c.load, c.has_load = parse_loadavg(string(text)), true }
 	if text, ok := read_kept_small(&r.filenr_fd, "/proc/sys/fs/file-nr", r.buf); ok {
 		pos := 0
 		if w, has := next_token(string(text), &pos); has { c.handles, _ = parse_ascii_u64(w) }

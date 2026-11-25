@@ -1,3 +1,4 @@
+#+build !windows
 package inspecteur
 
 // The details' journal (the Services section's pane, services_view.odin): the selected service's journal entries, each
@@ -82,8 +83,8 @@ journal_shown :: proc(app: ^App, v: ^Journal_View) -> []int {
 	d := v.details
 	if d == nil { return nil }
 	q := strings.to_lower(strings.trim_space(ui.line_edit_string(&v.search)), context.temp_allocator)
-	if v.shown_of == v.serial && v.shown_level == app.settings.journal_level && v.shown_query == q { return v.shown[:] }
-	v.shown_of, v.shown_level = v.serial, app.settings.journal_level
+	if v.shown_of == v.serial && v.shown_level == app.settings.extra.journal_level && v.shown_query == q { return v.shown[:] }
+	v.shown_of, v.shown_level = v.serial, app.settings.extra.journal_level
 	delete(v.shown_query)
 	v.shown_query = strings.clone(q)
 	clear(&v.shown)
@@ -91,7 +92,7 @@ journal_shown :: proc(app: ^App, v: ^Journal_View) -> []int {
 	v.errors, v.warnings = 0, 0
 	for e, i in d.journal {
 		if e.priority <= 3 { v.errors += 1 } else if e.priority == 4 { v.warnings += 1 }
-		if !journal_level_keeps(app.settings.journal_level, e.priority) { continue }
+		if !journal_level_keeps(app.settings.extra.journal_level, e.priority) { continue }
 		if q != "" && !strings.contains(strings.to_lower(e.message, context.temp_allocator), q) && !strings.contains(strings.to_lower(e.ident, context.temp_allocator), q) { continue }
 		append(&v.shown, i)
 		append(&v.shown_ids, journal_entry_id(e))
@@ -127,18 +128,18 @@ journal_bar :: proc(app: ^App, v: ^Journal_View, shown: int, em: f32, in_window:
 			labels := [3]string{fmt.tprintf(i18n.tr("All %d"), len(d.journal)), fmt.tprintf(i18n.tr("Warnings %d"), warnings + errors), fmt.tprintf(i18n.tr("Errors %d"), errors)}
 			key := ui.command_shortcut(COMMANDS[.Journal_Level])
 			tips := [3]string{fmt.tprintf(i18n.tr("Every entry (%s)"), key), fmt.tprintf(i18n.tr("Warnings and worse (%s)"), key), fmt.tprintf(i18n.tr("Errors and worse (%s)"), key)}
-			sel := int(app.settings.journal_level)
+			sel := int(app.settings.extra.journal_level)
 			ui.next({height = ui.px(bar_h)})   // (as wide as its labels: ui.segmented's own width)
 			if ui.segmented("svc_journal_level", labels[:], &sel, tips[:]) { journal_level_set(app, Journal_Level(sel)) }
 			ui.space(ui.CONTROL_GAP)
-			boot := app.settings.journal_boot ? 0 : 1
+			boot := app.settings.extra.journal_boot ? 0 : 1
 			bkey := ui.command_shortcut(COMMANDS[.Journal_Boot])
 			btips := [2]string{fmt.tprintf(i18n.tr("The entries of this boot (%s)"), bkey), fmt.tprintf(i18n.tr("The last entries, from any boot (%s)"), bkey)}
 			boot_labels := [2]string{i18n.tr("This boot"), i18n.tr("Every boot")}
 			ui.next({height = ui.px(bar_h)})
 			if ui.segmented("svc_journal_boot", boot_labels[:], &boot, btips[:]) { journal_boot_set(app, boot == 0) }
 			ui.space(ui.CONTROL_GAP)
-			follow := app.settings.journal_follow
+			follow := app.settings.extra.journal_follow
 			ui.next({width = ui.px(em * 2.2), height = ui.px(bar_h)})
 			tip := follow ? fmt.tprintf(i18n.tr("Following: new entries come in at the end (%s stops)"), ui.command_shortcut(COMMANDS[.Journal_Follow])) : cmd_tip(.Journal_Follow)
 			follow_button := ui.button("svc_journal_follow", icon = follow ? lucide.ARROW_DOWN : lucide.PAUSE, o = {tip = tip, intent = follow ? .Primary : .Neutral, face = follow ? .Raised : .Ghost})
@@ -283,7 +284,7 @@ journal_entry_text :: proc(app: ^App, e: Journal_Entry) -> string {
 }
 
 journal_level_set :: proc(app: ^App, l: Journal_Level) {
-	app.settings.journal_level = l
+	app.settings.extra.journal_level = l
 	pref_set(&app.prefs, "services.journal_level", JOURNAL_LEVEL_KEYS[l])
 	for v in journal_views(app) {
 		v.vl.sel = -1
@@ -293,12 +294,12 @@ journal_level_set :: proc(app: ^App, l: Journal_Level) {
 }
 
 journal_boot_set :: proc(app: ^App, boot: bool) {
-	app.settings.journal_boot = boot
+	app.settings.extra.journal_boot = boot
 	pref_set(&app.prefs, "services.journal_boot", boot ? "true" : "false")
 	// (each view read again, back to its end once read)
 	app.services.pane.shown_for = 0
 	if u, ok := selected_service(app); ok { details_ask(app, u.name) }
-	for w in app.journals {
+	for w in app.services.windows {
 		w.view.shown_for = 0
 		journal_view_ask(&w.view, w.manager, w.name, boot)
 	}
@@ -339,13 +340,13 @@ journal_run :: proc(app: ^App, c: Cmd) { journal_run_on(app, &app.services.pane,
 journal_run_on :: proc(app: ^App, v: ^Journal_View, c: Cmd) {
 	#partial switch c {
 	case .Journal_Search: if v.search_key != 0 { ui.set_focus(v.search_key); ui.line_edit_select_all(&v.search) }
-	case .Journal_Level:  journal_level_set(app, Journal_Level((int(app.settings.journal_level) + 1) % len(Journal_Level)))
-	case .Journal_Boot:   journal_boot_set(app, !app.settings.journal_boot)
+	case .Journal_Level:  journal_level_set(app, Journal_Level((int(app.settings.extra.journal_level) + 1) % len(Journal_Level)))
+	case .Journal_Boot:   journal_boot_set(app, !app.settings.extra.journal_boot)
 	case .Journal_Follow:
-		app.settings.journal_follow = !app.settings.journal_follow
-		pref_set(&app.prefs, "services.journal_follow", app.settings.journal_follow ? "true" : "false")
+		app.settings.extra.journal_follow = !app.settings.extra.journal_follow
+		pref_set(&app.prefs, "services.journal_follow", app.settings.extra.journal_follow ? "true" : "false")
 		for w in journal_views(app) { w.next = time.tick_now() }
-		say(app, app.settings.journal_follow ? i18n.tr("Following the journal: new entries come in at the end") : i18n.tr("The journal is not read again"))
+		say(app, app.settings.extra.journal_follow ? i18n.tr("Following the journal: new entries come in at the end") : i18n.tr("The journal is not read again"))
 	case .Journal_Copy:
 		d := v.details
 		if d == nil { return }
@@ -366,16 +367,16 @@ journal_run_on :: proc(app: ^App, v: ^Journal_View, c: Cmd) {
 
 // Every journal shown: the details', then those on their own (temporary allocator).
 journal_views :: proc(app: ^App) -> []^Journal_View {
-	out := make([dynamic]^Journal_View, 0, 1 + len(app.journals), context.temp_allocator)
+	out := make([dynamic]^Journal_View, 0, 1 + len(app.services.windows), context.temp_allocator)
 	append(&out, &app.services.pane)
-	for w in app.journals { append(&out, &w.view) }
+	for w in app.services.windows { append(&out, &w.view) }
 	return out[:]
 }
 
 // While the details follow the journal: the selected service's read again every JOURNAL_FOLLOW_MS (services_tick).
 journal_follow_tick :: proc(app: ^App) {
 	v := &app.services.pane
-	if !service_details_seen(app) || !app.settings.journal_follow || app.paused { return }
+	if !service_details_seen(app) || !app.settings.extra.journal_follow || app.paused { return }
 	if time.tick_diff(v.next, time.tick_now()) < 0 || journal_view_busy(v) { return }
 	v.next = time.tick_add(time.tick_now(), JOURNAL_FOLLOW_MS * time.Millisecond)
 	if u, ok := selected_service(app); ok { details_ask(app, u.name) }
@@ -383,7 +384,7 @@ journal_follow_tick :: proc(app: ^App) {
 
 // The milliseconds until the followed journal is read again (max(int): it is not followed).
 journal_due_ms :: proc(app: ^App) -> int {
-	if !service_details_seen(app) || !app.settings.journal_follow || app.paused { return max(int) }
+	if !service_details_seen(app) || !app.settings.extra.journal_follow || app.paused { return max(int) }
 	return max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), app.services.pane.next))) + 1, 1)
 }
 

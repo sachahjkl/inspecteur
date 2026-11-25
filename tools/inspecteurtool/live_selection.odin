@@ -1,3 +1,4 @@
+#+build linux
 package inspecteurtool
 
 // live's checks of the selection of many rows (Ctrl clicks, the kill of the rows selected), of End process tree, of the

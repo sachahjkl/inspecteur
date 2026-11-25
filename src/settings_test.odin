@@ -10,4 +10,10 @@ every_preference_is_documented :: proc(t: ^testing.T) {
 	for d in PREF_DEFS {
 		testing.expectf(t, strings.contains(doc, strings.concatenate({"| `", d.name, "` |"}, context.temp_allocator)), "%s is in docs/configuration.md", d.name)
 	}
+	for d in PREF_DEFS_AFTER {
+		testing.expectf(t, strings.contains(doc, strings.concatenate({"| `", d.name, "` |"}, context.temp_allocator)), "%s is in docs/configuration.md", d.name)
+	}
+	for d in OS_PREF_DEFS {
+		testing.expectf(t, strings.contains(doc, strings.concatenate({"| `", d.name, "` |"}, context.temp_allocator)), "%s is in docs/configuration.md", d.name)
+	}
 }

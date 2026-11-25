@@ -58,6 +58,7 @@ Reading :: struct {
 	display_server: i32,          // the compositor's pid (0: unknown)
 	own_units: []string,          // heap: the units Inspecteur runs in (the window keeps them)
 	tz:        ^datetime.TZ_Region,   // heap: the local time's zone (nil: UTC), which the window keeps
+	windows:   Reading_Windows,   // OS top-level windows snapshot read off the UI thread
 }
 
 // The readers, which the job alone touches, and the reading handed to the window.
@@ -146,7 +147,7 @@ sample_take :: proc(app: ^App) {
 	defer reading_free(r)
 	s.asked = false
 	t0 := time.tick_now()
-	if r.failed && app.sampler.samples == 0 { say(app, i18n.tr("The processes cannot be read (/proc)")) }
+	if r.failed && app.sampler.samples == 0 { say(app, i18n.tr(PROCS_READ_FAILED)) }
 	reading_keep(app, r)
 	machine_apply(&app.machine, r)
 	sampler_apply(&app.sampler, r, app.machine.d_total_ns, &app.catalog)
@@ -165,7 +166,7 @@ sample_take :: proc(app: ^App) {
 	// anyway)
 	gpus_want(app)
 	table_group(&app.table, app.sampler.procs[:])
-	app_windows_read(app)
+	app_windows_apply(app, &r.windows)
 	// On a static sort (Name, PID, User...) with unchanged process membership, row order and identities cannot change.
 	if app.rows_made == 0 || app.sampler.changes != app.rows_changes || !table_sort_static(&app.table) {
 		rows_again(app)
@@ -279,6 +280,7 @@ reading_make :: proc(s: ^Sampling, r: ^Reading, ask: Sample_Ask, now_ns: i64) {
 	}
 	clear(&s.seen)
 	for c in r.procs { s.seen[c.pid] = c.start }
+	reading_windows_read(&r.windows, s.demo != nil)
 }
 
 reading_free :: proc(r: ^Reading) {
@@ -287,6 +289,7 @@ reading_free :: proc(r: ^Reading) {
 	if r.tz != nil { timezone.region_destroy(r.tz) }
 	delete(r.own_units)
 	delete(r.info.model)
+	reading_windows_free(&r.windows)
 	virtual.arena_destroy(&r.arena)
 	free(r)
 }

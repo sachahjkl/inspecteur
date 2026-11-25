@@ -68,6 +68,13 @@ section_row :: proc(st: ^Section_Table, id: u64, search: string, icon := Row_Ico
 	})
 }
 
+// A name's identity (FNV-1a): a row stays selected across readings.
+name_id :: proc(name: string) -> u64 {
+	h: u64 = 14695981039346656037
+	for i in 0 ..< len(name) { h = (h ~ u64(name[i])) * 1099511628211 }
+	return h
+}
+
 // The table, its header and its rows. `empty`: what it says with no row and no filter.
 section_table_build :: proc(st: ^Section_Table, empty: string) -> ui.Table_Events {
 	shown := st.table.query != "" ? fmt.tprintf(i18n.tr("Nothing matches “%s”."), st.table.query) : empty

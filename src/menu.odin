@@ -54,8 +54,7 @@ Confirm :: struct {
 	act:     Confirm_Act,
 	chosen:  Chosen,            // Signal, Dump: the processes
 	sig:     process.Signal,
-	action:  Service_Action,    // Service: the action on `units`, of the manager shown
-	units:   [dynamic]string,   // owned
+	service: Confirm_Service,   // Service: platform-specific service confirmation payload
 }
 
 chosen_free :: proc(c: ^Chosen) {
@@ -66,8 +65,7 @@ chosen_free :: proc(c: ^Chosen) {
 
 confirm_free :: proc(c: ^Confirm) {
 	chosen_free(&c.chosen)
-	for u in c.units { delete(u) }
-	delete(c.units)
+	confirm_service_free(&c.service)
 	c^ = {}
 }
 
@@ -161,12 +159,6 @@ chosen_tree :: proc(app: ^App) -> (c: Chosen, ok: bool) {
 	return c, true
 }
 
-// The service the process belongs to, selected in the Services section (its manager's: the system's or the user's).
-go_to_service :: proc(app: ^App, p: ^Proc) {
-	if p.unit == "" { return }
-	go_to_service_named(app, p.unit_user ? .User : .System, p.unit)
-}
-
 // The process's name, searched for on the web (the person's browser).
 search_online :: proc(app: ^App) {
 	p := selected_proc(app)
@@ -231,14 +223,11 @@ row_menu_items :: proc(app: ^App) {
 		cmd_item(app, .End_Tree)
 		p := selected_proc(app)
 		cmd_item(app, .Suspend, p != nil && p.state == .Stopped ? i18n.tr("Resume") : i18n.tr("Suspend"))
-		if ui.menu_submenu(cmd_label(.Send_Signal)) {
-			for s in SIGNAL_ITEMS {
-				if ui.menu_item(i18n.tr(s.label), disabled = !cmd_can(app, .Send_Signal)).clicked { signal_selected(app, s.sig) }
-			}
-		}
+		row_menu_os_items(app)
 		ui.menu_separator()
 		cmd_item(app, .Raise_Priority)
 		cmd_item(app, .Lower_Priority)
+		row_menu_os_tuning(app)
 		cmd_item(app, .Affinity)
 		ui.menu_separator()
 		cmd_item(app, .Show_Window)
@@ -265,44 +254,6 @@ copy_command :: proc(app: ^App, p: ^Proc) {
 	if p.cmdline == "" { return }
 	platform.set_clipboard(app.main.win, p.cmdline)
 	announce(app, fmt.tprintf(i18n.tr("Copied the command line of %s"), p.name))
-}
-
-// The signals that Send a signal sends (the row's menu, the palette's form), each by its words and its name. The name is
-// the value of the palette's form (SIGNAL_ARGUMENTS) and what the demo says it did not send.
-SIGNAL_ITEMS := [?]struct { sig: process.Signal, label: string, name: string }{
-	{.Hangup, i18n.later("Hang up (SIGHUP)"), "SIGHUP"}, {.Interrupt, i18n.later("Interrupt (SIGINT)"), "SIGINT"}, {.Quit, i18n.later("Quit (SIGQUIT)"), "SIGQUIT"},
-	{.Terminate, i18n.later("Terminate (SIGTERM)"), "SIGTERM"}, {.Kill, i18n.later("Kill (SIGKILL)…"), "SIGKILL"}, {.Stop, i18n.later("Stop (SIGSTOP)"), "SIGSTOP"},
-	{.Continue, i18n.later("Continue (SIGCONT)"), "SIGCONT"}, {.User1, i18n.later("User 1 (SIGUSR1)"), "SIGUSR1"}, {.User2, i18n.later("User 2 (SIGUSR2)"), "SIGUSR2"},
-}
-
-// A signal's name ("SIGHUP"); "" for a signal Send a signal does not offer.
-signal_name :: proc(sig: process.Signal) -> string {
-	for s in SIGNAL_ITEMS { if s.sig == sig { return s.name } }
-	return ""
-}
-
-// Sends `sig` to the selected processes (an app's row: its first processes, as End task), with the guards of the others:
-// a kill is confirmed; a stop is not sent to Inspecteur, what it runs under or the display server (nothing could resume
-// them); a signal that may end them asks first.
-signal_selected :: proc(app: ^App, sig: process.Signal) {
-	#partial switch sig {
-	case .Kill:      kill_selected(app); return
-	case .Terminate: end_selected(app); return
-	}
-	c, ok := chosen_of_selection(app, whole = false)
-	defer chosen_free(&c)
-	if !ok { return }
-	#partial switch sig {
-	case .Stop:
-		for t in c.targets {
-			if guard_of(app, t.pid) != .None { say(app, i18n.tr("Not stopped: it is Inspecteur, runs it or draws the desktop, and nothing could resume it")); return }
-		}
-		send_signal(app, &c, sig)
-	case .Continue:
-		send_signal(app, &c, sig)
-	case:
-		signal_or_confirm(app, &c, sig)
-	}
 }
 
 // Asks the selected processes to end (SIGTERM). Several rows are asked once, the confirmation naming their count and
@@ -410,44 +361,13 @@ confirm_ask :: proc(app: ^App, c: Chosen, sig: process.Signal, tree := false) {
 	})
 }
 
-// Asks to confirm the stop or the restart of services: one is named, several are counted and listed. `danger`: what
-// else ends with them ("" none): Enter cancels then.
-confirm_service :: proc(app: ^App, action: Service_Action, units: []string, danger: string) {
-	m := &app.menu.confirm
-	confirm_free(m)
-	m.act, m.action = .Service, action
-	for u in units { append(&m.units, strings.clone(u)) }
-	many := len(units) > 1
-	what: string
-	switch {
-	case action == .Stop && many: what = i18n.tr("They stop, and their processes end; what needs them may stop too.")
-	case action == .Stop:         what = i18n.tr("It stops, and its processes end; what needs it may stop too.")
-	case many:                    what = i18n.tr("They stop, their processes end, and they start again.")
-	case:                         what = i18n.tr("It stops, its processes end, and it starts again.")
-	}
-	title: string
-	switch {
-	case action == .Stop && many: title = fmt.tprintf(i18n.tr(len(units), "Stop %d service?", "Stop %d services?"), len(units))
-	case action == .Stop:         title = fmt.tprintf(i18n.tr("Stop %s?"), units[0])
-	case many:                    title = fmt.tprintf(i18n.tr(len(units), "Restart %d service?", "Restart %d services?"), len(units))
-	case:                         title = fmt.tprintf(i18n.tr("Restart %s?"), units[0])
-	}
-	ui.confirm_open(CONFIRM_VIEW, {
-		title = title,
-		note = danger != "" ? fmt.tprintf("%s %s", danger, what) : what,
-		lines = many ? units : nil,
-		act = action == .Stop ? i18n.tr("Stop") : i18n.tr("Restart"),
-		enter_confirms = danger == "",
-	})
-}
-
 // What the confirmation was asked for, done.
 @(private = "file")
 confirm_act :: proc(app: ^App) {
 	m := &app.menu.confirm
 	switch m.act {
 	case .Signal:  send_signal(app, &m.chosen, m.sig)
-	case .Service: service_act_now(app, m.action, m.units[:])
+	case .Service: confirm_service_run(app, &m.service)
 	case .Dump:    dump_start(app, m.chosen.targets[0], m.chosen.name)
 	}
 }

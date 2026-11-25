@@ -1,3 +1,4 @@
+#+build !windows
 package inspecteur
 
 // A service's journal on its own (Ctrl+Shift+J, or the button of the details' journal): a view per service (its
@@ -50,7 +51,7 @@ journal_register :: proc(app: ^App) {
 // Opens the journal of the service `name` of `manager` on its own (one already open comes forward).
 journal_window_open :: proc(app: ^App, manager: Manager, name: string) {
 	instance := journal_instance(manager, name)
-	for w in app.journals {
+	for w in app.services.windows {
 		if w.instance == instance {
 			ui.view_open(&app.views, JOURNAL_VIEW, w, instance = w.instance, owner = &app.main.state)
 			return
@@ -75,9 +76,9 @@ journal_window_new :: proc(app: ^App, manager: Manager, name: string) {
 	w.instance = strings.clone(journal_instance(manager, name))
 	// (its readings are posted to the main window, whose build takes them; the view's window is built after it)
 	journal_view_init(&w.view, app.demo, &app.main.state)
-	journal_view_ask(&w.view, manager, name, app.settings.journal_boot)
+	journal_view_ask(&w.view, manager, name, app.settings.extra.journal_boot)
 	w.view.next = time.tick_add(time.tick_now(), JOURNAL_FOLLOW_MS * time.Millisecond)
-	append(&app.journals, w)
+	append(&app.services.windows, w)
 	// (the main window owns it wherever it is opened from: it docks in the Services section of the main window)
 	ui.view_open(&app.views, JOURNAL_VIEW, w, instance = w.instance, owner = &app.main.state)
 }
@@ -124,44 +125,44 @@ journal_window_info :: proc(app: ^App, w: ^Journal_Window) -> string {
 // Each turn of the loop, before the frames: the journals followed are read again when due; a closed one goes once no
 // reading of it is under way and the main window's build took what was posted (the reading holds its view until then).
 journals_tick :: proc(app: ^App) {
-	for i := len(app.journals) - 1; i >= 0; i -= 1 {
-		w := app.journals[i]
+	for i := len(app.services.windows) - 1; i >= 0; i -= 1 {
+		w := app.services.windows[i]
 		if !ui.view_is_open(&app.views, JOURNAL_VIEW, w.instance) {
 			_, _ = ui.view_ended(&app.views, JOURNAL_VIEW, w.instance)   // (how it ended says nothing to do)
-			ordered_remove(&app.journals, i)
-			append(&app.journals_closed, w)
+			ordered_remove(&app.services.windows, i)
+			append(&app.services.windows_closed, w)
 			continue
 		}
-		if app.settings.journal_follow && !app.paused && time.tick_diff(w.view.next, time.tick_now()) >= 0 && !journal_view_busy(&w.view) {
+		if app.settings.extra.journal_follow && !app.paused && time.tick_diff(w.view.next, time.tick_now()) >= 0 && !journal_view_busy(&w.view) {
 			w.view.next = time.tick_add(time.tick_now(), JOURNAL_FOLLOW_MS * time.Millisecond)
-			journal_view_ask(&w.view, w.manager, w.name, app.settings.journal_boot)
+			journal_view_ask(&w.view, w.manager, w.name, app.settings.extra.journal_boot)
 		}
 	}
-	for i := len(app.journals_closed) - 1; i >= 0; i -= 1 {
-		w := app.journals_closed[i]
+	for i := len(app.services.windows_closed) - 1; i >= 0; i -= 1 {
+		w := app.services.windows_closed[i]
 		if journal_view_busy(&w.view) { w.drained = false; continue }
 		// (its last reading may be posted and not taken yet: the next frame's build takes it)
 		if !w.drained { w.drained = true; continue }
-		unordered_remove(&app.journals_closed, i)
+		unordered_remove(&app.services.windows_closed, i)
 		journal_window_free(w)
 	}
 }
 
 // The milliseconds until a journal on its own is read again (max(int): none is followed).
 journals_due_ms :: proc(app: ^App) -> int {
-	if !app.settings.journal_follow || app.paused { return max(int) }
+	if !app.settings.extra.journal_follow || app.paused { return max(int) }
 	due := max(int)
-	for w in app.journals { due = min(due, max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), w.view.next))) + 1, 1)) }
-	if len(app.journals_closed) > 0 { due = min(due, 50) }   // (a closed one is freed at a next turn)
+	for w in app.services.windows { due = min(due, max(int(time.duration_milliseconds(time.tick_diff(time.tick_now(), w.view.next))) + 1, 1)) }
+	if len(app.services.windows_closed) > 0 { due = min(due, 50) }   // (a closed one is freed at a next turn)
 	return due
 }
 
 // At the end, once the chores stopped and the views were destroyed: every journal freed.
 journals_destroy :: proc(app: ^App) {
-	for w in app.journals { journal_window_free(w) }
-	for w in app.journals_closed { journal_window_free(w) }
-	delete(app.journals)
-	delete(app.journals_closed)
+	for w in app.services.windows { journal_window_free(w) }
+	for w in app.services.windows_closed { journal_window_free(w) }
+	delete(app.services.windows)
+	delete(app.services.windows_closed)
 }
 
 @(private = "file")

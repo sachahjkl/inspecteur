@@ -1,3 +1,4 @@
+#+build !windows
 package inspecteur
 
 // The Services section's model: the services of the system's service manager or of the user's, their state, whether
@@ -134,6 +135,8 @@ Services :: struct {
 	manager: Manager,          // the one shown
 	next:    time.Tick,        // the next reading while the section is shown
 	pending: Service_Action,   // an action asked and not answered yet
+	windows: [dynamic]^Journal_Window,          // the services' journals on their own, a view each (journal_window.odin)
+	windows_closed: [dynamic]^Journal_Window,   // closed, freed once their reading is done
 }
 
 SERVICE_COLUMNS := [?]ui.Table_Column{
@@ -149,7 +152,7 @@ SERVICE_COLUMNS := [?]ui.Table_Column{
 services_init :: proc(s: ^Services, app: ^App) {
 	section_table_init(&s.rows, app, SERVICE_COLUMNS[:])
 	section_layout_load(&s.rows, &app.prefs, "services")
-	s.manager = app.settings.manager
+	s.manager = app.settings.extra.manager
 	s.demo = app.demo
 	s.state = &app.main.state
 	s.job = {work = services_work, data = s}
@@ -249,7 +252,7 @@ services_posted :: proc(data: rawptr, _: u64) {
 
 // Asks for the details of the service `name` of the manager shown (its unit, its journal), for the pane.
 details_ask :: proc(app: ^App, name: string) {
-	journal_view_ask(&app.services.pane, app.services.manager, name, app.settings.journal_boot)
+	journal_view_ask(&app.services.pane, app.services.manager, name, app.settings.extra.journal_boot)
 }
 
 // A new reading becomes the rows; what an action came to is said.
@@ -375,13 +378,6 @@ selected_service :: proc(app: ^App) -> (u: Service, ok: bool) {
 	i := ui.table_selected(&s.rows.table)
 	if s.list == nil || s.list.manager != s.manager || i < 0 || i >= len(s.list.units) { return }
 	return s.list.units[i], true
-}
-
-// A name's identity (FNV-1a): a row stays selected across readings.
-name_id :: proc(name: string) -> u64 {
-	h: u64 = 14695981039346656037
-	for i in 0 ..< len(name) { h = (h ~ u64(name[i])) * 1099511628211 }
-	return h
 }
 
 ////////////////////////////////

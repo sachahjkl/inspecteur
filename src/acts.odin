@@ -1,3 +1,4 @@
+#+build !windows
 package inspecteur
 
 // What Inspecteur does to processes, off the window's thread: a signal, a suspend or a resume, a priority, an affinity

@@ -106,11 +106,11 @@ settings_changed :: proc(user: rawptr, name: string) {
 		rows_again(app)
 	case "processes.refresh_ms":
 		app.next_sample = time.tick_add(time.tick_now(), time.Duration(app.settings.refresh_ms) * time.Millisecond)
-	case "services.manager":
-		services_switch(app, app.settings.manager)
 	case prefs_page.SYSTEM_TITLE_PREF:
 		// (inspecteur's window changes its title bar at once, where the desktop lets it)
 		platform.set_integrated_title(app.main.win, !app.settings.system_title)
+	case:
+		settings_changed_os(app, name)
 	}
 	settings_free(&old)
 }

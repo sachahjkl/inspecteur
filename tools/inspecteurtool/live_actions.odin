@@ -1,3 +1,4 @@
+#+build linux
 package inspecteurtool
 
 // live's checks of the guards (Inspecteur does not suspend itself), of a list another user's process refuses, of Kill

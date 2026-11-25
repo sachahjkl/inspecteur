@@ -1,3 +1,4 @@
+#+build linux
 package inspecteurtool
 
 // live: the real program against a real compositor that nobody sees (session.odin), driven over the DevTools protocol

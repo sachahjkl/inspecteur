@@ -45,17 +45,13 @@ the_palettes_prefixes :: proc(t: ^testing.T) {
 	ui.palette_destroy(&app.palette)
 }
 
-// A Go to item's id names its process (pid and start) or its service (manager and name), and reads back.
+// A Go to process item's id names its process (pid and start) and reads back.
 @(test)
 go_to_ids_read_back :: proc(t: ^testing.T) {
 	pid, start, ok := go_to_process_parse(go_to_process_id(4242, 987654321))
 	testing.expect(t, ok && pid == 4242 && start == 987654321)
 	_, _, bad := go_to_process_parse("x:1")
 	testing.expect(t, !bad)
-	m, name, sok := go_to_service_parse(go_to_service_id(.User, "foo.service"))
-	testing.expect(t, sok && m == .User && name == "foo.service")
-	_, _, other := go_to_service_parse("nobody/foo.service")
-	testing.expect(t, !other)
 }
 
 // Every command has a well-formed id of its own: the person's keys, aliases and the palette's memory are stored under it.
@@ -108,7 +104,6 @@ a_command_s_button_states_its_act_name :: proc(t: ^testing.T) {
 
 // Processes of the demo's kind for the commands with arguments: no process of the system (app.demo set: nothing is
 // sent, set or written to a process; the footer says what would have been), the first background process selected.
-@(private = "file")
 demo_rows :: proc() -> ^App {
 	app := new(App)
 	app.demo = new(Demo)
@@ -124,7 +119,6 @@ demo_rows :: proc() -> ^App {
 	return app
 }
 
-@(private = "file")
 demo_rows_free :: proc(app: ^App) {
 	delete(app.status)
 	free(app.demo)
@@ -145,18 +139,6 @@ every_argument_offers_its_default :: proc(t: ^testing.T) {
 			testing.expectf(t, slice.contains(values, a.default.s), "%v: %s's default %q is one of its values", c, a.name, a.default.s)
 		}
 	}
-}
-
-// Send a signal with its form's value: that signal goes to the row selected, and to it alone.
-@(test)
-send_a_signal_takes_its_form_s_signal :: proc(t: ^testing.T) {
-	app := demo_rows()
-	defer demo_rows_free(app)
-	_, values := command_choices(app, 0, "signal")
-	testing.expect(t, slice.contains(values, "SIGUSR1"), "SIGUSR1 is offered")
-	testing.expect(t, cmd_can(app, .Send_Signal), "a process is selected")
-	cmd_run_with(app, .Send_Signal, {"SIGUSR1"})
-	testing.expectf(t, strings.contains(app.status, "SIGUSR1") && strings.contains(app.status, "a (PID 20)") && !strings.contains(app.status, "PID 21"), "the footer: %q", app.status)
 }
 
 // Set the priority with its form's value: the row selected gets that priority.

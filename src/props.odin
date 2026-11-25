@@ -1,3 +1,4 @@
+#+build !windows
 package inspecteur
 
 // The Properties of one process: its details, its threads, its open files, its modules, its environment (the system's:

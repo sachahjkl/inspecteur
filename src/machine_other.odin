@@ -1,4 +1,5 @@
 #+build !linux
+#+build !windows
 package inspecteur
 
 // The machine on a system not supported yet: no counters, no devices.

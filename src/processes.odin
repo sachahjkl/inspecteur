@@ -19,30 +19,6 @@ import "core:strconv"
 import "core:strings"
 import "gt:ascii"
 import "gt:ui"
-import i18n "gt:i18n"
-
-// Memory is a process's private memory: the pages that are its own. The resident memory counts the pages it shares with
-// others too (its libraries, shared memory): summed over a group, it would count them once per process.
-Column :: enum u8 { Name, PID, PPID, User, State, Nice, CPU, CPU_Graph, Memory, Resident, GPU, GPU_Memory, Read, Write, Threads, Started, Command, Executable }
-
-COLUMN_NAMES := [Column]string{
-	.Name = i18n.later("Name"), .PID = i18n.later("PID"), .PPID = i18n.later("Parent PID"), .User = i18n.later("User"), .State = i18n.later("State"), .Nice = PRIORITY_COLUMN, .CPU = i18n.later("CPU"), .CPU_Graph = i18n.later("CPU, 30 s"),
-	.Memory = i18n.later("Private memory"), .Resident = i18n.later("Resident"), .GPU = i18n.later("GPU"), .GPU_Memory = i18n.later("GPU memory"), .Read = i18n.later("Disk read"), .Write = i18n.later("Disk write"),
-	.Threads = i18n.later("Threads"), .Started = i18n.later("Started"), .Command = i18n.later("Command line"), .Executable = i18n.later("Executable"),
-}
-// The names in the preferences (processes.columns, processes.widths, processes.sort).
-COLUMN_KEYS := [Column]string{
-	.Name = "name", .PID = "pid", .PPID = "ppid", .User = "user", .State = "state", .Nice = "nice", .CPU = "cpu", .CPU_Graph = "cpu_graph",
-	.Memory = "memory", .Resident = "resident", .GPU = "gpu", .GPU_Memory = "gpu_memory", .Read = "read", .Write = "write",
-	.Threads = "threads", .Started = "started", .Command = "command", .Executable = "executable",
-}
-// The columns of text, on the left of their cells; numbers are on the right.
-COLUMN_TEXT :: bit_set[Column]{.Name, .User, .State, .Started, .Command, .Executable}
-// Each column's width when none was chosen, in ems (Name takes the room the others leave).
-COLUMN_DEFAULT_EM := [Column]f32{
-	.Name = 0, .PID = 5.5, .PPID = 6.5, .User = 6.5, .State = 7, .Nice = 4.5, .CPU = 5.5, .CPU_Graph = 6.5, .Memory = 8.5, .Resident = 7,
-	.GPU = 5.5, .GPU_Memory = 7, .Read = 7, .Write = 7, .Threads = 5.5, .Started = 9.5, .Command = 22, .Executable = 18,
-}
 
 column_of :: proc(key: string) -> (c: Column, ok: bool) {
 	for k, col in COLUMN_KEYS { if k == key { return col, true } }
@@ -61,6 +37,7 @@ Group :: struct {
 	gpu_mem: u64,
 	read_rate, write_rate: f64,
 	threads: i32,
+	extra:   Group_Extra,
 }
 
 Row_Kind :: enum u8 { Section, App, Process }
@@ -104,7 +81,7 @@ table_columns_init :: proc(t: ^Table) {
 	for c in Column {
 		t.columns[int(c)] = {
 			title = COLUMN_NAMES[c], width = COLUMN_DEFAULT_EM[c], number = c not_in COLUMN_TEXT,
-			low_first = c == .PID || c == .PPID || c == .Nice, hidden = c != .Name && c not_in shown,
+			low_first = column_low_first(c), hidden = c != .Name && c not_in shown,
 		}
 	}
 	ui.table_layout_init(&t.layout, t.columns[:])
@@ -240,6 +217,7 @@ table_group :: proc(t: ^Table, procs: []Proc) {
 		g.read_rate += p.read_rate
 		g.write_rate += p.write_rate
 		g.threads += p.threads
+		group_extra_sum(&g.extra, p)
 	}
 	for &g, k in t.groups { g.count = fill[k] }
 }
@@ -449,7 +427,6 @@ add_groups :: proc(t: ^Table, s: ^Sampler, groups: []Sort_Item) {
 }
 
 // What a row is sorted by: a number or a text; ties go by pid.
-@(private = "file")
 Sort_Item :: struct {
 	num:   f64,
 	text:  string,
@@ -483,14 +460,14 @@ sort_item_group :: proc(t: ^Table, s: ^Sampler, g: Group, k: int, name: string) 
 	case .Read:       it.num = g.read_rate
 	case .Write:      it.num = g.write_rate
 	case .Threads:    it.num = f64(g.threads)
-	case:             sort_value(&it, sort, s, root)
+	case:             if !sort_group_extra(&it, sort, g, root) { sort_value(&it, sort, s, root) }
 	}
 	return it
 }
 
 @(private = "file")
 sort_value :: proc(it: ^Sort_Item, c: Column, s: ^Sampler, p: ^Proc) {
-	switch c {
+	#partial switch c {
 	case .Name:       it.text = p.name
 	case .PID:        it.num = f64(p.pid)
 	case .PPID:       it.num = f64(p.ppid)
@@ -509,6 +486,7 @@ sort_value :: proc(it: ^Sort_Item, c: Column, s: ^Sampler, p: ^Proc) {
 	case .Started:    it.num = f64(p.started)
 	case .Command:    it.text = p.cmdline
 	case .Executable: it.text = p.exe
+	case:             sort_value_extra(it, c, p)
 	}
 }
 

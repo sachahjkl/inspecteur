@@ -1,3 +1,4 @@
+#+build !windows
 package inspecteur
 
 // The Startup section (startup.odin): what starts with the session. Its bar, a row's menu and the keys (commands.odin)
@@ -135,5 +136,22 @@ startup_copy :: proc(app: ^App) {
 		announce(app, fmt.tprintf(i18n.tr("Copied the command of %s"), name))
 	} else {
 		announce(app, fmt.tprintf(i18n.tr(len(lines), "Copied the command of %d item", "Copied the commands of %d items"), len(lines)))
+	}
+}
+
+// Mission Control's startup: how many items, how many on; those on by name.
+mission_startup :: proc(app: ^App, em: f32) {
+	s := &app.startup
+	if s.list == nil { mission_note(i18n.tr("Reading…"), em); return }
+	// (counted when the list was read: startup_posted)
+	on := s.list.on_count
+	mission_note(fmt.tprintf(i18n.tr(len(s.list.items), "%d item, %d on", "%d items, %d on"), len(s.list.items), on), em)
+	k := 0
+	for it in s.list.items {
+		if k >= on { break }
+		if !it.enabled { continue }
+		if mission_line(app, fmt.tprintf("mc_start_%d", k), it.name, it.command, it.status, -1, "", em, {kind = .Startup, name = it.name}) { tab_show(app, .Startup) }
+		k += 1
+		if k >= MISSION_TOP { break }
 	}
 }

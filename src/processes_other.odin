@@ -1,4 +1,5 @@
 #+build !linux
+#+build !windows
 package inspecteur
 
 // The processes on a system not supported yet: the reader cannot open, so the window says the reading failed instead

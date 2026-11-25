@@ -1,8 +1,8 @@
 name: CI
 
-# Every push to master and every pull request: inspecteurtool check (odin check -vet of the program and the tool, the unit tests,
-# a release build), then inspecteurtool live (the real program in a headless sway: the window
-# over the DevTools protocol, rendered by Mesa's lavapipe). The program is kept as an artifact.
+# Every push to master and every pull request:
+# - Linux: inspecteurtool check (odin check -vet for Linux, Windows and macOS, unit tests, release build), then inspecteurtool live.
+# - Windows: inspecteurtool.exe check (odin check -vet, src and src/winapi unit tests on live Win32/NT APIs, release build, console launcher and icon resource check).
 on:
   push:
     branches: [master]
@@ -89,3 +89,31 @@ jobs:
             build/live/*.png
           if-no-files-found: warn
 
+  windows:
+    name: Windows x64
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: ./ext/gui_toolkit/.github/actions/setup-odin
+
+      - name: inspecteurtool check
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build | Out-Null
+          odin build tools/inspecteurtool -collection:gt=ext/gui_toolkit/src -out:build/inspecteurtool.exe -vet
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          build/inspecteurtool.exe check
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: inspecteur-windows-x64-${{ github.sha }}
+          path: |
+            build/inspecteur.exe
+            build/inspecteur.com
+          if-no-files-found: warn

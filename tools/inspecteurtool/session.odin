@@ -1,3 +1,4 @@
+#+build linux
 package inspecteurtool
 
 // A session nobody sees, for `live`, `shots` and `bench`: the toolkit's program session (toolbox.Program_Session: its

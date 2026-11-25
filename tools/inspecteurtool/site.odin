@@ -13,22 +13,23 @@ import tk_site "gt:site"
 import toolbox "gt:toolbox"
 import inspecteur_licence "../../src/licence"
 
-// The home page's download: the one system the release builds for.
+// The home page's downloads: Linux and Windows.
 @(rodata)
 SITE_DOWNLOADS := [?]tk_site.Download{
 	{os = "linux", label = "Linux", href = "https://github.com/sachahjkl/inspecteur/releases/download/v{{version}}/inspecteur-{{version}}-linux-x64.tar.gz", detail = "v{{version}} · x64 · .tar.gz · Wayland"},
+	{os = "windows", label = "Windows", href = "https://github.com/sachahjkl/inspecteur/releases/download/v{{version}}/inspecteur-{{version}}-windows-x64.zip", detail = "v{{version}} · Windows 10 / 11 · x64 · .zip"},
 }
 
 SITE_LD := [?][2]string{
 	{"applicationCategory", "UtilitiesApplication"},
-	{"operatingSystem", "Linux"},
+	{"operatingSystem", "Linux, Windows"},
 	{"license", "https://opensource.org/license/mit"},
 }
 
 // The site as the toolkit's command takes it (its slices live as long as the tool: SITE_LD and SITE_DOWNLOADS are globals).
 site_project :: proc() -> tk_site.Project_Site {
 	// (where the site is published, what it is: the one place that says it; the vendor's fields are the toolkit's)
-	m := tk_site.meta_default("Inspecteur", "https://inspecteur.froment.software/", REPOSITORY, "A fast native task manager for Linux", "#0d1620", "#5be7c4")
+	m := tk_site.meta_default("Inspecteur", "https://inspecteur.froment.software/", REPOSITORY, "What runs on your computer: processes, performance, services, startup and connections", "#0d1620", "#5be7c4")
 	m.ld_fields = SITE_LD[:]
 	m.shop = shop()
 	return {meta = m, dir = "site", pages = {version_mark = "{{version}}", downloads = SITE_DOWNLOADS[:]}, images = tk_site.images_default()}
@@ -58,7 +59,7 @@ shop :: proc() -> tk_site.Shop {
 		repository     = REPOSITORY,
 		seller         = tk_site.SELLER_FROMENT,
 		code_licence   = "MIT License",
-		platform       = "Linux, x64 (Wayland).",
+		platform       = "Linux (Wayland) and Windows 10 / 11, x64.",
 		network        = tk_site.NETWORK_UPDATES_ONLY,
 		stylesheet     = "../style.css",
 		home           = "../",
