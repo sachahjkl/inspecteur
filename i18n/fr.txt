@@ -88,6 +88,12 @@ fr Le mode efficacité ne peut pas être changé pour %s
 en Access denied: run Inspecteur as an administrator to read the affinity of %s
 fr Accès refusé : lancez Inspecteur en tant qu'administrateur pour lire l'affinité de %s
 
+en Windows itself suspended %s: it resumes when it is shown
+fr Windows a lui-même suspendu %s : il reprend quand on l'affiche
+
+en Nothing was done: whether %s is suspended cannot be read
+fr Rien n'a été fait : impossible de savoir si %s est suspendu
+
 en Access denied for %s: run Inspecteur as an administrator (protected system processes remain blocked)
 fr Accès refusé pour %s : lancez Inspecteur en tant qu'administrateur (les processus système protégés restent bloqués)
 

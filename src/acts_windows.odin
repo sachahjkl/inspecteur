@@ -11,6 +11,7 @@ package inspecteur
 
 import "core:slice"
 import "core:strings"
+import "core:sync"
 import win "core:sys/windows"
 import i18n "gt:i18n"
 import process "gt:process"
@@ -49,6 +50,7 @@ Act :: struct {
 	closed_window: bool,
 	owner:         string,
 	guarded:       bool,
+	suspension:    winapi.Suspension, // Suspend: what it was
 	refusal:       Refusal_Kind,
 	refusal_detail: string,           // owned: e.g. "PPL (Antimalware)"
 }
@@ -136,6 +138,26 @@ win_act_suspend :: proc(pid: i32, start: u64, suspend: bool) -> (res: process.Ac
 	st := fn(h)
 	if st == winapi.STATUS_SUCCESS { return .Done, 0, .None, "" }
 	return st == winapi.STATUS_ACCESS_DENIED ? .Denied : .Failed, int(st), .None, ""
+}
+
+@(private = "file") suspend_lock: sync.Mutex   // (two presses: the second one sees what the first one did)
+
+// Suspends the process, or resumes it when it is suspended: decided on a handle held through the act. Nothing is done
+// when it cannot be told (a second suspension would want a second resumption), nor to an app that Windows itself froze.
+win_act_suspend_toggle :: proc(pid: i32, start: u64, guard: Guard) -> (sig: process.Signal, state: winapi.Suspension, guarded: bool, res: process.Act_Result, err: int, refusal: Refusal_Kind, detail: string) {
+	sync.lock(&suspend_lock)
+	defer sync.unlock(&suspend_lock)
+	sig = .Stop
+	h: win.HANDLE
+	h, res, err, refusal, detail = win_open_for_act(pid, start, WIN_PROCESS_SUSPEND_RESUME)
+	if res != .Done { return }
+	defer win.CloseHandle(h)
+	state, _ = win_suspension(pid, start)
+	if state == .Unknown || state == .Frozen { res = .Failed; return }
+	if state == .Suspended { sig = .Continue } else if guard != .None { guarded = true; return }
+	res, err, refusal, detail = win_act_suspend(pid, start, sig == .Stop)
+	if res == .Done && sig == .Stop { win_suspended_note(pid, start) }
+	return
 }
 
 // The result of a call that failed.
@@ -291,15 +313,12 @@ act_work :: proc(data: rawptr) {
 		}
 	case .Suspend:
 		t := a.targets[0]
-		if proc_state_now(t.pid, t.start) == .Stopped {
-			a.sig = .Continue
-		} else if a.guard != .None {
-			a.sig, a.guarded = .Stop, true
-			return
-		} else {
-			a.sig = .Stop
-		}
-		r, e, ref, det := win_act_suspend(t.pid, t.start, a.sig == .Stop)
+		r: process.Act_Result
+		e: int
+		ref: Refusal_Kind
+		det: string
+		a.sig, a.suspension, a.guarded, r, e, ref, det = win_act_suspend_toggle(t.pid, t.start, a.guard)
+		if a.guarded { return }
 		if r == .Done {
 			a.sent = 1
 		} else if r != .Gone {
@@ -409,6 +428,10 @@ signal_said :: proc(app: ^App, a: ^Act) {
 		return
 	}
 	switch {
+	case a.kind == .Suspend && a.result == .Failed && a.suspension == .Frozen:
+		say(app, i18n.tr("Windows itself suspended %s: it resumes when it is shown"), a.name)
+	case a.kind == .Suspend && a.result == .Failed && a.suspension == .Unknown:
+		say(app, i18n.tr("Nothing was done: whether %s is suspended cannot be read"), a.name)
 	case a.result == .Denied:
 		say(app, i18n.tr("Access denied for %s: run Inspecteur as an administrator (protected system processes remain blocked)"), a.name)
 	case a.result != .Done:

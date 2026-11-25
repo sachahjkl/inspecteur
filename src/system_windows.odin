@@ -80,6 +80,8 @@ Win_Dyn_Procs :: struct {
 	NtQuerySystemInformationEx:  proc "system" (info_class: u32, input_buf: rawptr, input_len: u32, out_buf: rawptr, out_len: u32, ret_len: ^u32) -> u32,
 	NtQueryInformationProcess:   proc "system" (h: win.HANDLE, info_class: u32, buf: rawptr, buf_len: u32, ret_len: ^u32) -> u32,
 	NtQueryObject:               proc "system" (h: win.HANDLE, info_class: u32, buf: rawptr, buf_len: u32, ret_len: ^u32) -> u32,
+	NtQueryInformationThread:    proc "system" (h: win.HANDLE, info_class: u32, buf: rawptr, buf_len: u32, ret_len: ^u32) -> u32,
+	GetProcessIdOfThread:        proc "system" (h: win.HANDLE) -> win.DWORD,
 	NtSuspendProcess:            proc "system" (h: win.HANDLE) -> u32,
 	NtResumeProcess:             proc "system" (h: win.HANDLE) -> u32,
 	IsProcessCritical:           proc "system" (h: win.HANDLE, critical: ^win.BOOL) -> win.BOOL,
@@ -115,6 +117,7 @@ win_dyn :: proc() -> ^Win_Dyn_Procs {
 			win_dyn_table.NtQuerySystemInformationEx = auto_cast win.GetProcAddress(nt, "NtQuerySystemInformationEx")
 			win_dyn_table.NtQueryInformationProcess  = auto_cast win.GetProcAddress(nt, "NtQueryInformationProcess")
 			win_dyn_table.NtQueryObject              = auto_cast win.GetProcAddress(nt, "NtQueryObject")
+			win_dyn_table.NtQueryInformationThread   = auto_cast win.GetProcAddress(nt, "NtQueryInformationThread")
 			win_dyn_table.NtSuspendProcess           = auto_cast win.GetProcAddress(nt, "NtSuspendProcess")
 			win_dyn_table.NtResumeProcess            = auto_cast win.GetProcAddress(nt, "NtResumeProcess")
 		}
@@ -127,6 +130,7 @@ win_dyn :: proc() -> ^Win_Dyn_Procs {
 			win_dyn_table.GetProcessDefaultCpuSets     = auto_cast win.GetProcAddress(k32, "GetProcessDefaultCpuSets")
 			win_dyn_table.SetProcessDefaultCpuSets     = auto_cast win.GetProcAddress(k32, "SetProcessDefaultCpuSets")
 			win_dyn_table.GetSystemCpuSetInformation   = auto_cast win.GetProcAddress(k32, "GetSystemCpuSetInformation")
+			win_dyn_table.GetProcessIdOfThread         = auto_cast win.GetProcAddress(k32, "GetProcessIdOfThread")
 			win_dyn_table.IsWow64Process               = auto_cast win.GetProcAddress(k32, "IsWow64Process")
 			win_dyn_table.ProcessIdToSessionId         = auto_cast win.GetProcAddress(k32, "ProcessIdToSessionId")
 			win_dyn_table.GetPriorityClass             = auto_cast win.GetProcAddress(k32, "GetPriorityClass")
@@ -319,6 +323,70 @@ integrity_label :: proc(lvl: winapi.Integrity_Level) -> string {
 	case .Protected:   return i18n.tr("Protected")
 	}
 	return ""
+}
+
+////////////////////////////////
+// Suspension
+
+// ThreadSuspendCount (Windows 8.1)
+WIN_NT_THREAD_SUSPEND_COUNT :: u32(35)
+
+// The suspend count of a thread of the process `pid`. `gone`: it ended, or its id is another process's thread now.
+win_thread_suspend_count :: proc(pid, tid: i32) -> (count: u32, gone, ok: bool, status: u32) {
+	d := win_dyn()
+	if d.NtQueryInformationThread == nil || d.GetProcessIdOfThread == nil { return }
+	h := win.OpenThread(win.THREAD_QUERY_INFORMATION, false, win.DWORD(tid))
+	if h == nil && win.GetLastError() == win.ERROR_ACCESS_DENIED { h = win.OpenThread(win.THREAD_QUERY_LIMITED_INFORMATION, false, win.DWORD(tid)) }
+	if h == nil {
+		e := win.GetLastError()
+		return 0, e == win.ERROR_INVALID_PARAMETER, false, u32(e)
+	}
+	defer win.CloseHandle(h)
+	if d.GetProcessIdOfThread(h) != win.DWORD(pid) { return 0, true, false, 0 }
+	status = d.NtQueryInformationThread(h, WIN_NT_THREAD_SUSPEND_COUNT, &count, size_of(count), nil)
+	if status == winapi.STATUS_SUCCESS { return count, false, true, status }
+	STATUS_THREAD_IS_TERMINATING :: u32(0xC000004B)
+	return 0, status == STATUS_THREAD_IS_TERMINATING, false, status
+}
+
+// Whether the process is suspended, now, by its threads' counts. The caller holds a verified handle on it when it acts on
+// the answer. `raw` (temporary): each thread's state, wait reason and count, or why it was not read.
+win_suspension :: proc(pid: i32, start: u64) -> (s: winapi.Suspension, raw: string) {
+	buf := make([]u8, 256 * 1024)
+	defer delete(buf)
+	if !win_query_system_processes(&buf) { return .Unknown, "no processes" }
+	decoded := make([dynamic]winapi.Decoded_Process, 0, 256, context.temp_allocator)
+	if !winapi.decode_system_processes(buf, u64(uintptr(raw_data(buf))), &decoded, want_threads = true) { return .Unknown, "not decoded" }
+	for dp in decoded {
+		if dp.pid != pid || dp.create_time != start { continue }
+		counts := make([dynamic]u32, 0, len(dp.thread_slice), context.temp_allocator)
+		read := true
+		b := strings.builder_make(context.temp_allocator)
+		for th in dp.thread_slice {
+			count, gone, ok, status := win_thread_suspend_count(pid, th.tid)
+			fmt.sbprintf(&b, "[%d: state %d, reason %d, count %d%s] ", th.tid, th.thread_state, th.wait_reason, count, ok ? "" : fmt.tprintf(", not read 0x%08X", status))
+			if ok { append(&counts, count) } else if !gone { read = false }
+		}
+		return winapi.suspension_of(counts[:], read, dp.all_suspended), strings.to_string(b)
+	}
+	return .Unknown, "not among the processes"
+}
+
+// The processes this program suspended, for the reader of the table (Proc_Reader.suspended): a hint that it checks.
+@(private = "file") win_suspended_lock: sync.Mutex
+@(private = "file") win_suspended_new:  [dynamic]Target
+
+win_suspended_note :: proc(pid: i32, start: u64) {
+	sync.lock(&win_suspended_lock)
+	defer sync.unlock(&win_suspended_lock)
+	if len(win_suspended_new) < 1024 { append(&win_suspended_new, Target{pid, start}) }
+}
+
+win_suspended_take :: proc(out: ^map[i32]u64) {
+	sync.lock(&win_suspended_lock)
+	defer sync.unlock(&win_suspended_lock)
+	for t in win_suspended_new { out[t.pid] = t.start }
+	clear(&win_suspended_new)
 }
 
 ////////////////////////////////

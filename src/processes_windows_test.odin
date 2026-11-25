@@ -216,14 +216,38 @@ win_child_acts_and_minidump :: proc(t: ^testing.T) {
 	sres, _, _, _ := win_act_affinity_set(child_pid, child_start, cpu0)
 	testing.expect_value(t, sres, process.Act_Result.Done)
 
-	// Suspend and resume on verified handle. (Logged: whether a thread that waits in the kernel shows as suspended.)
-	log.infof("before the suspension: %v", proc_state_now(child_pid, child_start))
-	sus_res, sus_err, _, _ := win_act_suspend(child_pid, child_start, true)
-	testing.expectf(t, sus_res == .Done, "suspend: %v, status 0x%08X", sus_res, u32(sus_err))
-	log.infof("after it: %v", proc_state_now(child_pid, child_start))
-	res_res, res_err, _, _ := win_act_suspend(child_pid, child_start, false)
-	testing.expectf(t, res_res == .Done, "resume: %v, status 0x%08X", res_res, u32(res_err))
-	log.infof("resumed: %v", proc_state_now(child_pid, child_start))
+	// Ctrl+P's act, twice: it suspends, then resumes, and never suspends twice. (The counts are the system's as soon as the
+	// call returns; nothing is waited for. The raw values are logged.)
+	reader: Proc_Reader
+	testing.expect(t, proc_reader_init(&reader))
+	defer proc_reader_destroy(&reader)
+	table_state :: proc(r: ^Proc_Reader, pid: i32) -> Proc_State {
+		procs := make([dynamic]Proc_Counters, context.temp_allocator)
+		procs_read(r, &procs)
+		for p in procs { if p.pid == pid { return p.state } }
+		return .Unknown
+	}
+	look :: proc(t: ^testing.T, r: ^Proc_Reader, pid: i32, start: u64, when_: string, want: winapi.Suspension) {
+		s, raw := win_suspension(pid, start)
+		table := table_state(r, pid)
+		log.infof("%s: %v, the table %v; %s", when_, s, table, raw)
+		testing.expectf(t, s == want, "%s: %v, wanted %v; %s", when_, s, want, raw)
+		testing.expectf(t, (table == .Stopped) == (want == .Suspended), "%s: the table says %v; %s", when_, table, raw)
+		now := proc_state_now(pid, start)
+		testing.expectf(t, (now == .Stopped) == (want == .Suspended) && now != .Unknown, "%s: the state now is %v", when_, now)
+	}
+	toggle :: proc(t: ^testing.T, pid: i32, start: u64, want: process.Signal) {
+		sig, was, guarded, res, err, refusal, _ := win_act_suspend_toggle(pid, start, .None)
+		testing.expectf(t, res == .Done && sig == want && !guarded, "toggle: %v, wanted %v; it was %v; %v, error 0x%08X, %v", sig, want, was, res, u32(err), refusal)
+	}
+	look(t, &reader, child_pid, child_start, "before", .Runs)
+	toggle(t, child_pid, child_start, .Stop)
+	look(t, &reader, child_pid, child_start, "suspended", .Suspended)
+	toggle(t, child_pid, child_start, .Continue)
+	look(t, &reader, child_pid, child_start, "resumed", .Runs)
+	_, _, held, _, _, _, _ := win_act_suspend_toggle(child_pid, child_start, .Ancestor)
+	testing.expect(t, held, "a guarded process is not suspended")
+	look(t, &reader, child_pid, child_start, "guarded", .Runs)
 
 	// The minidump of a running process has its modules and its whole memory.
 	dmp_path, why := process_dump(child_pid, child_start, "inspecteur_test_child")

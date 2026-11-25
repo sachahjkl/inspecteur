@@ -102,6 +102,7 @@ system_processes_decode_valid_chain_and_threads :: proc(t: ^testing.T) {
 	testing.expect(t, out[0].any_running && !out[0].all_suspended)
 	testing.expect_value(t, len(out[0].thread_slice), 2)
 	testing.expect_value(t, out[0].thread_slice[1].tid, i32(4202))
+	testing.expect_value(t, out[0].first_tid, i32(4201))
 	testing.expect_value(t, filetime_to_unix_sec(i64(out[0].create_time)), i64(1_700_000_000))
 
 	testing.expect_value(t, out[1].pid, i32(4300))
@@ -342,6 +343,16 @@ a_parent_that_started_after_its_child_is_none :: proc(t: ^testing.T) {
 	testing.expect_value(t, true_parent(10, 100, created), i32(10))
 	testing.expect_value(t, true_parent(20, 500, created), i32(0))   // (20 was given again after)
 	testing.expect_value(t, true_parent(30, 500, created), i32(0))   // (ended)
+}
+
+@(test)
+a_process_is_suspended_when_each_thread_is :: proc(t: ^testing.T) {
+	testing.expect_value(t, suspension_of({1, 1}, true, false), Suspension.Suspended)
+	testing.expect_value(t, suspension_of({2, 1}, true, true), Suspension.Suspended)
+	testing.expect_value(t, suspension_of({1, 0}, true, false), Suspension.Runs)
+	testing.expect_value(t, suspension_of({0, 0}, true, true), Suspension.Frozen)
+	testing.expect_value(t, suspension_of({1}, false, false), Suspension.Unknown)   // (never suspended again on a guess)
+	testing.expect_value(t, suspension_of({}, true, true), Suspension.Unknown)
 }
 
 @(test)

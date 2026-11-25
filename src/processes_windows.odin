@@ -100,6 +100,8 @@ Proc_Reader :: struct {
 	buf:          []u8,                 // reused growing buffer for SystemProcessInformation
 	sid_cache:    map[string]string,    // binary SID key -> owned "DOMAIN\User"
 	svc_by_pid:   map[i32]string,       // PID -> owned comma-separated SCM service names
+	suspended:    map[i32]u64,          // pid -> start: those known as suspended, checked at each reading
+	audit:        int,                  // where the walk of the processes not known as such is
 	svc_ticks:    int,                  // refreshes svc_by_pid periodically
 }
 
@@ -120,6 +122,7 @@ proc_reader_destroy :: proc(r: ^Proc_Reader) {
 	delete(r.sid_cache)
 	for _, v in r.svc_by_pid { delete(v) }
 	delete(r.svc_by_pid)
+	delete(r.suspended)
 	r^ = {}
 }
 
@@ -157,13 +160,14 @@ procs_read :: proc(r: ^Proc_Reader, out: ^[dynamic]Proc_Counters) {
 
 	created := make(map[i32]u64, len(decoded), context.temp_allocator)
 	for dp in decoded { created[dp.pid] = dp.create_time }
+	suspended_check(r, decoded[:])
 	for dp in decoded {
 		// PID 0 is System Idle Process; skip so CPU % sums against real processes as on Linux.
 		if dp.pid == 0 { continue }
 		name := dp.name
 		if name == "" && dp.pid == 4 { name = "System" }
 		state := Proc_State.Sleeping
-		if dp.all_suspended { state = .Stopped } else if dp.any_running { state = .Running }
+		if dp.all_suspended || dp.create_time != 0 && r.suspended[dp.pid] == dp.create_time { state = .Stopped } else if dp.any_running { state = .Running }
 		append(out, Proc_Counters{
 			pid      = dp.pid,
 			ppid     = winapi.true_parent(dp.ppid, dp.create_time, created),
@@ -315,19 +319,41 @@ win_sid_lookup_cached :: proc(r: ^Proc_Reader, sid: win.PSID) -> string {
 	return owned_val
 }
 
-// Queries live thread state for (pid, start) before Suspend/Resume acts.
+// How many processes a reading asks the suspension of, besides those known as suspended.
+@(private = "file") SUSPEND_AUDIT :: 8
+
+// Keeps r.suspended: those this program suspended (at once), those another program did (a few processes at each reading),
+// each by its first thread's count. The acts ask every thread (win_suspension): this is what the table shows.
+@(private = "file")
+suspended_check :: proc(r: ^Proc_Reader, procs: []winapi.Decoded_Process) {
+	win_suspended_take(&r.suspended)
+	gone := make([dynamic]i32, context.temp_allocator)
+	for pid, start in r.suspended {
+		keep := false
+		for &p in procs {
+			if p.pid != pid || p.create_time != start { continue }
+			count, _, ok, _ := win_thread_suspend_count(pid, p.first_tid)
+			keep = ok && count > 0
+			break
+		}
+		if !keep { append(&gone, pid) }
+	}
+	for pid in gone { delete_key(&r.suspended, pid) }
+	for _ in 0 ..< min(SUSPEND_AUDIT, len(procs)) {
+		r.audit = (r.audit + 1) % len(procs)
+		p := procs[r.audit]
+		if p.pid <= 4 || p.first_tid == 0 || p.any_running || p.create_time == 0 { continue }
+		if count, _, ok, _ := win_thread_suspend_count(p.pid, p.first_tid); ok && count > 0 { r.suspended[p.pid] = p.create_time }
+	}
+}
+
+// The state of (pid, start) now.
 proc_state_now :: proc(pid: i32, start: u64) -> Proc_State {
-	buf := make([]u8, 256 * 1024)
-	defer delete(buf)
-	if !win_query_system_processes(&buf) { return .Unknown }
-	decoded := make([dynamic]winapi.Decoded_Process, 0, 256, context.temp_allocator)
-	if !winapi.decode_system_processes(buf, u64(uintptr(raw_data(buf))), &decoded) { return .Unknown }
-	for dp in decoded {
-		if dp.pid != pid { continue }
-		if start != 0 && dp.create_time != start { return .Unknown }
-		if dp.all_suspended { return .Stopped }
-		if dp.any_running { return .Running }
-		return .Sleeping
+	s, _ := win_suspension(pid, start)
+	switch s {
+	case .Unknown:            return .Unknown
+	case .Runs:               return .Sleeping
+	case .Suspended, .Frozen: return .Stopped
 	}
 	return .Unknown
 }

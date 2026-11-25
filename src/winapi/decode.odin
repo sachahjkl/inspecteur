@@ -133,6 +133,7 @@ Decoded_Process :: struct {
 	nonpaged_pool:    u64,
 	io_read:          u64,
 	io_write:         u64,
+	first_tid:        i32,
 	all_suspended:    bool,
 	any_running:      bool,
 	thread_slice:     []Decoded_Thread,
@@ -180,6 +181,7 @@ decode_system_processes :: proc(
 
 		all_susp := tcount > 0
 		any_run := false
+		first_tid: i32
 		threads_out: []Decoded_Thread
 		if want_threads && tcount > 0 {
 			threads_out = make([]Decoded_Thread, tcount, allocator)
@@ -189,6 +191,7 @@ decode_system_processes :: proc(
 			th: SYSTEM_THREAD_INFORMATION64
 			mem.copy(&th, &buf[toff], size_of(SYSTEM_THREAD_INFORMATION64))
 			// KTHREAD_STATE: 2 = Running, 5 = Waiting; KWAIT_REASON: 5 = Suspended.
+			if ti == 0 { first_tid = i32(th.ClientId.UniqueThread) }
 			if th.ThreadState == 2 { any_run = true }
 			if !(th.ThreadState == 5 && th.WaitReason == 5) { all_susp = false }
 			if want_threads {
@@ -228,6 +231,7 @@ decode_system_processes :: proc(
 			nonpaged_pool    = raw.QuotaNonPagedPoolUsage,
 			io_read          = u64(max(raw.ReadTransferCount, 0)),
 			io_write         = u64(max(raw.WriteTransferCount, 0)),
+			first_tid        = first_tid,
 			all_suspended    = all_susp,
 			any_running      = any_run,
 			thread_slice     = threads_out,
@@ -237,6 +241,18 @@ decode_system_processes :: proc(
 		off = entry_end
 	}
 	return true
+}
+
+// What the threads of a process say of its suspension. `counts`: each thread's suspend count (a thread that ended since is
+// not among them); `read`: each could be read. `frozen`: every thread waits for its suspension, as the reading of the
+// processes has it (Windows freezes the threads of an app put aside, and counts nothing). A thread suspended while it
+// waits in the kernel keeps its wait reason: the counts alone tell it.
+Suspension :: enum u8 { Unknown, Runs, Suspended, Frozen }
+
+suspension_of :: proc(counts: []u32, read: bool, frozen: bool) -> Suspension {
+	if !read || len(counts) == 0 { return .Unknown }
+	for c in counts { if c == 0 { return frozen ? .Frozen : .Runs } }
+	return .Suspended
 }
 
 // A process's parent by its pid, unless that pid is another process's now: Windows keeps the pid of a parent that ended,

@@ -37,7 +37,9 @@ project :: proc() -> toolbox.Project {
 		version_file = "src/main.odin", version_line = "APP_VERSION :: ", program = PROGRAM,
 		// (live, shots and bench drive the release build over CDP: Devtools; only the icons inspecteur names: Lucide_Subset)
 		features = {.Devtools, .Lucide_Subset},
-		launcher = {default_rule = "detach", others = "--install,--uninstall,--status,prefs,version,--version,help,-h,--help", refuses_exit = 2},
+		// (what opens the window gives the prompt back; the rest waits, an unknown command too: its usage and its exit code 2.
+		// --pref is not named: it goes with a console command as with the window)
+		launcher = {default_rule = "wait", others = "(none),--section,--demo,--setup", refuses_exit = 2},
 		title = "Inspecteur", description = "What runs on this computer: its processes, performance, services, startup and connections.",
 		publisher = "Froment Software", copyright = "Copyright (c) 2026 sachahjkl",
 	}
