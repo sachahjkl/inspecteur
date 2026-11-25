@@ -34,6 +34,12 @@ MiniDumpWriteDump_Proc :: #type proc "system" (
 @(private = "file") MINIDUMP_WITH_HANDLE_DATA    :: u32(0x00000004)
 @(private = "file") MINIDUMP_WITH_UNLOADED_MODS  :: u32(0x00000020)
 @(private = "file") MINIDUMP_WITH_THREAD_INFO    :: u32(0x00001000)
+@(private = "file") MINIDUMP_IGNORE_INACCESSIBLE :: u32(0x00020000)
+
+// A process that changes while it is read gives ERROR_PARTIAL_COPY: tried again, so many times.
+@(private = "file") DUMP_TRIES   :: 4
+@(private = "file") DUMP_WAIT    :: 100 * time.Millisecond
+@(private = "file") DUMP_PARTIAL :: win.DWORD(299)
 
 // Writes a minidump of process (pid, start) named for `name`. Returns path or error reason (temporary).
 process_dump :: proc(pid: i32, start: u64, name: string) -> (path: string, why: string) {
@@ -78,24 +84,35 @@ process_dump :: proc(pid: i32, start: u64, name: string) -> (path: string, why: 
 		return "", fmt.tprintf(i18n.tr("cannot create dump file (error %d)"), int(win.GetLastError()))
 	}
 
-	full_flags := MINIDUMP_WITH_FULL_MEMORY | MINIDUMP_WITH_HANDLE_DATA | MINIDUMP_WITH_UNLOADED_MODS | MINIDUMP_WITH_THREAD_INFO
-	ok := fn(h, win.DWORD(pid), fh, full_flags, nil, nil, nil)
-	if !ok {
-		// Fall back to a smaller triage dump if full memory fails (e.g. tight disk or restricted pages).
-		_ = win.SetFilePointerEx(fh, 0, nil, win.FILE_BEGIN)
-		_ = win.SetEndOfFile(fh)
-		lite_flags := MINIDUMP_NORMAL | MINIDUMP_WITH_HANDLE_DATA | MINIDUMP_WITH_THREAD_INFO
-		ok = fn(h, win.DWORD(pid), fh, lite_flags, nil, nil, nil)
+	full_flags := MINIDUMP_WITH_FULL_MEMORY | MINIDUMP_WITH_HANDLE_DATA | MINIDUMP_WITH_UNLOADED_MODS | MINIDUMP_WITH_THREAD_INFO | MINIDUMP_IGNORE_INACCESSIBLE
+	lite_flags := MINIDUMP_NORMAL | MINIDUMP_WITH_HANDLE_DATA | MINIDUMP_WITH_THREAD_INFO
+	// (its error is an HRESULT, the Win32 error in its low half)
+	write :: proc(fn: MiniDumpWriteDump_Proc, h: win.HANDLE, pid: i32, fh: win.HANDLE, flags: u32) -> (hr: win.DWORD) {
+		for i in 0 ..< DUMP_TRIES {
+			if i > 0 { time.sleep(DUMP_WAIT) }
+			_ = win.SetFilePointerEx(fh, 0, nil, win.FILE_BEGIN)
+			_ = win.SetEndOfFile(fh)
+			if fn(h, win.DWORD(pid), fh, flags, nil, nil, nil) { return 0 }
+			hr = win.GetLastError()
+			if hr == 0 { hr = 0x80004005 }   // (E_FAIL: it failed and says nothing)
+			if hr & 0xFFFF != DUMP_PARTIAL { return }
+		}
+		return
 	}
-	last_err := win.GetLastError()   // (MiniDumpWriteDump's is an HRESULT)
+	last_err := write(fn, h, pid, fh, full_flags)
+	// Without its memory when all of it cannot be had (a full disk).
+	if last_err != 0 && last_err & 0xFFFF != DUMP_PARTIAL { last_err = write(fn, h, pid, fh, lite_flags) }
 	win.CloseHandle(fh)
 
-	if !ok {
+	if last_err != 0 {
 		_ = os.remove(path)
 		if last_err & 0xFFFF == win.ERROR_ACCESS_DENIED {
 			return "", i18n.tr("access denied: run Inspecteur as an administrator to dump this process")
 		}
-		return "", fmt.tprintf(i18n.tr("MiniDumpWriteDump failed (error %d)"), int(last_err & 0xFFFF))
+		if last_err & 0xFFFF == DUMP_PARTIAL {
+			return "", i18n.tr("its memory cannot be read whole (error 299): it is still starting, it ends, or it changes too fast")
+		}
+		return "", fmt.tprintf(i18n.tr("MiniDumpWriteDump failed (error %s)"), fmt.tprintf("0x%08X", u32(last_err)))
 	}
 	return path, ""
 }

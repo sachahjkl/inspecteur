@@ -31,12 +31,18 @@ win_protected_service_disables_control_commands :: proc(t: ^testing.T) {
 	}
 	ui.table_apply(&s.rows.table, &s.rows.data, "")
 
-	s.rows.table.vl.sel = 0
+	// (by its name: the table sorts its rows, Spooler before WinDefend)
+	choose :: proc(t: ^testing.T, app: ^App, name: string) {
+		testing.expectf(t, ui.table_select_id(&app.services.rows.table, name_id(name)), "%s is a row", name)
+		u, ok := selected_service(app)
+		testing.expectf(t, ok && u.name == name, "selected: %q, wanted %q", u.name, name)
+	}
+	choose(t, app, "WinDefend")
 	testing.expect(t, !service_can(app, .Service_Stop), "protected service cannot be stopped")
 	testing.expect(t, !service_can(app, .Service_Startup_Type), "protected service startup type cannot be changed")
 	testing.expect(t, service_can(app, .Service_Copy), "protected service name can still be copied")
 
-	s.rows.table.vl.sel = 1
+	choose(t, app, "Spooler")
 	testing.expect(t, service_can(app, .Service_Stop), "unprotected running service can be stopped")
 	testing.expect(t, service_can(app, .Service_Pause), "pausable running service can be paused")
 	testing.expect(t, !service_can(app, .Service_Continue), "running service cannot be continued")

@@ -720,8 +720,11 @@ fr la mémoire du processus ne peut pas être ouverte
 en cannot create dump file (error %d)
 fr impossible de créer le fichier d'image mémoire (erreur %d)
 
-en MiniDumpWriteDump failed (error %d)
-fr MiniDumpWriteDump a échoué (erreur %d)
+en its memory cannot be read whole (error 299): it is still starting, it ends, or it changes too fast
+fr sa mémoire ne peut pas être lue en entier (erreur 299) : il démarre encore, se termine ou change trop vite
+
+en MiniDumpWriteDump failed (error %s)
+fr MiniDumpWriteDump a échoué (erreur %s)
 
 en %d day, %d h %d min
 en+ %d days, %d h %d min

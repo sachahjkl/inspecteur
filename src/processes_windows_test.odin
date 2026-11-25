@@ -5,10 +5,14 @@ package inspecteur
 // and a CREATE_SUSPENDED child process created solely by the test (never touching
 // any other process, service, or user setting).
 
+import "core:log"
+import "core:mem"
 import "core:mem/virtual"
 import "core:os"
+import "core:slice"
 import "core:strings"
 import "core:testing"
+import "core:time"
 import win "core:sys/windows"
 import process "gt:process"
 import winapi "winapi"
@@ -101,24 +105,78 @@ win_own_process_properties_read :: proc(t: ^testing.T) {
 	testing.expect(t, len(env) > 0, "PEB environment block is decoded")
 }
 
+// A child that finished starting and waits: cmd writes a prompt, then reads the pipe that the test holds. Only what the
+// test made is acted on.
+@(private = "file")
+Test_Child :: struct { pi: win.PROCESS_INFORMATION, out, input: win.HANDLE }
+
+@(private = "file")
+test_child_start :: proc(t: ^testing.T) -> (c: Test_Child, ok: bool) {
+	sa := win.SECURITY_ATTRIBUTES{nLength = size_of(win.SECURITY_ATTRIBUTES), bInheritHandle = true}
+	child_in, child_out: win.HANDLE
+	if !win.CreatePipe(&child_in, &c.input, &sa, 0) { testing.expectf(t, false, "CreatePipe (stdin): error %d", win.GetLastError()); return }
+	defer win.CloseHandle(child_in)
+	if !win.CreatePipe(&c.out, &child_out, &sa, 0) {
+		testing.expectf(t, false, "CreatePipe (stdout): error %d", win.GetLastError())
+		win.CloseHandle(c.input)
+		return
+	}
+	defer win.CloseHandle(child_out)
+	HANDLE_FLAG_INHERIT :: win.DWORD(1)
+	win.SetHandleInformation(c.input, HANDLE_FLAG_INHERIT, 0)
+	win.SetHandleInformation(c.out, HANDLE_FLAG_INHERIT, 0)
+
+	exe := win_expand_env("%SystemRoot%\\System32\\cmd.exe")
+	cmd_w := win.utf8_to_utf16(strings.concatenate({"\"", exe, "\" /d /q /c set /p x=ready"}, context.temp_allocator), context.temp_allocator)
+	si := win.STARTUPINFOW{cb = size_of(win.STARTUPINFOW), dwFlags = win.STARTF_USESTDHANDLES, hStdInput = child_in, hStdOutput = child_out, hStdError = child_out}
+	if !win.CreateProcessW(nil, cstring16(raw_data(cmd_w)), nil, nil, true, win.CREATE_NO_WINDOW, nil, nil, &si, &c.pi) {
+		testing.expectf(t, false, "CreateProcessW: error %d", win.GetLastError())
+		win.CloseHandle(c.input)
+		win.CloseHandle(c.out)
+		return
+	}
+	// It is started once its prompt came (10 s at most).
+	avail: win.DWORD
+	since := time.tick_now()
+	for avail < 5 && time.tick_since(since) < 10 * time.Second {
+		if !win.PeekNamedPipe(c.out, nil, 0, nil, &avail, nil) { break }
+		if avail < 5 { time.sleep(5 * time.Millisecond) }
+	}
+	ok = avail >= 5
+	if !ok {
+		code: win.DWORD
+		win.GetExitCodeProcess(c.pi.hProcess, &code)
+		testing.expectf(t, false, "the child wrote %d bytes of its prompt (exit code %d, error %d)", avail, code, win.GetLastError())
+		test_child_end(&c)
+	}
+	return
+}
+
+@(private = "file")
+test_child_end :: proc(c: ^Test_Child) {
+	_ = win.TerminateProcess(c.pi.hProcess, 1)
+	_ = win.WaitForSingleObject(c.pi.hProcess, 5000)
+	for h in ([]win.HANDLE{c.pi.hThread, c.pi.hProcess, c.input, c.out}) { win.CloseHandle(h) }
+}
+
+// The streams of a dump, by their types; nil for a file that is none.
+@(private = "file")
+dump_streams :: proc(path: string) -> (types: []u32) {
+	raw, err := os.read_entire_file(path, context.temp_allocator)
+	if err != nil || len(raw) < 32 || string(raw[:4]) != "MDMP" { return nil }
+	n, at := int((^u32)(&raw[8])^), int((^u32)(&raw[12])^)
+	if n > 1024 || at + n * 12 > len(raw) { return nil }
+	types = make([]u32, n, context.temp_allocator)
+	for &v, i in types { mem.copy(&v, &raw[at + i * 12], 4) }
+	return
+}
+
 @(test)
 win_child_acts_and_minidump :: proc(t: ^testing.T) {
-	// Spawn a CREATE_SUSPENDED child owned solely by this test; it never executes code before termination.
-	cmd_str := strings.clone("C:\\Windows\\System32\\cmd.exe /c exit 0", context.temp_allocator)
-	cmd_w := win.utf8_to_utf16(cmd_str, context.temp_allocator)
-	si := win.STARTUPINFOW{cb = size_of(win.STARTUPINFOW)}
-	pi: win.PROCESS_INFORMATION
-	CREATE_SUSPENDED :: win.DWORD(0x00000004)
-	CREATE_NO_WINDOW :: win.DWORD(0x08000000)
-	if !win.CreateProcessW(nil, cstring16(raw_data(cmd_w)), nil, nil, false, CREATE_SUSPENDED | CREATE_NO_WINDOW, nil, nil, &si, &pi) {
-		testing.fail_now(t, "CreateProcessW failed to spawn test child")
-	}
-	defer {
-		_ = win.TerminateProcess(pi.hProcess, 1)
-		_ = win.WaitForSingleObject(pi.hProcess, 5000)
-		win.CloseHandle(pi.hThread)
-		win.CloseHandle(pi.hProcess)
-	}
+	child, started := test_child_start(t)
+	if !started { return }
+	defer test_child_end(&child)
+	pi := child.pi
 
 	child_pid := i32(pi.dwProcessId)
 	child_start, ct_ok := win_proc_create_time(pi.hProcess)
@@ -158,19 +216,23 @@ win_child_acts_and_minidump :: proc(t: ^testing.T) {
 	sres, _, _, _ := win_act_affinity_set(child_pid, child_start, cpu0)
 	testing.expect_value(t, sres, process.Act_Result.Done)
 
-	// Suspend and resume on verified handle.
-	sus_res, _, _, _ := win_act_suspend(child_pid, child_start, true)
-	testing.expect_value(t, sus_res, process.Act_Result.Done)
-	res_res, _, _, _ := win_act_suspend(child_pid, child_start, false)
-	testing.expect_value(t, res_res, process.Act_Result.Done)
+	// Suspend and resume on verified handle. (Logged: whether a thread that waits in the kernel shows as suspended.)
+	log.infof("before the suspension: %v", proc_state_now(child_pid, child_start))
+	sus_res, sus_err, _, _ := win_act_suspend(child_pid, child_start, true)
+	testing.expectf(t, sus_res == .Done, "suspend: %v, status 0x%08X", sus_res, u32(sus_err))
+	log.infof("after it: %v", proc_state_now(child_pid, child_start))
+	res_res, res_err, _, _ := win_act_suspend(child_pid, child_start, false)
+	testing.expectf(t, res_res == .Done, "resume: %v, status 0x%08X", res_res, u32(res_err))
+	log.infof("resumed: %v", proc_state_now(child_pid, child_start))
 
-	// Minidump writes a valid MDMP file and cleans up.
+	// The minidump of a running process has its modules and its whole memory.
 	dmp_path, why := process_dump(child_pid, child_start, "inspecteur_test_child")
 	testing.expectf(t, dmp_path != "" && why == "", "process_dump failed: %s", why)
 	if dmp_path != "" {
 		defer _ = os.remove(dmp_path)
-		raw, rerr := os.read_entire_file(dmp_path, context.temp_allocator)
-		testing.expect(t, rerr == nil && len(raw) >= 4 && string(raw[:4]) == "MDMP", "minidump header begins with MDMP")
+		streams := dump_streams(dmp_path)
+		// ModuleListStream 4, Memory64ListStream 9 (the whole memory, not the small dump).
+		testing.expectf(t, slice.contains(streams, 4) && slice.contains(streams, 9), "streams: %v", streams)
 	}
 
 	// Terminate via verified handle.
@@ -188,14 +250,20 @@ win_readonly_system_readers :: proc(t: ^testing.T) {
 	mc: Machine_Counters
 	machine_read(&mr, &mc)
 	testing.expect(t, mc.cpu_total_ns > 0, "GetSystemTimes reports CPU time")
-	testing.expect(t, len(mc.core_total_ns) > 0, "per-core performance counters populated")
+	groups := win_dyn().GetActiveProcessorGroupCount != nil ? int(win_dyn().GetActiveProcessorGroupCount()) : -1
+	testing.expectf(t, len(mc.core_total_ns) > 0, "processors: none; status 0x%08X, %d bytes asked, %d given, %d groups", mr.perf_status, mr.perf_asked, mr.perf_given, groups)
+	testing.expectf(t, mc.boot_time > 0, "boot time: %d", mc.boot_time)
+	testing.expectf(t, mc.handles > 0, "handles: %d", mc.handles)
+	mhz := make([]f32, len(mc.core_total_ns), context.temp_allocator)
+	log.infof("%d processors in %d groups, %.0f MHz; memory %d, page files %d of which %d free; %d disks and %d interfaces counted", len(mc.core_total_ns), groups, cpu_mhz_now(mhz), mc.mem.total, mc.mem.swap_total, mc.mem.swap_free, len(mc.disks), len(mc.nets))
 	testing.expect(t, mc.mem.total > 0, "GlobalMemoryStatusEx / GetPerformanceInfo report total RAM")
 	testing.expect(t, mc.uptime > 0, "GetTickCount64 reports uptime")
 	testing.expect(t, !mc.has_load, "Windows does not report POSIX load average")
 
 	ci := cpu_info_read()
 	defer delete(ci.model)
-	testing.expect(t, ci.logical > 0, "logical processor count > 0")
+	testing.expectf(t, ci.logical == len(mc.core_total_ns), "%d logical processors, %d counted", ci.logical, len(mc.core_total_ns))
+	testing.expectf(t, ci.cores > 0 && ci.sockets > 0, "%d cores, %d sockets", ci.cores, ci.sockets)
 
 	sr: Socket_Reader
 	defer socket_reader_destroy(&sr)
@@ -207,6 +275,11 @@ win_readonly_system_readers :: proc(t: ^testing.T) {
 	for d in disks { testing.expectf(t, d.capacity > 0, "%s tells its capacity", d.name) }
 	nets := make([dynamic]Net_Info, context.temp_allocator)
 	nets_list(&nets)
+	counted := 0
+	for n in nets { for k in mc.nets { if k.name == n.name { counted += 1; break } } }
+	testing.expectf(t, len(nets) == 0 || counted > 0, "%d interfaces, none of them among the %d counted", len(nets), len(mc.nets))
+	for d in disks { log.infof("%s: %s, %s, %d bytes, mounts %v", d.name, d.model, d.kind, d.capacity, d.mounts) }
+	for n in nets { log.infof("%s: %s, up %v", n.name, n.kind, n.up) }
 
 	arena: virtual.Arena
 	defer virtual.arena_destroy(&arena)

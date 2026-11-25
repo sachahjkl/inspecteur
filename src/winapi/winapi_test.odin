@@ -142,6 +142,9 @@ system_processes_reject_truncated_and_hostile_buffers :: proc(t: ^testing.T) {
 
 @(test)
 processor_performance_counts_kernel_including_idle :: proc(t: ^testing.T) {
+	testing.expect_value(t, processor_performance_length(16 * 1024), 341 * 48)   // (16384 is refused)
+	testing.expect_value(t, processor_performance_length(64 * 48), 64 * 48)
+	testing.expect_value(t, processor_performance_length(47), 0)
 	items := [2]SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION{
 		{IdleTime = 4_000_000, KernelTime = 6_000_000, UserTime = 4_000_000}, // total = 10M ticks, idle = 4M (60% busy)
 		{IdleTime = 9_000_000, KernelTime = 8_500_000, UserTime = 1_000_000}, // skewed kernel < idle clamped safely

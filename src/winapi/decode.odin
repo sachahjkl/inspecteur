@@ -279,6 +279,9 @@ Decoded_Cpu_Time :: struct {
 	idle_ns:  u64,
 }
 
+// The length to give the query for a buffer of `n` bytes: whole entries (any other length is refused).
+processor_performance_length :: proc(n: int) -> int { return n - n % size_of(SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION) }
+
 // Decodes an array of SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION entries.
 // Windows KernelTime includes IdleTime, so total CPU time is KernelTime + UserTime.
 decode_processor_performance :: proc(buf: []u8, out: ^[dynamic]Decoded_Cpu_Time) {

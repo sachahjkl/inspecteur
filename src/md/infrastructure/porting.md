@@ -38,6 +38,8 @@ Documentation screenshots use the demo so they contain no data from the host mac
 
 Libraries come from the system's folder alone (`win_system_library`): most are not KnownDLLs, and a file of their name beside the program would run.
 A buffer given to a system call is aligned (`win_bytes`).
+`SystemProcessorPerformanceInformation` refuses a length that is not a multiple of its entry, a longer one too.
+A dump of a process that has not finished starting, or that changes while it is read, fails with error 299: it is tried again a bounded number of times, then said.
 
 ## Limits of the Windows readers
 

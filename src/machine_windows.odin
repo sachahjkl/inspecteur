@@ -78,12 +78,14 @@ win_page_file_cb :: proc "system" (ctx: rawptr, info: ^winapi.ENUM_PAGE_FILE_INF
 
 Machine_Reader :: struct {
 	perf_buf:    []u8,     // reused buffer for SystemProcessorPerformanceInformation
+	perf_status: u32,      // the last call's NTSTATUS, and the bytes it asked and gave (a failure says why)
+	perf_asked, perf_given: u32,
 	drives:      [32]bool, // physical drives discovered in last probe
 	drive_ticks: int,
 }
 
 machine_reader_init :: proc(r: ^Machine_Reader) {
-	r.perf_buf = make([]u8, 16 * 1024)
+	r.perf_buf = win_bytes(64 * size_of(winapi.SYSTEM_PROCESSOR_PERFORMANCE_INFORMATION), context.allocator)
 }
 
 machine_reader_destroy :: proc(r: ^Machine_Reader) {
@@ -198,60 +200,41 @@ machine_read :: proc(r: ^Machine_Reader, c: ^Machine_Counters) {
 @(private = "file")
 win_read_per_core_times :: proc(r: ^Machine_Reader, c: ^Machine_Counters) {
 	d := win_dyn()
-	if d.NtQuerySystemInformation == nil { return }
-	if len(r.perf_buf) < 4096 {
-		delete(r.perf_buf)
-		r.perf_buf = make([]u8, 16 * 1024)
-	}
-
 	groups := d.GetActiveProcessorGroupCount != nil ? int(d.GetActiveProcessorGroupCount()) : 1
 	if groups > 1 && d.NtQuerySystemInformationEx != nil {
-		decoded := make([dynamic]winapi.Decoded_Cpu_Time, 0, 64, context.temp_allocator)
 		for g in 0 ..< groups {
-			gid := u16(g)
-			for _ in 0 ..< 4 {
-				ret: u32
-				st := d.NtQuerySystemInformationEx(WIN_NT_SYSTEM_PERF_INFO, &gid, size_of(gid), raw_data(r.perf_buf), u32(len(r.perf_buf)), &ret)
-				if st == winapi.STATUS_SUCCESS {
-					clear(&decoded)
-					nbytes := min(int(ret), len(r.perf_buf))
-					winapi.decode_processor_performance(r.perf_buf[:nbytes], &decoded)
-					for ct in decoded {
-						append(&c.core_total_ns, ct.total_ns)
-						append(&c.core_idle_ns, ct.idle_ns)
-					}
-					break
-				}
-				if st != winapi.STATUS_INFO_LENGTH_MISMATCH { break }
-				next, ok := winapi.next_buffer_size(len(r.perf_buf), ret)
-				if !ok { break }
-				delete(r.perf_buf)
-				r.perf_buf = make([]u8, next)
-			}
+			// (a group that cannot be read: not the others alone, whose processors would have its numbers)
+			if !win_read_group_times(r, c, g, true) { clear(&c.core_total_ns); clear(&c.core_idle_ns); break }
 		}
 		if len(c.core_total_ns) > 0 { return }
 	}
+	win_read_group_times(r, c, 0, false)
+}
 
-	// Single processor group (<= 64 logical processors) or fallback.
-	for _ in 0 ..< 4 {
-		ret: u32
-		st := d.NtQuerySystemInformation(WIN_NT_SYSTEM_PERF_INFO, raw_data(r.perf_buf), u32(len(r.perf_buf)), &ret)
-		if st == winapi.STATUS_SUCCESS {
-			decoded := make([dynamic]winapi.Decoded_Cpu_Time, 0, 64, context.temp_allocator)
-			nbytes := min(int(ret), len(r.perf_buf))
-			winapi.decode_processor_performance(r.perf_buf[:nbytes], &decoded)
-			for ct in decoded {
-				append(&c.core_total_ns, ct.total_ns)
-				append(&c.core_idle_ns, ct.idle_ns)
-			}
-			return
-		}
-		if st != winapi.STATUS_INFO_LENGTH_MISMATCH { return }
-		next, ok := winapi.next_buffer_size(len(r.perf_buf), ret)
-		if !ok { return }
-		delete(r.perf_buf)
-		r.perf_buf = make([]u8, next)
+// The processors of one group (`grouped`), or of this thread's. The kernel refuses (STATUS_INFO_LENGTH_MISMATCH) a length
+// that is not a multiple of the entry's size, a longer one too: the length given is rounded down to one. A group has 64
+// processors at most, so the buffer (processor_performance_length) never grows.
+@(private = "file")
+win_read_group_times :: proc(r: ^Machine_Reader, c: ^Machine_Counters, group: int, grouped: bool) -> bool {
+	d := win_dyn()
+	length := winapi.processor_performance_length(len(r.perf_buf))
+	if length == 0 { return false }
+	r.perf_asked, r.perf_given = u32(length), 0
+	if grouped {
+		gid := u16(group)
+		r.perf_status = d.NtQuerySystemInformationEx(WIN_NT_SYSTEM_PERF_INFO, &gid, size_of(gid), raw_data(r.perf_buf), u32(length), &r.perf_given)
+	} else {
+		if d.NtQuerySystemInformation == nil { return false }
+		r.perf_status = d.NtQuerySystemInformation(WIN_NT_SYSTEM_PERF_INFO, raw_data(r.perf_buf), u32(length), &r.perf_given)
 	}
+	if r.perf_status != winapi.STATUS_SUCCESS { return false }
+	decoded := make([dynamic]winapi.Decoded_Cpu_Time, 0, 64, context.temp_allocator)
+	winapi.decode_processor_performance(r.perf_buf[:min(int(r.perf_given), length)], &decoded)
+	for ct in decoded {
+		append(&c.core_total_ns, ct.total_ns)
+		append(&c.core_idle_ns, ct.idle_ns)
+	}
+	return len(decoded) > 0
 }
 
 @(private = "file")
