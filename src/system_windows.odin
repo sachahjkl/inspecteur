@@ -3,6 +3,7 @@ package inspecteur
 // Windows system constants, priority class mapping, verified handle opening, process safety checks
 // (critical process, PPL protection, integrity, elevation), dynamic NT/Win32 loaders, and UTF-16 helpers.
 
+import "base:runtime"
 import "core:fmt"
 import "core:mem"
 import "core:strings"
@@ -379,6 +380,8 @@ win_suspension :: proc(pid: i32, start: u64) -> (s: winapi.Suspension, raw: stri
 win_suspended_note :: proc(pid: i32, start: u64) {
 	sync.lock(&win_suspended_lock)
 	defer sync.unlock(&win_suspended_lock)
+	// (the process's own list, never the caller's allocator: a test's tracking allocator would call it a leak)
+	if win_suspended_new.allocator.procedure == nil { win_suspended_new.allocator = runtime.heap_allocator() }
 	if len(win_suspended_new) < 1024 { append(&win_suspended_new, Target{pid, start}) }
 }
 
