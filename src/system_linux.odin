@@ -19,6 +19,9 @@ PRIORITY_COLUMN := i18n.later("Nice")
 // Who may act on any process.
 ADMIN :: "root"
 
+// No system task manager to take the place of (src/md/features/install.md): the install shows no such box.
+SETUP_TASK_MANAGER_WORDS :: ""
+
 // Why a priority was refused.
 PRIORITY_DENIED := i18n.later("only root may raise a priority, or change another user's process")
 

@@ -12,7 +12,13 @@ package inspecteur
 //   inspecteur --uninstall   it all taken away (the preferences stay)
 //   inspecteur --status      what is installed, and whether Inspecteur runs (exit 0 installed, 2 to repair, 1 not)
 //   inspecteur --setup       the window, the install's dialog open
+//
+// On Windows the install offers Inspecteur in place of Task Manager (src/md/features/install.md): Windows then starts
+// its machine copy with taskmgr's path, which hands over to the person's install (main.odin, setup.task_manager_start).
 
+import "core:os"
+import desktop "gt:desktop"
+import "gt:i18n"
 import setup "gt:setup"
 import identity "identity"
 
@@ -32,5 +38,34 @@ setup_options :: proc() -> setup.Setup_Options {
 	id.nix_runtime_name = "inspecteur-runtime"
 	id.nixos_libraries = NIXOS_LIBRARIES[:]
 	id.uninstall_arguments = "--setup"   // (Settings > Apps: the install's dialog, its Uninstall)
-	return setup.Setup_Options{identity = id, version = APP_VERSION, icons = identity.ICONS[:], running = one_copy_running, quit = one_copy_quit, vendor_url = "https://froment.software"}
+	return setup.Setup_Options{
+		identity = id, version = APP_VERSION, icons = identity.ICONS[:], running = one_copy_running, quit = one_copy_quit,
+		vendor_url = "https://froment.software", choices = setup_choices(),
+		prepare = proc(o: ^desktop.Integration_Options, choices: []bool, user: rawptr) {
+			for x, i in setup_choices() {
+				if i >= len(choices) { break }
+				if .Path in x.parts { o.add_to_path = choices[i] }
+				if .Task_Manager in x.parts { o.task_manager = choices[i] }
+			}
+			desktop.roots_from_env(o, env_lookup)   // (a test's places: nothing of the person's)
+		},
+	}
 }
+
+// (not rodata: i18n.later marks the labels for the catalogue; tr where they are shown)
+// Each box is tied to its part (src/md/features/install.md): with an install there, it shows what the system has, and
+// what is ticked is what Install writes. The task manager's words are the system's (system_<os>.odin).
+@(private = "file")
+SETUP_CHOICES := [?]setup.Choice{
+	{label = i18n.later("Inspecteur in the terminal (on the PATH)"), on = true, parts = {.Path}},
+	{label = SETUP_TASK_MANAGER_WORDS, on = false, parts = {.Task_Manager}},
+}
+
+// The boxes this system has: the task manager's only where the system has the part (Windows).
+setup_choices :: proc() -> []setup.Choice {
+	return .Task_Manager in desktop.supported_parts() ? SETUP_CHOICES[:] : SETUP_CHOICES[:1]
+}
+
+// (the places of a test come from the environment: INSPECTEUR_DESKTOP_*)
+@(private = "file")
+env_lookup :: proc(name: string) -> string { return os.get_env(name, context.temp_allocator) }

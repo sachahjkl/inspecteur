@@ -62,6 +62,8 @@ section, the views, the tests) is [docs/architecture.md](../../docs/architecture
 - [features/services.md](features/services.md): systemd over the toolkit's D-Bus client, polkit and no sudo, Startup's
   autostart entries, a service's details and journal, the questions before Stop and Restart
 - [features/gpus.md](features/gpus.md): why a sleeping GPU is not woken, when NVML is open
+- [features/install.md](features/install.md): the install's boxes (the PATH, Task Manager on Windows), a start from
+  Task Manager handed over to the person's install, why no install is offered then
 - [features/connections.md](features/connections.md): a socket's process, the scan of descriptors skipped when every
   socket is known
 - [features/palette.md](features/palette.md): the palette's sources (the toolkit's commands and settings, Go to: the

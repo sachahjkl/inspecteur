@@ -82,7 +82,10 @@ the sheet of the keys (F1) lists them all. A test checks that no key does two th
 `--section <name>`, and `StartupWMClass`, the window's class), its icons (`assets/logo_<n>.png`). `setup.odin` gives it to
 the toolkit's `gt:setup` through `prefs_page.Install`: the install's dialog, offered at the start of a copy that is not
 installed (once per version, `install.choice`), the settings' Installation page, and `--install`, `--uninstall`,
-`--setup`. The updates start with the window; they act by themselves only once that reading says this copy is the
+`--setup`. Its boxes (`setup_choices`) are the PATH and, on Windows, Inspecteur in place of Task Manager
+(`Part.Task_Manager`: the Debugger of taskmgr.exe runs a machine copy in Program Files; `main.odin` starts with
+`setup.task_manager_start`, which hands over to the person's install, and such a start never offers the install:
+[src/md/features/install.md](../src/md/features/install.md)). The updates start with the window; they act by themselves only once that reading says this copy is the
 installed one. On NixOS a classic install builds a profile of
 `NIXOS_LIBRARIES` and points the copy at it; a copy from the Nix store is never offered an install. `inspecteurtool
 desktop_files` writes the same entry and icons for the Nix package.

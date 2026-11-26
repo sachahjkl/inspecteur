@@ -125,6 +125,7 @@ Run_Options :: struct {
 	tab:         Tab,
 	demo:        bool,
 	setup:       bool,   // --setup: the install's dialog open
+	from_task_manager: bool,   // started in place of Task Manager (Windows): the install is never offered
 	owner:       instance.Owner,   // the one Inspecteur's name, this start's (one_copy_acquire)
 	owns:        bool,
 	last_crash:  string,   // the report of the last run, which crashed or was killed ("": it ended cleanly): the crash bar
@@ -217,7 +218,7 @@ app_run :: proc(prefs: ^config.Prefs, opts: Run_Options) -> bool {
 	go_to_add(app)
 	// (the install is read on a task: until it says this copy is the installed one, the updates check nothing by
 	// themselves. Never offered in the demo)
-	prefs_page.install_offer(&app.install, &h.state, offer = !opts.setup && app.demo == nil)
+	prefs_page.install_offer(&app.install, &h.state, offer = !opts.setup && !opts.from_task_manager && app.demo == nil)
 	updates_start(app)
 	// (after an update, once: a message that stays opens the settings at What's new; never the demo's)
 	app.changelog.english = CHANGELOG

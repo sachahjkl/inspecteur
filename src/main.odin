@@ -33,6 +33,7 @@ USAGE :: `inspecteur: what runs on this computer
   inspecteur --uninstall      takes the install away (the preferences stay)
   inspecteur --status         what is installed, and whether Inspecteur runs (exit 0 installed, 2 to repair,
                               1 not installed)
+  inspecteur <taskmgr path>   Windows, in place of Task Manager: the window (taskmgr's options are ignored)
   inspecteur prefs            every preference, its value and what it does
   inspecteur version
   --pref name=value           a preference for this run only
@@ -48,7 +49,12 @@ main :: proc() {
 	cli.exit(run(os.args[1:]))
 }
 
-run :: proc(all_args: []string) -> cli.Exit {
+run :: proc(given_args: []string) -> cli.Exit {
+	// (Windows starts Inspecteur in place of Task Manager with taskmgr's path and options: the plain start, or the
+	// person's own installed copy when this is the machine's copy, which then ends; src/md/features/install.md)
+	all_args, handed_off := setup.task_manager_start(setup_options(), given_args)
+	if handed_off { return .Done }
+	_, from_task_manager := setup.task_manager_arguments(given_args)
 	// (once, before anything reads the folders: the preferences just below, the log, the licence, the views' memory;
 	// no log is open yet, so a problem goes to stderr)
 	if _, why := platform.user_dirs_move(APP_NAME, APP_FOLDER); why != "" { fmt.eprintfln("inspecteur: the folders were not all moved to %s: %s", APP_FOLDER, why) }
@@ -64,7 +70,7 @@ run :: proc(all_args: []string) -> cli.Exit {
 	switch verb {
 	case "", "--first-frame", "--section", "--demo":
 		// (the section shown last; --section another)
-		opts := Run_Options{tab = .Processes, setup = cmd == .Setup}
+		opts := Run_Options{tab = .Processes, setup = cmd == .Setup, from_task_manager = from_task_manager}
 		if tab, ok := tab_of(config.string_of(&prefs, "view.section")); ok { opts.tab = tab }
 		for i := 0; i < len(args); i += 1 {
 			switch args[i] {

@@ -17,6 +17,9 @@ PRIORITY_COLUMN := i18n.later("Nice")
 
 ADMIN :: "root"
 
+// No system task manager to take the place of (src/md/features/install.md): the install shows no such box.
+SETUP_TASK_MANAGER_WORDS :: ""
+
 PRIORITY_DENIED := i18n.later("only root may raise a priority, or change another user's process")
 
 PROCS_READ_FAILED  := i18n.later("The processes cannot be read (/proc)")

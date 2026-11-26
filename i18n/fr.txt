@@ -2348,6 +2348,9 @@ fr Suivi du journal des événements
 en Read the Windows Event Log again every 3 seconds while the details pane is shown. Alt+F switches it.
 fr Actualiser le journal des événements Windows toutes les 3 secondes tant que le panneau des détails est affiché. Alt+F le bascule.
 
+en Inspecteur in the terminal (on the PATH)
+fr Inspecteur dans le terminal (dans le PATH)
+
 en Autostart entry
 fr Démarrage auto
 
@@ -2574,6 +2577,9 @@ fr Les processus ne peuvent pas être lus
 
 en NVIDIA's driver library (nvml.dll) was not found or did not answer.
 fr La bibliothèque du pilote NVIDIA (nvml.dll) est introuvable ou ne répond pas.
+
+en Open Ctrl+Shift+Esc and Task Manager with Inspecteur (in place of Task Manager)
+fr Ouvrir Ctrl+Maj+Échap et le Gestionnaire des tâches avec Inspecteur (à la place du Gestionnaire des tâches)
 
 en Realtime
 fr Temps réel

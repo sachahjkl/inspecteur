@@ -71,8 +71,12 @@ Information.
   the order of their columns and their sort; the window opens on the section shown last, the CPU's page as it was left.
   A text too narrow for its place shows it whole when the pointer rests on it.
 - **Install and updates**: a downloaded copy installs itself for the user (the program, its menu entry with an action
-  per section, its icons); the installed copy updates itself from the signed releases. On NixOS a classic install runs
-  by itself; the Nix package is installed and updated by Nix.
+  per section, its icons, and on request the PATH); the installed copy updates itself from the signed releases. On NixOS
+  a classic install runs by itself; the Nix package is installed and updated by Nix.
+- **In place of Task Manager** (Windows): a box of the install makes Ctrl+Shift+Esc, the taskbar's Task Manager and
+  Ctrl+Alt+Del's open Inspecteur. Windows asks for an administrator, because the change is the same for every account;
+  Inspecteur keeps a copy in Program Files for it, which opens your own install. Unticked or uninstalled, Task Manager
+  comes back.
 - **Dialogs and panels where you want them**: Properties, the affinity, "Why is it slow?", the service's details, a
   journal and Mission Control's panels each float in the window, go to a window of their own, or dock at an edge, from
   the small icon of their header, their menu (a right click on it) or the palette. Each is shown as it was left.

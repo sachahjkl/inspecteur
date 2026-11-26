@@ -31,6 +31,10 @@ PROCS_READ_FAILED  := i18n.later("The processes cannot be read")
 HANDLES_LABEL      := i18n.later("Handles")
 GPU_NVIDIA_MISSING := i18n.later("NVIDIA's driver library (nvml.dll) was not found or did not answer.")
 
+// The install's box that puts Inspecteur in place of Task Manager (setup.odin): Windows has one by name, and
+// Ctrl+Shift+Esc is its key.
+SETUP_TASK_MANAGER_WORDS := i18n.later("Open Ctrl+Shift+Esc and Task Manager with Inspecteur (in place of Task Manager)")
+
 priority_text :: proc(nice: i8) -> string {
 	switch {
 	case nice <= -15: return i18n.tr("Realtime")
