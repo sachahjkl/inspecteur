@@ -7,7 +7,8 @@ package inspecteur
 // line, its executable, its owner, its systemd unit) is read once through a pinned /proc/<pid> descriptor, when the
 // sampler first sees the process.
 //
-// Kernel threads (PF_KTHREAD, kthreadd and its children) are not programs: they are left out. On real /proc, known
+// Kernel threads (PF_KTHREAD) are not programs: they are left out. Their flag alone says it: in a pid namespace (a
+// container) pid 2 and its children are programs, and the kernel's threads are not listed at all. On real /proc, known
 // kernel threads are watched through pidfd_open + epoll so live kernel threads cost zero syscalls per sample. Live
 // user processes keep their stat, statm and io descriptors open (pread at offset 0) up to a budget derived from
 // RLIMIT_NOFILE, falling back to openat + read + close beyond the budget.
@@ -290,6 +291,12 @@ procs_read :: proc(r: ^Proc_Reader, out: ^[dynamic]Proc_Counters) {
 	list_pids_at(r.proc_dir, r.dents, &r.pids, &r.stats)
 	slice.sort_by(r.pids[:], proc(a, b: Pid_Entry) -> bool { return a.pid < b.pid })
 	drain_exited_kthreads(r)
+	// (the descriptors of the processes gone go first: else, near the budget, the new processes of this sample would find
+	// it held by the dead ones and wait a sample for theirs)
+	for e in r.pids { if kp, ok := &r.kept[e.pid]; ok { kp.seen = r.readings } }
+	clear(&r.gone)
+	for pid, kp in r.kept { if kp.seen != r.readings { append(&r.gone, pid) } }
+	for pid in r.gone { kept_drop(r, pid) }
 
 	base_out := len(out^)
 	clear(&r.comm_buf)
@@ -350,7 +357,7 @@ procs_read :: proc(r: ^Proc_Reader, out: ^[dynamic]Proc_Counters) {
 		}
 
 		st, parsed := parse_stat(string(stat_text))
-		if !parsed || st.flags & PF_KTHREAD != 0 || pid == 2 || st.ppid == 2 {
+		if !parsed || st.flags & PF_KTHREAD != 0 {
 			// Watch newly discovered kernel threads via pidfd + epoll so future samples cost zero syscalls.
 			if parsed && r.real_proc && r.kthread_ep >= 0 && r.kept_fds < r.fd_budget && opened_stat_fd >= 0 {
 				if pfd, perr := linux.pidfd_open(linux.Pid(pid), {}); perr == .NONE {
@@ -495,11 +502,7 @@ procs_read :: proc(r: ^Proc_Reader, out: ^[dynamic]Proc_Counters) {
 		}
 	}
 
-	// Evict processes and kernel threads that vanished since the last sample so kept fds stay bounded.
-	clear(&r.gone)
-	for pid, kp in r.kept { if kp.seen != r.readings { append(&r.gone, pid) } }
-	for pid in r.gone { kept_drop(r, pid) }
-
+	// Evict kernel threads that vanished since the last sample so kept fds stay bounded.
 	clear(&r.gone)
 	for pid, kt in r.kthreads { if kt.seen != r.readings { append(&r.gone, pid) } }
 	for pid in r.gone {

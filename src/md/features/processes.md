@@ -1,7 +1,8 @@
 # The processes
 
 On Linux everything comes from `/proc`, read with system calls (`openat`, `pread`, `read`, `getdents`) into reusable
-buffers without per-process path allocations. Kernel threads (`PF_KTHREAD`) are not shown.
+buffers without per-process path allocations. Kernel threads (`PF_KTHREAD`) are not shown. Their flag alone tells
+them: in a pid namespace (a container) pid 2 and its children are programs, and the kernel's threads are not listed.
 
 ## What is read, and when
 

@@ -2,6 +2,7 @@
 package inspecteur
 
 import "core:fmt"
+import "core:log"
 import "core:mem"
 import "core:mem/virtual"
 import "core:os"
@@ -178,7 +179,7 @@ plain_procs_read :: proc(root: string, page_bytes: u64, out: ^[dynamic]Proc_Coun
 			if parsed { break }
 			field += 1
 		}
-		if !parsed || st_flags & PF_KTHREAD != 0 || pid == 2 || st_ppid == 2 { continue }
+		if !parsed || st_flags & PF_KTHREAD != 0 { continue }
 		c := Proc_Counters{
 			pid = pid, ppid = st_ppid, start = st_start, comm = strings.clone(comm, context.temp_allocator),
 			cpu_ns = st_ticks * TICK_NS, threads = st_threads, state = proc_state_of(st_state), nice = st_nice,
@@ -239,6 +240,14 @@ synth_write_proc :: proc(root: string, pid, ppid: i32, comm: string, state: u8, 
 	}
 	if cmdline != "" { _ = os.write_entire_file(fmt.tprintf("%s/cmdline", dir), cmdline) }
 	if cgroup != "" { _ = os.write_entire_file(fmt.tprintf("%s/cgroup", dir), cgroup) }
+}
+
+// The descriptors the reader holds, counted from its maps (kept_fds must say the same).
+@(private)
+kept_held :: proc(r: ^Proc_Reader) -> int {
+	held := len(r.kthreads)
+	for _, k in r.kept { held += int(k.stat_fd >= 0) + int(k.statm_fd >= 0) + int(k.io_fd >= 0) }
+	return held
 }
 
 @(private)
@@ -361,9 +370,7 @@ the_real_proc_is_read_through_kept_descriptors :: proc(t: ^testing.T) {
 	killed = true
 	if c, there := find(&r, &out, child.pid); there { testing.expect(t, c.start != first.start, "the child is gone") }
 	if kp, kept := r.kept[i32(child.pid)]; kept { testing.expect(t, kp.start != first.start, "its descriptors too") }
-	held := len(r.kthreads)
-	for _, k in r.kept { held += int(k.stat_fd >= 0) + int(k.statm_fd >= 0) + int(k.io_fd >= 0) }
-	testing.expect_value(t, r.kept_fds, held)
+	testing.expect_value(t, r.kept_fds, kept_held(&r))
 }
 
 // A descriptor kept on a pid used again by another process reads the new one's numbers, not the old one's: forks until
@@ -390,7 +397,8 @@ a_kept_descriptor_of_a_process_gone_is_opened_again :: proc(t: ^testing.T) {
 	for c in out {
 		if c.pid != own { continue }
 		found = true
-		testing.expect(t, c.start == mine.start && c.cpu_ns > 0 && c.resident > 0)
+		// (not its CPU time: a process that started a moment ago may have none yet, in clock ticks)
+		testing.expect(t, c.start == mine.start && c.threads > 0 && c.resident > 0)
 	}
 	testing.expect(t, found, "read again by its path")
 	testing.expect(t, r.kept[own].start == mine.start && r.kept[own].stat_fd >= 0)
@@ -407,12 +415,11 @@ synthetic_proc_matches_plain_reader :: proc(t: ^testing.T) {
 	defer {
 		// Restore permissions on chmod-000 test files so remove_all cleans up cleanly.
 		_ = os.chmod(fmt.tprintf("%s/104/io", root), {.Read_User, .Write_User})
-		_ = os.chmod(fmt.tprintf("%s/106/stat", root), {.Read_User, .Write_User})
 		_ = os.remove_all(root)
 	}
 	_ = os.write_entire_file(fmt.tprintf("%s/stat", root), "cpu  100 0 50 850 0 0 0 0 0 0\nbtime 1700000000\n")
 
-	// Kernel threads (must be omitted)
+	// Kernel threads (must be omitted), and a program whose parent is pid 2 (a pid namespace's: shown)
 	synth_write_proc(root, 2, 0, "kthreadd", 'S', PF_KTHREAD, 1, 2, 0, 1, 10, 0, 0, 0, 0)
 	synth_write_proc(root, 3, 2, "kworker/0:0", 'I', PF_KTHREAD, 5, 5, 0, 1, 11, 0, 0, 0, 0)
 	synth_write_proc(root, 4, 2, "kchild-noflag", 'S', 0, 1, 1, 0, 1, 12, 0, 0, 0, 0)
@@ -425,9 +432,10 @@ synthetic_proc_matches_plain_reader :: proc(t: ^testing.T) {
 	synth_write_proc(root, 104, 100, "denied-io", 'S', 0, 2, 3, 0, 3, 800, 400, 100, 999, 888, chmod_io_0 = true)
 	// Vanished mid-read: directory exists during readdir, has no stat file
 	_ = os.make_directory_all(fmt.tprintf("%s/105", root))
-	// Unreadable stat
+	// Unreadable stat, for root too (a mode is nothing to root): a folder, whose read fails (EISDIR)
 	synth_write_proc(root, 106, 100, "unreadable", 'S', 0, 1, 1, 0, 1, 900, 10, 0, 0, 0)
-	_ = os.chmod(fmt.tprintf("%s/106/stat", root), {})
+	_ = os.remove(fmt.tprintf("%s/106/stat", root))
+	_ = os.make_directory(fmt.tprintf("%s/106/stat", root))
 
 	// Test across three fd budgets: 0 (fallback only), 4 (tight cap), and 1024 (full kept pool).
 	for budget in ([3]int{0, 4, 1024}) {
@@ -441,10 +449,10 @@ synthetic_proc_matches_plain_reader :: proc(t: ^testing.T) {
 		_ = plain_procs_read(root, pr.page_bytes, &want)
 		expect_counters_equal(t, got[:], want[:], fmt.tprintf("sample1 budget=%d", budget))
 		testing.expectf(t, pr.kept_fds <= budget, "kept_fds=%d exceeded budget=%d", pr.kept_fds, budget)
-		testing.expect_value(t, len(got), 5)
+		testing.expect_value(t, len(got), 6)
 
 		// Verify proc_facts on pid 101 (newline+parens comm, user cgroup scope, cmdline, boot_time)
-		f101 := proc_facts(&pr, got[1])
+		f101 := proc_facts(&pr, got[2])
 		testing.expect_value(t, f101.name, "Web (Content)\n2")
 		testing.expect_value(t, f101.cmdline, "firefox -contentproc")
 		testing.expect_value(t, f101.scope, "app-firefox-99.scope")
@@ -624,6 +632,8 @@ synthetic_proc_churn_bounds_fds_and_memory :: proc(t: ^testing.T) {
 		facts := make([dynamic]Proc_Facts, 0, 128)
 		defer delete(facts)
 
+		// (root reads what a mode refuses: its io is never denied here)
+		denied := linux.geteuid() != 0
 		mem_at_3 := 0
 		for round in 0 ..< 12 {
 			free_all(context.temp_allocator)
@@ -654,10 +664,12 @@ synthetic_proc_churn_bounds_fds_and_memory :: proc(t: ^testing.T) {
 			table_group(&ct, cs.procs[:])
 			table_rows(&ct, &cs, nil)
 
-			// Only the 50 live processes' kept entries and 8 io_denied entries may exist after each reading.
+			// Only the 50 live processes' kept entries and their descriptors may exist after each reading (the gone ones'
+			// are let go before the new ones are read: 3 each fit the budget).
 			testing.expect_value(t, len(pr.kept), 50)
-			testing.expect_value(t, len(pr.io_denied), 8)
-			testing.expectf(t, pr.kept_fds <= 142, "kept_fds leaked: got %d", pr.kept_fds)
+			testing.expect_value(t, pr.kept_fds, kept_held(&pr))
+			testing.expect_value(t, pr.kept_fds, 50 * 3 - (denied ? 8 : 0))
+			if denied { testing.expect_value(t, len(pr.io_denied), 8) }
 			if round == 3 { mem_at_3 = int(track.current_memory_allocated) }
 		}
 		// Clean up the final round's short-lived processes and read once more: only the 10 steady processes remain.
@@ -674,6 +686,7 @@ synthetic_proc_churn_bounds_fds_and_memory :: proc(t: ^testing.T) {
 		testing.expect_value(t, len(pr.kept), 10)
 		testing.expect_value(t, len(pr.io_denied), 0)
 		testing.expect_value(t, pr.kept_fds, 30)
+		if !denied { log.info("root reads a file of mode 000: the denial of io is not tested") }
 		mem_at_end := int(track.current_memory_allocated)
 		testing.expectf(t, mem_at_end <= mem_at_3 + 32 * 1024, "live memory grew under /proc churn: round3=%d end=%d", mem_at_3, mem_at_end)
 	}
