@@ -3,8 +3,10 @@ name: Release
 # A version tag vX.Y.Z (inspecteurtool ship makes it) builds inspecteur and publishes it: the Linux and Windows
 # archives, each with its SHA-256, the programs alone and their update manifests signed by the secret UPDATE_SIGNING_KEY
 # (what installed copies update themselves from), on a GitHub release whose notes are the changelog's section of that
-# version. The Linux job creates the release as a draft; the Windows job adds its files and publishes it. The tag must
-# match APP_VERSION (inspecteurtool package checks).
+# version. The Linux job creates the release as a draft; the Windows job builds and tests every time, and adds its files
+# only when the repository variable WINDOWS_RELEASE is "true" (set once the Windows program was tried by hand:
+# gh variable set WINDOWS_RELEASE --body true); the last job publishes the release. The tag must match APP_VERSION
+# (inspecteurtool package checks).
 on:
   push:
     tags: ['v*']
@@ -79,13 +81,23 @@ jobs:
           build/inspecteurtool.exe package ${{ github.ref_name }}
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
-      - name: Publish
+      - name: Upload
+        if: vars.WINDOWS_RELEASE == 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "${{ github.ref_name }}" (Get-ChildItem build/dist/*).FullName --clobber
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          # (public once both systems' files are there: an installed copy that checks finds its manifest)
-          gh release edit "${{ github.ref_name }}" --draft=false --latest
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+  # (public once every system's files are there: an installed copy that checks finds its manifest; a Windows build that
+  # fails its tests keeps the release a draft, as before)
+  publish:
+    needs: [release, windows]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release edit "${{ github.ref_name }}" --draft=false --latest
