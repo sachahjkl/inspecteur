@@ -3,6 +3,14 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.28.0] - 2026-11-26 06:30
+
+### Added
+- **Inspecteur runs on Windows 10 and 11**: the processes with Windows' own columns and Efficiency mode, the performance, the services and the Event Log, the startup items as Task Manager keeps them, the connections, the Properties (handles, modules, wait chains, security) and dump files. It refuses to end a critical or protected process, and never asks for an administrator's rights by itself.
+
+### Changed
+- **Less CPU at rest on Linux**: reading the processes takes about a fifth of the CPU time it took, and the window makes one frame per sample instead of three. What each process uses of the GPUs is asked only while a GPU column or the Properties show it. Memory stays flat when thousands of short processes come and go.
+
 ## [0.27.0] - 2026-11-21 18:50
 
 ### Changed
@@ -404,6 +412,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.28.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.28.0
 [0.27.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.27.0
 [0.26.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.26.0
 [0.25.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.25.1
