@@ -11,6 +11,14 @@ import "core:strconv"
 import "core:strings"
 import "core:unicode/utf16"
 
+// A buffer for a system call: its start aligned to 16. A slice of bytes asks its allocator for an alignment of 1, and an
+// allocator may give just that (the test runner's Rollback_Stack does): the kernel then answers
+// STATUS_DATATYPE_MISALIGNMENT, or an error that is no list.
+aligned_bytes :: proc(n: int, allocator := context.allocator) -> []u8 {
+	b, _ := mem.make_aligned([]u8, n, 16, allocator)
+	return b
+}
+
 // Grows an NT query buffer safely while respecting the kernel's hint and a hard cap.
 next_buffer_size :: proc(current: int, needed: u32, max_bytes := MAX_NT_BUFFER_BYTES) -> (next: int, ok: bool) {
 	if current < 0 || max_bytes <= 0 { return 0, false }

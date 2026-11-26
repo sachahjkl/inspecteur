@@ -240,6 +240,22 @@ win_child_acts_and_minidump :: proc(t: ^testing.T) {
 		sig, was, guarded, res, err, refusal, _ := win_act_suspend_toggle(pid, start, .None)
 		testing.expectf(t, res == .Done && sig == want && !guarded, "toggle: %v, wanted %v; it was %v; %v, error 0x%08X, %v", sig, want, was, res, u32(err), refusal)
 	}
+	// The reading, again and again, by each of its readers, with allocations of odd sizes between (they moved the next
+	// buffer to an address the kernel refuses).
+	for i in 0 ..< 200 {
+		odd := make([]u8, 1 + i % 15)
+		defer delete(odd)
+		q: Win_Nt_Query
+		buf := make([]u8, 1 + i % 7)   // (too small and misaligned: the query must replace it)
+		ok := win_query_system_processes(&buf, &q)
+		delete(buf)
+		if !testing.expectf(t, ok, "try %d: %s", i, win_nt_query_text(q)) { break }
+		s, raw := win_suspension(child_pid, child_start)
+		if !testing.expectf(t, s == .Runs, "try %d: %v; %s", i, s, raw) { break }
+		procs := make([dynamic]Proc_Counters, context.temp_allocator)
+		procs_read(&reader, &procs)
+		if !testing.expectf(t, len(procs) > 0 && procs_read_problem(&reader) == "", "try %d: %d processes; %s", i, len(procs), procs_read_problem(&reader)) { break }
+	}
 	look(t, &reader, child_pid, child_start, "before", .Runs)
 	toggle(t, child_pid, child_start, .Stop)
 	look(t, &reader, child_pid, child_start, "suspended", .Suspended)

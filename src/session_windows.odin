@@ -16,7 +16,7 @@ display_server_pid :: proc() -> i32 {
 	if d.ProcessIdToSessionId != nil {
 		_ = d.ProcessIdToSessionId(win.GetCurrentProcessId(), &my_session)
 	}
-	buf := make([]u8, 256 * 1024)
+	buf := win_bytes(256 * 1024, context.allocator)
 	defer delete(buf)
 	for attempt in 0 ..< 8 {
 		ret: u32
@@ -37,7 +37,7 @@ display_server_pid :: proc() -> i32 {
 		next, ok := winapi.next_buffer_size(len(buf), ret)
 		if !ok { return 0 }
 		delete(buf)
-		buf = make([]u8, next)
+		buf = win_bytes(next, context.allocator)
 		_ = attempt
 	}
 	return 0

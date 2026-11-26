@@ -454,7 +454,7 @@ win_proc_security :: proc(pid: i32, start: u64, d: ^Props_Data, a: mem.Allocator
 // Threads + Windows Wait Chain Traversal (WCT)
 
 win_proc_threads :: proc(pid: i32, start: u64, out: ^[dynamic]Win_Thread_Row, has_deadlock: ^bool, a: mem.Allocator) -> Read_State {
-	buf := make([]u8, 256 * 1024)
+	buf := win_bytes(256 * 1024, context.allocator)
 	defer delete(buf)
 	if !win_query_system_processes(&buf) { return .Denied }
 	decoded := make([dynamic]winapi.Decoded_Process, 0, 256, context.temp_allocator)
@@ -672,7 +672,7 @@ win_proc_handles :: proc(pid: i32, start: u64, out: ^[dynamic]Win_Handle_Row, to
 	if res != .Done || h == nil { return .Denied }
 	defer win.CloseHandle(h)
 
-	buf := make([]u8, 4 * 1024 * 1024)
+	buf := win_bytes(4 * 1024 * 1024, context.allocator)
 	defer delete(buf)
 	ok := false
 	for _ in 0 ..< 6 {
@@ -683,7 +683,7 @@ win_proc_handles :: proc(pid: i32, start: u64, out: ^[dynamic]Win_Handle_Row, to
 		next, gok := winapi.next_buffer_size(len(buf), ret)
 		if !gok { break }
 		delete(buf)
-		buf = make([]u8, next)
+		buf = win_bytes(next, context.allocator)
 	}
 	if !ok { return .Denied }
 

@@ -37,6 +37,7 @@ Reading :: struct {
 	arena:     virtual.Arena,
 	ask:       Sample_Ask,
 	failed:    bool,              // the processes cannot be read (/proc)
+	problem:   string,            // this reading's processes could not be read: why (the last list is kept)
 	now_ns:    i64,               // when it was read (monotonic)
 	themes_stamp: i64,            // when the user's themes file changed (ns; 0: there is none)
 	took:      time.Duration,     // what reading it cost
@@ -150,7 +151,8 @@ sample_take :: proc(app: ^App) {
 	if r.failed && app.sampler.samples == 0 { say(app, i18n.tr(PROCS_READ_FAILED)) }
 	reading_keep(app, r)
 	machine_apply(&app.machine, r)
-	sampler_apply(&app.sampler, r, app.machine.d_total_ns, &app.catalog)
+	// (a list that could not be read is not a list without processes: they would all end)
+	if r.problem != "" { say(app, "%s: %s", i18n.tr(PROCS_READ_FAILED), r.problem) } else { sampler_apply(&app.sampler, r, app.machine.d_total_ns, &app.catalog) }
 	if gpu, has_gpu := gpu_procs(&app.machine); has_gpu {
 		app.had_gpu_procs = true
 		for &p in app.sampler.procs {
@@ -278,8 +280,12 @@ reading_make :: proc(s: ^Sampling, r: ^Reading, ask: Sample_Ask, now_ns: i64) {
 		r.facts[i] = s.demo != nil ? demo_proc_facts(s.demo, c) : proc_facts(&s.procs, c)
 		r.facts[i].read = true
 	}
-	clear(&s.seen)
-	for c in r.procs { s.seen[c.pid] = c.start }
+	r.problem = procs_read_problem(&s.procs)
+	// (a reading that failed has no processes: the next one must not read them all as new)
+	if r.problem == "" {
+		clear(&s.seen)
+		for c in r.procs { s.seen[c.pid] = c.start }
+	}
 	reading_windows_read(&r.windows, s.demo != nil)
 }
 

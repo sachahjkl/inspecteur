@@ -11,6 +11,9 @@ proc_reader_init :: proc(r: ^Proc_Reader) -> bool { return false }
 
 proc_reader_destroy :: proc(r: ^Proc_Reader) { r^ = {} }
 
+// "" when the last reading of the processes was read; else why not (Windows: a query can fail and be said).
+procs_read_problem :: proc(r: ^Proc_Reader) -> string { return "" }
+
 procs_read :: proc(r: ^Proc_Reader, out: ^[dynamic]Proc_Counters) {}
 
 proc_facts :: proc(r: ^Proc_Reader, c: Proc_Counters) -> (f: Proc_Facts) { return }

@@ -72,8 +72,7 @@ win_system_library :: proc(name: cstring16) -> win.HMODULE {
 // A buffer for a system call. Its start is aligned: the kernel refuses an unaligned one (STATUS_DATATYPE_MISALIGNMENT),
 // and a slice of bytes has an alignment of 1.
 win_bytes :: proc(n: int, allocator := context.temp_allocator) -> []u8 {
-	b, _ := mem.make_aligned([]u8, n, 16, allocator)
-	return b
+	return winapi.aligned_bytes(n, allocator)
 }
 
 Win_Dyn_Procs :: struct {
@@ -353,9 +352,10 @@ win_thread_suspend_count :: proc(pid, tid: i32) -> (count: u32, gone, ok: bool, 
 // Whether the process is suspended, now, by its threads' counts. The caller holds a verified handle on it when it acts on
 // the answer. `raw` (temporary): each thread's state, wait reason and count, or why it was not read.
 win_suspension :: proc(pid: i32, start: u64) -> (s: winapi.Suspension, raw: string) {
-	buf := make([]u8, 256 * 1024)
+	buf := win_bytes(256 * 1024, context.allocator)
 	defer delete(buf)
-	if !win_query_system_processes(&buf) { return .Unknown, "no processes" }
+	q: Win_Nt_Query
+	if !win_query_system_processes(&buf, &q) { return .Unknown, fmt.tprintf("the processes cannot be read: %s", win_nt_query_text(q)) }
 	decoded := make([dynamic]winapi.Decoded_Process, 0, 256, context.temp_allocator)
 	if !winapi.decode_system_processes(buf, u64(uintptr(raw_data(buf))), &decoded, want_threads = true) { return .Unknown, "not decoded" }
 	for dp in decoded {
@@ -462,7 +462,7 @@ win_reg_read_binary :: proc(root: win.HKEY, subkey, value_name: string, wow64_fl
 	size: win.DWORD
 	if win.RegGetValueW(hk, nil, vn, RRF_RT_ANY, &typ, nil, &size) != 0 || size == 0 { return nil, false }
 	if typ != win.REG_BINARY { return nil, false }
-	buf := make([]u8, int(size), allocator)
+	buf := win_bytes(int(size), allocator)
 	if win.RegGetValueW(hk, nil, vn, RRF_RT_ANY, &typ, &buf[0], &size) != 0 { return nil, false }
 	return buf[:min(int(size), len(buf))], true
 }

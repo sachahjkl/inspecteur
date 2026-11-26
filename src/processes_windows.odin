@@ -98,6 +98,7 @@ proc_has_service :: proc(p: ^Proc) -> bool {
 // Reused reader state owned solely by the sampling job thread.
 Proc_Reader :: struct {
 	buf:          []u8,                 // reused growing buffer for SystemProcessInformation
+	query:        Win_Nt_Query,         // what its last query answered
 	sid_cache:    map[string]string,    // binary SID key -> owned "DOMAIN\User"
 	svc_by_pid:   map[i32]string,       // PID -> owned comma-separated SCM service names
 	suspended:    map[i32]u64,          // pid -> start: those known as suspended, checked at each reading
@@ -110,7 +111,7 @@ Proc_Reader :: struct {
 
 proc_reader_init :: proc(r: ^Proc_Reader) -> bool {
 	if win_dyn().NtQuerySystemInformation == nil { return false }
-	r.buf = make([]u8, 256 * 1024)
+	r.buf = win_bytes(256 * 1024, context.allocator)
 	r.sid_cache = make(map[string]string, 64)
 	r.svc_by_pid = make(map[i32]string, 64)
 	return true
@@ -126,37 +127,54 @@ proc_reader_destroy :: proc(r: ^Proc_Reader) {
 	r^ = {}
 }
 
-// Queries SystemProcessInformation into `buf` (growing as needed).
-win_query_system_processes :: proc(buf: ^[]u8) -> bool {
+// What the last query answered: its NTSTATUS, the bytes it was given, those it said it needs, the tries.
+Win_Nt_Query :: struct { status, given, needed: u32, tries: int }
+
+win_nt_query_text :: proc(q: Win_Nt_Query) -> string {
+	return fmt.tprintf("NTSTATUS 0x%08X, %d bytes given, %d needed, %d tries", q.status, q.given, q.needed, q.tries)
+}
+
+// Queries SystemProcessInformation into `buf` (growing as needed; context.allocator's). A buffer too small is answered
+// with STATUS_INFO_LENGTH_MISMATCH, or STATUS_BUFFER_TOO_SMALL on some builds: both grow it.
+win_query_system_processes :: proc(buf: ^[]u8, q: ^Win_Nt_Query = nil) -> bool {
 	d := win_dyn()
-	if d.NtQuerySystemInformation == nil { return false }
-	if len(buf^) < 64 * 1024 {
+	local: Win_Nt_Query
+	q := q != nil ? q : &local
+	q^ = {}
+	if d.NtQuerySystemInformation == nil { q.status = 0xC0000002; return false }   // (STATUS_NOT_IMPLEMENTED)
+	if len(buf^) < 64 * 1024 || uintptr(raw_data(buf^)) % 16 != 0 {
 		delete(buf^)
-		buf^ = make([]u8, 256 * 1024)
+		buf^ = win_bytes(256 * 1024, context.allocator)
 	}
-	for attempt in 0 ..< 8 {
-		ret: u32
-		st := d.NtQuerySystemInformation(WIN_NT_SYSTEM_PROCESS_INFO, raw_data(buf^), u32(len(buf^)), &ret)
-		if st == winapi.STATUS_SUCCESS { return true }
-		if st != winapi.STATUS_INFO_LENGTH_MISMATCH { return false }
-		next, ok := winapi.next_buffer_size(len(buf^), ret)
+	for q.tries < 8 {
+		q.tries += 1
+		q.given, q.needed = u32(len(buf^)), 0
+		q.status = d.NtQuerySystemInformation(WIN_NT_SYSTEM_PROCESS_INFO, raw_data(buf^), q.given, &q.needed)
+		if q.status == winapi.STATUS_SUCCESS { return true }
+		if q.status != winapi.STATUS_INFO_LENGTH_MISMATCH && q.status != winapi.STATUS_BUFFER_TOO_SMALL { return false }
+		next, ok := winapi.next_buffer_size(len(buf^), q.needed)
 		if !ok { return false }
 		delete(buf^)
-		buf^ = make([]u8, next)
-		_ = attempt
+		buf^ = win_bytes(next, context.allocator)
 	}
 	return false
 }
 
+// "" when the last reading of the processes was read; else why not (the window says it, and keeps the last list).
+procs_read_problem :: proc(r: ^Proc_Reader) -> string {
+	if r.query.status == winapi.STATUS_SUCCESS { return "" }
+	return win_nt_query_text(r.query)
+}
+
 procs_read :: proc(r: ^Proc_Reader, out: ^[dynamic]Proc_Counters) {
-	if !win_query_system_processes(&r.buf) { return }
+	if !win_query_system_processes(&r.buf, &r.query) { return }
 	if r.svc_ticks % SVC_MAP_EVERY == 0 {
 		win_refresh_service_pid_map(&r.svc_by_pid)
 	}
 	r.svc_ticks += 1
 
 	decoded := make([dynamic]winapi.Decoded_Process, 0, 256, context.temp_allocator)
-	if !winapi.decode_system_processes(r.buf, u64(uintptr(raw_data(r.buf))), &decoded) { return }
+	if !winapi.decode_system_processes(r.buf, u64(uintptr(raw_data(r.buf))), &decoded) { r.query.status = winapi.STATUS_DATA_ERROR; return }
 
 	created := make(map[i32]u64, len(decoded), context.temp_allocator)
 	for dp in decoded { created[dp.pid] = dp.create_time }

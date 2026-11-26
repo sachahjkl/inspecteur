@@ -50,7 +50,7 @@ sockets_read :: proc(r: ^Socket_Reader, out: ^[dynamic]Socket) {
 	if ip.GetExtendedTcpTable == nil && ip.GetExtendedUdpTable == nil { return }
 	if len(r.buf) < 64 * 1024 {
 		delete(r.buf)
-		r.buf = make([]u8, 64 * 1024)
+		r.buf = win_bytes(64 * 1024, context.allocator)
 	}
 
 	// Build PID -> creation time map in one kernel call so every Socket carries verified (pid, start).
@@ -109,7 +109,7 @@ query_tcp_table :: proc(ip: ^Win_Ip_Procs, buf: ^[]u8, af: u32) -> ([]u8, bool) 
 		next, ok := winapi.next_buffer_size(len(buf^), u32(sz))
 		if !ok { return nil, false }
 		delete(buf^)
-		buf^ = make([]u8, next)
+		buf^ = win_bytes(next, context.allocator)
 	}
 	return nil, false
 }
@@ -124,7 +124,7 @@ query_udp_table :: proc(ip: ^Win_Ip_Procs, buf: ^[]u8, af: u32) -> ([]u8, bool) 
 		next, ok := winapi.next_buffer_size(len(buf^), u32(sz))
 		if !ok { return nil, false }
 		delete(buf^)
-		buf^ = make([]u8, next)
+		buf^ = win_bytes(next, context.allocator)
 	}
 	return nil, false
 }

@@ -281,6 +281,9 @@ drain_exited_kthreads :: proc(r: ^Proc_Reader) {
 }
 
 // Every process now, sorted by pid (its `comm` in the temporary allocator).
+// "" when the last reading of the processes was read; else why not (Windows: a query can fail and be said).
+procs_read_problem :: proc(r: ^Proc_Reader) -> string { return "" }
+
 procs_read :: proc(r: ^Proc_Reader, out: ^[dynamic]Proc_Counters) {
 	r.readings += 1
 	r.stats = {}

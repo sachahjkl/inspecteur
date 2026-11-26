@@ -16,6 +16,26 @@ utf16le_bytes :: proc(s: string, nul := true, allocator := context.temp_allocato
 	return out
 }
 
+// The allocator of a test (the runner's Rollback_Stack) gives a slice of bytes at any address: the reads of the processes
+// failed now and then, after an allocation of an odd size. aligned_bytes never does.
+@(test)
+a_buffer_for_the_kernel_is_aligned_whatever_the_allocator :: proc(t: ^testing.T) {
+	stack: mem.Rollback_Stack
+	if !testing.expect(t, mem.rollback_stack_init(&stack, 1 << 20) == nil) { return }
+	defer mem.rollback_stack_destroy(&stack)
+	a := mem.rollback_stack_allocator(&stack)
+	misaligned := 0
+	for odd in 1 ..< 16 {
+		_, _ = make([]u8, odd, a)
+		plain := make([]u8, 4096, a)
+		if uintptr(raw_data(plain)) % 4 != 0 { misaligned += 1 }
+		b := aligned_bytes(256 * 1024, a)
+		testing.expectf(t, len(b) == 256 * 1024 && uintptr(raw_data(b)) % 16 == 0, "after %d bytes: %p", odd, raw_data(b))
+	}
+	// (the cause: without its alignment, a byte slice lands where the last allocation ended)
+	testing.expectf(t, misaligned > 0, "a plain slice of bytes was always aligned (%d times misaligned)", misaligned)
+}
+
 @(test)
 buffer_growth_is_bounded_and_adds_headroom :: proc(t: ^testing.T) {
 	n, ok := next_buffer_size(64 * 1024, 0)

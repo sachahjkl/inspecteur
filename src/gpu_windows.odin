@@ -183,7 +183,7 @@ pdh_init :: proc(p: ^Pdh_State) {
 	_ = p.add_counter(p.query, raw_data(win.utf8_to_utf16("\\GPU Engine(*)\\Utilization Percentage", context.temp_allocator)), 0, &p.eng_counter)
 	_ = p.add_counter(p.query, raw_data(win.utf8_to_utf16("\\GPU Adapter Memory(*)\\Dedicated Usage", context.temp_allocator)), 0, &p.mem_counter)
 	_ = p.add_counter(p.query, raw_data(win.utf8_to_utf16("\\GPU Process Memory(*)\\Dedicated Usage", context.temp_allocator)), 0, &p.proc_counter)
-	p.buf = make([]u8, 64 * 1024)
+	p.buf = win_bytes(64 * 1024, context.allocator)
 	p.ok = p.eng_counter != nil || p.mem_counter != nil || p.proc_counter != nil
 }
 
@@ -202,7 +202,7 @@ pdh_read_array :: proc(p: ^Pdh_State, counter: rawptr) -> []Pdh_Fmt_Countervalue
 		next, ok := winapi.next_buffer_size(len(p.buf), sz)
 		if !ok { return nil }
 		delete(p.buf)
-		p.buf = make([]u8, next)
+		p.buf = win_bytes(next, context.allocator)
 	}
 	return nil
 }
