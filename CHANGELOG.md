@@ -3,6 +3,12 @@
 All notable changes to inspecteur are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the versions follow [semantic versioning](https://semver.org/).
 
+## [0.29.0] - 2026-11-26 10:41
+
+### Added
+- **In place of Task Manager on Windows**: the install offers to open Ctrl+Shift+Esc, the taskbar's Task Manager and Ctrl+Alt+Del's Task Manager with Inspecteur. Windows asks for an administrator, because the change is the same for every account; unticked or uninstalled, Task Manager comes back as it was. The copy that Task Manager starts for every account opens your own install; when it runs as administrator it installs, updates and opens nothing, and its title says so.
+- **Inspecteur on the PATH**: the install offers to put Inspecteur on the PATH (on Windows with its console launcher), so `inspecteur --status` works in a terminal.
+
 ## [0.28.1] - 2026-11-26 06:54
 
 ### Fixed
@@ -417,6 +423,7 @@ The command line is `--install`, `--uninstall`, `--status` and `--setup`, as in 
 - **Themes**: every theme of gui_toolkit, light or dark (Ctrl+Shift+L).
 - `inspecteur --demo`: a made-up machine in place of the real one: the pictures of the documentation are made with it.
 - `inspecteur prefs` lists every preference; `--pref name=value` sets one for a run (`docs/configuration.md`).
+[0.29.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.29.0
 [0.28.1]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.28.1
 [0.28.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.28.0
 [0.27.0]: https://github.com/sachahjkl/inspecteur/releases/tag/v0.27.0
