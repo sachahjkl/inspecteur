@@ -50,10 +50,9 @@ main :: proc() {
 }
 
 run :: proc(given_args: []string) -> cli.Exit {
-	// (Windows starts Inspecteur in place of Task Manager with taskmgr's path and options: the plain start, or the
-	// person's own installed copy when this is the machine's copy, which then ends; src/md/features/install.md)
-	all_args, handed_off := setup.task_manager_start(setup_options(), given_args)
-	if handed_off { return .Done }
+	// (Windows starts Inspecteur in place of Task Manager with taskmgr's path and options: the plain start of the
+	// install for everyone, which Task Manager's Debugger runs; src/md/features/install.md)
+	all_args := setup.task_manager_start(given_args)
 	_, from_task_manager := setup.task_manager_arguments(given_args)
 	// (once, before anything reads the folders: the preferences just below, the log, the licence, the views' memory;
 	// no log is open yet, so a problem goes to stderr)

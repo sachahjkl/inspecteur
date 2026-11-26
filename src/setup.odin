@@ -13,8 +13,8 @@ package inspecteur
 //   inspecteur --status      what is installed, and whether Inspecteur runs (exit 0 installed, 2 to repair, 1 not)
 //   inspecteur --setup       the window, the install's dialog open
 //
-// On Windows the install offers Inspecteur in place of Task Manager (src/md/features/install.md): Windows then starts
-// its machine copy with taskmgr's path, which hands over to the person's install (main.odin, setup.task_manager_start).
+// On Windows an install for everyone offers Inspecteur in place of Task Manager (src/md/features/install.md): Windows
+// then starts that install with taskmgr's path (main.odin, setup.task_manager_start).
 
 import "core:os"
 import desktop "gt:desktop"
